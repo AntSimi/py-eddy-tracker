@@ -468,18 +468,6 @@ class AVISO_grid (py_eddy_tracker):
         by Evan Mason
         Changed to gv2, 14 May 07...
         '''
-        #def gv2(zeta, gof, pm, pn, umask, vmask): # Pierrick's version
-            #ugv = np.copy(vmask)
-            #ugv *= (zeta[1:] - zeta[:-1])
-            #ugv *= self.half_interp(pn[1:], pn[:-1])
-            #ugv = self.v2rho_2d(ugv)
-            #ugv *= -gof
-            #vgv = np.copy(umask)
-            #vgv *= (zeta[:,1:] - zeta[:,:-1])
-            #vgv *= self.half_interp(pm[:,1:], pm[:,:-1])
-            #vgv = self.u2rho_2d(vgv)
-            #vgv *= gof
-            #return ugv, vgv
         def gv2(zeta, gof, pm, pn, umask, vmask): # Pierrick's version
             ugv = -gof * self.v2rho_2d(vmask * (zeta[1:] - zeta[:-1]) \
                                         * 0.5 * (pn[1:] + pn[:-1]))
@@ -640,77 +628,16 @@ if __name__ == '__main__':
     AVISO_files = 'dt_ref_global_merged_msla_h_qd_????????_*.nc'
     
     # Set date range (YYYYMMDD)
-    #date_str, date_end = 19921014, 20110119 # Chelton 2011
-    #date_str, date_end = 19921014, 20120404 # Chelton 2011 (updated)
-    #date_str, date_end = 20000105, 20001227 # timing experiment
-    #date_str, date_end = 19960828, 20120404 # test_gauss_sla.y
-    date_str, date_end = 19980107, 19991110 # Pablo experiment
+    date_str, date_end = 19980107, 19991110 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
-    #diag_type = 'Q'
+    #diag_type = 'Q' <<< not implemented in 1.0.1
     diag_type = 'sla'
     
     days_btwn_recs = 7.
     
     # Path to directory where outputs are to be saved...
-    root_save_dir = '/home/emason/mercurial_projects/eddy_tracker/test/AVISO/'
-
     #savedir = directory
-    #savedir = '/atl_domain/median_ug/'
-    #savedir = '/atl_domain/mean_ug/'
-    #savedir = '/atl_domain/mean_ug/with_copy/'
-    #savedir = '/atl_domain/mean_ug/with_copy/fixed_uavg/'
-    #savedir = '/atl_domain/mean_ug/with_copy/fixed_uavg/sep_dist_s/'
-    #savedir = '/atl_domain/mean_ug/with_copy/fixed_uavg/eddy_radius_s_lims/'
-    #savedir = '/atl_domain/mean_ug/with_copy/fixed_uavg/both_eddy_radius_s+e_lims/'
-    #savedir = '/atl_domain/new_h0/'
-    #savedir = '/atl_domain/new_h0/half_leff_limit/'
-    #savedir = '/atl_domain/new_h0/half_leff_limit_0.7/'
-    #savedir = '/atl_domain/new_h0/ls_50km/'
-    #savedir = '/atl_domain/new_h0/no_pixel_thresh/'
-    #savedir = '/atl_domain/new_h0/spd_pixel_thresh/'
-    #savedir = '/atl_domain/new_h0/spd_pixel_thresh/half_cm_int/'
-    #savedir = '/atl_domain/new_h0/spd_pixel_thresh/no_rad_thresh/'
-    #savedir = '/atl_domain/new_h0/spd_pixel_thresh/no_rad_thresh/resample_cont/'
-    #savedir = '/atl_domain/new_h0/spd_pixel_thresh/no_rad_thresh/resample_cont/linear_h0/'
-    #savedir = '/atl_domain/contains_point_eff/dist_thresh/median_copy/'
-    #savedir = '/atl_domain/contains_point_eff/dist_thresh/mean_copy/'
-    #savedir = '/atl_domain/'
-    #savedir = '/atl_domain/shp55/'
-    #savedir = '/atl_domain/shp55/single_extrema/'
-    #savedir = '/atl_domain/shp55/single_extrema/chelton_ellipse/'
-    #savedir = '/atl_domain/shp55/single_extrema/chelton_ellipse/center_local/'
-    #savedir = '/atl_domain/shp55/single_extrema/chelton_ellipse/center_local/haversine/'
-    #savedir = '/atl_domain/shp55/single_extrema/chelton_ellipse/center_local/shape_test_100/'
-    #savedir = '/atl_domain/shp55/single_extrema/chelton_ellipse/center_local/unlimited_locals/'
-    #savedir = '/atl_domain/shp55/single_extrema/chelton_ellipse/center_local/shape_test_100_unlimited_locals/'
-    
-    
-    #savedir = '/can_domain/new_h0/spd_pixel_thresh/with_rad_thresh/'
-    #savedir = '/can_domain/new_h0/spd_pixel_thresh/no_rad_thresh/'
-    #savedir = '/can_domain/new_h0/spd_pixel_thresh/no_rad_thresh/evolve_5/'
-    #savedir = '/can_domain/contains_point_eff/'
-    #savedir = '/can_domain/contains_point_eff/dist_thresh/'
-    #savedir = '/can_domain/contains_point_eff/dist_thresh/shp_err_40/'
-    #savedir = '/can_domain/contains_point_eff/dist_thresh/shp_err_60/'
-    #savedir = '/can_domain/contains_point_eff/dist_thresh/median_copy/'
-    #savedir = '/can_domain/'
-    
-    #savedir = root_save_dir + savedir
-    
-    #savedir = '/shared/emason/eddy_tracks/Barbara/'
-    #savedir = '/shared/emason/eddy_tracks/Charlotte/'
-    #savedir = '/shared/emason/eddy_tracks/Souza/'
-    #savedir = '/home/emason/mercurial_projects/eddy_tracker/tracks/Souza/'
-    #savedir = '/home/emason/mercurial_projects/eddy_tracker/tracks/Barbara/'
-    savedir = '/shared/emason/eddy_tracks/test/'
-    #savedir = '/shared/emason/eddy_tracks/test/cent_s/'
-    #savedir = '/shared/emason/eddy_tracks/test/cent_s/bigger_ellipse/'
-    #savedir = '/shared/emason/eddy_tracks/global/'
-    
-    #savedir = '/home/emason/mercurial_projects/eddy_tracker/test/AVISO/no_shape_test/canary/'
-    #savedir = '/home/emason/mercurial_projects/eddy_tracker/test/AVISO/no_shape_test/canary/unlim_locals/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp_with_development_code/'
     savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
     
     
@@ -796,46 +723,17 @@ if __name__ == '__main__':
     #lonmax = -5.5
     #latmin = 11.5
     #latmax = 38.5
-    
-    #lonmin = -359.     # Global
-    #lonmax = -1
-    #latmin = -50.
-    #latmax = 50.
 
-    #lonmin = -179.     # Southern hemisphere
-    #lonmax = 179
-    #latmin = -60.
-    #latmax = -0.5
-
-    #lonmin = -30     # small test domain
-    #lonmax = -12.5
-    #latmin = 28.25
-    #latmax = 34.25
-
-    #lonmin = -145.     # Jaison
-    #lonmax = -115
-    #latmin = 25.
-    #latmax = 45.
-
-    #lonmin = -179.     # Barbara
+    #lonmin = -179.     # SEP
     #lonmax = -65
     #latmin = -40.
     #latmax = -5.
-    
-    #lonmin = 0.5     # Charlotte
-    #lonmax = 51.
-    #latmin = -47.
-    #latmax = -24.
     
     #lonmin = -70.     # Souza
     #lonmax = 30.
     #latmin = -50.
     #latmax = -15.
-    
-    #lonmin = -10     # Test wrapping
-    #lonmax = 25.
-    #latmin = -47.
-    #latmax = -24.
+
     
     
     # Typical parameters
