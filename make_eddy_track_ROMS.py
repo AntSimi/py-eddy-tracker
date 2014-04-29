@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_ROMS.py
 
-Version 1.0.1
+Version 1.1.0
 
 
 
@@ -281,7 +281,7 @@ if __name__ == '__main__':
 
     Mx, My = M(grd.lon()[jstr:jend,istr:iend],
                grd.lat()[jstr:jend,istr:iend])
-    pMx, pMy = pcol_2dxy(Mx, My)
+    #pMx, pMy = pcol_2dxy(Mx, My)
 
     # Get Rossby wave speed data
     rwv = eddy_tracker.rossby_wave_speeds(rw_path)

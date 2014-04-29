@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 1.0.1
+Version 1.1.0
 ===========================================================================
 
 
@@ -51,6 +51,16 @@ import make_eddy_tracker_list_obj as eddy_tracker
 #import roms_grid as rg
 import haversine_distmat as hav # needs compiling with f2py
 
+
+def datestr2datetime(datestr):
+    '''
+    Take strings with format YYYYMMDD and convert to datetime instance
+    '''
+    assert len(datestr) == 8, "'datestr' must have length 8"
+    assert datestr[0] in ('1', '2'), "first character of 'datestr' should be '1' or '2'"
+    return dt.datetime.datetime(np.int(datestr[:4]),
+                                np.int(datestr[4:6]),
+                                np.int(datestr[6:]))
 
 
 def gaussian_resolution(res, zwl, mwl):

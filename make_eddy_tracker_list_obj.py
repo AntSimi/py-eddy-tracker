@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 1.0.1
+Version 1.1.0
 
 
 ===========================================================================
@@ -34,8 +34,8 @@ Version 1.0.1
 """
 
 import haversine_distmat as hav # needs compiling with f2py
-from make_eddy_track import *
-
+#from make_eddy_track import *
+from py_eddy_tracker_classes import *
 
 def haversine_distance_vector(lon1, lat1, lon2, lat2):
     '''

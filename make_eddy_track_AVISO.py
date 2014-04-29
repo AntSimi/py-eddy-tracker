@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 1.0.1
+Version 1.1.0
 
 
 Scroll down to line ~630 to get started
@@ -33,7 +33,9 @@ Scroll down to line ~630 to get started
 
 
 import glob as glob
+#import matplotlib.pyplot as plt
 from py_eddy_tracker_classes import *
+from make_eddy_tracker_list_obj import *
 
 
 class py_eddy_tracker (object):
@@ -634,7 +636,6 @@ if __name__ == '__main__':
     #diag_type = 'Q' <<< not implemented in 1.0.1
     diag_type = 'sla'
     
-    days_btwn_recs = 7.
     
     # Path to directory where outputs are to be saved...
     #savedir = directory
@@ -646,13 +647,8 @@ if __name__ == '__main__':
     
     print '\nOutputs saved to', savedir
     
+    days_btwn_recs = 7.
     
-
-    
-    
-    
-    
-
     
     
     # Reference Julian day (Julian date at Jan 1, 1992)
@@ -660,6 +656,7 @@ if __name__ == '__main__':
 
     # Min and max permitted eddy radii [m]
     if 'Q' in diag_type:
+        Exception # Not implemented
         radmin = 15000.
         radmax = 250000.
         ampmin = 0.02
@@ -673,11 +670,9 @@ if __name__ == '__main__':
 
     
     # Obtain this file from:
-    #  http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
+    # http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
     rw_path = '/home/emason/data_tmp/chelton_eddies/rossrad.dat'
-        
-    # Option to track using speed-based radius or effective radius
-    #track_with_speed = True
+
     
     # Make figures for animations
     anim_figs = True
@@ -685,13 +680,12 @@ if __name__ == '__main__':
 
     # Define contours
     if 'Q' in diag_type:
-        # Set Q contours
+        # Set Q contour spacing 
         qparameter = np.linspace(0, 5*10**-11, 25)
     elif 'sla' in diag_type:
-        # Units, cm; for anticyclones use -50 to 50
-        #slaparameter = np.arange(-100., 100.5, 0.5)
-        slaparameter = np.arange(-100., 101., 1.0)
-        #slaparameter = np.arange(-50., 51., 1.)
+        # Set SLA contour spacing
+        slaparameter = np.arange(-100., 101., 1.0) # cm
+
     
     
     # Apply a filter to the Q parameter
@@ -737,7 +731,7 @@ if __name__ == '__main__':
     
     
     # Typical parameters
-    dist0 = 25000. # m separation distance after ~7 days (see Chelton2011 fig 22)
+    dist0 = 25000. # m separation distance after ~7 days (see CSS11 fig 22)
     if 'Q' in diag_type:
         amp0 = 0.02 # vort/f
     elif 'sla' in diag_type:
@@ -754,22 +748,20 @@ if __name__ == '__main__':
     evolve_armax = 5  # max change in area
     
     
-    separation_method = 'ellipse' # see Chelton etal (2011)
+    separation_method = 'ellipse' # see CSS11
     #separation_method = 'sum_radii' # see Kurian etal (2011)
     
-    if 'sum_radii' in separation_method:
-        # Separation distance factor. Adjust according to number of days between records
-        # For 7 days, Chelton uses 150 km search ellipse
-        # So, given typical eddy radius of r=50 km, 1.5 * (r1 + r2) = 150 km.
-        #sep_dist_fac = 1.0
-        sep_dist_fac = 1.15 # Seems ok for AVISO 7-day
-        #sep_dist_fac = 1.5 # Causes tracks to jump for AVISO 7-day
+    #if 'sum_radii' in separation_method:
+        ## Separation distance factor. Adjust according to number of days between records
+        ## For 7 days, Chelton uses 150 km search ellipse
+        ## So, given typical eddy radius of r=50 km, 1.5 * (r1 + r2) = 150 km.
+        ##sep_dist_fac = 1.0
+        #sep_dist_fac = 1.15 # Seems ok for AVISO 7-day
+        ##sep_dist_fac = 1.5 # Causes tracks to jump for AVISO 7-day
     
     
-    #cmap = plt.cm.Spectral_r
-    #cmap = plt.cm.jet
-    cmap = plt.cm.RdBu
 
+    cmap = plt.cm.RdBu
     
     verbose = False
 
@@ -779,6 +771,9 @@ if __name__ == '__main__':
     
     assert date_str < date_end, 'date_end must be larger than date_str'
     assert diag_type in ('Q','sla'), 'diag_type not properly defined'
+    
+    thestartdate = dt.date2num(datestr2datetime(str(date_str)))
+    theenddate = dt.date2num(datestr2datetime(str(date_end)))
     
     # Get complete AVISO file list
     AVISO_files = sorted(glob.glob(directory + AVISO_files))
@@ -793,10 +788,8 @@ if __name__ == '__main__':
                               qparameter.size), 2)[::-1]
         
         # The shape error can maybe be played with...
-        #shape_err = np.power(np.linspace(200., 40,  qparameter.size), 2) / 100.
         shape_err = np.power(np.linspace(85., 40,  qparameter.size), 2) / 100.
         shape_err[shape_err < 35.] = 35.
-        #shape_err = 35. * np.ones(qparameter.size)
         
     elif 'sla' in diag_type:
         shape_err = 55. * np.ones(slaparameter.size)
@@ -808,7 +801,7 @@ if __name__ == '__main__':
 
     Mx, My = sla_grd.Mx[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1], \
              sla_grd.My[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-    pMx, pMy = sla_grd.pcol_2dxy(Mx, My)
+    #pMx, pMy = sla_grd.pcol_2dxy(Mx, My)
     
     
     # Get Rossby wave speed data
@@ -932,8 +925,6 @@ if __name__ == '__main__':
     A_eddy.dist0 = np.float(dist0)
     C_eddy.dist0 = np.float(dist0)
     
-    start = 0
-    start_time = time.time()
     A_eddy.days_btwn_recs = days_btwn_recs
     C_eddy.days_btwn_recs = days_btwn_recs
     
@@ -943,15 +934,32 @@ if __name__ == '__main__':
 
     
     # Loop through the AVISO files...
-    active = False
+    #active = False
+    start = True
+    start_time = time.time()
     print '\nStart tracking'
     for AVISO_file in AVISO_files:
-
-        if str(date_str) in AVISO_file:
+        
+        
+        with netcdf.Dataset(AVISO_file) as nc:
+	    
+            try:
+               thedate = nc.OriginalName
+               thedate = thedate.partition('qd_')[2].partition('_')[0]
+               thedate = datestr2datetime(thedate)
+               thedate = dt.date2num(thedate)
+            except Exception:
+               thedate = nc.variables['time']
+               raise Exception # 2014 AVISO not yet implemented
+        
+        
+        if np.logical_and(thedate >= thestartdate,
+                          thedate <= theenddate):
             active = True
-            file_time = time.time()
-            
-            
+        else:
+            active = False
+        
+        
         if active:
             
             #rec_start_time = time.time()
@@ -1161,13 +1169,14 @@ if __name__ == '__main__':
                 plt.close(250)
 
 
-            if str(date_str) not in AVISO_file:
-                first_record = False
-            else:
+            if start:
                 first_record = True
                 # Set old variables equal to new variables
                 A_eddy.set_old_variables()
                 C_eddy.set_old_variables()
+                start = False
+            else:
+                first_record = False
 
             
             # Track the eddies

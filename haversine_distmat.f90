@@ -24,7 +24,7 @@
 !    f2py -m haversine_distmat -h haversine_distmat.pyf haversine_distmat.f90  --overwrite-signature
 !    f2py -c --fcompiler=gfortran haversine_distmat.pyf haversine_distmat.f90
 !
-!   Version 1.0.1
+!   Version 1.1.0
 !
 !===========================================================================
 
