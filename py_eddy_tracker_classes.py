@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 1.1.0
+Version 1.2.0
 ===========================================================================
 
 
@@ -128,9 +128,12 @@ def do_basemap(M, ax):
     '''
     Convenience method for Basemap functions
     '''
-    if np.logical_or(np.diff([M.lonmin, M.lonmax]) > 40,
-                     np.diff([M.latmin, M.latmax]) > 40):
+    if np.logical_or(np.diff([M.lonmin, M.lonmax]) > 60,
+                     np.diff([M.latmin, M.latmax]) > 60):
         stride = 10
+    elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 40,
+                     np.diff([M.latmin, M.latmax]) > 40):
+        stride = 8
     elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 30,
                        np.diff([M.latmin, M.latmax]) > 30):
         stride = 5
@@ -152,6 +155,14 @@ def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, diag_type,
                 savedir, tit, fignum):
     '''
     '''
+    def plot_tracks(Eddy, track_length, rtime, col, thax):
+        for i in Eddy.get_active_tracks(rtime):
+            if Eddy.tracklist[i].lon.size > track_length: # filter for longer tracks
+                aex, aey = Eddy.M(Eddy.tracklist[i].lon, Eddy.tracklist[i].lat)
+                M.plot(aex, aey, col, lw=0.5, ax=thax)
+                M.scatter([aex[-1]], [aey[-1]], s=7, c=col, ax=thax)
+        return
+    
     plt.figure(fignum)
     thax = plt.subplot(111)
     track_length = 0 # for filtering below
@@ -167,22 +178,11 @@ def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, diag_type,
     elif 'sla' in diag_type:
         cb = M.pcolormesh(pMx, pMy, A_eddy.slacopy, cmap=cmap, ax=thax)
         M.contour(Mx, My, A_eddy.slacopy, [0.], ax=thax, colors='k', linewidths=0.5)
-        M.contour(Mx, My, A_eddy.slacopy, A_eddy.slaparameter, ax=thax, colors='g', linewidths=0.25)
+        M.contour(Mx, My, A_eddy.slacopy, A_eddy.slaparameter, ax=thax, colors='g',
+                  linestyles='solid', linewidths=0.15)
         cb.set_clim(-20., 20.)
-    
-    for i in A_eddy.get_active_tracks(rtime):
-        # Filter only tracks longer than ...
-        if A_eddy.tracklist[i].lon.size > track_length:
-            aex, aey = M(A_eddy.tracklist[i].lon, A_eddy.tracklist[i].lat)
-            M.plot(aex, aey, 'r', lw=0.5, ax=thax)
-            M.scatter([aex[-1]], [aey[-1]], s=7, c='r', ax=thax)
-    
-    for i in C_eddy.get_active_tracks(rtime):
-        # Filter only tracks longer than ...
-        if C_eddy.tracklist[i].lon.size > track_length:
-            cex, cey = M(C_eddy.tracklist[i].lon, C_eddy.tracklist[i].lat)
-            M.plot(cex, cey, 'b',lw=0.5, ax=thax)
-            M.scatter([cex[-1]], [cey[-1]], s=7, c='b', ax=thax)
+    plot_tracks(A_eddy, track_length, rtime, 'r', thax)
+    plot_tracks(C_eddy, track_length, rtime, 'b', thax)
     
     do_basemap(M, thax)
     
@@ -475,6 +475,7 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
             poly_i = False
 
         if poly_i:
+            # NOTE: contains_points requires matplotlib 1.3 +
             mask_i = poly_i.contains_points(points)
             
             # 1. Ensure polygon_i is within polygon_e
@@ -612,7 +613,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                 centlon_e, centlat_e, eddy_radius_e, aerr, junk = fit_circle(cx, cy)
                 
                 # Filter for shape: >35% (>55%) is not an eddy for Q (SLA)
-                if True:#np.logical_and(aerr >= 0., aerr <= Eddy.shape_err[collind]):
+                if np.logical_and(aerr >= 0., aerr <= Eddy.shape_err[collind]):
                                 
                     # Get centroid in lon lat
                     centlon_e, centlat_e = Eddy.M.projtran(centlon_e, centlat_e, inverse=True)
@@ -1071,60 +1072,21 @@ def track_eddies(Eddy, first_record):
             plt.ylabel('old')
             plt.title('original')
         
-        #print 'ellipse11'
+
         # Make an ellipse at current old_eddy location
         # (See CSS11 sec. B4, pg. 208)
         if 'ellipse' in Eddy.separation_method:
             
-            # All this should go to rwv object, so that it returns ellipse_path
-            rw_d = Eddy.rwv.get_rwdistance(Eddy.old_lon[old_ind],
-                                           Eddy.old_lat[old_ind],
-                                           Eddy.days_btwn_recs)
-            rw_d *= 1.75
-            checkfig = False
-            '''if rw_d > 15e4:
-                checkfig = False
-            else:
-                checkfig = False'''
-            rw_d = np.maximum(rw_d, 15e4)
-            rw_d *= 2.
-            # Make two ellipses, cut, and rejoin
-            e_ellipse = patch.Ellipse((old_x[old_ind], old_y[old_ind]), 3e5, 15e4)
-            w_ellipse = patch.Ellipse((old_x[old_ind], old_y[old_ind]), rw_d, 15e4)
-            ee = e_ellipse.get_verts()
-            ww = w_ellipse.get_verts()
-            eesize = ee[:,0].size * 0.5
-            wwsize = ww[:,0].size * 0.5
-            eeww_x = np.hstack((ee[:eesize,0], ww[wwsize:,0]))
-            eeww_y = np.hstack((ee[:eesize,1], ww[wwsize:,1]))
-            ellipse_path = path.Path(np.array([eeww_x, eeww_y]).T)
+            ellipse_path = Eddy.search_ellipse.get_search_ellipse(
+                                             old_x[old_ind], old_y[old_ind])
             
-            if checkfig:
-                plt.figure(250)
-                #Eddy.M.plot(ee[:,0], ee[:,1], 'b')
-                #Eddy.M.plot(ww[:,0], ww[:,1], 'g')
-                Eddy.M.plot(eeww_x, eeww_y, 'r')
-                #Eddy.M.drawcoastlines()
-                #Eddy.M.fillcontinents()
-                #plt.show()
             
-            if False:
-                plt.figure(919)
-                Eddy.M.scatter(old_x[old_ind], old_y[old_ind],c='b')
-                Eddy.M.plot(ee[:,0], ee[:,1], 'b')
-                Eddy.M.plot(ww[:,0], ww[:,1], 'g')
-                Eddy.M.plot(eeww_x, eeww_y, '.r')
-                Eddy.M.drawcoastlines()
-                Eddy.M.fillcontinents()
-        
-        
-        #print 'ellipse12'
-        #print 'loop21'
         # Loop over separation distances between old and new
         for new_ind, new_dist in enumerate(dist_mat[old_ind]):
             
             if 'ellipse' in Eddy.separation_method:
-                if ellipse_path.contains_point((new_x[new_ind], new_y[new_ind])):
+                if Eddy.search_ellipse.ellipse_path.contains_point(
+                                          (new_x[new_ind], new_y[new_ind])):
                     sep_proceed = True
                 else:
                     sep_proceed = False

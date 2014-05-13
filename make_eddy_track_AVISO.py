@@ -24,10 +24,10 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 1.1.0
+Version 1.2.0
 
 
-Scroll down to line ~630 to get started
+Scroll down to line ~640 to get started
 ===========================================================================
 """
 
@@ -36,7 +36,7 @@ import glob as glob
 #import matplotlib.pyplot as plt
 from py_eddy_tracker_classes import *
 from make_eddy_tracker_list_obj import *
-
+from dateutil import parser
 
 class py_eddy_tracker (object):
     '''
@@ -71,15 +71,13 @@ class py_eddy_tracker (object):
           varname : variable ('temp', 'mask_rho', etc) to read
           indices : string of index ranges, eg. '[0,:,0]'
         '''
-        nc = netcdf.Dataset(varfile)
-        try:
-            var = eval(''.join(("nc.variables[varname]", indices)))
-        except Exception:
-            nc.close()
-            return None
-        else:
-            nc.close()
-            return var
+        with netcdf.Dataset(varfile) as nc:
+            try:
+                var = eval(''.join(("nc.variables[varname]", indices)))
+            except Exception:
+                return None
+            else:
+                return var
 
 
     def read_nc_att(self, varfile, varname, att):
@@ -88,10 +86,8 @@ class py_eddy_tracker (object):
           varname : variable ('temp', 'mask_rho', etc) to read
           att : string of attribute, eg. 'valid_range'
         '''
-        nc = netcdf.Dataset(varfile)
-        att = eval(''.join(("nc.variables[varname].", att)))
-        nc.close()
-        return att
+        with netcdf.Dataset(varfile) as nc:
+            return eval(''.join(("nc.variables[varname].", att)))
 
 
     def set_initial_indices(self, lonmin, lonmax, latmin, latmax):
@@ -226,7 +222,10 @@ class py_eddy_tracker (object):
         '''
         Speed up frequent operations of type 0.5 * (arr[:-1] + arr[1:])
         '''
-        return ne.evaluate('0.5 * (h_one + h_two)')
+        h_one += h_two
+        h_one *= 0.5
+        return h_one
+        #return ne.evaluate('0.5 * (h_one + h_two)')
 
 
     def get_AVISO_f_pm_pn(self):
@@ -279,7 +278,7 @@ class py_eddy_tracker (object):
             u_out[:, 1:L] = self.half_interp(uu_in[:, 0:Lm], uu_in[:, 1:L])
             u_out[:, 0] = u_out[:, 1]
             u_out[:, L] = u_out[:, Lm]
-            return (np.squeeze(u_out))
+            return (u_out.squeeze())
         Mshp, Lshp = uu_in.shape
         return uu2ur(uu_in, Mshp, Lshp + 1)
 
@@ -293,7 +292,7 @@ class py_eddy_tracker (object):
             v_out[1:M] = self.half_interp(vv_in[:Mm], vv_in[1:M])
             v_out[0] = v_out[1]
             v_out[M] = v_out[Mm]
-            return (np.squeeze(v_out))
+            return (v_out.squeeze())
         Mshp, Lshp = vv_in.shape
         return vv2vr(vv_in, Mshp + 1, Lshp)
 
@@ -377,9 +376,16 @@ class AVISO_grid (py_eddy_tracker):
         self.latmin = latmin
         self.latmax = latmax
         
-        self._lon = self.read_nc(AVISO_file, 'NbLongitudes')
-        self._lat = self.read_nc(AVISO_file, 'NbLatitudes')
-        self.fillval = self.read_nc_att(AVISO_file, 'Grid_0001', '_FillValue')
+        try: # new AVISO (2014)
+            self._lon = self.read_nc(AVISO_file, 'lon')
+            self._lat = self.read_nc(AVISO_file, 'lat')
+            self.fillval = self.read_nc_att(AVISO_file, 'sla', '_FillValue')
+            base_date = self.read_nc_att(AVISO_file, 'time', 'units')
+            self.base_date = dt.date2num(parser.parse(base_date.split(' ')[2:4][0]))
+        except Exception: # old AVISO
+            self._lon = self.read_nc(AVISO_file, 'NbLongitudes')
+            self._lat = self.read_nc(AVISO_file, 'NbLatitudes')
+            self.fillval = self.read_nc_att(AVISO_file, 'Grid_0001', '_FillValue')
         if np.logical_and(lonmin < 0, lonmax <=0):
             self._lon -= 360.
         self._lon, self._lat = np.meshgrid(self._lon, self._lat)
@@ -402,22 +408,37 @@ class AVISO_grid (py_eddy_tracker):
         Read nc data from AVISO file
         '''
         if self.zero_crossing:
-            ssh1 = self.read_nc(AVISO_file, 'Grid_0001',
-                                indices='[:self.ip0, self.jp0:self.jp1]').T
-            ssh0 = self.read_nc(AVISO_file, 'Grid_0001',
-                                indices='[ self.ip1:,self.jp0:self.jp1]').T
+            try: # new AVISO (2014)
+                ssh1 = self.read_nc(AVISO_file, 'sla',
+                       indices='[:, self.jp0:self.jp1, :self.ip0]')
+                ssh0 = self.read_nc(AVISO_file, 'sla',
+                       indices='[:,self.jp0:self.jp1, self.ip1:]')
+                ssh0, ssh1 = ssh0.squeeze(), ssh1.squeeze()
+                ssh0 *= 100. # m to cm
+                ssh1 *= 100. # m to cm
+            except Exception: # old AVISO
+                ssh1 = self.read_nc(AVISO_file, 'Grid_0001',
+                       indices='[:self.ip0, self.jp0:self.jp1]').T
+                ssh0 = self.read_nc(AVISO_file, 'Grid_0001',
+                       indices='[self.ip1:,self.jp0:self.jp1]').T
             zeta = np.ma.concatenate((ssh0, ssh1), axis=1)
-            del ssh0, ssh1
         else:
-            zeta = self.read_nc(AVISO_file, 'Grid_0001',
-                                indices='[self.ip0:self.ip1, self.jp0:self.jp1]').T
-        date = self.read_nc_att(AVISO_file, 'Grid_0001', 'date') # cm
+            try: # new AVISO (2014)
+                zeta = self.read_nc(AVISO_file, 'sla',
+                       indices='[:, self.jp0:self.jp1, self.ip0:self.ip1]')
+                zeta = zeta.squeeze()
+                zeta *= 100. # m to cm
+            except Exception: # old AVISO
+                zeta = self.read_nc(AVISO_file, 'Grid_0001',
+                       indices='[self.ip0:self.ip1, self.jp0:self.jp1]').T
+                #date = self.read_nc_att(AVISO_file, 'Grid_0001', 'date') # cm
+
         try: # Extrapolate over land points with fillmask
             zeta = fillmask(zeta, self.mask == 1)
             #zeta = fillmask(zeta, 1 + (-1 * zeta.mask))
         except Exception: # In case no landpoints
             zeta = np.ma.masked_array(zeta)
-        return zeta, date
+        return zeta
 
 
 
@@ -623,31 +644,71 @@ if __name__ == '__main__':
     #----------------------------------------------------------------------------
     # Some user-defined input...
 
-    # Path to directory where SSH data are stored...
-    #directory = '/shared/Altimetry/MSLA/REF/'
-    #directory = '/shared/Altimetry/MSLA/GLOBAL/DT/REF/'
-    directory = '/marula/emason/data/altimetry/MSLA/GLOBAL/DT/REF/'
-    AVISO_files = 'dt_ref_global_merged_msla_h_qd_????????_*.nc'
+
+    # Specify the AVISO domain
+    the_domain = 'Global'
+    #the_domain = 'BlackSea'
+    #the_domain = 'MedSea' # not yet implemented
+    
+    # Specify use of new AVISO 2014 data
+    new_AVISO = True
+    
+    # Set path(s) to directory where SSH data are stored...
+    if 'Global' in the_domain:
+        if new_AVISO:
+            directory = '/path/to/your/aviso_data/'
+            #directory = '/shared/Altimetry/global/delayed-time/grids/msla/all-sat-merged/h/'
+            AVISO_files = 'dt_global_allsat_msla_h_????????_20140106.nc'
+            days_btwn_recs = 1.
+        else:
+            directory = '/path/to/your/aviso_data/'
+            #directory = '/marula/emason/data/altimetry/MSLA/GLOBAL/DT/REF/'
+            AVISO_files = 'dt_ref_global_merged_msla_h_qd_????????_*.nc'
+            days_btwn_recs = 7.
+    
+    elif 'MedSea' in the_domain:
+        if new_AVISO:
+            directory = '/path/to/your/aviso_data/'
+            #directory = '/shared/Altimetry/regional-mediterranean/delayed-time/grids/msla/all-sat-merged/h/'
+            AVISO_files = 'dt_blacksea_allsat_msla_h_????????_*.nc'
+        else:
+            pass
+    
+    elif 'BlackSea' in the_domain:
+        if new_AVISO:
+            directory = '/path/to/your/aviso_data/'
+            #irectory = '/shared/Altimetry/regional-blacksea/delayed-time/grids/msla/all-sat-merged/h/'
+            AVISO_files = 'dt_blacksea_allsat_msla_h_????????_*.nc'
+            days_btwn_recs = 1.
+    else:
+        Exception #no_domain_specified
+    
     
     # Set date range (YYYYMMDD)
     date_str, date_end = 19980107, 19991110 # 
+    #date_str, date_end = 20081107, 20100110 # 
+    #date_str, date_end = 19930101, 20121231 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
-    #diag_type = 'Q' <<< not implemented in 1.0.1
+    #diag_type = 'Q' <<< not implemented in 1.2.0
     diag_type = 'sla'
     
     
     # Path to directory where outputs are to be saved...
     #savedir = directory
-    savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test_0.35/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test_0.3/'
+    #savedir = '/shared/emason/eddy_tracks/Barbara/2009/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
+    savedir = '/path/to/save/your/outputs/'
     
     
     # True to save outputs in same style as Chelton
     chelton_style_nc = True
     
     print '\nOutputs saved to', savedir
-    
-    days_btwn_recs = 7.
     
     
     
@@ -663,8 +724,8 @@ if __name__ == '__main__':
         ampmax = 100.
         
     elif 'sla' in diag_type:
-        radmin = 0#50000. # Chelton recommends ~50 km minimum
-        radmax = 1e9#250000.
+        radmin = 0.3 # degrees (Chelton recommends ~50 km minimum)
+        radmax = 4.461 # degrees
         ampmin = 1. # cm
         ampmax = 150.
 
@@ -706,29 +767,44 @@ if __name__ == '__main__':
     # Save only tracks longer than...     
     track_duration_min = 28. # days
 
-
     subdomain = True
-    lonmin = -36.     # Canary
-    lonmax = -7.5
-    latmin = 18.
-    latmax = 33.2
+    if the_domain in 'Global':
+        lonmin = -36.     # Canary
+        lonmax = -7.5
+        latmin = 18.
+        latmax = 33.2
 
-    #lonmin = -65.     # Corridor
-    #lonmax = -5.5
-    #latmin = 11.5
-    #latmax = 38.5
+        #lonmin = -65.     # Corridor
+        #lonmax = -5.5
+        #latmin = 11.5
+        #latmax = 38.5
 
-    #lonmin = -179.     # SEP
-    #lonmax = -65
-    #latmin = -40.
-    #latmax = -5.
+        #lonmin = -179.     # SEP
+        #lonmax = -65
+        #latmin = -40.
+        #latmax = -5.
     
-    #lonmin = -70.     # Souza
-    #lonmax = 30.
-    #latmin = -50.
-    #latmax = -15.
+        #lonmin = -70.     # Souza
+        #lonmax = 30.
+        #latmin = -50.
+        #latmax = -15.
 
+        #lonmin = -1.5     # Charlotte
+        #lonmax = 51.
+        #latmin = -47.
+        #latmax = -24.
     
+    elif the_domain in 'MedSea':
+        lonmin = 354.     # SEP
+        lonmax = 396
+        latmin = 30.
+        latmax = 46.
+    
+    elif the_domain in 'BlackSea':
+        lonmin = 27.     # SEP
+        lonmax = 42.
+        latmin = 40.
+        latmax = 47.
     
     # Typical parameters
     dist0 = 25000. # m separation distance after ~7 days (see CSS11 fig 22)
@@ -801,15 +877,17 @@ if __name__ == '__main__':
 
     Mx, My = sla_grd.Mx[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1], \
              sla_grd.My[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-    #pMx, pMy = sla_grd.pcol_2dxy(Mx, My)
+    pMx, pMy = sla_grd.pcol_2dxy(Mx, My)
     
     
-    # Get Rossby wave speed data
-    rwv = eddy_tracker.rossby_wave_speeds(rw_path)
-    rwv.make_subset(lonmin - 2.5, lonmax + 2.5,
-                    latmin - 2.5, latmax + 2.5)
+    ## Instantiate Rossby deformation radius object
+    #rwv = eddy_tracker.RossbyWaveSpeed(the_domain,
+            #[lonmin, lonmax, latmin, latmax], rw_path=rw_path)
     
     
+    # Instantiate search ellipse object
+    search_ellipse = eddy_tracker.SearchEllipse(the_domain, days_btwn_recs,
+                                    rw_path, [lonmin, lonmax, latmin, latmax])
     
     
     if isinstance(smoothing, str):
@@ -860,8 +938,11 @@ if __name__ == '__main__':
     A_eddy.M = sla_grd.M
     C_eddy.M = sla_grd.M
     
-    A_eddy.rwv = rwv
-    C_eddy.rwv = rwv
+    #A_eddy.rwv = rwv
+    #C_eddy.rwv = rwv
+    
+    A_eddy.search_ellipse = search_ellipse
+    C_eddy.search_ellipse = search_ellipse
     
     
     A_eddy.separation_method = separation_method
@@ -913,8 +994,11 @@ if __name__ == '__main__':
     
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
-    pixmin = np.round((np.pi * 0.4**2) / sla_grd.get_resolution()**2)
-    pixmax = np.round((np.pi * 4.461**2) / sla_grd.get_resolution()**2)
+    pixmin = np.round((np.pi * radmin**2) / sla_grd.get_resolution()**2)
+    pixmax = np.round((np.pi * radmax**2) / sla_grd.get_resolution()**2)
+    
+    print '--- Pixel range = %s-%s' %(np.int(pixmin), np.int(pixmax))
+    
     A_eddy.pixel_threshold = [pixmin, pixmax]
     C_eddy.pixel_threshold = [pixmin, pixmax]
     
@@ -928,13 +1012,12 @@ if __name__ == '__main__':
     A_eddy.days_btwn_recs = days_btwn_recs
     C_eddy.days_btwn_recs = days_btwn_recs
     
-    # Create nc files for saving
+    # Create nc files for saving of eddy tracks
     A_eddy.create_netcdf(directory, A_savefile, 'Anticyclonic')
     C_eddy.create_netcdf(directory, C_savefile, 'Cyclonic')
 
     
     # Loop through the AVISO files...
-    #active = False
     start = True
     start_time = time.time()
     print '\nStart tracking'
@@ -949,9 +1032,9 @@ if __name__ == '__main__':
                thedate = datestr2datetime(thedate)
                thedate = dt.date2num(thedate)
             except Exception:
-               thedate = nc.variables['time']
-               raise Exception # 2014 AVISO not yet implemented
-        
+               thedate = nc.variables['time'][:]
+               thedate += sla_grd.base_date
+        rtime = thedate
         
         if np.logical_and(thedate >= thestartdate,
                           thedate <= theenddate):
@@ -1022,7 +1105,7 @@ if __name__ == '__main__':
             
             elif 'sla' in diag_type:
                 
-                sla, rtime = sla_grd.get_AVISO_data(AVISO_file)
+                sla = sla_grd.get_AVISO_data(AVISO_file)
                 
                 if isinstance(smoothing, str):
                     
@@ -1050,9 +1133,16 @@ if __name__ == '__main__':
                 sla = np.ma.masked_where(sla_grd.mask == False, sla)
                 
                 # Get timing
-                ymd = rtime.split(' ')[0].split('-')
-                yr, mo, da = np.int(ymd[0]), np.int(ymd[1]), np.int(ymd[2])
-                rtime = dt.date2num(dt.datetime.datetime(yr, mo, da))
+                #ymd = rtime.split(' ')[0].split('-')
+                #yr, mo, da = np.int(ymd[0]), np.int(ymd[1]), np.int(ymd[2])
+                #rtime = dt.date2num(dt.datetime.datetime(yr, mo, da))
+                try:
+                    thedate = dt.num2date(rtime)[0]
+                except:
+                    thedate = dt.num2date(rtime)
+                yr = thedate.year
+                mo = thedate.month
+                da = thedate.day
                 
                 #if sla.mask.size > 1:
                     #umask, vmask, junk = sla_grd.uvpmask(-sla.mask)
@@ -1123,29 +1213,20 @@ if __name__ == '__main__':
                                                  xi=xi, CSxi=CSxi, verbose=verbose)
             
             elif 'sla' in diag_type:
-	        #print 'start A loop'
-                tt = time.time()
                 A_eddy.sign_type = 'Anticyclonic'
                 A_eddy = collection_loop(A_CS, sla_grd, rtime,
                                          A_list_obj=A_eddy, C_list_obj=None,
                                          sign_type=A_eddy.sign_type, verbose=verbose)
-	        #print 'end A loop in %s seconds\n' %(time.time() - tt)
-	        #print 'end A loop'
                 # Note that C_CS is reverse order
-	        #print 'start C loop'
-                tt = time.time()
                 C_eddy.sign_type='Cyclonic'
                 C_eddy = collection_loop(C_CS, sla_grd, rtime,
                                          A_list_obj=None, C_list_obj=C_eddy,
                                          sign_type=C_eddy.sign_type, verbose=verbose)
-	        #print 'end C loop in %s seconds\n' %(time.time() - tt)
             
             # Debug
             if 'fig250' in locals():
                 
                 plt.figure(250)
-                #dy, dm, dd = oceantime2ymd(rtime)
-                #dtime = dy + dm + dd
                 tit = 'Y' + str(yr) + 'M' + str(mo) + 'D' + str(da)
                 
                 if 'Q' in diag_type:

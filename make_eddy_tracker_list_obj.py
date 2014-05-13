@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 1.1.0
+Version 1.2.0
 
 
 ===========================================================================
@@ -734,33 +734,59 @@ class track_list (object):
     
 
 
-class rossby_wave_speeds (object):
+class RossbyWaveSpeed (object):
   
-    def __init__(self, path):
+    def __init__(self, domain, limits, rw_path=None):
         '''
-        Initialise the rossby_wave_speeds object
+        Initialise the RossbyWaveSpeedsobject
         '''
-        data = np.loadtxt(path)
-        self._lon = data[:,1] - 360.
-        self._lat = data[:,0]
-        self._defrad = data[:,3]
-        self._distance = np.array([])
+        self.domain = domain
+        self.rw_path = rw_path
+        if 'Global' in domain:
+            assert self.rw_path is not None, \
+                'Must supply a path for the Rossby deformation radius data'
+            data = np.loadtxt(rw_path)
+            self._lon = data[:,1] - 360.
+            self._lat = data[:,0]
+            self._defrad = data[:,3]
+            self.limits = limits
+            self._make_subset()
+            self.vartype = 'variable'
+        else:
+            self.vartype = 'constant'
+        self.distance = np.empty(1)
+        self.start = True
     
         
     def get_rwdistance(self, x, y, days_between_records):
         '''
         '''
-        distance = self._get_rlongwave_spd(x, y)
-        distance *= 86400.
-        distance *= days_between_records
-        return np.abs(distance)
+        if 'Global' in self.domain:
+            self.distance[:] = self._get_rlongwave_spd(x, y)
+            self.distance *= 86400.
+        elif 'BlackSea' in self.domain:
+            self.distance[:] = 15000. # e.g. Blokhina & Afanasyev, 2003
+        elif 'MedSea' in self.domain:
+            self.distance[:] = 20000.
+        else:
+            Exception # Unknown domain
+        if self.start:
+            print '------ using %s Rossby deformation radius of %s m' \
+                                %(self.vartype, self.distance)
+            self.start = False
+        self.distance *= days_between_records
+        return np.abs(self.distance)
     
     
-    def make_subset(self, lonmin, lonmax, latmin, latmax):
+    def _make_subset(self, ):
         '''
         '''
-        lloi = np.logical_and(self._lon >= lonmin, self._lon <= lonmax)
-        lloi *= np.logical_and(self._lat >= latmin, self._lat <= latmax)
+        pad = 1.5 # degrees
+        lonmin, lonmax, latmin, latmax = self.limits
+        lloi = np.logical_and(self._lon >= lonmin - pad,
+                              self._lon <= lonmax + pad)
+        lloi *= np.logical_and(self._lat >= latmin - pad,
+                               self._lat <= latmax + pad)
         self._lon = self._lon[lloi]
         self._lat = self._lat[lloi]
         self._defrad = self._defrad[lloi]
@@ -802,8 +828,99 @@ class rossby_wave_speeds (object):
 
     
     
+class SearchEllipse (object):
     
-    
+    def __init__(self, domain, days_btwn_recs, rw_path, limits):
+        '''Class to construct a search ellipse/circle around a specified point.
+        
+        
+        
+        '''
+        self.domain = domain
+        self.days_btwn_recs = days_btwn_recs
+        self.rw_path = rw_path
+        self.limits = limits
+        self.rw_d_fac = 1.75
+        self.e_w_major = self.days_btwn_recs * 3e5 / 7.
+        self.n_s_minor = self.days_btwn_recs * 15e4 / 7.
+        self.rwv = RossbyWaveSpeed(self.domain,
+                               self.limits, rw_path=self.rw_path)
+        self.rw_d = np.empty(1)
+        self.rw_d_mod = np.empty(1)
+        
+    def _set_east_ellipse(self):
+        '''
+        '''
+        self.east_ellipse = patch.Ellipse((self.x, self.y),
+                                           self.e_w_major, self.n_s_minor)
+        return self
+        
+    def _set_west_ellipse(self):
+        '''
+        '''
+        self.west_ellipse = patch.Ellipse((self.x, self.y),
+                                           self.rw_d_mod, self.n_s_minor)
+        return self
+        
+    def _set_global_ellipse(self):
+        '''
+        '''
+        self._set_east_ellipse()._set_west_ellipse()
+        e_verts = self.east_ellipse.get_verts()
+        e_size = e_verts[:,0].size
+        e_size *= 0.5
+        w_verts = self.west_ellipse.get_verts()
+        w_size = w_verts[:,0].size
+        w_size *= 0.5
+        ew_x = np.hstack((e_verts[:e_size,0], w_verts[w_size:,0]))
+        ew_y = np.hstack((e_verts[:e_size,1], w_verts[w_size:,1]))
+        self.ellipse_path = path.Path(np.array([ew_x, ew_y]).T)
+        return self.ellipse_path
+        
+    def _set_black_sea_ellipse(self):
+        '''
+        '''
+        self.black_sea_ellipse = patch.Ellipse((self.x, self.y),
+                               2. * self.rw_d_mod, 2. * self.rw_d_mod)
+        verts = self.black_sea_ellipse.get_verts()
+        self.ellipse_path = path.Path(np.array([verts[:,0],
+                                                verts[:,1]]).T)
+            
+            
+    def get_search_ellipse(self, x, y):
+        '''
+        '''
+        self.x = x
+        self.y = y
+            
+        if 'Global' in self.domain:
+            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.days_btwn_recs)
+            self.rw_d_mod[:] = 1.75
+            self.rw_d_mod *= self.rw_d
+            self.rw_d_mod[:] = np.maximum(self.rw_d_mod, self.n_s_minor)
+            self.rw_d_mod *= 2.
+            self._set_global_ellipse()
+            
+        elif 'BlackSea'  in self.domain:
+            self.rw_d_mod[:] = 1.75
+            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.days_btwn_recs)
+            self.rw_d_mod *= self.rw_d
+            self._set_black_sea_ellipse()
+            
+            
+    def view_search_ellipse(self, Eddy):
+        '''
+        '''
+        plt.figure()
+        ax = plt.subplot(111)
+        ax.set_title('Rossby def. rad %s m' %self.rw_d)
+        Eddy.M.scatter(self.x, self.y, c='b')
+        #Eddy.M.plot(ee[:,0], ee[:,1], 'b')
+        #Eddy.M.plot(ww[:,0], ww[:,1], 'g')
+        Eddy.M.plot(self.ellipse_path.vertices[:,0],
+                    self.ellipse_path.vertices[:,1], 'r')
+        Eddy.M.drawcoastlines()
+        plt.show()
     
     
     
