@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 1.2.1
+Version 1.3.0
 
 
 Scroll down to line ~640 to get started
@@ -401,7 +401,28 @@ class AVISO_grid (py_eddy_tracker):
         self.set_index_padding()
         self.make_gridmask(with_pad, use_maskoceans).uvmask()
         self.get_AVISO_f_pm_pn()
+        self.set_u_v_eke()
         
+
+
+    def set_u_v_eke(self, pad=2):
+        '''
+        '''
+        double_pad = pad * 2
+        if self.zero_crossing:
+            u1 = np.empty((self.ip0, self.jp1 - self.jp0))
+            u0 = np.empty((self._lon.shape[0] - self.ip1, self.jp1 - self.jp0))
+            self.u = np.ma.concatenate((u0, u1), axis=1)
+        else:
+            self.u = np.empty((self.jp1 - self.jp0, self.ip1 - self.ip0))
+        self.v = np.empty_like(self.u)
+        self.eke = np.empty((self.u.shape[0] - double_pad,
+                             self.u.shape[1] - double_pad))
+        return self
+
+
+
+
 
 
     def get_AVISO_data(self, AVISO_file):
@@ -492,13 +513,21 @@ class AVISO_grid (py_eddy_tracker):
         by Evan Mason
         Changed to gv2, 14 May 07...
         '''
-        def gv2(zeta, gof, pm, pn, umask, vmask): # Pierrick's version
-            ugv = -gof * self.v2rho_2d(vmask * (zeta[1:] - zeta[:-1]) \
-                                        * 0.5 * (pn[1:] + pn[:-1]))
-            vgv =  gof * self.u2rho_2d(umask * (zeta[:, 1:] - zeta[:, :-1]) \
-                                        * 0.5 * (pm[:, 1:] + pm[:, :-1]))
-            return ugv, vgv
-        return gv2(zeta, self.gof(), self.pm(), self.pn(), self.umask(), self.vmask())
+        #def gv2(zeta, gof, pm, pn, umask, vmask): # Pierrick's version
+        self.u[:] = -self.gof() * self.v2rho_2d(self.vmask() * (zeta.data[1:] - zeta.data[:-1]) \
+                                        * 0.5 * (self.pn()[1:] + self.pn()[:-1]))
+        self.v[:] =  self.gof() * self.u2rho_2d(self.umask() * (zeta.data[:, 1:] - zeta.data[:, :-1]) \
+                                        * 0.5 * (self.pm()[:, 1:] + self.pm()[:, :-1]))
+            #return ugv, vgv
+        #return gv2(zeta, self.gof(), self.pm(), self.pn(), self.umask(), self.vmask())
+        return self
+
+    def getEKE(self, u, v):
+        '''
+        '''
+        np.add(u**2, v**2, out=self.eke)
+        self.eke *= 0.5
+        return self
 
 
     def lon(self):
@@ -782,15 +811,15 @@ if __name__ == '__main__':
     subdomain = True
     if the_domain in 'Global':
         
-        #lonmin = -36.     # Canary
-        #lonmax = -7.5
-        #latmin = 18.
-        #latmax = 33.2
+        lonmin = -36.     # Canary
+        lonmax = -7.5
+        latmin = 18.
+        latmax = 33.2
 
-        lonmin = -65.     # Corridor
-        lonmax = -5.5
-        latmin = 11.5
-        latmax = 38.5
+        #lonmin = -65.     # Corridor
+        #lonmax = -5.5
+        #latmin = 11.5
+        #latmax = 38.5
 
         #lonmin = -179.     # SEP
         #lonmax = -65
@@ -1174,14 +1203,16 @@ if __name__ == '__main__':
                 #else:
                     #umask, vmask, junk = sla_grd.uvpmask(np.zeros_like(sla))
                 
-                # Multiply by 0.01 for m/s
-                u, v = sla_grd.getSurfGeostrVel(sla * 0.01)
+                # Multiply by 0.01 for m
+                sla_grd.getSurfGeostrVel(sla * 0.01)
                 
                 # Remove padded boundary
                 sla = sla[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                u = u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                v = v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-
+                u = sla_grd.u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                v = sla_grd.v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                
+                sla_grd.getEKE(u, v)
+                
                 A_eddy.sla = np.ma.copy(sla)
                 C_eddy.sla = np.ma.copy(sla)
                 A_eddy.slacopy = np.ma.copy(sla)
@@ -1207,7 +1238,9 @@ if __name__ == '__main__':
                 if anim_figs:
                    animfig = plt.figure(999)
                    animax = animfig.add_subplot(111)
-
+                   # Colorbar axis
+                   animax_cbar = get_cax(animax, dx=0.03, width=.05, position='b')
+                   
             if 'Q' in diag_type:
                 CS = ax.contour(sla_grd.lon(),
                                  sla_grd.lat(), qparam, qparameter)
@@ -1325,7 +1358,7 @@ if __name__ == '__main__':
                     #print 'figure saving'
                     #tt = time.time()
                     anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, diag_type, 
-                                savedir, 'SLA ' + tit, animax)
+                                savedir, 'SLA ' + tit, animax, animax_cbar)
                     #print 'figure saving done in %s seconds\n' %(time.time() - tt)
                 #anim_fig.start()
                 

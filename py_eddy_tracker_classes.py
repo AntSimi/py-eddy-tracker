@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 1.2.1
+Version 1.3.0
 ===========================================================================
 
 
@@ -152,7 +152,7 @@ def do_basemap(M, ax):
 
 
 def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, diag_type,
-                savedir, tit, ax):
+                savedir, tit, ax, ax_cbar):
     '''
     '''
     def plot_tracks(Eddy, track_length, rtime, col, ax):
@@ -169,18 +169,18 @@ def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, diag_type,
     M = A_eddy.M
     
     if 'Q' in diag_type:
-        cb = M.pcolormesh(pMx, pMy, xicopy, cmap=cmap, ax=ax)
+        pcm = M.pcolormesh(pMx, pMy, xicopy, cmap=cmap, ax=ax)
         M.contour(Mx, My, xi, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, qparam, qparameter, ax=ax, colors='g', linewidths=0.25)
-        cb.set_clim(-.5, .5)
+        pcm.set_clim(-.5, .5)
         M.contour(Mx, My, qparam, [qparameter[0]], ax=ax, colors='m', linewidths=0.25)
     
     elif 'sla' in diag_type:
-        cb = M.pcolormesh(pMx, pMy, A_eddy.slacopy, cmap=cmap, ax=ax)
+        pcm = M.pcolormesh(pMx, pMy, A_eddy.slacopy, cmap=cmap, ax=ax)
         M.contour(Mx, My, A_eddy.slacopy, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, A_eddy.slacopy, A_eddy.slaparameter, ax=ax, colors='g',
                   linestyles='solid', linewidths=0.15)
-        cb.set_clim(-20., 20.)
+        pcm.set_clim(-20., 20.)
     plot_tracks(A_eddy, track_length, rtime, 'r', ax)
     plot_tracks(C_eddy, track_length, rtime, 'b', ax)
     
@@ -188,10 +188,16 @@ def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, diag_type,
     
     ax.set_title(tit)
     #cax = get_cax(sp)
-    plt.colorbar(cb, use_gridspec=True, orientation='horizontal', aspect=30)
+    #ax_cbar.update_normal(pcm)
+    #if 'cbar' in locals():
+        #cbar.update_normal(pcm)
+    #else:
+        #cbar = plt.colorbar(pcm, use_gridspec=True, orientation='horizontal', aspect=30)
+    plt.colorbar(pcm, cax=ax_cbar, orientation='horizontal')
     plt.savefig(savedir + 'eddy_track_%s.png' %tit.replace(' ','_'), dpi=150, bbox_inches='tight')
     #plt.close(fignum)
     ax.cla()
+    ax_cbar.cla()
     return
 
 
@@ -205,10 +211,11 @@ def get_cax(subplot, dx=0, width=.015, position='r'):
       position - 'r' - right (default)
                - 'b' - bottom
     '''
+    assert position in ('b', 'r'), 'position must be "r" or "b"'
     cax = subplot.get_position().get_points()
-    if position=='r':
+    if position in 'r' and 'r' in position:
         cax = plt.axes([cax[1][0]+dx,cax[0][1],width,cax[1][1]-cax[0][1]])
-    if position=='b':
+    if position in 'b' and 'b' in position:
         cax = plt.axes([cax[0][0],cax[0][1]-2*dx,cax[1][0]-cax[0][0],width])
     return cax
 
@@ -587,6 +594,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
         has_ts = True
     elif 'AVISO' in Eddy.datatype:
         has_ts = False
+    else:
+        Exception # unknown datatype
     
     # Unpack indices for convenience
     istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
@@ -661,7 +670,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     #print 'no eddy'
                             else:
                                 proceed1 = False
-
+                        else:
+                            raise Exception
                         
                         if proceed1:
                             # Get lon,lat of bounding box around eddy
@@ -797,7 +807,12 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             else:
                                 proceed2 = False
 
-                            if proceed2:      
+                            if proceed2:
+                                
+                                # Get sum of eke within Ceff
+                                teke = np.sum(grd.eke[jmin:jmax,imin:imax].flat[mask_e])
+                                
+                                
                                 if 'Q' in Eddy.diag_type:
                                     if 0:
                                         plt.figure()
@@ -820,12 +835,12 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     Uavg = np.nan_to_num(Uavg).max()
                                 
                                 elif 'sla' in Eddy.diag_type:
-				    #tt = time.time()
+                                   #tt = time.time()
                                     Uavg, centlon_s, centlat_s, eddy_radius_s,\
                                          contlon_s, contlat_s, inner_contlon, inner_contlat = get_Uavg(Eddy, CS, collind,
                                                                        centlon_e, centlat_e, poly_e, grd, eddy_radius_e)
                                     #print '------- got Uavg in %s seconds' %(time.time() - tt)
-				    #tt = time.time()
+                                    #tt = time.time()
                                     centlon_lmi, centlat_lmi, junk, junk, junk = fit_circle(inner_contlon,
                                                                                             inner_contlat)
                                     #print '------- got fit_circle in %s seconds' %(time.time() - tt)
@@ -884,15 +899,15 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                                               cent_temp=cent_temp,
                                                                               cent_salt=cent_salt)
                                     else: # AVISO
-				        #tt = time.time()
+                                        #tt = time.time()
                                         if 'Anticyclonic' in sign_type:
                                             A_list_obj.update_eddy_properties(centlon, centlat,
                                                                               eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, Uavg, rtime, bounds)
+                                                                              amplitude, Uavg, teke, rtime, bounds)
                                         elif 'Cyclonic' in sign_type:
                                             C_list_obj.update_eddy_properties(centlon, centlat,
                                                                               eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, Uavg, rtime, bounds)
+                                                                              amplitude, Uavg, teke, rtime, bounds)
                                         #print '------- updated properties i %s seconds' %(time.time() - tt)
 
                                 # Mask out already found eddies
@@ -1048,6 +1063,7 @@ def track_eddies(Eddy, first_record):
         new_rd_e = np.array([])
         new_am = np.array([])
         new_Ua = np.array([])
+        new_ek = np.array([])
         new_tm = np.array([])
         new_tp = np.array([])
         new_st = np.array([])
@@ -1126,6 +1142,7 @@ def track_eddies(Eddy, first_record):
                     new_rd_e = np.r_[new_rd_e, Eddy.new_radii_tmp_e[new_ind]]
                     new_am = np.r_[new_am, Eddy.new_amp_tmp[new_ind]]
                     new_Ua = np.r_[new_Ua, Eddy.new_Uavg_tmp[new_ind]]
+                    new_ek = np.r_[new_ek, Eddy.new_teke_tmp[new_ind]]
                     new_tm = np.r_[new_tm, Eddy.new_time_tmp[new_ind]]
                     if 'ROMS' in Eddy.datatype:
                         new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
@@ -1155,7 +1172,7 @@ def track_eddies(Eddy, first_record):
                                   new_tp, new_st)
             elif 'AVISO' in Eddy.datatype:
                 Eddy = accounting(Eddy, old_ind, new_ln, new_lt, new_rd_s, new_rd_e,
-                                  new_am, new_Ua, new_tm, new_bnds, new_eddy, first_record)
+                                  new_am, new_Ua, new_ek, new_tm, new_bnds, new_eddy, first_record)
         
         # More than one eddy within range
         elif dist_arr.size > 1:
@@ -1211,7 +1228,7 @@ def track_eddies(Eddy, first_record):
                 
                 Eddy = accounting(Eddy, old_ind,
                                   new_ln[dx0], new_lt[dx0], new_rd_s[dx0], new_rd_e[dx0],
-                                  new_am[dx0], new_Ua[dx0], new_tm[dx0],
+                                  new_am[dx0], new_Ua[dx0], new_ek[dx0], new_tm[dx0],
                                   new_bnds[dx0], new_eddy, first_record)
             
             if debug_dist:
@@ -1277,6 +1294,7 @@ def track_eddies(Eddy, first_record):
                                       Eddy.new_radii_tmp_e[neind],
                                       Eddy.new_amp_tmp[neind],
                                       Eddy.new_Uavg_tmp[neind],
+                                      Eddy.new_teke_tmp[neind],
                                       Eddy.new_time_tmp[neind],
                                       Eddy.new_bounds_tmp[neind], True, False)  
     #print 'Leaving track_eddies'
@@ -1287,7 +1305,7 @@ def track_eddies(Eddy, first_record):
 
 
 def accounting(Eddy, old_ind, centlon, centlat,
-               eddy_radius_s, eddy_radius_e, amplitude, Uavg, rtime, 
+               eddy_radius_s, eddy_radius_e, amplitude, Uavg, teke, rtime, 
                bounds, new_eddy, first_record, cent_temp=None, cent_salt=None):
     '''
     Accounting for new or old eddy (either cyclonic or anticyclonic)
@@ -1298,6 +1316,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
       eddy_radius_e:  effective eddy radius from fit_circle
       amplitude  :  eddy amplitude/intensity (max abs vorticity/f in eddy)
       Uavg       :  average velocity within eddy contour
+      teke       : sum of EKE within Ceff
       rtime      :  ROMS time in seconds
       cent_temp  :  array of temperature at centroids
       cent_salt  :  array of salinity at centroids
@@ -1323,6 +1342,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
             Eddy.new_radii_s[old_ind] = eddy_radius_s
             Eddy.new_radii_e[old_ind] = eddy_radius_e
             Eddy.new_amp[old_ind] = amplitude
+            Eddy.new_Uavg[old_ind] = Uavg
+            Eddy.new_teke[old_ind] = teke
             if 'ROMS' in Eddy.datatype:
                 Eddy.new_temp[old_ind] = cent_temp
                 Eddy.new_salt[old_ind] = cent_salt
@@ -1334,6 +1355,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
             Eddy.insert_at_index('new_radii_s', old_ind, eddy_radius_s)
             Eddy.insert_at_index('new_radii_e', old_ind, eddy_radius_e)
             Eddy.insert_at_index('new_amp', old_ind, amplitude)
+            Eddy.insert_at_index('new_Uavg', old_ind, Uavg)
+            Eddy.insert_at_index('new_teke', old_ind, teke)
             if 'ROMS' in Eddy.datatype:
                 Eddy.insert_at_index('new_temp', old_ind, cent_temp)
                 Eddy.insert_at_index('new_salt', old_ind, cent_salt)
@@ -1346,7 +1369,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
         
         elif 'AVISO' in Eddy.datatype:
             
-            Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg,
+            Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg, teke,
                               eddy_radius_s, eddy_radius_e, amplitude,
                               bounds)
 
@@ -1358,6 +1381,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
         Eddy.insert_at_index('new_radii_s', Eddy.index, eddy_radius_s)
         Eddy.insert_at_index('new_radii_e', Eddy.index, eddy_radius_e)
         Eddy.insert_at_index('new_amp', Eddy.index, amplitude)
+        Eddy.insert_at_index('new_Uavg', Eddy.index, Uavg)
+        Eddy.insert_at_index('new_teke', Eddy.index, teke)
         if 'ROMS' in Eddy.datatype:
             Eddy.insert_at_index('new_temp', Eddy.index, cent_temp)
             Eddy.insert_at_index('new_salt', Eddy.index, cent_salt)
@@ -1369,7 +1394,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
             Eddy.append_list(centlon, centlat, rtime, Uavg,
                 eddy_radius_s, eddy_radius_e, amplitude, bounds, cent_temp, cent_salt)
         elif 'AVISO' in Eddy.datatype:
-            Eddy.append_list(centlon, centlat, rtime, Uavg,
+            Eddy.append_list(centlon, centlat, rtime, Uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude, bounds)
         
         Eddy.index += 1

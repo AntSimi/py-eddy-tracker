@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 1.2.1
+Version 1.3.0
 
 
 ===========================================================================
@@ -123,7 +123,7 @@ class track (object):
         saved2nc - Becomes True once saved to netcdf file
         dayzero - True at first appearance of eddy
     '''
-    def __init__(self, eddy_index, datatype, lon, lat, time, Uavg,
+    def __init__(self, eddy_index, datatype, lon, lat, time, Uavg, teke,
                        radius_s, radius_e, amplitude, bounds,
                        temp=None,
                        salt=None):
@@ -134,6 +134,7 @@ class track (object):
         self.lat        = np.atleast_1d(lat)
         self.ocean_time = np.atleast_1d(time)
         self.Uavg       = np.atleast_1d(Uavg)
+        self.teke       = np.atleast_1d(teke)
         self.radius_s   = np.atleast_1d(radius_s) # speed-based eddy radius
         self.radius_e   = np.atleast_1d(radius_e) # effective eddy radius
         self.amplitude  = np.atleast_1d(amplitude)
@@ -146,7 +147,7 @@ class track (object):
         self.saved2nc   = False
 
 
-    def append_pos(self, lon, lat, time, Uavg,
+    def append_pos(self, lon, lat, time, Uavg, teke,
                    radius_s, radius_e, amplitude, bounds, temp, salt):
         '''
         Append track updates
@@ -155,6 +156,7 @@ class track (object):
         self.lat = np.r_[self.lat, lat]
         self.ocean_time = np.r_[self.ocean_time, time]
         self.Uavg = np.r_[self.Uavg, Uavg]
+        self.teke = np.r_[self.teke, teke]
         self.radius_s = np.r_[self.radius_s, radius_s]
         self.radius_e = np.r_[self.radius_e, radius_e]
         self.amplitude = np.r_[self.amplitude, amplitude]
@@ -210,6 +212,7 @@ class track_list (object):
         self.new_radii_e = np.array([])
         self.new_amp    = np.array([])
         self.new_Uavg   = np.array([])
+        self.new_teke   = np.array([])
         if 'ROMS' in self.datatype:
             self.new_temp = np.array([])
             self.new_salt = np.array([])
@@ -221,6 +224,7 @@ class track_list (object):
         self.old_radii_e  = np.array([])
         self.old_amp    = np.array([])
         self.old_Uavg   = np.array([])
+        self.old_teke   = np.array([])
         if 'ROMS' in self.datatype:
             self.old_temp = np.array([])
             self.old_salt = np.array([])
@@ -235,24 +239,24 @@ class track_list (object):
         assert datatype in ('ROMS', 'AVISO'), "Unknown string in 'datatype' parameter"
 
 
-    def append_list(self, lon, lat, time, Uavg,
+    def append_list(self, lon, lat, time, Uavg, teke,
             radius_s, radius_e, amplitude, bounds, temp=None, salt=None):
         '''
         Append a new 'track' object to the list
         '''
         self.tracklist.append(track(self.index, self.datatype,
-                                    lon, lat, time, Uavg,
+                                    lon, lat, time, Uavg, teke,
                                     radius_s, radius_e,
                                     amplitude, bounds,
                                     temp, salt))
 
 
-    def update_track(self, index, lon, lat, time, Uavg,
+    def update_track(self, index, lon, lat, time, Uavg, teke,
              radius_s, radius_e, amplitude, bounds, temp=None, salt=None):
         '''
         Update a track at index
         '''
-        self.tracklist[index].append_pos(lon, lat, time, Uavg,
+        self.tracklist[index].append_pos(lon, lat, time, Uavg, teke,
                                          radius_s, radius_e,
                                          amplitude, bounds,
                                          temp, salt)
@@ -268,6 +272,7 @@ class track_list (object):
         self.new_radii_tmp_e = np.array([])
         self.new_amp_tmp = np.array([])
         self.new_Uavg_tmp = np.array([])
+        self.new_teke_tmp = np.array([])
         self.new_time_tmp = np.array([])
         self.new_temp_tmp = np.array([])
         self.new_salt_tmp = np.array([])
@@ -285,6 +290,7 @@ class track_list (object):
         self.old_radii_e = np.copy(self.new_radii_tmp_e)
         self.old_amp = np.copy(self.new_amp_tmp)
         self.old_Uavg = np.copy(self.new_Uavg_tmp)
+        self.old_teke = np.copy(self.new_teke_tmp)
         self.old_temp = np.copy(self.new_temp_tmp)
         self.old_salt = np.copy(self.new_salt_tmp)
 
@@ -391,6 +397,7 @@ class track_list (object):
         nc.createVariable('A', 'f8', ('Nobs'), fill_value=self.fillval)
         nc.createVariable('L', 'f8', ('Nobs'), fill_value=self.fillval)
         nc.createVariable('U', 'f8', ('Nobs'), fill_value=self.fillval)
+        nc.createVariable('Teke', 'f8', ('Nobs'), fill_value=self.fillval)
         nc.createVariable('radius_e', 'f8', ('Nobs'), fill_value=self.fillval)
         if 'Q' in self.diag_type:
             nc.createVariable('qparameter', 'f8', ('Nobs'), fill_value=self.fillval)
@@ -446,10 +453,11 @@ class track_list (object):
                                         'between the extremum of SSH within ' + \
                                         'the eddy and the SSH around the contour ' + \
                                         'defining the eddy perimeter'
+        
         nc.variables['L'].units = 'km'
         nc.variables['L'].min_val = self.radmin / 1000.
         nc.variables['L'].max_val = self.radmax / 1000.
-        nc.variables['L'].long_name = 'radius scale'
+        nc.variables['L'].long_name = 'speed radius scale'
         nc.variables['L'].description = 'radius of a circle whose area is equal ' + \
                                         'to that enclosed by the contour of ' + \
                                         'maximum circum-average speed'
@@ -460,6 +468,13 @@ class track_list (object):
         nc.variables['U'].long_name = 'maximum circum-averaged speed'
         nc.variables['U'].description = 'average speed of the contour defining ' + \
                                         'the radius scale L'
+        nc.variables['Teke'].units = 'm^2/sec^2'
+        #nc.variables['Teke'].min = 0.
+        #nc.variables['Teke'].max = 376.6
+        nc.variables['Teke'].long_name = 'sum EKE within contour Ceff'
+        nc.variables['Teke'].description = 'sum of eddy kinetic energy within contour defining ' + \
+                                        'the effective radius'
+        
         nc.variables['radius_e'].units = 'km'
         nc.variables['radius_e'].min_val = self.radmin / 1000.
         nc.variables['radius_e'].max_val = self.radmax / 1000.
@@ -495,6 +510,7 @@ class track_list (object):
                 track.qparameter = False
                 track.amplitude = False
                 track.Uavg = False
+                track.teke = False
                 track.radius_s = False
                 track.radius_e = False
                 track.bounds = False
@@ -549,6 +565,7 @@ class track_list (object):
                         nc.variables['lat'][self.ncind:tend] = np.array([self.tracklist[i].lat])
                         nc.variables['A'][self.ncind:tend] = np.array([self.tracklist[i].amplitude])
                         nc.variables['U'][self.ncind:tend] = np.array([self.tracklist[i].Uavg]) * 100. # to cm/s
+                        nc.variables['Teke'][self.ncind:tend] = np.array([self.tracklist[i].teke])
                         nc.variables['L'][self.ncind:tend] = np.array([self.tracklist[i].radius_s]) * np.array(1e-3)
                         nc.variables['radius_e'][self.ncind:tend] = np.array([self.tracklist[i].radius_e]) * np.array(1e-3)
                         if 'ROMS' in self.datatype:
@@ -594,6 +611,7 @@ class track_list (object):
         self.old_radii_e = self.new_radii_e[lasti:]
         self.old_amp     = self.new_amp[lasti:]
         self.old_Uavg    = self.new_Uavg[lasti:]
+        self.old_teke    = self.new_teke[lasti:]
         if 'ROMS' in self.datatype:
             self.old_temp = self.new_temp[lasti:]
             self.old_salt = self.new_salt[lasti:]
@@ -604,6 +622,7 @@ class track_list (object):
         self.new_radii_e = np.array([])
         self.new_amp     = np.array([])
         self.new_Uavg    = np.array([])
+        self.new_teke    = np.array([])
         self.new_time    = np.array([])
         if 'ROMS' in self.datatype:
             self.new_temp = np.array([])
@@ -669,6 +688,14 @@ class track_list (object):
             self.new_amp = np.zeros((newsize))
             self.new_amp[:tmp.size] = tmp
             self.new_amp[ind] = x
+        elif 'new_Uavg' in xarr:
+            self.new_Uavg = np.zeros((newsize))
+            self.new_Uavg[:tmp.size] = tmp
+            self.new_Uavg[ind] = x
+        elif 'new_teke' in xarr:
+            self.new_teke = np.zeros((newsize))
+            self.new_teke[:tmp.size] = tmp
+            self.new_teke[ind] = x
         elif 'new_temp' in xarr:
             self.new_temp = np.zeros((newsize))
             self.new_temp[:tmp.size] = tmp
@@ -683,7 +710,7 @@ class track_list (object):
 
 
     def update_eddy_properties(self, centlon, centlat, eddy_radius_s, eddy_radius_e,
-                               amplitude, Uavg, rtime, bounds, cent_temp=None, cent_salt=None):
+                               amplitude, Uavg, teke, rtime, bounds, cent_temp=None, cent_salt=None):
         '''
         Append new variable values to track arrays
         '''
@@ -693,6 +720,7 @@ class track_list (object):
         self.new_radii_tmp_e = np.r_[self.new_radii_tmp_e, eddy_radius_e]
         self.new_amp_tmp = np.r_[self.new_amp_tmp, amplitude]
         self.new_Uavg_tmp = np.r_[self.new_Uavg_tmp, Uavg]
+        self.new_teke_tmp = np.r_[self.new_teke_tmp, teke]
         self.new_time_tmp = np.r_[self.new_time_tmp, rtime]
         if 'ROMS' in self.datatype:
             self.new_temp_tmp = np.r_[self.new_temp_tmp, cent_temp]
