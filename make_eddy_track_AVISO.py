@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 1.2.0
+Version 1.2.1
 
 
 Scroll down to line ~640 to get started
@@ -61,8 +61,8 @@ class py_eddy_tracker (object):
         '''
         Set some constants
         '''
-        gravity = 9.81
-        earth_radius = 6371315.0
+        self.gravity = 9.81
+        self.earth_radius = 6371315.0
     
     
     def read_nc(self, varfile, varname, indices="[:]"):
@@ -241,7 +241,7 @@ class py_eddy_tracker (object):
         self._gof *= 4.
         self._gof *= np.pi
         self._gof /= 86400.
-        self._gof = 9.81 / self._gof
+        self._gof = self.gravity / self._gof
         
         lonu = self.half_interp(self.lonpad()[:,:-1], self.lonpad()[:,1:])
         latu = self.half_interp(self.latpad()[:,:-1], self.latpad()[:,1:])
@@ -375,6 +375,7 @@ class AVISO_grid (py_eddy_tracker):
         self.lonmax = lonmax
         self.latmin = latmin
         self.latmax = latmax
+        self.gravity = 9.81
         
         try: # new AVISO (2014)
             self._lon = self.read_nc(AVISO_file, 'lon')
@@ -438,7 +439,7 @@ class AVISO_grid (py_eddy_tracker):
             #zeta = fillmask(zeta, 1 + (-1 * zeta.mask))
         except Exception: # In case no landpoints
             zeta = np.ma.masked_array(zeta)
-        return zeta
+        return zeta.astype(np.float64)
 
 
 
@@ -470,7 +471,7 @@ class AVISO_grid (py_eddy_tracker):
         #   Points greater than one are then set to zero
         weight = dist / (dist.min(axis=1)[:,np.newaxis])
         weight *= np.ones_like(dist)
-        np.place(weight, weight>1., 0.)
+        np.place(weight, weight > 1., 0.)
 
         # Multiply the queried good points by the weight, selecting only the
         # nearest points.  Divide by the number of nearest points to get average
@@ -653,41 +654,51 @@ if __name__ == '__main__':
     # Specify use of new AVISO 2014 data
     new_AVISO = True
     
+    # Specify subsampling new AVISO 2014 data; i.e. you may
+    # prefer to use every second day rather than every day
+    if new_AVISO:
+        new_AVISO_SUBSAMP = True
+        if new_AVISO_SUBSAMP:
+            days_btwn_recs = 7. # put sampling rate (days) here
+        else:
+            days_btwn_recs = 1.
+    else: # old seven day AVISO
+        days_btwn_recs = 7.
+
     # Set path(s) to directory where SSH data are stored...
     if 'Global' in the_domain:
         if new_AVISO:
-            directory = '/path/to/your/aviso_data/'
+            #directory = '/path/to/your/aviso_data/'
             #directory = '/shared/Altimetry/global/delayed-time/grids/msla/all-sat-merged/h/'
-            AVISO_files = 'dt_global_allsat_msla_h_????????_20140106.nc'
-            days_btwn_recs = 1.
+            #AVISO_files = 'dt_global_allsat_msla_h_????????_20140106.nc'
+            directory = '/shared/Altimetry/global/delayed-time/grids/msla/two-sat-merged/h/'
+            AVISO_files = 'dt_global_twosat_msla_h_????????_20140106.nc'
         else:
             directory = '/path/to/your/aviso_data/'
             #directory = '/marula/emason/data/altimetry/MSLA/GLOBAL/DT/REF/'
             AVISO_files = 'dt_ref_global_merged_msla_h_qd_????????_*.nc'
-            days_btwn_recs = 7.
     
     elif 'MedSea' in the_domain:
         if new_AVISO:
-            directory = '/path/to/your/aviso_data/'
-            #directory = '/shared/Altimetry/regional-mediterranean/delayed-time/grids/msla/all-sat-merged/h/'
+            #directory = '/path/to/your/aviso_data/'
+            directory = '/shared/Altimetry/regional-mediterranean/delayed-time/grids/msla/all-sat-merged/h/'
             AVISO_files = 'dt_blacksea_allsat_msla_h_????????_*.nc'
         else:
             pass
     
     elif 'BlackSea' in the_domain:
         if new_AVISO:
-            directory = '/path/to/your/aviso_data/'
-            #irectory = '/shared/Altimetry/regional-blacksea/delayed-time/grids/msla/all-sat-merged/h/'
+            #directory = '/path/to/your/aviso_data/'
+            directory = '/shared/Altimetry/regional-blacksea/delayed-time/grids/msla/all-sat-merged/h/'
             AVISO_files = 'dt_blacksea_allsat_msla_h_????????_*.nc'
-            days_btwn_recs = 1.
     else:
         Exception #no_domain_specified
     
     
     # Set date range (YYYYMMDD)
-    date_str, date_end = 19980107, 19991110 # 
+    #date_str, date_end = 19980107, 19991110 # 
     #date_str, date_end = 20081107, 20100110 # 
-    #date_str, date_end = 19930101, 20121231 # 
+    date_str, date_end = 19930101, 20121231 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
     #diag_type = 'Q' <<< not implemented in 1.2.0
@@ -697,12 +708,13 @@ if __name__ == '__main__':
     # Path to directory where outputs are to be saved...
     #savedir = directory
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
+    savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test_0.35/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test_0.3/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO/CEC/'
     #savedir = '/shared/emason/eddy_tracks/Barbara/2009/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
-    savedir = '/path/to/save/your/outputs/'
+    #savedir = '/path/to/save/your/outputs/'
     
     
     # True to save outputs in same style as Chelton
@@ -724,7 +736,7 @@ if __name__ == '__main__':
         ampmax = 100.
         
     elif 'sla' in diag_type:
-        radmin = 0.3 # degrees (Chelton recommends ~50 km minimum)
+        radmin = 0.35 # degrees (Chelton recommends ~50 km minimum)
         radmax = 4.461 # degrees
         ampmin = 1. # cm
         ampmax = 150.
@@ -769,15 +781,16 @@ if __name__ == '__main__':
 
     subdomain = True
     if the_domain in 'Global':
-        lonmin = -36.     # Canary
-        lonmax = -7.5
-        latmin = 18.
-        latmax = 33.2
+        
+        #lonmin = -36.     # Canary
+        #lonmax = -7.5
+        #latmin = 18.
+        #latmax = 33.2
 
-        #lonmin = -65.     # Corridor
-        #lonmax = -5.5
-        #latmin = 11.5
-        #latmax = 38.5
+        lonmin = -65.     # Corridor
+        lonmax = -5.5
+        latmin = 11.5
+        latmax = 38.5
 
         #lonmin = -179.     # SEP
         #lonmax = -65
@@ -794,17 +807,21 @@ if __name__ == '__main__':
         #latmin = -47.
         #latmax = -24.
     
+    
     elif the_domain in 'MedSea':
+        
         lonmin = 354.     # SEP
         lonmax = 396
         latmin = 30.
         latmax = 46.
     
     elif the_domain in 'BlackSea':
-        lonmin = 27.     # SEP
+        
+        lonmin = 27.     # Black Sea
         lonmax = 42.
         latmin = 40.
         latmax = 47.
+    
     
     # Typical parameters
     dist0 = 25000. # m separation distance after ~7 days (see CSS11 fig 22)
@@ -818,10 +835,10 @@ if __name__ == '__main__':
     
     # Parameters used by Chelton etal and Kurian etal (Sec. 3.2) to ensure the slow evolution
     # of the eddies over time; they use min and max values of 0.25 and 2.5
-    evolve_ammin = 0.05# 0.25 # min change in amplitude
-    evolve_ammax = 5#2.5  # max change in amplitude
-    evolve_armin = 0.05# 0.25 # min change in area
-    evolve_armax = 5  # max change in area
+    evolve_ammin = 0.01# 0.25 # min change in amplitude
+    evolve_ammax = 10#2.5  # max change in amplitude
+    evolve_armin = 0.01# 0.25 # min change in area
+    evolve_armax = 10  # max change in area
     
     
     separation_method = 'ellipse' # see CSS11
@@ -853,6 +870,9 @@ if __name__ == '__main__':
     
     # Get complete AVISO file list
     AVISO_files = sorted(glob.glob(directory + AVISO_files))
+    
+    # Use this for subsampling to get identical list as old_AVISO
+    #AVISO_files = AVISO_files[5:-5:7]
     
     # Set up a grid object using first AVISO file in the list
     sla_grd = AVISO_grid(AVISO_files[0], lonmin, lonmax, latmin, latmax)
@@ -1020,20 +1040,25 @@ if __name__ == '__main__':
     # Loop through the AVISO files...
     start = True
     start_time = time.time()
+    
     print '\nStart tracking'
+    
     for AVISO_file in AVISO_files:
         
-        
         with netcdf.Dataset(AVISO_file) as nc:
-	    
+    
             try:
                thedate = nc.OriginalName
-               thedate = thedate.partition('qd_')[2].partition('_')[0]
+               if 'qd_' in thedate:
+                   thedate = thedate.partition('qd_')[2].partition('_')[0]
+               else:
+                   thedate = thedate.partition('h_')[2].partition('_')[0]
                thedate = datestr2datetime(thedate)
                thedate = dt.date2num(thedate)
             except Exception:
                thedate = nc.variables['time'][:]
                thedate += sla_grd.base_date
+        
         rtime = thedate
         
         if np.logical_and(thedate >= thestartdate,
@@ -1174,33 +1199,39 @@ if __name__ == '__main__':
             
             # Get contours of Q/sla parameter
             if 'first_record' not in locals():
+                
                 print '------ getting SLA contours'
-            plt.figure(99)
+                contfig = plt.figure(99)
+                ax = contfig.add_subplot(111)
+                
+                if anim_figs:
+                   animfig = plt.figure(999)
+                   animax = animfig.add_subplot(111)
+
             if 'Q' in diag_type:
-                CS = plt.contour(sla_grd.lon(),
+                CS = ax.contour(sla_grd.lon(),
                                  sla_grd.lat(), qparam, qparameter)
                 # Get xi contour field at zero
-                CSxi = plt.contour(sla_grd.lon(),
+                CSxi = ax.contour(sla_grd.lon(),
                                    sla_grd.lat(), xi, [0.])
                 
             elif 'sla' in diag_type:
-                A_CS = plt.contour(sla_grd.lon(),
+                A_CS = ax.contour(sla_grd.lon(),
                                    sla_grd.lat(), A_eddy.sla, slaparameter)
                 # Note that CSc is for the cyclonics, slaparameter in reverse order
-                C_CS = plt.contour(sla_grd.lon(),
+                C_CS = ax.contour(sla_grd.lon(),
                                    sla_grd.lat(), C_eddy.sla, slaparameter[::-1])
             else: Exception
             
-            if True:
-                plt.close(99)
-            else:
-                # Debug
+            if True: # clear the current axis
+                ax.cla()
+            else: # draw debug figure
                 if 'Q' in diag_type:
-                    plt.title('qparameter and xi')
-                    plt.clabel(CS, np.array([qparameter.min(), qparameter.max()]))
+                    ax.set_title('qparameter and xi')
+                    ax.clabel(CS, np.array([qparameter.min(), qparameter.max()]))
                 elif 'sla' in diag_type:
-                    plt.title('slaparameter')
-                    plt.clabel(A_CS, np.array([slaparameter.min(), slaparameter.max()]))
+                    ax.set_title('slaparameter')
+                    ax.clabel(A_CS, np.array([slaparameter.min(), slaparameter.max()]))
                 plt.axis('image')
                 plt.show()
             
@@ -1227,7 +1258,7 @@ if __name__ == '__main__':
             if 'fig250' in locals():
                 
                 plt.figure(250)
-                tit = 'Y' + str(yr) + 'M' + str(mo) + 'D' + str(da)
+                tit = 'Y' + str(yr) + 'M' + str(mo).zfill(2) + 'D' + str(da).zfill(2)
                 
                 if 'Q' in diag_type:
                     plt.title('Q ' + tit)
@@ -1274,7 +1305,7 @@ if __name__ == '__main__':
             
             if anim_figs: # Make figures for animations
                 
-                tit = 'Y' + str(yr) + 'M' + str(mo) + 'D' + str(da)
+                tit = 'Y' + str(yr) + 'M' + str(mo).zfill(2) + 'D' + str(da).zfill(2)
                 
                 #if 'anim_fig' in locals():
                     ## Wait if there is a still-active anim_fig thread
@@ -1290,11 +1321,11 @@ if __name__ == '__main__':
                              args=(33, M, pMx, pMy, slacopy, plt.cm.RdBu_r, rtime, diag_type, Mx, My, 
                                    slacopy, slacopy, slaparameter, A_eddy, C_eddy,
                                    savedir, plt, 'SLA ' + tit))'''
-                    fignum = 31
+
                     #print 'figure saving'
                     #tt = time.time()
                     anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, diag_type, 
-                                savedir, 'SLA ' + tit, fignum)
+                                savedir, 'SLA ' + tit, animax)
                     #print 'figure saving done in %s seconds\n' %(time.time() - tt)
                 #anim_fig.start()
                 

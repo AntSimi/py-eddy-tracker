@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 1.2.0
+Version 1.2.1
 ===========================================================================
 
 
@@ -152,45 +152,46 @@ def do_basemap(M, ax):
 
 
 def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, diag_type,
-                savedir, tit, fignum):
+                savedir, tit, ax):
     '''
     '''
-    def plot_tracks(Eddy, track_length, rtime, col, thax):
+    def plot_tracks(Eddy, track_length, rtime, col, ax):
         for i in Eddy.get_active_tracks(rtime):
             if Eddy.tracklist[i].lon.size > track_length: # filter for longer tracks
                 aex, aey = Eddy.M(Eddy.tracklist[i].lon, Eddy.tracklist[i].lat)
-                M.plot(aex, aey, col, lw=0.5, ax=thax)
-                M.scatter([aex[-1]], [aey[-1]], s=7, c=col, ax=thax)
+                M.plot(aex, aey, col, lw=0.5, ax=ax)
+                M.scatter([aex[-1]], [aey[-1]], s=7, c=col, ax=ax)
         return
     
-    plt.figure(fignum)
-    thax = plt.subplot(111)
+    #plt.figure(fignum)
+    #thax = plt.subplot(111)
     track_length = 0 # for filtering below
     M = A_eddy.M
     
     if 'Q' in diag_type:
-        cb = M.pcolormesh(pMx, pMy, xicopy, cmap=cmap, ax=thax)
-        M.contour(Mx, My, xi, [0.], ax=thax, colors='k', linewidths=0.5)
-        M.contour(Mx, My, qparam, qparameter, ax=thax, colors='g', linewidths=0.25)
+        cb = M.pcolormesh(pMx, pMy, xicopy, cmap=cmap, ax=ax)
+        M.contour(Mx, My, xi, [0.], ax=ax, colors='k', linewidths=0.5)
+        M.contour(Mx, My, qparam, qparameter, ax=ax, colors='g', linewidths=0.25)
         cb.set_clim(-.5, .5)
-        M.contour(Mx, My, qparam, [qparameter[0]], ax=thax, colors='m', linewidths=0.25)
+        M.contour(Mx, My, qparam, [qparameter[0]], ax=ax, colors='m', linewidths=0.25)
     
     elif 'sla' in diag_type:
-        cb = M.pcolormesh(pMx, pMy, A_eddy.slacopy, cmap=cmap, ax=thax)
-        M.contour(Mx, My, A_eddy.slacopy, [0.], ax=thax, colors='k', linewidths=0.5)
-        M.contour(Mx, My, A_eddy.slacopy, A_eddy.slaparameter, ax=thax, colors='g',
+        cb = M.pcolormesh(pMx, pMy, A_eddy.slacopy, cmap=cmap, ax=ax)
+        M.contour(Mx, My, A_eddy.slacopy, [0.], ax=ax, colors='k', linewidths=0.5)
+        M.contour(Mx, My, A_eddy.slacopy, A_eddy.slaparameter, ax=ax, colors='g',
                   linestyles='solid', linewidths=0.15)
         cb.set_clim(-20., 20.)
-    plot_tracks(A_eddy, track_length, rtime, 'r', thax)
-    plot_tracks(C_eddy, track_length, rtime, 'b', thax)
+    plot_tracks(A_eddy, track_length, rtime, 'r', ax)
+    plot_tracks(C_eddy, track_length, rtime, 'b', ax)
     
-    do_basemap(M, thax)
+    do_basemap(M, ax)
     
-    plt.title(tit)
+    ax.set_title(tit)
     #cax = get_cax(sp)
     plt.colorbar(cb, use_gridspec=True, orientation='horizontal', aspect=30)
     plt.savefig(savedir + 'eddy_track_%s.png' %tit.replace(' ','_'), dpi=150, bbox_inches='tight')
-    plt.close(fignum)
+    #plt.close(fignum)
+    ax.cla()
     return
 
 

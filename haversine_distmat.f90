@@ -18,13 +18,16 @@
 ! 
 ! Copyright (c) 2014 by Evan Mason
 ! Email: emason@imedea.uib-csic.es
+!
 ! ===========================================================================
 !
 !    To compile for f2py do following in terminal:
 !    f2py -m haversine_distmat -h haversine_distmat.pyf haversine_distmat.f90  --overwrite-signature
 !    f2py -c --fcompiler=gfortran haversine_distmat.pyf haversine_distmat.f90
 !
-!   Version 1.2.0
+!    If you have ifort on your system, change 'gfortran' to 'intelem'
+!
+!   Version 1.2.1
 !
 !===========================================================================
 
