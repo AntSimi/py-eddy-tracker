@@ -37,6 +37,7 @@ import haversine_distmat as hav # needs compiling with f2py
 #from make_eddy_track import *
 from py_eddy_tracker_classes import *
 
+
 def haversine_distance_vector(lon1, lat1, lon2, lat2):
     '''
     Haversine formula to calculate distance between two points
@@ -244,6 +245,7 @@ class track_list (object):
         '''
         Append a new 'track' object to the list
         '''
+        #print 'AAAAAAAAA', time
         self.tracklist.append(track(self.index, self.datatype,
                                     lon, lat, time, Uavg, teke,
                                     radius_s, radius_e,
@@ -256,6 +258,7 @@ class track_list (object):
         '''
         Update a track at index
         '''
+        #print 'CCCCCCCC', time
         self.tracklist[index].append_pos(lon, lat, time, Uavg, teke,
                                          radius_s, radius_e,
                                          amplitude, bounds,
@@ -303,11 +306,11 @@ class track_list (object):
         This call also identifies and removes
         inactive tracks.
         '''
-        self.active_tracks = []
+        active_tracks = []
         for i, item in enumerate(self.tracklist):
             if item._is_alive(rtime):
-                self.active_tracks.append(i)
-        return self.active_tracks
+                active_tracks.append(i)
+        return active_tracks
 
 
     def get_inactive_tracks(self, rtime):
@@ -316,11 +319,11 @@ class track_list (object):
         This call also identifies and removes
         inactive tracks
         '''
-        self.inactive_tracks = []
+        inactive_tracks = []
         for i, item in enumerate(self.tracklist):
             if not item._is_alive(rtime):
-                self.inactive_tracks.append(i)
-        return self.inactive_tracks
+                inactive_tracks.append(i)
+        return inactive_tracks
 
 
         
@@ -519,23 +522,23 @@ class track_list (object):
         return
     
     
-    def get_non_lin_param(self, i):
-        '''
-        Return the non-linearity parameter along a track
-        '''
-        #start_time = time.time()
-        distances = haversine_distance_vector(self.tracklist[i].lon[:-1],
-                               self.tracklist[i].lat[:-1],
-                               self.tracklist[i].lon[1:],
-                               self.tracklist[i].lat[1:])
-        distances = np.concatenate((distances[0][np.newaxis],
-                                    distances,
-                                    distances[-1][np.newaxis]))
-        distances = distances[:-1]
-        distances += distances[1:]
-        distances *= 0.5
-        distances /= (self.days_btwn_recs * 86400.)
-        return np.array([self.tracklist[i].Uavg]) / distances
+    #def get_non_lin_param(self, i):
+        #'''
+        #Return the non-linearity parameter along a track
+        #'''
+        ##start_time = time.time()
+        #distances = haversine_distance_vector(self.tracklist[i].lon[:-1],
+                               #self.tracklist[i].lat[:-1],
+                               #self.tracklist[i].lon[1:],
+                               #self.tracklist[i].lat[1:])
+        #distances = np.concatenate((distances[0][np.newaxis],
+                                    #distances,
+                                    #distances[-1][np.newaxis]))
+        #distances = distances[:-1]
+        #distances += distances[1:]
+        #distances *= 0.5
+        #distances /= (self.days_btwn_recs * 86400.)
+        #return np.array([self.tracklist[i].Uavg]) / distances
     
     
     def write2chelton_nc(self, savedir, rtime):
@@ -546,9 +549,12 @@ class track_list (object):
         Each inactive track is 'emptied' after saving
         '''
         nc = netcdf.Dataset(savedir, 'a')
+        inactive_tracks = self.get_inactive_tracks(rtime)
+        tracks2save = np.asarray(inactive_tracks)
         
-        tracks2save = np.array([self.get_inactive_tracks(rtime)])
-        if np.any(tracks2save):
+        #print 'tracks2save', tracks2save
+        
+        if np.any(tracks2save): # Note, this could break if all eddies become inactive at same time
             
             for i in np.nditer(tracks2save):
 
@@ -564,10 +570,13 @@ class track_list (object):
                         nc.variables['lon'][self.ncind:tend] = np.array([self.tracklist[i].lon])
                         nc.variables['lat'][self.ncind:tend] = np.array([self.tracklist[i].lat])
                         nc.variables['A'][self.ncind:tend] = np.array([self.tracklist[i].amplitude])
-                        nc.variables['U'][self.ncind:tend] = np.array([self.tracklist[i].Uavg]) * 100. # to cm/s
+                        self.tracklist[i].Uavg *= np.array(100.) # to cm/s
+                        nc.variables['U'][self.ncind:tend] = self.tracklist[i].Uavg
                         nc.variables['Teke'][self.ncind:tend] = np.array([self.tracklist[i].teke])
-                        nc.variables['L'][self.ncind:tend] = np.array([self.tracklist[i].radius_s]) * np.array(1e-3)
-                        nc.variables['radius_e'][self.ncind:tend] = np.array([self.tracklist[i].radius_e]) * np.array(1e-3)
+                        self.tracklist[i].radius_s *= np.array(1e-3)
+                        nc.variables['L'][self.ncind:tend] = self.tracklist[i].radius_s
+                        self.tracklist[i].radius_e * np.array(1e-3)
+                        nc.variables['radius_e'][self.ncind:tend] = self.tracklist[i].radius_e
                         if 'ROMS' in self.datatype:
                             nc.variables['temp'][self.ncind:tend] = np.array([self.tracklist[i].temp])
                             nc.variables['salt'][self.ncind:tend] = np.array([self.tracklist[i].salt])
@@ -653,7 +662,7 @@ class track_list (object):
         THIS IS SLOW BECAUSE REMAKES THE ARRAY EVERY TIME
         TRY UPDATING WITH VERY LONG ZERO ARRAYS...
         
-        This is the way to do it, all tracks as lists rather np arrays
+        This is the way to do it, all tracks as lists rather than np arrays
         try:
             self.new_lon[ind] = x
         except:
@@ -722,9 +731,12 @@ class track_list (object):
         self.new_Uavg_tmp = np.r_[self.new_Uavg_tmp, Uavg]
         self.new_teke_tmp = np.r_[self.new_teke_tmp, teke]
         self.new_time_tmp = np.r_[self.new_time_tmp, rtime]
+        #print self.new_time_tmp
+        #print self.new_lon_tmp
         if 'ROMS' in self.datatype:
-            self.new_temp_tmp = np.r_[self.new_temp_tmp, cent_temp]
-            self.new_salt_tmp = np.r_[self.new_salt_tmp, cent_salt]
+            #self.new_temp_tmp = np.r_[self.new_temp_tmp, cent_temp]
+            #self.new_salt_tmp = np.r_[self.new_salt_tmp, cent_salt]
+            pass
         try:
             self.new_bounds_tmp = np.vstack((self.new_bounds_tmp, bounds))
         except Exception:    
@@ -770,7 +782,7 @@ class RossbyWaveSpeed (object):
         '''
         self.domain = domain
         self.rw_path = rw_path
-        if 'Global' in domain:
+        if self.domain in ('Global', 'ROMS'):
             assert self.rw_path is not None, \
                 'Must supply a path for the Rossby deformation radius data'
             data = np.loadtxt(rw_path)
@@ -789,24 +801,28 @@ class RossbyWaveSpeed (object):
     def get_rwdistance(self, x, y, days_between_records):
         '''
         '''
-        if 'Global' in self.domain:
+        if self.domain in ('Global', 'ROMS'):
+	    #print 'x,y', x,y
             self.distance[:] = self._get_rlongwave_spd(x, y)
             self.distance *= 86400.
+            #if self.domain in 'ROMS':
+                #self.distance *= 1.5
         elif 'BlackSea' in self.domain:
-            self.distance[:] = 15000. # e.g. Blokhina & Afanasyev, 2003
+            self.distance[:] = 15000. # e.g., Blokhina & Afanasyev, 2003
         elif 'MedSea' in self.domain:
             self.distance[:] = 20000.
         else:
             Exception # Unknown domain
         if self.start:
+            print '------ setting ellipse for %s domain' %self.domain
             print '------ using %s Rossby deformation radius of %s m' \
-                                %(self.vartype, self.distance)
+                                %(self.vartype, np.abs(self.distance[0]))
             self.start = False
         self.distance *= days_between_records
         return np.abs(self.distance)
     
     
-    def _make_subset(self, ):
+    def _make_subset(self):
         '''
         '''
         pad = 1.5 # degrees
@@ -920,8 +936,7 @@ class SearchEllipse (object):
         '''
         self.x = x
         self.y = y
-            
-        if 'Global' in self.domain:
+        if self.domain in ('Global', 'ROMS'):
             self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.days_btwn_recs)
             self.rw_d_mod[:] = 1.75
             self.rw_d_mod *= self.rw_d
@@ -934,14 +949,17 @@ class SearchEllipse (object):
             self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.days_btwn_recs)
             self.rw_d_mod *= self.rw_d
             self._set_black_sea_ellipse()
+        
+        else: Exception
             
             
     def view_search_ellipse(self, Eddy):
         '''
+        Input A_eddy or C_eddy
         '''
         plt.figure()
         ax = plt.subplot(111)
-        ax.set_title('Rossby def. rad %s m' %self.rw_d)
+        ax.set_title('Rossby def. rad %s m' %self.rw_d[0])
         Eddy.M.scatter(self.x, self.y, c='b')
         #Eddy.M.plot(ee[:,0], ee[:,1], 'b')
         #Eddy.M.plot(ww[:,0], ww[:,1], 'g')

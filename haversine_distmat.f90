@@ -44,23 +44,31 @@
       real(kind=8), parameter                     :: erad = 6371315.0
       real(kind=8), dimension(:,:), intent(inout) :: dist
       external :: haversine
-
+      !write (*,*) 'aaa'
       d2r = atan2(0.,-1.)/ 180. ! atan2(0.,-1.) == pi
       m = size(xa, 1)
       n = size(xb, 1)
-      
+      allocate(xa1(m))
+      allocate(xa2(m))
+      allocate(xb1(n))
+      allocate(xb2(n))
       xa1 = xa(:,1)
       xa2 = xa(:,2)
       xb1 = xb(:,1)
       xb2 = xb(:,2)
+      !write (*,*) 'bbb', xa1
 
 !     Loop over empty dist matrix and fill
-        do j = 1, m
-          do i = 1, n
-            call haversine(xa1(j), xa2(j), xb1(i), xb2(i), d2r, thedist)
-            dist(j,i) = thedist
-          enddo
+      do j = 1, m
+        do i = 1, n
+          call haversine(xa1(j), xa2(j), xb1(i), xb2(i), d2r, thedist)
+          dist(j,i) = thedist
         enddo
+      enddo
+      deallocate(xa1)
+      deallocate(xa2)
+      deallocate(xb1)
+      deallocate(xb2)
       dist = dist * erad
     end subroutine haversine_distmat
 
@@ -81,10 +89,10 @@
       m = size(lon1)
       
 !     Loop over empty dist matrix and fill
-        do i = 1, m
-          call haversine(lon1(i), lat1(i), lon2(i), lat2(i), d2r, thedist)
-          dist(i) = thedist
-        enddo
+      do i = 1, m
+        call haversine(lon1(i), lat1(i), lon2(i), lat2(i), d2r, thedist)
+        dist(i) = thedist
+      enddo
       dist = dist * erad
     
     end subroutine haversine_distvec

@@ -31,7 +31,11 @@ Version 1.3.0
 ===========================================================================
 """
 
-
+from py_eddy_tracker_classes import *
+from make_eddy_tracker_list_obj import *
+from make_eddy_track_AVISO import *
+from dateutil import parser
+import roms_grid as rg
 
 
 
@@ -43,22 +47,20 @@ if __name__ == '__main__':
     #----------------------------------------------------------------------------
     # Some user-defined input...
 
-
+    # Specify the AVISO domain
+    the_domain = 'Canary_Islands'
+    #the_domain = 'BlackSea'
+    #the_domain = 'MedSea' # not yet implemented
+    
+    
+    
     directory = '/marula/emason/runs2009/na_2009_7pt5km/'
     #directory = '/marula/emason/runs2012/na_7pt5km/'
     #directory = '/marula/emason/runs2013/canwake4km/'
 
 
     #savedir = directory
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/sla_1/'
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/sla_2/'
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/sla_3/'
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/sla_4/'
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/sla_5/'  
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/test/'  
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/sla_6/'   
-    #savedir = '/marula/emason/runs2012/na_7pt5km/eddy_tracking_exps/sla_7/'
-    savedir = '/marula/emason/runs2009/na_7pt5km/eddy_tracking_exps/sla_1/'
+    savedir = '/marula/emason/runs2009/na_2009_7pt5km/eddy_tracking_exps/sla_1/'
 
     # True to save outputs in same style as CSS11
     chelton_style_nc = True
@@ -75,7 +77,8 @@ if __name__ == '__main__':
     geos = True
 
     if 'sla' in diag_type:
-        sshfile = '/marula/emason/runs2012/na_7pt5km/seasmean.nc'
+        #sshfile = '/marula/emason/runs2012/na_7pt5km/seasmean.nc'
+        sshfile = '/marula/emason/runs2009/na_2009_7pt5km/seasmean.nc'
         #sshfile = '/marula/emason/runs2013/canwake4km/seasmean.nc'
 
     Ymin         = 11
@@ -87,11 +90,16 @@ if __name__ == '__main__':
     filetype     = 'avg'
     sigma_lev    = -1  # -1 for surface
     
+    days_btwn_recs = 3.
+    
     # Set grid
     grdname = 'roms_grd_NA2009_7pt5km.nc'
     #grdname = 'cb_2009_3km_grd_smooth.nc'
     #grdname = 'grd_canwake4km.nc'
-
+    
+    pad = 2
+    
+    
     # Min and max permitted eddy radii [m]
     if 'Q' in diag_type:
         radmin = 15000.
@@ -142,20 +150,17 @@ if __name__ == '__main__':
         error
     
     # Save only tracks longer than...     
-    track_duration_min = 28 # days
+    track_duration_min = 5 # days
 
 
 
     subdomain = True
-    #lonmin = -40
-    #lonmax = -10
-    #latmin = 18.
-    #latmax = 34.
+    if the_domain in 'Canary_Islands':
     
-    lonmin = -38.     # Canary
-    lonmax = -5.5
-    latmin = 11.5
-    latmax = 38.5
+        lonmin = -38.     # Canary
+        lonmax = -5.5
+        latmin = 20.5
+        latmax = 38.5
     
     # for canbas4
     #lonmin = -36.
@@ -237,39 +242,17 @@ if __name__ == '__main__':
         #shape_err = np.power(np.linspace(85., 40,  slaparameter.size), 2) / 100.
         #shape_err[shape_err < 50.] = 50.
     
+    
+    
     # Get grid
-    grd = rg.romsgrid(grdname)
+    grd = rg.RomsGrid(grdname, lonmin, lonmax, latmin, latmax, pad)
     
-    if subdomain:
-        istr, junk = eddy_tracker.nearest(lonmin, latmin + 0.5 * (latmax-latmin), grd.lon(), grd.lat())
-        iend, junk = eddy_tracker.nearest(lonmax, latmin + 0.5 * (latmax-latmin), grd.lon(), grd.lat())
-        junk, jstr = eddy_tracker.nearest(lonmin + 0.5 * (lonmax-lonmin), latmin, grd.lon(), grd.lat())
-        junk, jend = eddy_tracker.nearest(lonmin + 0.5 * (lonmax-lonmin), latmax, grd.lon(), grd.lat())
-    else:
-        istr, jstr = 0, 0
-        iend, jend = None, None
-
-    
-    # Get indices for a temporary pad around u and v
-    # Padding removes unwanted discontinuities at xi boundaries arising
-    # from use of u2rho_2d and v2rho_2d
-    ipadstr, ipadend, jpadstr, jpadend, iunpadstr, iunpadend, junpadstr, junpadend = \
-        padding(grd.lon(), grd.lat(), istr, iend, jstr, jend)
-
-    
-
     
     # Get mean sea level from seasmean.nc
     if 'sla' in diag_type:
-        nc = netcdf.Dataset(sshfile)
-        sshmean = nc.variables['zeta'][-1,jpadstr:jpadend, ipadstr:ipadend]
-        nc.close()
-
-
-
-    # Mapping
-    lonmin, lonmax, latmin, latmax = get_limits(grd.lon()[jstr:jend,istr:iend],
-                                                grd.lat()[jstr:jend,istr:iend], .1)
+        with netcdf.Dataset(sshfile) as nc:
+            sshmean = nc.variables['zeta'][-1, grd.jp0:grd.jp1, grd.ip0:grd.ip1]
+    
                                                    
     # Create Basemap instance for Mercator projection.
     M = Basemap(projection='merc', llcrnrlon  = lonmin,  \
@@ -279,21 +262,23 @@ if __name__ == '__main__':
                                     lat_ts     = 28.,     \
                                     resolution = 'h') # 'h'-high, 'l'-low
 
-    Mx, My = M(grd.lon()[jstr:jend,istr:iend],
-               grd.lat()[jstr:jend,istr:iend])
-    #pMx, pMy = pcol_2dxy(Mx, My)
+    Mx, My = M(grd.lon(), grd.lat())
+    pMx, pMy = pcol_2dxy(Mx, My)
 
-    # Get Rossby wave speed data
-    rwv = eddy_tracker.rossby_wave_speeds(rw_path)
-    rwv.make_subset(lonmin - 2.5, lonmax + 2.5,
-                    latmin - 2.5, latmax + 2.5)
+                    
+    # Instantiate search ellipse object
+    search_ellipse = eddy_tracker.SearchEllipse('ROMS', days_btwn_recs,
+                                    rw_path, [lonmin, lonmax, latmin, latmax])
+    
+    
 
     if 'Gaussian' in smoothing and 'sla' in diag_type:
         # Get parameters for ndimage.gaussian_filter
         zres, mres = gaussian_resolution(grd.get_resolution(), zwl, mwl)
-        # Rotate to account for grid rotation
-        zres, mres = grd.rotate_vec(zres, mres, istr, iend, istr, jend)
         
+        # Rotate to account for grid rotation
+        zres, mres = grd.rotate_vec(zres, mres)
+        zres, mres = zres.mean(), mres.mean()
     
 
     fig  = plt.figure(1)
@@ -326,6 +311,7 @@ if __name__ == '__main__':
         # See CSS11 section B2 (0.4 degree radius)
         pixmin = np.round((np.pi * radmin**2) / grd.get_resolution()**2)
         pixmax = np.round((np.pi * radmax**2) / grd.get_resolution()**2)
+        print '--- Pixel range = %s-%s' %(np.int(pixmin), np.int(pixmax))
         A_eddy.pixel_threshold = [pixmin, pixmax]
         C_eddy.pixel_threshold = [pixmin, pixmax]
         A_eddy.radmin = np.float(grd.get_resolution(radmin))
@@ -356,8 +342,10 @@ if __name__ == '__main__':
     A_eddy.M = M
     C_eddy.M = M
     
-    A_eddy.rwv = rwv
-    C_eddy.rwv = rwv
+    #A_eddy.rwv = rwv
+    #C_eddy.rwv = rwv
+    A_eddy.search_ellipse = search_ellipse
+    C_eddy.search_ellipse = search_ellipse
     
     A_eddy.separation_method = separation_method
     C_eddy.separation_method = separation_method
@@ -376,11 +364,11 @@ if __name__ == '__main__':
     C_eddy.evolve_armin = np.float(evolve_armin)
     C_eddy.evolve_armax = np.float(evolve_armax)
 
-    A_eddy.istr, A_eddy.iend = istr, iend
-    A_eddy.jstr, A_eddy.jend = jstr, jend
-    C_eddy.istr, C_eddy.iend = istr, iend
-    C_eddy.jstr, C_eddy.jend = jstr, jend
-
+    A_eddy.i0, A_eddy.i1 = grd.i0, grd.i1
+    A_eddy.j0, A_eddy.j1 = grd.j0, grd.j1
+    C_eddy.i0, C_eddy.i1 = grd.i0, grd.i1
+    C_eddy.j0, C_eddy.j1 = grd.j0, grd.j1
+    
     A_eddy.lonmin, A_eddy.lonmax = np.float(lonmin), np.float(lonmax)
     A_eddy.latmin, A_eddy.latmax = np.float(latmin), np.float(latmax)
     C_eddy.lonmin, C_eddy.lonmax = np.float(lonmin), np.float(lonmax)
@@ -390,7 +378,6 @@ if __name__ == '__main__':
     C_eddy.fillval = fillval
     A_eddy.verbose = verbose
     C_eddy.verbose = verbose
-
 
     
     A_eddy.area0 = np.float(area0)
@@ -427,17 +414,20 @@ if __name__ == '__main__':
                     nc.close()
                 else:
                     rho_ntr = False
-                    
-                # create nc files for saving
+                
                 # Create nc files for saving
-                if chelton_style_nc:
-                    A_eddy.create_chelton_netcdf(directory, A_savefile, 'Anticyclonic', grd,
-                                                 Ymin, Ymax, Mmin, Mmax, model, sigma_lev, rho_ntr)
-                    C_eddy.create_chelton_netcdf(directory, C_savefile, 'Cyclonic', grd,
-                                                 Ymin, Ymax, Mmin, Mmax, model, sigma_lev, rho_ntr)
-                else:
-                    A_eddy.create_netcdf(directory, A_savefile, 'Anticyclonic')
-                    C_eddy.create_netcdf(directory, C_savefile, 'Cyclonic')
+                A_eddy.create_netcdf(directory, A_savefile, 'Anticyclonic', grd=grd,
+                                     Ymin=Ymin, Ymax=Ymax, Mmin=Mmin, Mmax=Mmax, model=model,
+                                     sigma_lev=sigma_lev, rho_ntr=rho_ntr)
+                C_eddy.create_netcdf(directory, C_savefile, 'Cyclonic', grd=grd,
+                                     Ymin=Ymin, Ymax=Ymax, Mmin=Mmin, Mmax=Mmax, model=model,
+                                     sigma_lev=sigma_lev, rho_ntr=rho_ntr)
+                
+                #A_eddy.create_netcdf(directory, A_savefile, 'Anticyclonic', grd,
+                                     #Ymin, Ymax, Mmin, Mmax, model, sigma_lev, rho_ntr)
+                #C_eddy.create_netcdf(directory, C_savefile, 'Cyclonic', grd,
+                                     #Ymin, Ymax, Mmin, Mmax, model, sigma_lev, rho_ntr)
+                
                 
                 record_range = record_range.size
                 
@@ -447,11 +437,11 @@ if __name__ == '__main__':
                 print '--- record', record + 1
                 
                 # Reset holding variables to empty arrays
-                A_eddy.set_holding_variables()
-                C_eddy.set_holding_variables()
+                A_eddy.reset_holding_variables()
+                C_eddy.reset_holding_variables()
                 
                 
-                grdmask = grd.mask()[jpadstr:jpadend, ipadstr:ipadend]
+                grdmask = grd.mask()
                 
                 if 'Q' in diag_type:
                     u, v, temp, salt, rtime = get_ROMS_data(filename, pad, record, sigma_lev,
@@ -501,80 +491,72 @@ if __name__ == '__main__':
                     xicopy = np.ma.copy(xi)
                 
                 elif 'sla' in diag_type:
+                    
                     # Note that sla (zeta) is returned in m
-                    sla, temp, salt, rtime = get_ROMS_data(filename, pad, record, sigma_lev,
-                                                            ipadstr, ipadend, jpadstr, jpadend, diag_type)
+                    sla, rtime = get_ROMS_data(filename, grd, record, sigma_lev, diag_type)
                     
                     # Get anomaly
                     sla -= sshmean
                     
-                    u, v = getSurfGeostrVel(sla, grd.f()[jpadstr:jpadend,
-                                                    ipadstr:ipadend], 
-                                            grd.pm()[jpadstr:jpadend,
-                                                     ipadstr:ipadend],
-                                            grd.pn()[jpadstr:jpadend,
-                                                     ipadstr:ipadend],
-                                            grd.uvpmask()[0][jpadstr:jpadend,
-                                                             ipadstr:ipadend-1],
-                                            grd.uvpmask()[1][jpadstr:jpadend-1,
-                                                             ipadstr:ipadend])
-                    
-                    sla *= 100. # m to cm
-                    
-                    # Remove padded boundary
-                    sla = sla[junpadstr:junpadend, iunpadstr:iunpadend]
-                    u = u[junpadstr:junpadend, iunpadstr:iunpadend]
-                    v = v[junpadstr:junpadend, iunpadstr:iunpadend]
-
-                    
-                    #sla *= grdmask
-                    sla = np.ma.masked_where(grdmask[junpadstr:junpadend, iunpadstr:iunpadend] == 0, sla)
-                    #sla = sla - np.ma.mean(sla)#[np.nonzero(grdmask)])
-                    
                     if isinstance(smoothing, str):
                         
                         if 'Gaussian' in smoothing:
-                            
-                            if Yr == Ymin and Mo == Mmin:
+                            if 'first_record' not in locals():
                                 print '--- applying Gaussian high-pass filter to SLA'
-                                
                             # Set landpoints to zero
-                            sla *= grdmask[junpadstr:junpadend, iunpadstr:iunpadend]
+                            sla *= grd.mask()
                             # High pass filter
                             # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
                             sla -= ndimage.gaussian_filter(sla, [mres, zres])
-                        
                         elif 'Hanning' in smoothing:
                             # smooth_fac passes of 2d Hanning filter
                             #han_time = time.time()
                             sla = func_hann2d_fast(sla, smooth_fac)
                             #print 'hanning', str(time.time() - han_time), ' seconds!'
                     
+                    #sla *= grd.mask()
+                    sla = np.ma.masked_where(grd.mask() == 0, sla)
+                    
+                    grd.getSurfGeostrVel(sla)#, grd.f(), grd.pm(), grd.pn(),
+                                                #grd.u_mask, grd.v_mask)
+                    
+                    sla *= 100. # m to cm
+                    
+                    # Remove padded boundary
+                    sla = sla[grd.jup0:grd.jup1, grd.iup0:grd.iup1]
+                    #u = grd.u[grd.jup0:grd.jup1, grd.iup0:grd.iup1]
+                    #v = grd.v[grd.jup0:grd.jup1, grd.iup0:grd.iup1]
+                    
+                    # Calculate EKE
+                    grd.getEKE()
+                    
                     A_eddy.sla = np.ma.copy(sla)
                     C_eddy.sla = np.ma.copy(sla)
                     A_eddy.slacopy = np.ma.copy(sla)
                     C_eddy.slacopy = np.ma.copy(sla)
                 
-                # Remove padded boundary
-                temp = temp[junpadstr:junpadend, iunpadstr:iunpadend]
-                salt = salt[junpadstr:junpadend, iunpadstr:iunpadend]
-                A_eddy.temp = temp
-                C_eddy.temp = temp
-                A_eddy.salt = salt
-                C_eddy.salt = salt
-                
-                
                 # Get scalar speed
-                Uspd = np.hypot(u, v)
-                Uspd = np.ma.masked_where(grdmask[junpadstr:junpadend,
-                                              iunpadstr:iunpadend] == True, Uspd)
+                Uspd = np.hypot(grd.u, grd.v)
+                Uspd = np.ma.masked_where(grd.mask()[grd.jup0:grd.jup1,
+                                                     grd.iup0:grd.iup1] == True, Uspd)
                 
                 A_eddy.Uspd = np.ma.copy(Uspd)
                 C_eddy.Uspd = np.ma.copy(Uspd)
                 
                 
                 # Get contours of Q/sla parameter
-                plt.figure(99)
+                if 'first_record' not in locals():
+                
+                    print '------ getting SLA contours'
+                    contfig = plt.figure(99)
+                    ax = contfig.add_subplot(111)
+                
+                    if anim_figs:
+                        animfig = plt.figure(999)
+                        animax = animfig.add_subplot(111)
+                        # Colorbar axis
+                        animax_cbar = get_cax(animax, dx=0.03, width=.05, position='b')
+                
                 if 'Q' in diag_type:
                     CS = plt.contour(grd.lon()[jstr:jend,istr:iend],
                                      grd.lat()[jstr:jend,istr:iend], qparam, qparameter)
@@ -585,22 +567,22 @@ if __name__ == '__main__':
                     #plt.close(99)
                 
                 elif 'sla' in diag_type:
-                    A_CS = plt.contour(grd.lon()[jstr:jend,istr:iend],
-                                       grd.lat()[jstr:jend,istr:iend], sla, slaparameter)
+                    A_CS = ax.contour(grd.lon(), grd.lat(), A_eddy.sla, slaparameter)
                     # Note that CSc is for the cyclonics, slaparameter in reverse order
-                    C_CS = plt.contour(grd.lon()[jstr:jend,istr:iend],
-                                       grd.lat()[jstr:jend,istr:iend], sla, slaparameter[::-1])
+                    C_CS = ax.contour(grd.lon(), grd.lat(), C_eddy.sla, slaparameter[::-1])
                 
-                if True:
-                    plt.close(99)
+                else: Exception
+                
+                if True: # clear the current axis
+                    ax.cla()
                 else:
                     # Debug
                     if 'Q' in diag_type:
-                        plt.title('qparameter and xi')
-                        plt.clabel(CS, np.array([qparameter.min(), qparameter.max()]))
+                        ax.set_title('qparameter and xi')
+                        ax.clabel(CS, np.array([qparameter.min(), qparameter.max()]))
                     elif 'sla' in diag_type:
-                        plt.title('slaparameter')
-                        plt.clabel(CS, np.array([slaparameter.min(), slaparameter.max()]))
+                        ax.set_title('slaparameter')
+                        ax.clabel(CS, np.array([slaparameter.min(), slaparameter.max()]))
                     plt.axis('image')
                     #plt.colorbar()
                     plt.show()
@@ -613,13 +595,16 @@ if __name__ == '__main__':
                                        verbose=verbose)
                 
                 elif 'sla' in diag_type:
+		    #print 'rtime 1', rtime
+                    A_eddy.sign_type = 'Anticyclonic'
                     A_eddy = collection_loop(A_CS, grd, rtime,
                                              A_list_obj=A_eddy,  C_list_obj=None,
-                                             sign_type='Anticyclonic', verbose=verbose)
+                                             sign_type=A_eddy.sign_type, verbose=verbose)
                     # Note that CSc is reverse order
+                    C_eddy.sign_type = 'Cyclonic'
                     C_eddy = collection_loop(C_CS, grd, rtime,
                                              A_list_obj=None, C_list_obj=C_eddy,
-                                             sign_type='Cyclonic', verbose=verbose)
+                                             sign_type=C_eddy.sign_type, verbose=verbose)
                 
                 
                 
@@ -654,30 +639,15 @@ if __name__ == '__main__':
                     #plt.clf()
                     plt.close(250)
 
-
-                # If first record (ie, t == t0), set 'old' equal to 'new'
-                if np.alltrue([Yr == Ymin, Mo == Mmin, record == 0]):
-                    A_eddy.old_lon = A_eddy.new_lon_tmp
-                    A_eddy.old_lat = A_eddy.new_lat_tmp
-                    A_eddy.old_radii_s = A_eddy.new_radii_tmp_s
-                    A_eddy.old_radii_e = A_eddy.new_radii_tmp_e
-                    A_eddy.old_amp = A_eddy.new_amp_tmp
-                    A_eddy.old_Uavg = A_eddy.new_Uavg_tmp
-                    A_eddy.old_temp = A_eddy.new_temp_tmp
-                    A_eddy.old_salt = A_eddy.new_salt_tmp
-                    
-                    C_eddy.old_lon = C_eddy.new_lon_tmp
-                    C_eddy.old_lat = C_eddy.new_lat_tmp
-                    C_eddy.old_radii_s = C_eddy.new_radii_tmp_s
-                    C_eddy.old_radii_e = C_eddy.new_radii_tmp_e
-                    C_eddy.old_amp = C_eddy.new_amp_tmp
-                    C_eddy.old_Uavg = C_eddy.new_Uavg_tmp
-                    C_eddy.old_temp = C_eddy.new_temp_tmp
-                    C_eddy.old_salt = C_eddy.new_salt_tmp
+                if start:
                     first_record = True
+                    # Set old variables equal to new variables
+                    A_eddy.set_old_variables()
+                    C_eddy.set_old_variables()
+                    start = False
                 else:
                     first_record = False
-
+                
                 
                 # Track the eddies
                 #tracking_start_time = time.time()
@@ -690,11 +660,11 @@ if __name__ == '__main__':
                     
                     dy, dm, dd = oceantime2ymd(rtime)
                     dtime = dy + dm + dd
-                    tit = 'Y' + dy + 'M' + dm + 'D' + dd
+                    tit = 'Y' + dy.zfill(2) + 'M' + dm.zfill(2) + 'D' + dd.zfill(2)
                     
-                    if 'anim_fig' in locals():
-                        # Wait if there is a still-active anim_fig thread
-                        anim_fig.join()
+                    #if 'anim_fig' in locals():
+                        ## Wait if there is a still-active anim_fig thread
+                        #anim_fig.join()
                     
                     if 'Q' in diag_type:
                         anim_fig = threading.Thread(name='anim_figure', target=anim_figure,
@@ -706,9 +676,9 @@ if __name__ == '__main__':
                                      args=(33, M, pMx, pMy, slacopy, plt.cm.RdBu_r, rtime, dtime, diag_type, Mx, My, 
                                            slacopy, slacopy, slaparameter, A_eddy, C_eddy,
                                            savedir, plt, 'SLA ' + tit))'''
-                        fignum = 31
-                        anim_figure(A_eddy, C_eddy, M, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, diag_type, 
-                                savedir, 'SLA ' + tit, fignum)
+                        #fignum = 31
+                        anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, diag_type, 
+                                savedir, 'SLA ' + tit, animax, animax_cbar)
                     #anim_fig.start()
                     
                                             
@@ -718,6 +688,7 @@ if __name__ == '__main__':
                 if not first_record:
                     if verbose:
                         print '--- saving to nc'
+                    #print 'ddsssssss', rtime
                     A_eddy.write2chelton_nc(A_savefile, rtime)
                     C_eddy.write2chelton_nc(C_savefile, rtime)
                 #print 'Saving the eddies', time.time() - saving_start_time, 'seconds'

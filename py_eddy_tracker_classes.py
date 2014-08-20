@@ -591,7 +591,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
         Eddy = C_list_obj
     
     if 'ROMS' in Eddy.datatype:
-        has_ts = True
+        #has_ts = True
+        has_ts = False
     elif 'AVISO' in Eddy.datatype:
         has_ts = False
     else:
@@ -686,7 +687,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             # Get eddy circumference using eddy_radius_e
                             centx, centy = Eddy.M(centlon_e, centlat_e)
                             circlon, circlat = get_circle(centx, centy, eddy_radius_e, 180)
-                            circlon, circlat = Eddy.M.projtran(circlon, circlat, inverse=True)
+                            circlon[:], circlat[:] = Eddy.M.projtran(circlon, circlat, inverse=True)
                             Eddy.circlon = circlon
                             Eddy.circlat = circlat
                             
@@ -694,7 +695,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             rectlon = grd.lon()[jmin:jmax,imin:imax].ravel()
                             rectlat = grd.lat()[jmin:jmax,imin:imax].ravel()
 
-                            # Get mask inside the eddy
+                            # Get mask inside the eddy (effective contour)
                             poly_e = path.Path(np.array([contlon_e, contlat_e]).T)
                             # NOTE: Path.contains_points requires matplotlib 1.2 or higher
                             mask_e = poly_e.contains_points(np.array([rectlon, rectlat]).T)
@@ -740,8 +741,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                 if 0: # Debug
                                                     plt.figure(511)
                                                     plt.title('Anticyclones')
-                                                    x511, y511 = Eddy.M(grd.lon()[jstr:jend,istr:iend],
-                                                                        grd.lat()[jstr:jend,istr:iend])
+                                                    x511, y511 = Eddy.M(grd.lon(), grd.lat())
                                                     Eddy.M.pcolormesh(x511, y511, Eddy.slacopy-Eddy.slacopy.mean())
                                                     plt.clim(-10,10)
                                                     print 'Eddy.slacopy-Eddy.slacopy.mean()',(Eddy.slacopy-Eddy.slacopy.mean()).max()
@@ -752,8 +752,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                     lmi_j, lmi_i = np.where(local_extrema)
                                                     lmi_i = lmi_i[0] + imin
                                                     lmi_j = lmi_j[0] + jmin
-                                                    x_i, y_i = Eddy.M(grd.lon()[jstr:jend,istr:iend][lmi_j, lmi_i],
-                                                                      grd.lat()[jstr:jend,istr:iend][lmi_j, lmi_i])
+                                                    x_i, y_i = Eddy.M(grd.lon()[lmi_j, lmi_i],
+                                                                      grd.lat()[lmi_j, lmi_i])
                                                     Eddy.M.scatter(x_i, y_i, c='gray')
                                                     Eddy.M.fillcontinents()
                                                     plt.show()
@@ -778,8 +778,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                 if 0: # Debug
                                                     plt.figure(511)
                                                     plt.title('Cyclones')
-                                                    x511, y511 = Eddy.M(grd.lon()[jstr:jend,istr:iend],
-                                                                        grd.lat()[jstr:jend,istr:iend])
+                                                    x511, y511 = Eddy.M(grd.lon(), grd.lat())
                                                     Eddy.M.pcolormesh(x511, y511, Eddy.slacopy-Eddy.slacopy.mean())
                                                     plt.clim(-10,10)
                                                     print 'Eddy.slacopy-Eddy.slacopy.mean()',(Eddy.slacopy-Eddy.slacopy.mean()).max()
@@ -790,8 +789,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                     lmi_j, lmi_i = np.where(local_extrema)
                                                     lmi_i = lmi_i[0] + imin
                                                     lmi_j = lmi_j[0] + jmin
-                                                    x_i, y_i = Eddy.M(grd.lon()[jstr:jend,istr:iend][lmi_j, lmi_i],
-                                                                      grd.lat()[jstr:jend,istr:iend][lmi_j, lmi_i])
+                                                    x_i, y_i = Eddy.M(grd.lon()[lmi_j, lmi_i], grd.lat()[lmi_j, lmi_i])
                                                     Eddy.M.scatter(x_i, y_i, c='gray')
                                                     Eddy.M.fillcontinents()
                                                     plt.show()
@@ -900,6 +898,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                                               cent_salt=cent_salt)
                                     else: # AVISO
                                         #tt = time.time()
+                                        #print 'rtime2', rtime
                                         if 'Anticyclonic' in sign_type:
                                             A_list_obj.update_eddy_properties(centlon, centlat,
                                                                               eddy_radius_s, eddy_radius_e,
@@ -922,16 +921,16 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 
                                 # Debug. Figure showing individual contours with centroid
                                 # Note: do not use with ipython
-                                if 0 and np.any(Eddy.sla[jmin:jmax, imin:imax].flat[mask_c] == Eddy.fillval):
+                                if 0 and np.any(Eddy.sla[jmin:jmax, imin:imax].flat[mask_e] == Eddy.fillval):
                                     plt.figure(100)
-                                    jjj, iii = grd.lon()[jstr:jend,istr:iend][jmin:jmax,imin:imax].shape
+                                    jjj, iii = grd.lon()[jmin:jmax,imin:imax].shape
                                     if not(iii == 1 or jjj == 1):
                                         plt.plot(contlon_e, contlat_e, 'm.-')
                                         plt.plot(contlon_s, contlat_s, 'g.-')
                                         plt.plot(circlon, circlat, c='m')
                                         xpcol, ypcol = pcol_2dxy(
-                                            grd.lon()[jstr:jend,istr:iend][jmin:jmax+1,imin:imax+1],
-                                            grd.lat()[jstr:jend,istr:iend][jmin:jmax+1,imin:imax+1])
+                                            grd.lon()[jmin:jmax+1,imin:imax+1],
+                                            grd.lat()[jmin:jmax+1,imin:imax+1])
                                         if 'Q' in Eddy.diag_type:
                                             plt.title('Shp.err. %s, Q %s' %(aerr, CS.levels[collind]))
                                             plt.pcolormesh(xpcol, ypcol, xi[jmin:jmax+1,imin:imax+1], cmap=cmap, shading='faceted')
@@ -941,8 +940,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                             plt.title('Shp.err. %s, SLA %s' %(aerr, CS.levels[collind]))
                                             pcm = plt.pcolormesh(xpcol, ypcol, np.ma.masked_equal(
                                                       Eddy.sla[jmin:jmax+1,imin:imax+1], Eddy.fillval), cmap=plt.cm.bwr, shading='faceted')
-                                            plt.scatter(grd.lon()[jstr:jend,istr:iend][jmin:jmax,imin:imax].ravel(),
-                                                        grd.lat()[jstr:jend,istr:iend][jmin:jmax,imin:imax].ravel(), s=5, c='k')
+                                            plt.scatter(grd.lon()[jmin:jmax,imin:imax].ravel(),
+                                                        grd.lat()[jmin:jmax,imin:imax].ravel(), s=5, c='k')
                                             plt.clim(np.min(Eddy.slacopy[jmin:jmax+1,imin:imax+1]),
                                                      np.max(Eddy.slacopy[jmin:jmax+1,imin:imax+1]))
                                         plt.axis('image')
@@ -960,14 +959,14 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 do_fig_250 = False
                                 if do_fig_250:
                                     fig250 = plt.figure(250)
-                                    jjj, iii = grd.lon()[jstr:jend,istr:iend][jmin:jmax,imin:imax].shape
-                                                
+                                    jjj, iii = grd.lon()[jmin:jmax,imin:imax].shape
+                                    
                                     if np.logical_and(iii != 1, jjj != 1):
                                         circx, circy = Eddy.M(circlon, circlat)
                                         Eddy.M.plot(cx, cy, 'g')
                                         Eddy.M.plot(circx, circy, 'g')
-                                        xpcol, ypcol = pcol_2dxy(grd.lon()[jstr:jend,istr:iend][jmin:jmax+1,imin:imax+1],
-                                                              grd.lat()[jstr:jend,istr:iend][jmin:jmax+1,imin:imax+1])
+                                        xpcol, ypcol = pcol_2dxy(grd.lon()[jmin:jmax+1,imin:imax+1],
+                                                                 grd.lat()[jmin:jmax+1,imin:imax+1])
                                         xpcol, ypcol = Eddy.M(xpcol, ypcol)
                                         try:
                                             pcol200 = Eddy.M.pcolormesh(xpcol, ypcol, xi[jmin:jmax+1,imin:imax+1],
@@ -975,7 +974,6 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                             plt.clim(-np.max(np.abs(xicopy[jmin:jmax+1,imin:imax+1])),
                                                       np.max(np.abs(xicopy[jmin:jmax+1,imin:imax+1])))
                                         except:
-                                            #pcol200 = np.ma.masked_equal()
                                             pcol200 = Eddy.M.pcolormesh(xpcol, ypcol, Eddy.slacopy[jmin:jmax+1,imin:imax+1],
                                                                         cmap=plt.cm.RdBu_r, shading='faceted')
                                             pcol200.set_clim(-20, 20)
@@ -988,13 +986,18 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                         
     if 'do_fig_250' in locals():
         if do_fig_250:
-            print Eddy.new_time_tmp
-            title = dt.num2date(Eddy.new_time_tmp[-1])
-            plt.title(sign_type + 's ' + str(title.day) + '/' + str(title.month) + '/' + str(title.year))
+            if 'ROMS' in Eddy.datatype:
+                title = str(Eddy.new_time_tmp[-1])
+            elif 'AVISO' in Eddy.datatype:
+                title = dt.num2date(Eddy.new_time_tmp[-1])
+                title = sign_type + 's ' + str(title.day) + '/' + str(title.month) + '/' + str(title.year)
+            else: Exception
+            plt.title(title)
             Eddy.M.drawcoastlines()
             Eddy.M.fillcontinents('k')
             plt.show()
-        
+    
+    
     # Leave collection_loop
     if 'sla' in Eddy.diag_type:
         if C_list_obj is None:
@@ -1036,6 +1039,7 @@ def track_eddies(Eddy, first_record):
     #X_new = np.array([new_x, new_y]).T
     #dist_mat = spatial.distance.cdist(X_old, X_new, 'euclidean')
     
+    #print 'here 0.1'
     
     X_old = np.array([Eddy.old_lon, Eddy.old_lat]).T
     X_new = np.array([Eddy.new_lon_tmp, Eddy.new_lat_tmp]).T
@@ -1043,15 +1047,17 @@ def track_eddies(Eddy, first_record):
     #dist_mat = spatial.distance.cdist(X_old, X_new, lambda u, v: haversine_cdist(u, v))
     # We use f2py functions from file haversine_distmat.f90
     #  to get the distance matrix, dist_mat
-    dist_mat = np.asfortranarray(np.empty((X_old.shape[0], X_new.shape[0])))
-    #print 'before'
+    dist_mat = np.empty((X_old.shape[0], X_new.shape[0]))
     hav.haversine_distmat(np.asfortranarray(X_old),
                           np.asfortranarray(X_new),
                           np.asfortranarray(dist_mat))
+    #print 'here 0.3'
     dist_mat_copy = np.copy(dist_mat)
     
     new_eddy_inds = np.ones(Eddy.new_lon_tmp.size, dtype=bool)
     new_eddy = False
+    
+    #print 'here 1'
     
     # Loop over the old eddies looking for active eddies
     #for old_ind in np.nditer(np.arange(dist_mat.shape[0])):
@@ -1064,9 +1070,9 @@ def track_eddies(Eddy, first_record):
         new_am = np.array([])
         new_Ua = np.array([])
         new_ek = np.array([])
-        new_tm = np.array([])
-        new_tp = np.array([])
-        new_st = np.array([])
+        new_tm = np.array([]) # new time
+        new_tp = np.array([]) # new temp
+        new_st = np.array([]) # new salt
         new_bnds = np.array([], dtype=np.int16)
         new_inds = np.array([], dtype=np.int16)
         backup_ind = np.array([], dtype=np.int16)
@@ -1104,6 +1110,7 @@ def track_eddies(Eddy, first_record):
             if 'ellipse' in Eddy.separation_method:
                 if Eddy.search_ellipse.ellipse_path.contains_point(
                                           (new_x[new_ind], new_y[new_ind])):
+                #if ellipse_path.contains_point(new_x[new_ind], new_y[new_ind]):
                     sep_proceed = True
                 else:
                     sep_proceed = False
@@ -1145,8 +1152,9 @@ def track_eddies(Eddy, first_record):
                     new_ek = np.r_[new_ek, Eddy.new_teke_tmp[new_ind]]
                     new_tm = np.r_[new_tm, Eddy.new_time_tmp[new_ind]]
                     if 'ROMS' in Eddy.datatype:
-                        new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
-                        new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
+                        #new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
+                        #new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
+                        pass
                     try:
                         new_bnds = np.vstack((new_bnds, Eddy.new_bounds_tmp[new_ind]))
                     except Exception:
@@ -1167,16 +1175,19 @@ def track_eddies(Eddy, first_record):
             # Nothing to be done except update the eddy tracks
             # NOTE accounting should be part of Eddy object...
             if 'ROMS' in Eddy.datatype:
+                new_tp = new_st = 99 #; print 'fix me 1177'
+                #print new_ln, new_lt
                 Eddy = accounting(Eddy, old_ind, new_ln, new_lt, new_rd_s, new_rd_e,
-                                  new_am, new_Ua, new_tm, new_bnds, new_eddy, first_record,
+                                  new_am, new_Ua, new_ek, new_tm, new_bnds, new_eddy, first_record,
                                   new_tp, new_st)
             elif 'AVISO' in Eddy.datatype:
+	        #print 'here 1.1'
                 Eddy = accounting(Eddy, old_ind, new_ln, new_lt, new_rd_s, new_rd_e,
                                   new_am, new_Ua, new_ek, new_tm, new_bnds, new_eddy, first_record)
         
         # More than one eddy within range
         elif dist_arr.size > 1:
-            
+            #print 'eeeeeee'
             # Loop to find the right eddy
             delta_area = np.array([])
             delta_amp = np.array([])
@@ -1217,13 +1228,14 @@ def track_eddies(Eddy, first_record):
             dx0 = dx[0] # Index to the right eddy
             dx_unused = dx[1:] # Index/indices to the unused eddy/eddies
             
+            
             # Update eddy track dx0
             if 'ROMS' in Eddy.datatype:
                 Eddy = accounting(Eddy, old_ind,
                                   new_ln[dx0], new_lt[dx0], new_rd_s[dx0], new_rd_e[dx0],
-                                  new_am[dx0], new_Ua[dx0], new_tm[dx0],
-                                  new_bnds[dx0], new_eddy, first_record,
-                                  new_tp[dx0], new_st[dx0])
+                                  new_am[dx0], new_Ua[dx0], new_ek[dx0], new_tm[dx0],
+                                  new_bnds[dx0], new_eddy, first_record)#,
+                                  #new_tp[dx0], new_st[dx0])
             elif 'AVISO' in Eddy.datatype:
                 
                 Eddy = accounting(Eddy, old_ind,
@@ -1263,6 +1275,7 @@ def track_eddies(Eddy, first_record):
     #print 'out2'        
     # Finished looping over old eddy tracks
     
+    #print 'here 2'
     # Now we need to add new eddies defined by new_eddy_inds
     if np.any(new_eddy_inds):
         if False:#Eddy.verbose:
@@ -1273,6 +1286,8 @@ def track_eddies(Eddy, first_record):
             if a_new_eddy: # Update the eddy tracks
             
                 if 'ROMS' in Eddy.datatype:
+                    #print '-------------new ROMS eddy',Eddy.new_time_tmp[neind]
+                    #print '-------------new ROMS bounds',Eddy.new_bounds_tmp[neind]
                     Eddy = accounting(Eddy, False,
                                       Eddy.new_lon_tmp[neind], 
                                       Eddy.new_lat_tmp[neind],
@@ -1280,10 +1295,11 @@ def track_eddies(Eddy, first_record):
                                       Eddy.new_radii_tmp_e[neind],
                                       Eddy.new_amp_tmp[neind],
                                       Eddy.new_Uavg_tmp[neind],
+                                      Eddy.new_teke_tmp[neind],
                                       Eddy.new_time_tmp[neind],
-                                      Eddy.new_bounds_tmp[neind], True, False,
-                                      Eddy.new_temp_tmp[neind],
-                                      Eddy.new_salt_tmp[neind])
+                                      Eddy.new_bounds_tmp[neind], True, False)#,
+                                      #Eddy.new_temp_tmp[neind],
+                                      #Eddy.new_salt_tmp[neind])
                 elif 'AVISO' in Eddy.datatype:
 		    #print 'Eddy.new_lon_tmp[neind]',Eddy.new_lon_tmp[neind]
 		    #print 'CCCC'
@@ -1307,6 +1323,7 @@ def track_eddies(Eddy, first_record):
 def accounting(Eddy, old_ind, centlon, centlat,
                eddy_radius_s, eddy_radius_e, amplitude, Uavg, teke, rtime, 
                bounds, new_eddy, first_record, cent_temp=None, cent_salt=None):
+    #print 'EEEEEEEEEEEEE', rtime
     '''
     Accounting for new or old eddy (either cyclonic or anticyclonic)
       Eddy  : eddy_tracker.tracklist object
@@ -1330,7 +1347,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
             print '------ writing first record'
         new_eddy = True
     
-    
+    #print 'BBBBBBBBBBB',rtime
     if not new_eddy: # It's an old (ie, active) eddy
         
         # SHOULD BE NO NEED FOR TRY->EXCEPT HERE,
@@ -1363,7 +1380,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
             #print 'bb',old_ind
 
         if 'ROMS' in Eddy.datatype:
-            Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg,
+            Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg, teke,
                               eddy_radius_s, eddy_radius_e, amplitude,
                               bounds, cent_temp, cent_salt)
         
@@ -1391,7 +1408,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
             print '------ starting a new track list for %ss' %Eddy.sign_type
             Eddy.new_list = False
         if 'ROMS' in Eddy.datatype:
-            Eddy.append_list(centlon, centlat, rtime, Uavg,
+            Eddy.append_list(centlon, centlat, rtime, Uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude, bounds, cent_temp, cent_salt)
         elif 'AVISO' in Eddy.datatype:
             Eddy.append_list(centlon, centlat, rtime, Uavg, teke,
@@ -1403,25 +1420,25 @@ def accounting(Eddy, old_ind, centlon, centlat,
 
 
 
-def get_ROMS_data(rfile, pad=None, index=None, sigma_lev=None,
-                  istr=None, iend=None, jstr=None, jend=None, diag_type=None):
-    nc = netcdf.Dataset(rfile, 'r')
-    if pad is None:
-        time = nc.variables['ocean_time'][:]
-        nc.close()
-        return time
-    t = nc.variables['temp'][index, sigma_lev, jstr:jend, istr:iend]
-    s = nc.variables['salt'][index, sigma_lev, jstr:jend, istr:iend]
-    time = nc.variables['ocean_time'][index]
-    if 'Q' in diag_type:
-        u = nc.variables['u'][index, sigma_lev, jstr:jend, istr:iend-1]
-        v = nc.variables['v'][index, sigma_lev, jstr:jend-1, istr:iend]
-        nc.close()
-        return u, v, t, s, time
-    elif 'sla' in diag_type:
-        zeta = nc.variables['zeta'][index, jstr:jend, istr:iend]
-        nc.close()
-        return zeta, t, s, time
+def get_ROMS_data(rfile, grd=None, index=None, sigma_lev=None, diag_type=None):
+    with netcdf.Dataset(rfile) as nc:
+        if index is None:
+            time = nc.variables['ocean_time'][:]
+            return time
+        time = nc.variables['ocean_time'][index]
+        istr, iend = grd.ip0, grd.ip1
+        jstr, jend = grd.jp0, grd.jp1
+        if 'Q' in diag_type:
+            u = nc.variables['u'][index, sigma_lev, jstr:jend, istr:iend-1]
+            v = nc.variables['v'][index, sigma_lev, jstr:jend-1, istr:iend]
+            t = nc.variables['temp'][index, sigma_lev, jstr:jend, istr:iend]
+            s = nc.variables['salt'][index, sigma_lev, jstr:jend, istr:iend]
+            return u, v, t, s, time
+        elif 'sla' in diag_type:
+            zeta = nc.variables['zeta'][index, jstr:jend, istr:iend]
+            return zeta, time
+        else:
+            return
 
 
 
