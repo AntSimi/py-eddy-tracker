@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 1.3.0
+Version 1.4.0
 
 
 Scroll down to line ~640 to get started
@@ -785,7 +785,8 @@ if __name__ == '__main__':
         qparameter = np.linspace(0, 5*10**-11, 25)
     elif 'sla' in diag_type:
         # Set SLA contour spacing
-        slaparameter = np.arange(-100., 101., 1.0) # cm
+        #slaparameter = np.arange(-100., 101., 1.0) # cm
+        slaparameter = np.arange(-100., 100.25, 0.25) # cm
 
     
     
@@ -886,9 +887,17 @@ if __name__ == '__main__':
         ##sep_dist_fac = 1.5 # Causes tracks to jump for AVISO 7-day
     
     
+    #Define track_extra_variables to track and save:
+    # - effective contour points
+    # - speed-based contour points
+    # - shape test values
+    # - profiles of swirl velocity from effective contour inwards
+    # Useful for working with ARGO data
+    track_extra_variables = True
+
+
 
     cmap = plt.cm.RdBu
-    
     verbose = False
 
 
@@ -950,8 +959,8 @@ if __name__ == '__main__':
     #axis = plt.axes()
 
     # Initialise two eddy objects to hold data
-    A_eddy = eddy_tracker.track_list('AVISO', track_duration_min)
-    C_eddy = eddy_tracker.track_list('AVISO', track_duration_min)
+    A_eddy = eddy_tracker.track_list('AVISO', track_duration_min, track_extra_variables)
+    C_eddy = eddy_tracker.track_list('AVISO', track_duration_min, track_extra_variables)
     
     if 'Q' in diag_type:
         A_savefile = "".join([savedir, 'eddy_tracks_Q_AVISO_anticyclonic.nc'])
@@ -1042,6 +1051,7 @@ if __name__ == '__main__':
     C_eddy.fillval = sla_grd.fillval
     A_eddy.verbose = verbose
     C_eddy.verbose = verbose
+    
     
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
@@ -1369,12 +1379,12 @@ if __name__ == '__main__':
             #saving_start_time = time.time()
             if not first_record:
                 if verbose:
-                    print '--- saving to nc', A_savefile
-                    print '--- saving to nc', C_savefile
+                    print '--- saving to nc', A_eddy.savedir
+                    print '--- saving to nc', C_eddy.savedir
                     print '+++'
                 if chelton_style_nc: # Recommended
-                    A_eddy.write2chelton_nc(A_savefile, rtime)
-                    C_eddy.write2chelton_nc(C_savefile, rtime)
+                    A_eddy.write2chelton_nc(rtime)
+                    C_eddy.write2chelton_nc(rtime)
                 else:
                     A_eddy.write2nc(A_savefile, rtime)
                     C_eddy.write2nc(C_savefile, rtime)

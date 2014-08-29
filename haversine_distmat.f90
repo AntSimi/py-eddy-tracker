@@ -27,7 +27,7 @@
 !
 !    If you have ifort on your system, change 'gfortran' to 'intelem'
 !
-!   Version 1.3.0
+!   Version 1.4.0
 !
 !===========================================================================
 

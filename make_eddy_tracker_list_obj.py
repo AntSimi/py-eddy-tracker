@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 1.3.0
+Version 1.4.0
 
 
 ===========================================================================
@@ -103,7 +103,11 @@ def uniform_resample(x, y, num_fac=4, kind='linear'):
     #plt.show()
     return xnew, ynew
     
-    
+
+def strcompare(str1, str2):
+    return str1 in str2 and str2 in str1
+
+ 
 
 class track (object):
     '''
@@ -125,9 +129,9 @@ class track (object):
         dayzero - True at first appearance of eddy
     '''
     def __init__(self, eddy_index, datatype, lon, lat, time, Uavg, teke,
-                       radius_s, radius_e, amplitude, bounds,
-                       temp=None,
-                       salt=None):
+                       radius_s, radius_e, amplitude, bounds, temp=None, salt=None, 
+                       save_extras=False, contour_e=None, contour_s=None,
+                       Uavg_profile=None, shape_error=None):
 
         self.eddy_index = eddy_index
         self.datatype   = datatype
@@ -146,10 +150,18 @@ class track (object):
         self.alive      = True
         self.dayzero    = True
         self.saved2nc   = False
-
-
-    def append_pos(self, lon, lat, time, Uavg, teke,
-                   radius_s, radius_e, amplitude, bounds, temp, salt):
+        self.save_extras = save_extras
+        if self.save_extras:
+            self.contour_e = [contour_e]
+            self.contour_s = [contour_s]
+            self.Uavg_profile = [Uavg_profile]
+            self.shape_error = np.atleast_1d(shape_error)
+        
+    
+    
+    def append_pos(self, lon, lat, time, Uavg, teke, radius_s, radius_e,
+                   amplitude, bounds, temp=None, salt=None, contour_e=None, contour_s=None,
+                   Uavg_profile=None, shape_error=None):
         '''
         Append track updates
         '''
@@ -160,6 +172,7 @@ class track (object):
         self.teke = np.r_[self.teke, teke]
         self.radius_s = np.r_[self.radius_s, radius_s]
         self.radius_e = np.r_[self.radius_e, radius_e]
+        #print 'self.amplitude_e222', self.amplitude, amplitude
         self.amplitude = np.r_[self.amplitude, amplitude]
         if 'ROMS' in self.datatype:
             self.temp = np.r_[self.temp, temp]
@@ -168,6 +181,12 @@ class track (object):
             self.bounds = np.hstack((self.bounds, bounds))
         except Exception:
             self.bounds = np.vstack((self.bounds, bounds))
+        if self.save_extras:
+            self.contour_e.append(contour_e)
+            self.contour_s.append(contour_s)
+            self.Uavg_profile.append(Uavg_profile)
+            self.shape_error = np.r_[self.shape_error, shape_error]
+        return self
 
 
 
@@ -200,13 +219,14 @@ class track_list (object):
         old_lon, old_lat: old lon/lat centroids
         eddy_index:   index of eddy in track_list
     '''
-    def __init__(self, datatype, track_duration_min):
+    def __init__(self, datatype, track_duration_min, track_extra_variables):
         '''
         Initialise the list 'tracklist'
         '''
         self.tracklist = []
         self.datatype = datatype
         self.track_duration_min = track_duration_min
+        self.track_extra_variables = track_extra_variables
         self.new_lon    = np.array([])
         self.new_lat    = np.array([])
         self.new_radii_s = np.array([])
@@ -218,7 +238,7 @@ class track_list (object):
             self.new_temp = np.array([])
             self.new_salt = np.array([])
         self.new_time   = np.array([])
-        self.new_bounds = np.atleast_2d([])
+        self.new_bounds = np.atleast_2d(np.empty(4, dtype=np.int16))
         self.old_lon    = np.array([])
         self.old_lat    = np.array([])
         self.old_radii_s  = np.array([])
@@ -231,6 +251,15 @@ class track_list (object):
             self.old_salt = np.array([])
         self.old_time   = np.array([])
         self.old_bounds = np.atleast_2d([])
+        if self.track_extra_variables:
+            self.new_contour_e = []
+            self.new_contour_s = []
+            self.new_Uavg_profile = []
+            self.new_shape_error = np.atleast_1d([])
+            self.old_contour_e = []
+            self.old_contour_s = []
+            self.old_Uavg_profile = []
+            self.old_shape_error = np.atleast_1d([])
         self.new_list   = True # flag indicating new list
         self.index = 0 # counter
         self.ncind = 0 # index to write to nc files, will increase and increase...
@@ -241,28 +270,31 @@ class track_list (object):
 
 
     def append_list(self, lon, lat, time, Uavg, teke,
-            radius_s, radius_e, amplitude, bounds, temp=None, salt=None):
+            radius_s, radius_e, amplitude, bounds, temp=None, salt=None,
+            contour_e=None, contour_s=None, Uavg_profile=None, shape_error=None):
         '''
         Append a new 'track' object to the list
         '''
         #print 'AAAAAAAAA', time
         self.tracklist.append(track(self.index, self.datatype,
                                     lon, lat, time, Uavg, teke,
-                                    radius_s, radius_e,
-                                    amplitude, bounds,
-                                    temp, salt))
+                                    radius_s, radius_e, amplitude, bounds,
+                                    temp, salt, self.track_extra_variables,
+                                    contour_e, contour_s, Uavg_profile, shape_error))
 
 
     def update_track(self, index, lon, lat, time, Uavg, teke,
-             radius_s, radius_e, amplitude, bounds, temp=None, salt=None):
+             radius_s, radius_e, amplitude, bounds, temp=None, salt=None,
+             contour_e=None, contour_s=None, Uavg_profile=None, shape_error=None):
         '''
         Update a track at index
         '''
-        #print 'CCCCCCCC', time
         self.tracklist[index].append_pos(lon, lat, time, Uavg, teke,
                                          radius_s, radius_e,
                                          amplitude, bounds,
-                                         temp, salt)
+                                         temp=temp, salt=salt,
+                                         contour_e=contour_e, contour_s=contour_s,
+                                         Uavg_profile=Uavg_profile, shape_error=shape_error)
 
 
     def reset_holding_variables(self):
@@ -279,7 +311,12 @@ class track_list (object):
         self.new_time_tmp = np.array([])
         self.new_temp_tmp = np.array([])
         self.new_salt_tmp = np.array([])
-        self.new_bounds_tmp = np.atleast_2d([])
+        self.new_bounds_tmp = np.atleast_2d(np.empty(4, dtype=np.int16))
+        if self.track_extra_variables:
+            self.new_contour_e_tmp = []
+            self.new_contour_s_tmp = []
+            self.new_Uavg_profile_tmp = []
+            self.new_shape_error_tmp = np.atleast_1d([])
         return
 
 
@@ -296,6 +333,11 @@ class track_list (object):
         self.old_teke = np.copy(self.new_teke_tmp)
         self.old_temp = np.copy(self.new_temp_tmp)
         self.old_salt = np.copy(self.new_salt_tmp)
+        if self.track_extra_variables:
+            self.old_contour_e = list(self.new_contour_e_tmp)
+            self.old_contour_s = list(self.new_contour_s_tmp)
+            self.old_Uavg_profile = list(self.new_Uavg_profile_tmp)
+            self.old_shape_error = np.atleast_1d([])
 
 
     def get_active_tracks(self, rtime):
@@ -340,8 +382,13 @@ class track_list (object):
         '''
         Create netcdf file same style as Chelton etal (2011)
         '''
-        nc = netcdf.Dataset(savedir, 'w', format='NETCDF4')
-        nc.title = title
+        #print 'yooooooooooooo'
+        if not self.track_extra_variables:
+            self.savedir = savedir
+        else:
+           self.savedir = savedir.replace('.nc', '_ARGO_enabled.nc')
+        nc = netcdf.Dataset(self.savedir, 'w', format='NETCDF4')
+        nc.title = title + ' eddy tracks'
         nc.directory = directory
         nc.days_between_records = np.float64(self.days_btwn_recs)
         nc.min_track_duration = np.float64(self.track_duration_min)
@@ -374,7 +421,7 @@ class track_list (object):
             nc.Mmax = np.int32(Mmax)
             nc.sigma_lev_index = np.int32(sigma_lev)
             
-            if model=='ip_roms':
+            if 'ip_roms' in model:
                 nc.rho_ntr = rho_ntr
         
         nc.evolve_amp_min = self.evolve_ammin
@@ -386,7 +433,9 @@ class track_list (object):
         nc.createDimension('Nobs', None)#len(Eddy.tracklist))
         #nc.createDimension('time', None) #len(maxlen(ocean_time)))
         nc.createDimension('four', 4)
-
+            
+            
+            
         # Create variables     
         nc.createVariable('track', np.int32, ('Nobs'), fill_value=self.fillval)   
         nc.createVariable('n', np.int32, ('Nobs'), fill_value=self.fillval)  
@@ -408,7 +457,7 @@ class track_list (object):
             nc.createVariable('temp', 'f8', ('Nobs'), fill_value=self.fillval)
             nc.createVariable('salt', 'f8', ('Nobs'), fill_value=self.fillval)
             
-        nc.createVariable('NLP', 'f8', ('Nobs'), fill_value=self.fillval)
+        #nc.createVariable('NLP', 'f8', ('Nobs'), fill_value=self.fillval)
         nc.createVariable('bounds', np.int16, ('Nobs','four'), fill_value=self.fillval)
         nc.createVariable('eddy_duration', np.int16, ('Nobs'), fill_value=self.fillval)
         
@@ -487,8 +536,8 @@ class track_list (object):
         
         if 'Q' in self.diag_type:
             nc.variables['qparameter'].units = 's^{-2}'
-        nc.variables['NLP'].units = 'None, swirl vel. / propagation vel.'
-        nc.variables['NLP'].long_name = 'Non-linear parameter'
+        #nc.variables['NLP'].units = 'None, swirl vel. / propagation vel.'
+        #nc.variables['NLP'].long_name = 'Non-linear parameter'
 
         if 'ROMS' in self.datatype:
             nc.variables['temp'].units = 'deg. C'
@@ -496,8 +545,28 @@ class track_list (object):
         nc.variables['bounds'].units = 'indices to eddy location (imin,imax,jmin,jmax);' +  \
             ' use like this: var[jstr:jend,istr:iend][jmin:jmax,imin:imax]'
         
+        if self.track_extra_variables:
+            
+            nc.createDimension('contour_points', None)
+            nc.createDimension('Uavg_contour_count', np.int(self.slaparameter.size * 0.333))
+            nc.createVariable('contour_e', 'f4', ('contour_points','Nobs'), fill_value=self.fillval)
+            nc.createVariable('contour_s', 'f4', ('contour_points','Nobs'), fill_value=self.fillval)
+            nc.createVariable('Uavg_profile', 'f4', ('Uavg_contour_count','Nobs'), fill_value=self.fillval)
+            nc.createVariable('shape_error', 'f4', ('Nobs'), fill_value=self.fillval)
+            
+            nc.variables['contour_e'].long_name = 'positions of effective contour points'
+            nc.variables['contour_e'].description = 'lons/lats of effective contour points; ' + \
+                                                    'lons (lats) in first (last) half of vector'
+            nc.variables['contour_s'].long_name = 'positions of speed-based contour points'
+            nc.variables['contour_s'].description = 'lons/lats of speed-based contour points; ' + \
+                                                    'lons (lats) in first (last) half of vector'
+            nc.variables['Uavg_profile'].long_name = 'radial profile of Uavg'
+            nc.variables['Uavg_profile'].description = 'all Uavg values from effective contour inwards to ' + \
+                                                       'smallest inner contour (pixel == 1)'
+            nc.variables['shape_error'].units = '%'
+        
         nc.close()
-        return
+        return self
         
 
 
@@ -508,16 +577,21 @@ class track_list (object):
         #start_time = time.time()
         for track in self.tracklist:
             if not track.alive:
-                track.lon = False
-                track.lat = False
-                track.qparameter = False
-                track.amplitude = False
-                track.Uavg = False
-                track.teke = False
-                track.radius_s = False
-                track.radius_e = False
-                track.bounds = False
-                track.ocean_time = False
+                track.lon = []
+                track.lat = []
+                track.qparameter = []
+                track.amplitude = []
+                track.Uavg = []
+                track.teke = []
+                track.radius_s = []
+                track.radius_e = []
+                track.bounds = []
+                track.ocean_time = []
+                if self.track_extra_variables:
+                    track.contour_e = []
+                    track.contour_s = []
+                    track.Uavg_profile = []
+                    track.shape_error = []
         #print '_reduce_inactive_tracks', str(time.time() - start_time), ' seconds!'
         return
     
@@ -541,14 +615,14 @@ class track_list (object):
         #return np.array([self.tracklist[i].Uavg]) / distances
     
     
-    def write2chelton_nc(self, savedir, rtime):
+    def write2chelton_nc(self, rtime):
         '''
         Write inactive tracks to netcdf file.
         'ncind' is important because prevents writing of 
         already written tracks.
         Each inactive track is 'emptied' after saving
         '''
-        nc = netcdf.Dataset(savedir, 'a')
+        nc = netcdf.Dataset(self.savedir, 'a')
         inactive_tracks = self.get_inactive_tracks(rtime)
         tracks2save = np.asarray(inactive_tracks)
         
@@ -562,20 +636,31 @@ class track_list (object):
                 if np.logical_and(not self.tracklist[i].saved2nc,
                                   np.all(self.tracklist[i].ocean_time)):
      
-                    tsize = self.tracklist[i].ocean_time.size
-                    
-                    if tsize >= self.track_duration_min / self.days_btwn_recs:
+                    #tsize = self.tracklist[i].ocean_time.size
+                    tsize = len(self.tracklist[i].lon)
+                    #print 'ncindncindncind',self.ncind
+                    if tsize >= self.track_duration_min / self.days_btwn_recs and tsize > 1.:
 
                         tend = self.ncind + tsize
-                        nc.variables['lon'][self.ncind:tend] = np.array([self.tracklist[i].lon])
-                        nc.variables['lat'][self.ncind:tend] = np.array([self.tracklist[i].lat])
+                        
+                        #if self.sign_type in 'Anticyclonic':
+                            #print '\ntsize', tsize
+                            #print self.ncind, tend
+                            #print 'np.array([self.tracklist[i].lon])',np.asarray([self.tracklist[i].lon])
+                            
+                            #print "\nnc.variables['lon'][:tend]", nc.variables['lon'][:tend]
+                            #print "nc.variables['lon'][self.ncind:tend]", nc.variables['lon'][self.ncind:tend]
+                        
+                        
+                        nc.variables['lon'][self.ncind:tend] = np.asarray(self.tracklist[i].lon)
+                        nc.variables['lat'][self.ncind:tend] = np.asarray([self.tracklist[i].lat])
                         nc.variables['A'][self.ncind:tend] = np.array([self.tracklist[i].amplitude])
                         self.tracklist[i].Uavg *= np.array(100.) # to cm/s
                         nc.variables['U'][self.ncind:tend] = self.tracklist[i].Uavg
                         nc.variables['Teke'][self.ncind:tend] = np.array([self.tracklist[i].teke])
-                        self.tracklist[i].radius_s *= np.array(1e-3)
+                        self.tracklist[i].radius_s *= np.array(1e-3) # to km
                         nc.variables['L'][self.ncind:tend] = self.tracklist[i].radius_s
-                        self.tracklist[i].radius_e * np.array(1e-3)
+                        self.tracklist[i].radius_e *= np.array(1e-3) # to km
                         nc.variables['radius_e'][self.ncind:tend] = self.tracklist[i].radius_e
                         if 'ROMS' in self.datatype:
                             nc.variables['temp'][self.ncind:tend] = np.array([self.tracklist[i].temp])
@@ -588,14 +673,26 @@ class track_list (object):
                         else:
                             nc.variables['ocean_time'][self.ncind:tend] = np.array([self.tracklist[i].ocean_time])
                         nc.variables['n'][self.ncind:tend] = np.arange(tsize, dtype=np.int32)
-                        nc.variables['track'][self.ncind:tend] = np.ones(tsize) * self.ch_index
+                        nc.variables['track'][self.ncind:tend] = np.full(tsize, self.ch_index)
                         nc.variables['track'].max_val = np.int32(self.ch_index)
                         nc.variables['eddy_duration'][self.ncind:tend] = np.array([self.tracklist[i].ocean_time]).size \
                                                                                  * self.days_btwn_recs
-                    
+                        if self.track_extra_variables:
+                            nc.variables['shape_error'][self.ncind:tend] = np.array([self.tracklist[i].shape_error])
+                            for j in np.arange(tend - self.ncind):
+                                jj = j + self.ncind
+                                contour_e_arr = np.asarray(self.tracklist[i].contour_e[j]).ravel()
+                                nc.variables['contour_e'][:contour_e_arr.size,jj] = contour_e_arr
+                                contour_s_arr = np.asarray(self.tracklist[i].contour_s[j]).ravel()
+                                nc.variables['contour_s'][:contour_s_arr.size,jj] = contour_s_arr
+                                #print 'BBBBBBBB', np.asarray(self.tracklist[i].Uavg_profile).ravel()
+                                #print 'j',j
+                                Uavg_profile_arr = np.asarray(self.tracklist[i].Uavg_profile[j]).ravel()
+                                nc.variables['Uavg_profile'][:Uavg_profile_arr.size,jj] = Uavg_profile_arr #np.asarray(self.tracklist[i].Uavg_profile[j]).ravel()
+                        
                         # Flag indicating track[i] is now saved
                         self.tracklist[i].saved2nc = True
-                        self.ncind += len(self.tracklist[i].lon)
+                        self.ncind += tsize
                         self.ch_index += 1
                         nc.sync()
         
@@ -621,10 +718,8 @@ class track_list (object):
         self.old_amp     = self.new_amp[lasti:]
         self.old_Uavg    = self.new_Uavg[lasti:]
         self.old_teke    = self.new_teke[lasti:]
-        if 'ROMS' in self.datatype:
-            self.old_temp = self.new_temp[lasti:]
-            self.old_salt = self.new_salt[lasti:]
         self.old_bounds  = self.new_bounds[lasti:]
+        
         self.new_lon     = np.array([])
         self.new_lat     = np.array([])
         self.new_radii_s = np.array([])
@@ -633,11 +728,26 @@ class track_list (object):
         self.new_Uavg    = np.array([])
         self.new_teke    = np.array([])
         self.new_time    = np.array([])
+        self.new_bounds  = np.atleast_2d(np.empty(4, dtype=np.int16))
+        
         if 'ROMS' in self.datatype:
+            self.old_temp = self.new_temp[lasti:]
+            self.old_salt = self.new_salt[lasti:]
+            
             self.new_temp = np.array([])
             self.new_salt = np.array([])
-        self.new_bounds  = np.atleast_2d([])
         
+        if self.track_extra_variables:
+            self.old_contour_e = list(self.new_contour_e[lasti:])
+            self.old_contour_s = list(self.new_contour_s[lasti:])
+            self.old_Uavg_profile = list(self.new_Uavg_profile[lasti:])
+            self.old_shape_error = self.new_shape_error[lasti:]
+            
+            self.new_contour_e = []
+            self.new_contour_s = []
+            self.new_Uavg_profile = []
+            self.new_shape_error = np.array([])
+            
         return self
         
         
@@ -666,63 +776,115 @@ class track_list (object):
         try:
             self.new_lon[ind] = x
         except:
-            self.new_lon.append([0] * (ind - len(self.new_lon) + 1)
+            self.new_lon += [0] * (ind - len(self.new_lon) + 1)
             self.new_lon[ind] = x
         THIS IMPLIES CHANGING TO LISTS ALL THROUGH THE CODE... NOT URGENT FOR NOW
         ------------------------------------------------------------------
         
         '''
-        tmp  = eval('np.copy(self.' + xarr +')')
-        if ind < tmp.size:
-            newsize = tmp.size
+        tmp = eval('self.' + xarr)
+        
+        if isinstance(tmp, np.ndarray):
+            tmp  = np.copy(tmp)
+            if ind < tmp.size:
+                newsize = tmp.size
+            else:
+                newsize = ind + 1
+            #print 'numpy-------'
+        
+        elif isinstance(tmp, list):
+            tmp = list(tmp)
+            if ind < len(tmp):
+                newsize = len(tmp)
+            else:
+                newsize = ind + 1
+            #print 'list-------'
+        
         else:
-            newsize = ne.evaluate('ind + 1')
-        if 'new_lon' in xarr:
+            Exception
+        
+        if strcompare('new_lon', xarr):
             self.new_lon = np.zeros((newsize))
             self.new_lon[:tmp.size] = tmp
             self.new_lon[ind] = x
-        elif 'new_lat' in xarr:
+        elif strcompare('new_lat', xarr):
             self.new_lat = np.zeros((newsize))
             self.new_lat[:tmp.size] = tmp
             self.new_lat[ind] = x
-        elif 'new_radii_s' in xarr:
+        elif strcompare('new_radii_s', xarr):
             self.new_radii_s = np.zeros((newsize))
             self.new_radii_s[:tmp.size] = tmp
             self.new_radii_s[ind] = x
-        elif 'new_radii_e' in xarr:
+        elif strcompare('new_radii_e', xarr):
             self.new_radii_e = np.zeros((newsize))
             self.new_radii_e[:tmp.size] = tmp
             self.new_radii_e[ind] = x
-        elif 'new_amp' in xarr:
+        elif strcompare('new_amp', xarr):
             self.new_amp = np.zeros((newsize))
             self.new_amp[:tmp.size] = tmp
             self.new_amp[ind] = x
-        elif 'new_Uavg' in xarr:
+        elif strcompare('new_Uavg', xarr):
             self.new_Uavg = np.zeros((newsize))
             self.new_Uavg[:tmp.size] = tmp
             self.new_Uavg[ind] = x
-        elif 'new_teke' in xarr:
+        elif strcompare('new_teke', xarr):
             self.new_teke = np.zeros((newsize))
             self.new_teke[:tmp.size] = tmp
             self.new_teke[ind] = x
-        elif 'new_temp' in xarr:
+        elif strcompare('new_temp', xarr):
             self.new_temp = np.zeros((newsize))
             self.new_temp[:tmp.size] = tmp
             self.new_temp[ind] = x
-        elif 'new_salt' in xarr:
+        elif strcompare('new_salt', xarr):
             self.new_salt = np.zeros((newsize))
             self.new_salt[:tmp.size] = tmp
             self.new_salt[ind] = x
+        elif strcompare('new_shape_error', xarr):
+            self.new_shape_error = np.zeros((newsize))
+            self.new_shape_error[:tmp.size] = tmp
+            self.new_shape_error[ind] = x
+        elif strcompare('new_bounds', xarr):
+            if ind < tmp.shape[0]:
+                newsize = tmp.size
+            else:
+                newsize = ind + 1
+            self.new_bounds = np.zeros((newsize, 4))
+            self.new_bounds[:tmp.shape[0]] = tmp
+            self.new_bounds[ind] = x
+        
+        elif strcompare('new_contour_e', xarr):
+            try:
+                self.new_contour_e[ind] = x
+            except:
+                self.new_contour_e += [0] * (ind - len(self.new_contour_e) + 1)
+                self.new_contour_e[ind] = x
+        elif strcompare('new_contour_s', xarr):
+            try:
+                self.new_contour_s[ind] = x
+            except:
+                self.new_contour_s += [0] * (ind - len(self.new_contour_s) + 1)
+                self.new_contour_s[ind] = x
+        elif strcompare('new_Uavg_profile', xarr):
+            try:
+                self.new_Uavg_profile[ind] = x
+            except:
+                self.new_Uavg_profile += [0] * (ind - len(self.new_Uavg_profile) + 1)
+                self.new_Uavg_profile[ind] = x
         else:
             raise Exception
         return self
 
 
     def update_eddy_properties(self, centlon, centlat, eddy_radius_s, eddy_radius_e,
-                               amplitude, Uavg, teke, rtime, bounds, cent_temp=None, cent_salt=None):
+                               amplitude, Uavg, teke, rtime, bounds,
+                               contour_e=None, contour_s=None,
+                               Uavg_profile=None, shape_error=None,
+                               cent_temp=None, cent_salt=None):
         '''
         Append new variable values to track arrays
         '''
+        #print 'self.new_lon_tmp', self.new_lon_tmp
+        #print 'centlon', centlon
         self.new_lon_tmp = np.r_[self.new_lon_tmp, centlon]
         self.new_lat_tmp = np.r_[self.new_lat_tmp, centlat]
         self.new_radii_tmp_s = np.r_[self.new_radii_tmp_s, eddy_radius_s]
@@ -741,6 +903,13 @@ class track_list (object):
             self.new_bounds_tmp = np.vstack((self.new_bounds_tmp, bounds))
         except Exception:    
             self.new_bounds_tmp = np.hstack((self.new_bounds_tmp, bounds))
+        if self.track_extra_variables:
+	    #print 'self.new_shape_error_tmp', self.new_shape_error_tmp
+	    #print 'shape_error', shape_error
+            self.new_contour_e_tmp.append(contour_e)
+            self.new_contour_s_tmp.append(contour_s)
+            self.new_Uavg_profile_tmp.append(Uavg_profile)
+            self.new_shape_error_tmp = np.r_[self.new_shape_error_tmp, shape_error]
         return self
     
     

@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_ROMS.py
 
-Version 1.3.0
+Version 1.4.0
 
 
 
@@ -90,7 +90,9 @@ if __name__ == '__main__':
     filetype     = 'avg'
     sigma_lev    = -1  # -1 for surface
     
-    days_btwn_recs = 3.
+    days_btwn_recs = 3. # days
+    # Save only tracks longer than...     
+    track_duration_min = 28 # days
     
     # Set grid
     grdname = 'roms_grd_NA2009_7pt5km.nc'
@@ -132,7 +134,7 @@ if __name__ == '__main__':
         qparameter = np.linspace(0, 5*10**-11, 25)
         
     elif 'sla' in diag_type: # Units, cm; for anticyclones use -50 to 50
-        slaparameter = np.arange(-100., 101., 1.0)
+        slaparameter = np.arange(-100., 101., .25)
     
     
     # Apply a filter to the Q parameter
@@ -149,8 +151,6 @@ if __name__ == '__main__':
     else:
         error
     
-    # Save only tracks longer than...     
-    track_duration_min = 5 # days
 
 
 
@@ -161,6 +161,11 @@ if __name__ == '__main__':
         lonmax = -5.5
         latmin = 20.5
         latmax = 38.5
+        
+        #lonmin = -25.     # Canary
+        #lonmax = -15
+        #latmin = 22.
+        #latmax = 28.
     
     # for canbas4
     #lonmin = -36.
@@ -186,10 +191,10 @@ if __name__ == '__main__':
     
     # Parameters used by CSS11 and KCCMC11 (Sec. 3.2) to ensure the slow evolution
     # of the eddies over time; they use min and max values of 0.25 and 2.5
-    evolve_ammin = 0.05 #0.25 #0.15 # min change in amplitude
-    evolve_ammax = 5 #2.5 #5.  # max change in amplitude
-    evolve_armin = 0.05 #0.25 #0.15 # min change in area
-    evolve_armax = 5 #2.5 #5.  # max change in area
+    evolve_ammin = 0.0005 #0.25 #0.15 # min change in amplitude
+    evolve_ammax = 500 #2.5 #5.  # max change in amplitude
+    evolve_armin = 0.0005 #0.25 #0.15 # min change in area
+    evolve_armax = 500 #2.5 #5.  # max change in area
     
     
     separation_method = 'ellipse' # see CSS11
@@ -238,6 +243,7 @@ if __name__ == '__main__':
         #shape_err = 35. * np.ones(qparameter.size)
         
     elif 'sla' in diag_type:
+        #shape_err = 55. * np.ones(slaparameter.size)
         shape_err = 55. * np.ones(slaparameter.size)
         #shape_err = np.power(np.linspace(85., 40,  slaparameter.size), 2) / 100.
         #shape_err[shape_err < 50.] = 50.
@@ -387,7 +393,7 @@ if __name__ == '__main__':
     A_eddy.dist0 = np.float(dist0)
     C_eddy.dist0 = np.float(dist0)
 
-    start = 0
+    start = True
     start_time = time.time()
     
     # Loop thru the years...
@@ -402,11 +408,14 @@ if __name__ == '__main__':
             filename = directory + model + '_' + filetype + \
                        '_Y' + str(Yr) + 'M' + str(Mo) + '.nc'
             print 'Opening file:', filename
-            if start == 0:
-                start = 1
+            if start:
+                start = False
                 record_range = get_ROMS_data(filename)
-                A_eddy.days_btwn_recs = np.squeeze(np.diff(record_range[0:2]) / 86400.)
-                C_eddy.days_btwn_recs = np.squeeze(np.diff(record_range[0:2]) / 86400.)
+                
+                check_days_btwn_recs = np.squeeze(np.diff(record_range[0:2]) / 86400.)
+                assert days_btwn_recs == check_days_btwn_recs, '"days_btwn_recs" is incorrectly set'
+                A_eddy.days_btwn_recs = check_days_btwn_recs
+                C_eddy.days_btwn_recs = check_days_btwn_recs
                 
                 if 'ip_roms' in model:
                     nc = netcdf.Dataset(filename)
@@ -595,12 +604,11 @@ if __name__ == '__main__':
                                        verbose=verbose)
                 
                 elif 'sla' in diag_type:
-		    #print 'rtime 1', rtime
                     A_eddy.sign_type = 'Anticyclonic'
                     A_eddy = collection_loop(A_CS, grd, rtime,
                                              A_list_obj=A_eddy,  C_list_obj=None,
                                              sign_type=A_eddy.sign_type, verbose=verbose)
-                    # Note that CSc is reverse order
+                    # Note that CSc is in reverse order
                     C_eddy.sign_type = 'Cyclonic'
                     C_eddy = collection_loop(C_CS, grd, rtime,
                                              A_list_obj=None, C_list_obj=C_eddy,
@@ -640,11 +648,11 @@ if __name__ == '__main__':
                     plt.close(250)
 
                 if start:
-                    first_record = True
                     # Set old variables equal to new variables
                     A_eddy.set_old_variables()
                     C_eddy.set_old_variables()
-                    start = False
+                    first_record = True
+                    #start = False
                 else:
                     first_record = False
                 
