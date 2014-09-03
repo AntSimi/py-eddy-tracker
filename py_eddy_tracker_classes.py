@@ -449,11 +449,11 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
         return np.mean(uavg[np.isfinite(uavg)])
     
     # True for debug figures
-    debug_U = False
-    if debug_U:
-        schem_dic = {}
-        conts_x = np.array([])
-        conts_y = np.array([])
+    #debug_U = False
+    #if debug_U:
+        #schem_dic = {}
+        #conts_x = np.array([])
+        #conts_y = np.array([])
     
     # Unpack indices for convenience
     istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
@@ -520,34 +520,34 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
                 seglon, seglat = poly_i.vertices[:,0], poly_i.vertices[:,1]
                 seglon, seglat = eddy_tracker.uniform_resample(seglon, seglat)
                 
-                if debug_U:
-                    px, py = pcol_2dxy(grd.lon()[jmin:jmax,imin:imax],
-                                       grd.lat()[jmin:jmax,imin:imax])
-                    plt.figure(55)
-                    ax1 = plt.subplot(121)
-                    if start:
-                        pcm = ax1.pcolormesh(px, py, Eddy.Uspd[jmin:jmax,imin:imax], cmap=plt.cm.gist_earth_r)
-                        pcm.set_clim(0, .5)
-                        plt.colorbar(pcm, orientation='horizontal')
-                        plt.scatter(grd.lon()[jmin:jmax,imin:imax],
-                                    grd.lat()[jmin:jmax,imin:imax], s=5, c='k')
-                        start = False
-                    plt.plot(seglon, seglat, '.-r')
-                    plt.plot(Eddy.circlon, Eddy.circlat, 'b')
-                    plt.scatter(centlon_e, centlat_e, s=125, c='r')
-                    plt.axis('image')
-                    ax2 = plt.subplot(122)
-                    ax2.set_title('sum mask: %s' %np.sum(mask_i))
-                    plt.pcolormesh(px, py, mask_i.reshape(px.shape), cmap=plt.cm.Accent, edgecolors='orange')
-                    plt.scatter(grd.lon()[jmin:jmax,imin:imax],
-                                grd.lat()[jmin:jmax,imin:imax], s=5, c='k')
-                    plt.plot(seglon, seglat, '.-r')
-                    conts_x = np.append(conts_x, seglon)
-                    conts_y = np.append(conts_y, seglat)
-                    conts_x = np.append(conts_x, 9999)
-                    conts_y = np.append(conts_y, 9999)
-                    plt.plot(Eddy.circlon, Eddy.circlat, 'b')
-                    plt.scatter(centlon_e, centlat_e, s=125, c='r')
+                #if debug_U:
+                    #px, py = pcol_2dxy(grd.lon()[jmin:jmax,imin:imax],
+                                       #grd.lat()[jmin:jmax,imin:imax])
+                    #plt.figure(55)
+                    #ax1 = plt.subplot(121)
+                    #if start:
+                        #pcm = ax1.pcolormesh(px, py, Eddy.Uspd[jmin:jmax,imin:imax], cmap=plt.cm.gist_earth_r)
+                        #pcm.set_clim(0, .5)
+                        #plt.colorbar(pcm, orientation='horizontal')
+                        #plt.scatter(grd.lon()[jmin:jmax,imin:imax],
+                                    #grd.lat()[jmin:jmax,imin:imax], s=5, c='k')
+                        #start = False
+                    #plt.plot(seglon, seglat, '.-r')
+                    #plt.plot(Eddy.circlon, Eddy.circlat, 'b')
+                    #plt.scatter(centlon_e, centlat_e, s=125, c='r')
+                    #plt.axis('image')
+                    #ax2 = plt.subplot(122)
+                    #ax2.set_title('sum mask: %s' %np.sum(mask_i))
+                    #plt.pcolormesh(px, py, mask_i.reshape(px.shape), cmap=plt.cm.Accent, edgecolors='orange')
+                    #plt.scatter(grd.lon()[jmin:jmax,imin:imax],
+                                #grd.lat()[jmin:jmax,imin:imax], s=5, c='k')
+                    #plt.plot(seglon, seglat, '.-r')
+                    #conts_x = np.append(conts_x, seglon)
+                    #conts_y = np.append(conts_y, seglat)
+                    #conts_x = np.append(conts_x, 9999)
+                    #conts_y = np.append(conts_y, 9999)
+                    #plt.plot(Eddy.circlon, Eddy.circlat, 'b')
+                    #plt.scatter(centlon_e, centlat_e, s=125, c='r')
                 
                 # Interpolate Uspd to seglon, seglat, then get mean
                 Uavgseg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], seglon[:-1], seglat[:-1])
@@ -555,7 +555,7 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
                 if save_all_uavg:
                     all_uavg.append(Uavgseg)
                 
-                if Uavgseg >= Uavg:
+                if Uavgseg >= Uavg and np.sum(mask_i) >= Eddy.pixel_threshold[0]:
                     Uavg = Uavgseg.copy()
                     theseglon, theseglat = seglon.copy(), seglat.copy()
                 
@@ -569,28 +569,28 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
         # Speed based eddy radius (eddy_radius_s)
         centx_s, centy_s, eddy_radius_s, junk, junk = fit_circle(cx, cy)
         centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
-        if debug_U:
-            ax1.set_title('Speed-based radius: %s km' %np.int(eddy_radius_s/1e3))
-            ax1.plot(poly_e.vertices[:,0], poly_e.vertices[:,1], 'om')
-            ax1.plot(theseglon, theseglat, 'g', lw=3)
-            ax1.plot(inner_seglon, inner_seglat, 'k')
-            ax1.scatter(centlon_s, centlat_s, s=50, c='g')
-            ax1.axis('image')
-            ax2.plot(theseglon, theseglat, 'g', lw=3)
-            ax1.plot(inner_seglon, inner_seglat, 'k')
-            ax2.axis('image')
-            plt.show()
-            schem_dic['lon'] = grd.lon()[jmin:jmax,imin:imax]
-            schem_dic['lat'] = grd.lat()[jmin:jmax,imin:imax]
-            schem_dic['spd'] = Eddy.Uspd[jmin:jmax,imin:imax]
-            schem_dic['inner_seg'] = np.array([inner_seglon, inner_seglat]).T
-            schem_dic['effective_seg'] = np.array([poly_e.vertices[:,0], poly_e.vertices[:,1]]).T
-            schem_dic['effective_circ'] = np.array([Eddy.circlon, Eddy.circlat]).T
-            schem_dic['speed_seg'] = np.array([theseglon, theseglat]).T
-            schem_dic['all_segs'] = np.array([conts_x, conts_y]).T
-            schem_dic['Ls_centroid'] = np.array([centlon_s, centlat_s])
-            schem_dic['Leff_centroid'] = np.array([centlon_e, centlat_e])
-            io.savemat('schematic_fig_%s' %np.round(eddy_radius_s/1e3, 3), schem_dic)
+        #if debug_U:
+            #ax1.set_title('Speed-based radius: %s km' %np.int(eddy_radius_s/1e3))
+            #ax1.plot(poly_e.vertices[:,0], poly_e.vertices[:,1], 'om')
+            #ax1.plot(theseglon, theseglat, 'g', lw=3)
+            #ax1.plot(inner_seglon, inner_seglat, 'k')
+            #ax1.scatter(centlon_s, centlat_s, s=50, c='g')
+            #ax1.axis('image')
+            #ax2.plot(theseglon, theseglat, 'g', lw=3)
+            #ax1.plot(inner_seglon, inner_seglat, 'k')
+            #ax2.axis('image')
+            #plt.show()
+            #schem_dic['lon'] = grd.lon()[jmin:jmax,imin:imax]
+            #schem_dic['lat'] = grd.lat()[jmin:jmax,imin:imax]
+            #schem_dic['spd'] = Eddy.Uspd[jmin:jmax,imin:imax]
+            #schem_dic['inner_seg'] = np.array([inner_seglon, inner_seglat]).T
+            #schem_dic['effective_seg'] = np.array([poly_e.vertices[:,0], poly_e.vertices[:,1]]).T
+            #schem_dic['effective_circ'] = np.array([Eddy.circlon, Eddy.circlat]).T
+            #schem_dic['speed_seg'] = np.array([theseglon, theseglat]).T
+            #schem_dic['all_segs'] = np.array([conts_x, conts_y]).T
+            #schem_dic['Ls_centroid'] = np.array([centlon_s, centlat_s])
+            #schem_dic['Leff_centroid'] = np.array([centlon_e, centlat_e])
+            #io.savemat('schematic_fig_%s' %np.round(eddy_radius_s/1e3, 3), schem_dic)
         if not save_all_uavg:
             return Uavg, centlon_s, centlat_s, eddy_radius_s, theseglon, theseglat, inner_seglon, inner_seglat
         else:  
@@ -598,13 +598,13 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
     
     except Exception: # If no interior contours found, use eddy_radius_e
         
-        if debug_U and 0:
-            plt.title('Effective radius: %s km' %np.int(eddy_radius_e/1e3))
-            plt.plot(poly_e.vertices[:,0], poly_e.vertices[:,1], 'om')
-            plt.plot(theseglon, theseglat, 'g')
-            plt.scatter(centlon_e, centlat_e, s=125, c='r')
-            plt.axis('image')
-            plt.show()
+        #if debug_U and 0:
+            #plt.title('Effective radius: %s km' %np.int(eddy_radius_e/1e3))
+            #plt.plot(poly_e.vertices[:,0], poly_e.vertices[:,1], 'om')
+            #plt.plot(theseglon, theseglat, 'g')
+            #plt.scatter(centlon_e, centlat_e, s=125, c='r')
+            #plt.axis('image')
+            #plt.show()
         if not save_all_uavg:
             return Uavg, centlon_e, centlat_e, eddy_radius_e, theseglon, theseglat, theseglon, theseglat
         else:

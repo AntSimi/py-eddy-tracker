@@ -134,7 +134,7 @@ if __name__ == '__main__':
         qparameter = np.linspace(0, 5*10**-11, 25)
         
     elif 'sla' in diag_type: # Units, cm; for anticyclones use -50 to 50
-        slaparameter = np.arange(-100., 101., .25)
+        slaparameter = np.arange(-100., 100.25, 0.25)
     
     
     # Apply a filter to the Q parameter
@@ -157,10 +157,10 @@ if __name__ == '__main__':
     subdomain = True
     if the_domain in 'Canary_Islands':
     
-        lonmin = -38.     # Canary
+        lonmin = -36.     # Canary
         lonmax = -5.5
-        latmin = 20.5
-        latmax = 38.5
+        latmin = 18.
+        latmax = 35.5
         
         #lonmin = -25.     # Canary
         #lonmax = -15
@@ -215,6 +215,14 @@ if __name__ == '__main__':
     
     verbose = False
 
+    #Define track_extra_variables to track and save:
+    # - effective contour points
+    # - speed-based contour points
+    # - shape test values
+    # - profiles of swirl velocity from effective contour inwards
+    # Useful for working with ARGO data
+    track_extra_variables = True
+    
     
     # Note this is a global value
     fillval = -9999
@@ -292,8 +300,8 @@ if __name__ == '__main__':
 
     ## Initialise
     # Objects to hold data (qparameter)
-    A_eddy = eddy_tracker.track_list('ROMS', track_duration_min)
-    C_eddy = eddy_tracker.track_list('ROMS', track_duration_min)
+    A_eddy = eddy_tracker.track_list('ROMS', track_duration_min, track_extra_variables)
+    C_eddy = eddy_tracker.track_list('ROMS', track_duration_min, track_extra_variables)
     
     if 'Q' in diag_type:
         A_savefile = "".join([savedir, 'eddy_tracks_anticyclonic.nc'])
@@ -526,7 +534,7 @@ if __name__ == '__main__':
                     #sla *= grd.mask()
                     sla = np.ma.masked_where(grd.mask() == 0, sla)
                     
-                    grd.getSurfGeostrVel(sla)#, grd.f(), grd.pm(), grd.pn(),
+                    grd.get_geostrophic_velocity(sla)#, grd.f(), grd.pm(), grd.pn(),
                                                 #grd.u_mask, grd.v_mask)
                     
                     sla *= 100. # m to cm
@@ -697,8 +705,8 @@ if __name__ == '__main__':
                     if verbose:
                         print '--- saving to nc'
                     #print 'ddsssssss', rtime
-                    A_eddy.write2chelton_nc(A_savefile, rtime)
-                    C_eddy.write2chelton_nc(C_savefile, rtime)
+                    A_eddy.write2chelton_nc(rtime)
+                    C_eddy.write2chelton_nc(rtime)
                 #print 'Saving the eddies', time.time() - saving_start_time, 'seconds'
                 
             # Running time for a single monthly file

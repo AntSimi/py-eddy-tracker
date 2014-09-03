@@ -360,22 +360,16 @@ class PyEddyTracker (object):
         self.Mx, self.My = x, y
         return self
 
-    def getSurfGeostrVel(self, zeta):
+    def get_geostrophic_velocity(self, zeta):
         '''
         Returns u and v geostrophic velocity at
         surface from variables f, zeta, pm, pn...
         Note: output at rho points
-        Adapted from IRD surf_geostr_vel.m function
-        by Evan Mason
-        Changed to gv2, 14 May 07...
         '''
-        #def gv2(zeta, gof, pm, pn, umask, vmask): # Pierrick's version
         self.upad[:] = -self.gof() * self.v2rho_2d(self.vmask() * (zeta.data[1:] - zeta.data[:-1]) \
                                         * 0.5 * (self.pn()[1:] + self.pn()[:-1]))
         self.vpad[:] =  self.gof() * self.u2rho_2d(self.umask() * (zeta.data[:, 1:] - zeta.data[:, :-1]) \
                                         * 0.5 * (self.pm()[:, 1:] + self.pm()[:, :-1]))
-            #return ugv, vgv
-        #return gv2(zeta, self.gof(), self.pm(), self.pn(), self.umask(), self.vmask())
         return self
 
 
@@ -735,12 +729,8 @@ if __name__ == '__main__':
     # Path to directory where outputs are to be saved...
     #savedir = directory
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
-    savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
     savedir = '/marula/emason/aviso_eddy_tracking/junk/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test_0.35/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test_0.3/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO/CEC/'
-    #savedir = '/shared/emason/eddy_tracks/Barbara/2009/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
     #savedir = '/path/to/save/your/outputs/'
     
@@ -812,9 +802,9 @@ if __name__ == '__main__':
     if the_domain in 'Global':
         
         lonmin = -36.     # Canary
-        lonmax = -7.5
+        lonmax = -5.5
         latmin = 18.
-        latmax = 33.2
+        latmax = 35.5
         
         #lonmin = -30.        # BENCS
         #lonmax =  22.
@@ -869,10 +859,10 @@ if __name__ == '__main__':
     
     # Parameters used by Chelton etal and Kurian etal (Sec. 3.2) to ensure the slow evolution
     # of the eddies over time; they use min and max values of 0.25 and 2.5
-    evolve_ammin = 0.01# 0.25 # min change in amplitude
-    evolve_ammax = 10#2.5  # max change in amplitude
-    evolve_armin = 0.01# 0.25 # min change in area
-    evolve_armax = 10  # max change in area
+    evolve_ammin = 0.0005# 0.25 # min change in amplitude
+    evolve_ammax = 500#2.5  # max change in amplitude
+    evolve_armin = 0.0005# 0.25 # min change in area
+    evolve_armax = 500  # max change in area
     
     
     separation_method = 'ellipse' # see CSS11
@@ -1212,7 +1202,7 @@ if __name__ == '__main__':
                     #umask, vmask, junk = sla_grd.uvpmask(np.zeros_like(sla))
                 
                 # Multiply by 0.01 for m
-                sla_grd.getSurfGeostrVel(sla * 0.01)
+                sla_grd.get_geostrophic_velocity(sla * 0.01)
                 
                 # Remove padded boundary
                 sla = sla[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
