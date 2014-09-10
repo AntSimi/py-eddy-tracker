@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 1.4.0
+Version 1.4.1
 
 
 Scroll down to line ~640 to get started
@@ -680,11 +680,14 @@ if __name__ == '__main__':
     if new_AVISO:
         new_AVISO_SUBSAMP = True
         if new_AVISO_SUBSAMP:
-            days_btwn_recs = 7. # put sampling rate (days) here
+            days_btwn_recs = 3. # put sampling rate (days) here
         else:
             days_btwn_recs = 1.
     else: # old seven day AVISO
         days_btwn_recs = 7.
+    
+    # Save only tracks longer than...     
+    track_duration_min = 28. # days
 
     # Set path(s) to directory where SSH data are stored...
     if 'Global' in the_domain:
@@ -729,8 +732,8 @@ if __name__ == '__main__':
     # Path to directory where outputs are to be saved...
     #savedir = directory
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
-    savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
     #savedir = '/path/to/save/your/outputs/'
     
@@ -795,8 +798,6 @@ if __name__ == '__main__':
     else:
         Exception
     
-    # Save only tracks longer than...     
-    track_duration_min = 28. # days
 
     subdomain = True
     if the_domain in 'Global':
@@ -905,6 +906,8 @@ if __name__ == '__main__':
     
     # Use this for subsampling to get identical list as old_AVISO
     #AVISO_files = AVISO_files[5:-5:7]
+    if new_AVISO_SUBSAMP:
+        AVISO_files = AVISO_files[5:-5:np.int(days_btwn_recs)]
     
     # Set up a grid object using first AVISO file in the list
     sla_grd = AvisoGrid(AVISO_files[0], lonmin, lonmax, latmin, latmax)

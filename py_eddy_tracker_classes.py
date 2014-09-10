@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 1.4.0
+Version 1.4.1
 ===========================================================================
 
 
@@ -456,7 +456,7 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
         #conts_y = np.array([])
     
     # Unpack indices for convenience
-    istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
+    #istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
     imin, imax, jmin, jmax = Eddy.imin, Eddy.imax, Eddy.jmin, Eddy.jmax
     
     # TO DO: these would be passed in instead of grd if using Cython
@@ -505,7 +505,7 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e
                     proceed = False
             
             else:
-                # Iterate until 1 pixels
+                # Iterate until 1 pixel
                 if np.all([poly_e.contains_path(poly_i),
                            poly_i.contains_point([centlon_e, centlat_e]),
                            np.logical_and(np.sum(mask_i) >= 1,

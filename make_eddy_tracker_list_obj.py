@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 1.4.0
+Version 1.4.1
 
 
 ===========================================================================
@@ -391,7 +391,7 @@ class track_list (object):
         nc.title = title + ' eddy tracks'
         nc.directory = directory
         nc.days_between_records = np.float64(self.days_btwn_recs)
-        nc.min_track_duration = np.float64(self.track_duration_min)
+        nc.track_duration_min = np.float64(self.track_duration_min)
         
         if 'Q' in self.diag_type:
             nc.Q_parameter_contours = self.qparameter
