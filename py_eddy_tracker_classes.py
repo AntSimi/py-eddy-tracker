@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 1.4.1
+Version 1.4.2
 ===========================================================================
 
 
@@ -152,7 +152,8 @@ def do_basemap(M, ax):
 
 
 def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, diag_type,
-                savedir, tit, ax, ax_cbar):
+                savedir, tit, ax, ax_cbar, qparam=None, qparameter=None,
+                xi=None, xicopy=None):
     '''
     '''
     def plot_tracks(Eddy, track_length, rtime, col, ax):
@@ -262,7 +263,7 @@ def quart_interp(h1, h2, h3, h4):
     return ne.evaluate('0.25 * (h1 + h2 + h3 + h4)')
 
 
-def okubo_weiss(u, v, pm, pn):
+def okubo_weiss(grd):
     '''
     Calculate the Okubo-Weiss parameter
     See e.g. http://ifisc.uib.es/oceantech/showOutput.php?idFile=61
@@ -277,11 +278,15 @@ def okubo_weiss(u, v, pm, pn):
         def vort(u, v, dx, dy):
             dx = ne.evaluate('1 / dx')
             dy = ne.evaluate('1 / dy')
-            uy, ux = np.gradient(u2rho_2d(u), dx, dy)
-            vy, vx = np.gradient(v2rho_2d(v), dx, dy)
+            uy, ux = np.gradient(grd.u2rho_2d(u), dx, dy)
+            vy, vx = np.gradient(grd.v2rho_2d(v), dx, dy)
             xi = ne.evaluate('vx - uy')
             return xi
         return vort(u, v, pm, pn)
+    u = grd.rho2u_2d(grd.u)
+    v = grd.rho2v_2d(grd.v)
+    pm = grd.pm()[grd.jup0:grd.jup1, grd.iup0:grd.iup1]
+    pn = grd.pn()[grd.jup0:grd.jup1, grd.iup0:grd.iup1]
 
     Mp, Lp = pm.shape
     L = ne.evaluate('Lp - 1')
@@ -669,13 +674,14 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                     if 'Q' in Eddy.diag_type:
                         junk, junk, junk, xilon, xilat, junk = CSxi.find_nearest_contour(
                                                                centlon_e, centlat_e, pixel=False)
-                        eddy_radius_e = haversine_distance_vector(centlon_e, centlat_e, xilon, xilat)
-                        
+                        eddy_radius_e = hav.haversine_dist(centlon_e, centlat_e, xilon, xilat)
+                        #print eddy_radius_e, Eddy.radmin, Eddy.radmax
                         if np.logical_and(eddy_radius_e >= Eddy.radmin,
                                           eddy_radius_e <= Eddy.radmax):
                             proceed0 = True
                         else:
-                            proceed0 = False
+                            proceed0 = True#False
+                        #print 'proceed0', proceed0
                     elif 'sla' in Eddy.diag_type:
                         # If 'sla' is defined we filter below with pixel count
                         proceed0 = True
@@ -689,10 +695,11 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                             grd.lat())
                         # If condition not True this eddy has already been detected
                         if 'Q' in Eddy.diag_type:
-                            if xi[centj, centi] != fillval:
+                            if xi[centj, centi] != Eddy.fillval:
                                 proceed1 = True
                             else:
                                 proceed1 = False
+                            #print 'proceed1', proceed1
                         elif 'sla' in Eddy.diag_type:
                             if Eddy.sla[centj, centi] != Eddy.fillval:
                                 acyc_not_cyc = Eddy.sla[centj, centi] >= CS.cvalues[collind]
@@ -735,27 +742,24 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             poly_e = path.Path(np.array([contlon_e, contlat_e]).T)
                             # NOTE: Path.contains_points requires matplotlib 1.2 or higher
                             mask_e = poly_e.contains_points(np.array([rectlon, rectlat]).T)
-                            
+                            #print 'np.sum(mask_e)',np.sum(mask_e), Eddy.pixel_threshold
                             # sum(mask) between 8 and 1000, CSS11 criterion 2 
                             if np.logical_and(np.sum(mask_e) >= Eddy.pixel_threshold[0],
                                               np.sum(mask_e) <= Eddy.pixel_threshold[1]):
                                 
                                 points = np.array([grd.lon()[jmin:jmax,imin:imax].ravel(),
                                                    grd.lat()[jmin:jmax,imin:imax].ravel()]).T
+                                # Resample the contour points for a more even spatial distribution
+                                contlon_e, contlat_e = eddy_tracker.uniform_resample(contlon_e, contlat_e)
                                 
                                 if 'Q' in Eddy.diag_type:
                                     # Note, eddy amplitude == max(abs(vort/f)) within eddy, KCCMC11
                                     amplitude = np.abs(xi[jmin:jmax,imin:imax].flat[mask_e]).max()
-                                
+                                    
                                 elif 'sla' in Eddy.diag_type:
                                     # Define as difference between extremum value for SLA anomaly and
                                     # the identifying contour value
                                     # CSS11, section B3 (here we assume h0 == CS.cvalues[collind])
-                                    #h0 = CS.cvalues[collind]
-                                    
-                                    # Resample the contour points for a more even spatial distribution
-                                    contlon_e, contlat_e = eddy_tracker.uniform_resample(contlon_e, contlat_e)
-
                                     h0 = interpolate.griddata(points, Eddy.sla[jmin:jmax,imin:imax].ravel(),
                                                                  (contlon_e, contlat_e), 'linear')
                                     h0 = np.mean(h0[np.isfinite(h0)]) # Use 'isfinite' in case of NaNs from griddata
@@ -835,7 +839,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             else:
                                 amplitude = 0.
                             
-                            #print 'amplitude',amplitude
+                                #print 'amplitude',amplitude
                             if np.logical_and(amplitude >= Eddy.ampmin, amplitude <= Eddy.ampmax):
                                 proceed2 = True
                             else:
@@ -864,9 +868,10 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                         #print interpolate.griddata(points, Uavg.ravel(),(contlon_e, contlat_e), 'linear')        
                                         plt.show()
 
-                                    Uavg = interpolate.griddata(points, U_avg[jmin:jmax,imin:imax].ravel(),
-                                                                (contlon_e, contlat_e), 'cubic')
+                                    Uavg = interpolate.griddata(points, Eddy.Uspd[jmin:jmax,imin:imax].ravel(),
+                                                                (contlon_e, contlat_e), 'linear')
                                     Uavg = np.nan_to_num(Uavg).max()
+                                    #Uavg = 0; print 'fix me'
                                 
                                 elif 'sla' in Eddy.diag_type:
                                    #tt = time.time()
@@ -891,8 +896,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     
                                     # Get indices of speed-based centroid
                                     centi, centj = eddy_tracker.nearest(centlon_s, centlat_s,
-                                                                        grd.lon(),
-                                                                        grd.lat())
+                                                                        grd.lon(), grd.lat())
                                         
                                 # Set the bounds
                                 bounds = np.atleast_2d(np.int16([imin, imax, jmin, jmax]))
@@ -904,20 +908,32 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 
                                 # Update Q eddy properties
                                 if 'Q' in Eddy.diag_type:
-                                    # Anticyclone
-                                    if xi[centj, centi] <= 0.:
-                                        A_list_obj.update_eddy_properties(centlon, centlat,
-                                                                          eddy_radius_s, eddy_radius_e,
+                                    # We pass eddy_radius_e as a dummy for eddy_radius_s
+                                    
+                                    if has_ts: # for ocean model
+                                        if xi[centj, centi] <= 0.: # Anticyclone
+                                            A_list_obj.update_eddy_properties(centlon_e, centlat_e,
+                                                                          eddy_radius_e, eddy_radius_e,
                                                                           amplitude, Uavg, teke, rtime, bounds,
                                                                           cent_temp=cent_temp,
                                                                           cent_salt=cent_salt)
-                                    # Cyclone
-                                    elif xi[centj, centi] >= 0.:
-                                        C_list_obj.update_eddy_properties(centlon, centlat,
-                                                                          eddy_radius_s, eddy_radius_e,
+                                        elif xi[centj, centi] >= 0.: # Cyclone
+                                            C_list_obj.update_eddy_properties(centlon_e, centlat_e,
+                                                                          eddy_radius_e, eddy_radius_e,
                                                                           amplitude, Uavg, teke, rtime, bounds,
                                                                           cent_temp=cent_temp,
                                                                           cent_salt=cent_salt)
+                                    else: # for AVISO
+                                        if xi[centj, centi] <= 0.: # Anticyclone
+                                            A_list_obj.update_eddy_properties(centlon_e, centlat_e,
+                                                                          eddy_radius_e, eddy_radius_e,
+                                                                          amplitude, Uavg, teke, rtime, bounds)
+                                        elif xi[centj, centi] >= 0.: # Cyclone
+                                            C_list_obj.update_eddy_properties(centlon_e, centlat_e,
+                                                                          eddy_radius_e, eddy_radius_e,
+                                                                          amplitude, Uavg, teke, rtime, bounds)
+                                
+                                
                                 # Update sla eddy properties
                                 elif 'sla' in Eddy.diag_type:
                                     
@@ -942,7 +958,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                                               amplitude, Uavg, teke, rtime, bounds,
                                                                               cent_temp=cent_temp,
                                                                               cent_salt=cent_salt)
-                                    else: # AVISO
+                                    else: # for AVISO
                                         #tt = time.time()
                                         #print 'rtime2', rtime
                                         #print np.append(contlon_e, contlat_e)
@@ -980,9 +996,9 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
 
                                 # Mask out already found eddies
                                 if 'Q' in Eddy.diag_type:
-                                    mask_c = nx.points_inside_poly(np.array([rectlon, rectlat]).T,
-                                                                  np.array([hcirclon, hcirclat]).T)
-                                    xi[jmin:jmax, imin:imax].flat[mask_c] = Eddy.fillval
+                                    #mask_c = nx.points_inside_poly(np.array([rectlon, rectlat]).T,
+                                                                  #np.array([hcirclon, hcirclat]).T)
+                                    xi[jmin:jmax, imin:imax].flat[mask_e] = Eddy.fillval
                                     
                                 elif 'sla' in Eddy.diag_type:
                                     Eddy.sla[jmin:jmax, imin:imax].flat[mask_e] = Eddy.fillval

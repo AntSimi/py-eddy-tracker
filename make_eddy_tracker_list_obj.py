@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 1.4.1
+Version 1.4.2
 
 
 ===========================================================================

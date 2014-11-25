@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 1.4.1
+Version 1.4.2
 
 
 Scroll down to line ~640 to get started
@@ -250,6 +250,7 @@ class PyEddyTracker (object):
         self._gof *= 4.
         self._gof *= np.pi
         self._gof /= 86400.
+        self._f = np.copy(self._gof)
         self._gof = self.gravity / self._gof
         
         lonu = self.half_interp(self.lonpad()[:,:-1], self.lonpad()[:,1:])
@@ -304,6 +305,34 @@ class PyEddyTracker (object):
             return (v_out.squeeze())
         Mshp, Lshp = vv_in.shape
         return vv2vr(vv_in, Mshp + 1, Lshp)
+
+
+    def rho2u_2d(self, rho_in):
+        '''
+        Convert a 2D field at rho points to a field at u points
+        '''
+        def _r2u(rho_in, Lp):
+            u_out = rho_in[:, :Lp - 1]
+            u_out += rho_in[:, 1:Lp]
+            u_out *= 0.5
+            return np.squeeze(u_out)
+        assert rho_in.ndim == 2, 'rho_in must be 2d'
+        Mshp, Lshp = rho_in.shape
+        return _r2u(rho_in, Lshp)
+
+
+    def rho2v_2d(self, rho_in):
+        '''
+        Convert a 2D field at rho points to a field at v points
+        '''
+        def _r2v(rho_in, Mp):
+            v_out = rho_in[:Mp - 1]
+            v_out += rho_in[1:Mp]
+            v_out *= 0.5
+            return np.squeeze(v_out)
+        assert rho_in.ndim == 2, 'rho_in must be 2d'
+        Mshp, Lshp = rho_in.shape
+        return _r2v(rho_in, Mshp)
 
 
     def uvmask(self):
@@ -579,6 +608,9 @@ class AvisoGrid (PyEddyTracker):
     def vmask(self): # Mask at V points
         return self._vmask
     
+    def f(self): #  Coriolis
+        return self._f
+      
     def gof(self): # Gravity / Coriolis
         return self._gof
 
@@ -725,15 +757,16 @@ if __name__ == '__main__':
     date_str, date_end = 19930101, 20121231 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
-    #diag_type = 'Q' <<< not implemented in 1.2.0
-    diag_type = 'sla'
+    diag_type = 'Q' #<<< not implemented in 1.2.0
+    #diag_type = 'sla'
     
     
     # Path to directory where outputs are to be saved...
     #savedir = directory
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
-    savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_SUBSAMP-3days/'
+    savedir = '/marula/emason/aviso_eddy_tracking/junk/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
     #savedir = '/path/to/save/your/outputs/'
     
@@ -748,17 +781,15 @@ if __name__ == '__main__':
     # Reference Julian day (Julian date at Jan 1, 1992)
     jday_ref = 2448623
 
-    # Min and max permitted eddy radii [m]
+    # Min and max permitted eddy radii [degrees]
+    radmin = 0.4 # degrees (Chelton recommends ~50 km minimum)
+    radmax = 4.461 # degrees
+    
     if 'Q' in diag_type:
-        Exception # Not implemented
-        radmin = 15000.
-        radmax = 250000.
-        ampmin = 0.02
+        ampmin = 0.02 # max(abs(xi/f)) within the eddy
         ampmax = 100.
         
     elif 'sla' in diag_type:
-        radmin = 0.4 # degrees (Chelton recommends ~50 km minimum)
-        radmax = 4.461 # degrees
         ampmin = 1. # cm
         ampmax = 150.
 
@@ -773,11 +804,12 @@ if __name__ == '__main__':
 
 
     # Define contours
+    # Set Q contour spacing 
     if 'Q' in diag_type:
-        # Set Q contour spacing 
-        qparameter = np.linspace(0, 5*10**-11, 25)
+        qparameter = np.linspace(0, 5*10**-11, 100)
+    
+    # Set SLA contour spacing
     elif 'sla' in diag_type:
-        # Set SLA contour spacing
         #slaparameter = np.arange(-100., 101., 1.0) # cm
         slaparameter = np.arange(-100., 100.25, 0.25) # cm
 
@@ -802,10 +834,10 @@ if __name__ == '__main__':
     subdomain = True
     if the_domain in 'Global':
         
-        lonmin = -36.     # Canary
+        lonmin = -40.     # Canary
         lonmax = -5.5
-        latmin = 18.
-        latmax = 35.5
+        latmin = 16.
+        latmax = 36.5
         
         #lonmin = -30.        # BENCS
         #lonmax =  22.
@@ -884,7 +916,7 @@ if __name__ == '__main__':
     # - shape test values
     # - profiles of swirl velocity from effective contour inwards
     # Useful for working with ARGO data
-    track_extra_variables = True
+    track_extra_variables = False
 
 
 
@@ -921,10 +953,11 @@ if __name__ == '__main__':
         # The shape error can maybe be played with...
         shape_err = np.power(np.linspace(85., 40,  qparameter.size), 2) / 100.
         shape_err[shape_err < 35.] = 35.
+        hanning_passes = 5
         
     elif 'sla' in diag_type:
-        shape_err = 55. * np.ones(slaparameter.size)
-        #shape_err = 1000. * np.ones(slaparameter.size)
+        #shape_err = 55. * np.ones(slaparameter.size)
+        shape_err = 1000. * np.ones(slaparameter.size)
         #shape_err = np.power(np.linspace(85., 40,  slaparameter.size), 2) / 100.
         #shape_err[shape_err < 50.] = 50.
     
@@ -1112,120 +1145,87 @@ if __name__ == '__main__':
             
             #grdmask = grd.mask()[j0:j1,i0:i1]
             
+            sla = sla_grd.get_AVISO_data(AVISO_file)
+                
+            if isinstance(smoothing, str):
+                    
+                if 'Gaussian' in smoothing:
+                    if 'first_record' not in locals():
+                        print '------ applying Gaussian high-pass filter'
+                    # Set landpoints to zero
+                    np.place(sla, sla_grd.mask == False, 0.)
+                    np.place(sla, sla.data == sla_grd.fillval, 0.)
+                    # High pass filter, see
+                    # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
+                    sla -= ndimage.gaussian_filter(sla, [mres, zres])
+                elif 'Hanning' in smoothing:
+                    print '------ applying %s passes of Hanning filter' %smooth_fac
+                    # Do smooth_fac passes of 2d Hanning filter
+                    sla = func_hann2d_fast(sla, smooth_fac)
+                
+                
+            # Expand the landmask
+            sla = np.ma.masked_where(sla_grd.mask == False, sla)
+                
+            # Get timing
+            try:
+                thedate = dt.num2date(rtime)[0]
+            except:
+                thedate = dt.num2date(rtime)
+            yr = thedate.year
+            mo = thedate.month
+            da = thedate.day
+                
+            # Multiply by 0.01 for m
+            sla_grd.get_geostrophic_velocity(sla * 0.01)
+                
+            # Remove padded boundary
+            sla = sla[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+            #u = sla_grd.u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+            #v = sla_grd.v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                
+            # Calculate EKE
+            sla_grd.getEKE()
+            
+            
             if 'Q' in diag_type:
-                u, v, temp, salt, rtime = get_ROMS_data(filename, pad, record, sigma_lev,
-                                                ip0, ip1, jp0, jp1, diag_type)
-                # Sort out masking (important for subsurface fields)
-                u = np.ma.masked_outside(u, -10., 10.)
-                v = np.ma.masked_outside(v, -10., 10.)
 
-                u.data[u.mask] = 0.
-                v.data[v.mask] = 0.
-                u = u.data
-                v = v.data
-
-                okubo, xi = okubo_weiss(u, v, grd.pm()[jp0:jp1,
-                                                       ip0:ip1],
-                                              grd.pn()[jp0:jp1,
-                                                       ip0:ip1])
+                okubo, xi = okubo_weiss(sla_grd)
             
                 qparam = np.ma.multiply(-0.25, okubo) # see Kurian etal 2011
             
-                # Remove padded boundary
-                qparam = qparam[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                xi = xi[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                u = u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                v = v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-            
-                u = u2rho_2d(u)
-                v = v2rho_2d(v)
+                #u = u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                #v = v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                #u = u2rho_2d(u)
+                #v = v2rho_2d(v)
                 
-                if 'smoothing' in locals():
-                    
-                    if 'Gaussian' in smoothing:
-                        qparam = ndimage.gaussian_filter(qparam, smooth_fac, 0)
-                    
-                    elif 'Hanning' in smoothing:
-                        # smooth_fac passes of 2d Hanning filter
-                        #han_time = time.time()
-                        qparam = func_hann2d_fast(qparam, smooth_fac)
-                        #print 'hanning', str(time.time() - han_time), ' seconds!'
-                        xi = func_hann2d_fast(xi, smooth_fac)
+                qparam = func_hann2d_fast(qparam, hanning_passes)
+                #xi = func_hann2d_fast(xi, hanning_passes)
                     
                 # Set Q over land to zero
-                qparam *= sla_grd.mask
+                qparam *= sla_grd.mask[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
                 #qparam = np.ma.masked_where(grdmask == False, qparam)
-                xi *= sla_grd.mask
-                xi = np.ma.masked_where(sla_grd.mask == False,
-                                    xi / grd.f()[j0:j1,i0:i1])
+                xi *= sla_grd.mask[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                xi = np.ma.masked_where(sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
+                                                     sla_grd.iup0:sla_grd.iup1] == False,
+                                                     xi / sla_grd.f()[sla_grd.jup0:sla_grd.jup1,
+                                                                      sla_grd.iup0:sla_grd.iup1])
+                # Remove padded boundary
+                #qparam = qparam[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                #xi = xi[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
                 xicopy = np.ma.copy(xi)
             
-            
             elif 'sla' in diag_type:
-                
-                sla = sla_grd.get_AVISO_data(AVISO_file)
-                
-                if isinstance(smoothing, str):
-                    
-                    if 'Gaussian' in smoothing:
-                        if 'first_record' not in locals():
-                            print '------ applying Gaussian high-pass filter'
-                        # Set landpoints to zero
-                        np.place(sla, sla_grd.mask == False, 0.)
-                        np.place(sla, sla.data == sla_grd.fillval, 0.)
-                        # High pass filter, see
-                        # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
-                        #print 'start smoothing'
-                        sla -= ndimage.gaussian_filter(sla, [mres, zres])
-                        #print 'end smoothing'
-                    elif 'Hanning' in smoothing:
-                        print '------ applying %s passes of Hanning filter' %smooth_fac
-                        # Do smooth_fac passes of 2d Hanning filter
-                        sla = func_hann2d_fast(sla, smooth_fac)
-                
-                
-                # Expand the landmask
-                sla = np.ma.masked_where(sla_grd.mask == False, sla)
-                
-                # Get timing
-                #ymd = rtime.split(' ')[0].split('-')
-                #yr, mo, da = np.int(ymd[0]), np.int(ymd[1]), np.int(ymd[2])
-                #rtime = dt.date2num(dt.datetime.datetime(yr, mo, da))
-                try:
-                    thedate = dt.num2date(rtime)[0]
-                except:
-                    thedate = dt.num2date(rtime)
-                yr = thedate.year
-                mo = thedate.month
-                da = thedate.day
-                
-                #if sla.mask.size > 1:
-                    #umask, vmask, junk = sla_grd.uvpmask(-sla.mask)
-                #else:
-                    #umask, vmask, junk = sla_grd.uvpmask(np.zeros_like(sla))
-                
-                # Multiply by 0.01 for m
-                sla_grd.get_geostrophic_velocity(sla * 0.01)
-                
-                # Remove padded boundary
-                sla = sla[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                #u = sla_grd.u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                #v = sla_grd.v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                
-                # Calculate EKE
-                sla_grd.getEKE()
-                
+            
                 A_eddy.sla = np.ma.copy(sla)
                 C_eddy.sla = np.ma.copy(sla)
                 A_eddy.slacopy = np.ma.copy(sla)
                 C_eddy.slacopy = np.ma.copy(sla)
-                
-
+            
             # Get scalar speed
             Uspd = np.hypot(sla_grd.u, sla_grd.v)
             Uspd = np.ma.masked_where(sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
                                                    sla_grd.iup0:sla_grd.iup1] == False, Uspd)
-            
             A_eddy.Uspd = np.ma.copy(Uspd)
             C_eddy.Uspd = np.ma.copy(Uspd)
             
@@ -1274,18 +1274,18 @@ if __name__ == '__main__':
 
 
             # Now we loop over the CS collection
+            A_eddy.sign_type = 'Anticyclonic'
+            C_eddy.sign_type = 'Cyclonic'
             if 'Q' in diag_type:
                 A_eddy, C_eddy = collection_loop(CS, sla_grd, rtime,
                                                  A_list_obj=A_eddy, C_list_obj=C_eddy,
                                                  xi=xi, CSxi=CSxi, verbose=verbose)
             
             elif 'sla' in diag_type:
-                A_eddy.sign_type = 'Anticyclonic'
                 A_eddy = collection_loop(A_CS, sla_grd, rtime,
                                          A_list_obj=A_eddy, C_list_obj=None,
                                          sign_type=A_eddy.sign_type, verbose=verbose)
                 # Note that C_CS is reverse order
-                C_eddy.sign_type = 'Cyclonic'
                 C_eddy = collection_loop(C_CS, sla_grd, rtime,
                                          A_list_obj=None, C_list_obj=C_eddy,
                                          sign_type=C_eddy.sign_type, verbose=verbose)
@@ -1349,10 +1349,14 @@ if __name__ == '__main__':
                     #anim_fig.join()
                 
                 if 'Q' in diag_type:
-                    anim_fig = threading.Thread(name='anim_figure', target=anim_figure,
-                             args=(33, M, pMx, pMy, xicopy, cmap, rtime, diag_type, Mx, My, 
-                                   xi.copy(), qparam.copy(), qparameter, A_eddy, C_eddy,
-                                   savedir, plt, 'Q ' + tit))
+                    #anim_fig = threading.Thread(name='anim_figure', target=anim_figure,
+                             #args=(33, M, pMx, pMy, xicopy, cmap, rtime, diag_type, Mx, My, 
+                                   #xi.copy(), qparam.copy(), qparameter, A_eddy, C_eddy,
+                                   #savedir, plt, 'Q ' + tit))
+                    anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, diag_type, 
+                                savedir, 'Q-parameter ' + tit, animax, animax_cbar,
+                                qparam=qparam, qparameter=qparameter, xi=xi, xicopy=xicopy)
+                
                 elif 'sla' in diag_type:
                     '''anim_fig = threading.Thread(name='anim_figure', target=anim_figure,
                              args=(33, M, pMx, pMy, slacopy, plt.cm.RdBu_r, rtime, diag_type, Mx, My, 
