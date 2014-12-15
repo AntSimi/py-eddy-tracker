@@ -31,6 +31,19 @@ Scroll down to line ~640 to get started
 ===========================================================================
 """
 
+"""
+WARNINGS...?
+
+--- AVISO_file: /marula/emason/data/altimetry/MSLA/GLOBAL/DT/REF/dt_ref_global_merged_msla_h_qd_19930915_19930915_20100503.nc
+/usr/lib64/python2.7/site-packages/numpy/lib/arraysetops.py:197: RuntimeWarning: invalid value encountered in not_equal
+  flag = np.concatenate(([True], aux[1:] != aux[:-1]))
+--- AVISO_file: /marula/emason/data/altimetry/MSLA/GLOBAL/DT/REF/dt_ref_global_merged_msla_h_qd_19930922_19930922_20100503.nc
+"""
+
+
+
+
+
 
 import glob as glob
 #import matplotlib.pyplot as plt
@@ -114,6 +127,7 @@ class PyEddyTracker (object):
             return iind, jind
 
         if 'AvisoGrid' in self.__class__.__name__:
+            
             if self.zero_crossing is True:
                 '''
                 Used for a zero crossing, e.g., across Agulhas region
@@ -135,6 +149,7 @@ class PyEddyTracker (object):
                 limits = half_limits(lon, lat)
                 iind, jind = kdt(self._lon, self._lat, limits)
                 self.i0 = iind.max()
+        
         return self
 
 
@@ -395,10 +410,19 @@ class PyEddyTracker (object):
         surface from variables f, zeta, pm, pn...
         Note: output at rho points
         '''
-        self.upad[:] = -self.gof() * self.v2rho_2d(self.vmask() * (zeta.data[1:] - zeta.data[:-1]) \
-                                        * 0.5 * (self.pn()[1:] + self.pn()[:-1]))
-        self.vpad[:] =  self.gof() * self.u2rho_2d(self.umask() * (zeta.data[:, 1:] - zeta.data[:, :-1]) \
-                                        * 0.5 * (self.pm()[:, 1:] + self.pm()[:, :-1]))
+        gof = self.gof().view()
+        vmask = self.v2rho_2d(self.vmask().view()
+        zeta1, zeta2 = zeta.data[1:].view(), zeta.data[:-1].view()
+        pn1, pn2 = self.pn()[1:].view(), self.pn()[:-1].view()
+        self.upad[:] = ne.evaluate('-gof * vmask * (zeta1 - zeta2) * 0.5 * (pn1 + pn2)')
+        #self.upad[:] = -self.gof() * self.v2rho_2d(self.vmask() * (zeta.data[1:] - zeta.data[:-1]) \
+                                        #* 0.5 * (self.pn()[1:] + self.pn()[:-1]))
+        umask = self.u2rho_2d(self.umask().view()
+        zeta1, zeta2 = zeta.data[:,1:].view(), zeta.data[:,:-1].view()
+        pm1, pm2 = self.pm()[:,1:].view(), self.pm()[:,:-1].view()
+        self.vpad[:] =  ne.evaluate('gof * umask * (zeta1 - zeta2) * 0.5 * (pm1 + pm2)')
+        #self.vpad[:] =  self.gof() * self.u2rho_2d(self.umask() * (zeta.data[:, 1:] - zeta.data[:, :-1]) \
+                                        #* 0.5 * (self.pm()[:, 1:] + self.pm()[:, :-1]))
         return self
 
 
@@ -424,15 +448,17 @@ class PyEddyTracker (object):
         '''
         self.u[:] = self.upad[self.jup0:self.jup1, self.iup0:self.iup1]
         self.v[:] = self.vpad[self.jup0:self.jup1, self.iup0:self.iup1]
-        np.add(self.u**2, self.v**2, out=self.eke)
-        self.eke *= 0.5
+        u, v = self.u.view(), self.v.view()
+        self.eke[:] = ne.evaluate('0.5 * (u**2 + v**2)')
+        #np.add(self.u**2, self.v**2, out=self.eke)
+        #self.eke *= 0.5
         return self
 
 
 
 class AvisoGrid (PyEddyTracker):
     '''
-    Class to satisfy the need of the ROMS eddy tracker
+    Class to satisfy the need of the eddy tracker
     to have a grid class
     '''
     def __init__(self, AVISO_file, lonmin, lonmax, latmin, latmax, with_pad=True, use_maskoceans=False):
@@ -705,7 +731,7 @@ if __name__ == '__main__':
     #the_domain = 'MedSea' # not yet implemented
     
     # Specify use of new AVISO 2014 data
-    new_AVISO = True
+    new_AVISO = False
     
     # Specify subsampling new AVISO 2014 data; i.e. you may
     # prefer to use every second day rather than every day
@@ -730,8 +756,8 @@ if __name__ == '__main__':
             directory = '/marula/emason/data/altimetry/global/delayed-time/grids/msla/two-sat-merged/h/'
             AVISO_files = 'dt_global_twosat_msla_h_????????_20140106.nc'
         else:
-            directory = '/path/to/your/aviso_data/'
-            #directory = '/marula/emason/data/altimetry/MSLA/GLOBAL/DT/REF/'
+            #directory = '/path/to/your/aviso_data/'
+            directory = '/marula/emason/data/altimetry/MSLA/GLOBAL/DT/REF/'
             AVISO_files = 'dt_ref_global_merged_msla_h_qd_????????_*.nc'
     
     elif 'MedSea' in the_domain:
@@ -754,11 +780,11 @@ if __name__ == '__main__':
     # Set date range (YYYYMMDD)
     #date_str, date_end = 19980107, 19991110 # 
     #date_str, date_end = 20081107, 20100110 # 
-    date_str, date_end = 19930101, 20121231 # 
+    date_str, date_end = 19921014, 20120718 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
-    diag_type = 'Q' #<<< not implemented in 1.2.0
-    #diag_type = 'sla'
+    #diag_type = 'Q' #<<< not implemented in 1.2.0
+    diag_type = 'sla'
     
     
     # Path to directory where outputs are to be saved...
@@ -766,8 +792,9 @@ if __name__ == '__main__':
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_SUBSAMP-3days/'
-    savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
+    savedir = '/marula/emason/aviso_eddy_tracking/Corridor_V3_Dec2014/'
     #savedir = '/path/to/save/your/outputs/'
     
     
@@ -810,8 +837,8 @@ if __name__ == '__main__':
     
     # Set SLA contour spacing
     elif 'sla' in diag_type:
-        #slaparameter = np.arange(-100., 101., 1.0) # cm
-        slaparameter = np.arange(-100., 100.25, 0.25) # cm
+        slaparameter = np.arange(-100., 101., 1.0) # cm
+        #slaparameter = np.arange(-100., 100.25, 0.25) # cm
 
     
     
@@ -844,10 +871,10 @@ if __name__ == '__main__':
         #latmin = -35.
         #latmax = -10.
 
-        #lonmin = -65.     # Corridor
-        #lonmax = -5.5
-        #latmin = 11.5
-        #latmax = 38.5
+        lonmin = -65.     # Corridor
+        lonmax = -5.5
+        latmin = 11.5
+        latmax = 38.5
 
         #lonmin = -179.     # SEP
         #lonmax = -65
@@ -938,7 +965,7 @@ if __name__ == '__main__':
     
     # Use this for subsampling to get identical list as old_AVISO
     #AVISO_files = AVISO_files[5:-5:7]
-    if new_AVISO_SUBSAMP:
+    if new_AVISO and new_AVISO_SUBSAMP:
         AVISO_files = AVISO_files[5:-5:np.int(days_btwn_recs)]
     
     # Set up a grid object using first AVISO file in the list
@@ -1341,7 +1368,8 @@ if __name__ == '__main__':
             
             if anim_figs: # Make figures for animations
                 
-                tit = 'Y' + str(yr) + 'M' + str(mo).zfill(2) + 'D' + str(da).zfill(2)
+                #tit = 'Y' + str(yr) + 'M' + str(mo).zfill(2) + 'D' + str(da).zfill(2)
+                tit = ''.join((str(yr), str(mo).zfill(2), str(da).zfill(2)))
                 #tit = str(yr) + str(mo).zfill(2) + str(da).zfill(2)
                 
                 #if 'anim_fig' in locals():
@@ -1380,12 +1408,12 @@ if __name__ == '__main__':
                     print '--- saving to nc', C_eddy.savedir
                     print '+++'
                 if chelton_style_nc: # Recommended
-                    A_eddy.write2chelton_nc(rtime)
-                    C_eddy.write2chelton_nc(rtime)
+                    A_eddy.write2netcdf(rtime)
+                    C_eddy.write2netcdf(rtime)
                 else:
                     A_eddy.write2nc(A_savefile, rtime)
                     C_eddy.write2nc(C_savefile, rtime)
-                    
+                    raise Exception, 'not supported'
             #print 'Saving the eddies', time.time() - saving_start_time, 'seconds'
                 
             # Running time for a single monthly file

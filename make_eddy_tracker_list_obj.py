@@ -109,6 +109,9 @@ def strcompare(str1, str2):
 
  
 
+
+
+
 class track (object):
     '''
     Class that holds eddy tracks and related info
@@ -371,24 +374,18 @@ class track_list (object):
         
 
     def create_netcdf(self, directory, savedir, title,
-                                    grd=None,
-                                    Ymin=None,
-                                    Ymax=None,
-                                    Mmin=None,
-                                    Mmax=None,
-                                    model=None,
-                                    sigma_lev=None,
-                                    rho_ntr=None):
+                      grd=None, Ymin=None, Ymax=None,
+                      Mmin=None, Mmax=None, model=None,
+                      sigma_lev=None, rho_ntr=None):
         '''
         Create netcdf file same style as Chelton etal (2011)
         '''
-        #print 'yooooooooooooo'
         if not self.track_extra_variables:
             self.savedir = savedir
         else:
            self.savedir = savedir.replace('.nc', '_ARGO_enabled.nc')
         nc = netcdf.Dataset(self.savedir, 'w', format='NETCDF4')
-        nc.title = title + ' eddy tracks'
+        nc.title = ''.join((title, ' eddy tracks'))
         nc.directory = directory
         nc.days_between_records = np.float64(self.days_btwn_recs)
         nc.track_duration_min = np.float64(self.track_duration_min)
@@ -615,7 +612,7 @@ class track_list (object):
         #return np.array([self.tracklist[i].Uavg]) / distances
     
     
-    def write2chelton_nc(self, rtime):
+    def write2netcdf(self, rtime):
         '''
         Write inactive tracks to netcdf file.
         'ncind' is important because prevents writing of 
@@ -790,7 +787,6 @@ class track_list (object):
                 newsize = tmp.size
             else:
                 newsize = ind + 1
-            #print 'numpy-------'
         
         elif isinstance(tmp, list):
             tmp = list(tmp)
@@ -798,11 +794,12 @@ class track_list (object):
                 newsize = len(tmp)
             else:
                 newsize = ind + 1
-            #print 'list-------'
+            
         
         else:
             Exception
         
+        # First, numpy arrays...
         if strcompare('new_lon', xarr):
             self.new_lon = np.zeros((newsize))
             self.new_lon[:tmp.size] = tmp
@@ -852,23 +849,25 @@ class track_list (object):
             self.new_bounds[:tmp.shape[0]] = tmp
             self.new_bounds[ind] = x
         
+        # Second, lists...
         elif strcompare('new_contour_e', xarr):
             try:
                 self.new_contour_e[ind] = x
             except:
-                self.new_contour_e += [0] * (ind - len(self.new_contour_e) + 1)
+                #self.new_contour_e += [0] * (ind - len(self.new_contour_e) + 1)
+                self.new_contour_e.append([0] * (ind - len(self.new_contour_e) + 1))
                 self.new_contour_e[ind] = x
         elif strcompare('new_contour_s', xarr):
             try:
                 self.new_contour_s[ind] = x
             except:
-                self.new_contour_s += [0] * (ind - len(self.new_contour_s) + 1)
+                self.new_contour_s.append([0] * (ind - len(self.new_contour_s) + 1))
                 self.new_contour_s[ind] = x
         elif strcompare('new_Uavg_profile', xarr):
             try:
                 self.new_Uavg_profile[ind] = x
             except:
-                self.new_Uavg_profile += [0] * (ind - len(self.new_Uavg_profile) + 1)
+                self.new_Uavg_profile.append([0] * (ind - len(self.new_Uavg_profile) + 1))
                 self.new_Uavg_profile[ind] = x
         else:
             raise Exception
