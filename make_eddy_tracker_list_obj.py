@@ -914,7 +914,7 @@ class track_list (object):
     
         
     
-    def get_bounds(self, centlon, centlat, radius, i, j, grd):
+    def set_bounds(self, centlon, centlat, radius, i, j, grd):
         '''
         Get indices to a bounding box around the eddy
         '''

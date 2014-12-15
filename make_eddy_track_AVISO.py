@@ -404,6 +404,7 @@ class PyEddyTracker (object):
         self.Mx, self.My = x, y
         return self
 
+
     def get_geostrophic_velocity(self, zeta):
         '''
         Returns u and v geostrophic velocity at
@@ -411,16 +412,21 @@ class PyEddyTracker (object):
         Note: output at rho points
         '''
         gof = self.gof().view()
-        vmask = self.v2rho_2d(self.vmask().view()
+        
+        vmask = self.vmask().view()
         zeta1, zeta2 = zeta.data[1:].view(), zeta.data[:-1].view()
         pn1, pn2 = self.pn()[1:].view(), self.pn()[:-1].view()
-        self.upad[:] = ne.evaluate('-gof * vmask * (zeta1 - zeta2) * 0.5 * (pn1 + pn2)')
+        self.upad[:] = self.v2rho_2d(ne.evaluate('vmask * (zeta1 - zeta2) * 0.5 * (pn1 + pn2)'))
+        self.upad *= -gof
         #self.upad[:] = -self.gof() * self.v2rho_2d(self.vmask() * (zeta.data[1:] - zeta.data[:-1]) \
                                         #* 0.5 * (self.pn()[1:] + self.pn()[:-1]))
-        umask = self.u2rho_2d(self.umask().view()
+        
+        umask = self.umask().view()
         zeta1, zeta2 = zeta.data[:,1:].view(), zeta.data[:,:-1].view()
         pm1, pm2 = self.pm()[:,1:].view(), self.pm()[:,:-1].view()
-        self.vpad[:] =  ne.evaluate('gof * umask * (zeta1 - zeta2) * 0.5 * (pm1 + pm2)')
+        #self.vpad[:] = ne.evaluate('gof * (umask * (zeta1 - zeta2) * 0.5 * (pm1 + pm2))')
+        self.vpad[:] = self.u2rho_2d(ne.evaluate('umask * (zeta1 - zeta2) * 0.5 * (pm1 + pm2)'))
+        self.vpad *= gof
         #self.vpad[:] =  self.gof() * self.u2rho_2d(self.umask() * (zeta.data[:, 1:] - zeta.data[:, :-1]) \
                                         #* 0.5 * (self.pm()[:, 1:] + self.pm()[:, :-1]))
         return self
@@ -656,8 +662,8 @@ class AvisoGrid (PyEddyTracker):
 
 
     def get_resolution(self):
-        return np.mean(np.sqrt(np.diff(self.lon()[1:], axis=1) *
-                               np.diff(self.lat()[:,1:], axis=0)))
+        return np.sqrt(np.diff(self.lon()[1:], axis=1) *
+                       np.diff(self.lat()[:,1:], axis=0)).mean()
 
 
 
@@ -731,12 +737,12 @@ if __name__ == '__main__':
     #the_domain = 'MedSea' # not yet implemented
     
     # Specify use of new AVISO 2014 data
-    new_AVISO = False
+    new_AVISO = True
     
     # Specify subsampling new AVISO 2014 data; i.e. you may
     # prefer to use every second day rather than every day
     if new_AVISO:
-        new_AVISO_SUBSAMP = True
+        new_AVISO_SUBSAMP = False
         if new_AVISO_SUBSAMP:
             days_btwn_recs = 3. # put sampling rate (days) here
         else:
@@ -780,7 +786,8 @@ if __name__ == '__main__':
     # Set date range (YYYYMMDD)
     #date_str, date_end = 19980107, 19991110 # 
     #date_str, date_end = 20081107, 20100110 # 
-    date_str, date_end = 19921014, 20120718 # 
+    #date_str, date_end = 19921014, 20120718 # 
+    date_str, date_end = 20020101, 20021231 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
     #diag_type = 'Q' #<<< not implemented in 1.2.0
@@ -794,7 +801,8 @@ if __name__ == '__main__':
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_SUBSAMP-3days/'
     #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
-    savedir = '/marula/emason/aviso_eddy_tracking/Corridor_V3_Dec2014/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/Corridor_V3_Dec2014/'
+    savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_1_acd66ba338a9/'
     #savedir = '/path/to/save/your/outputs/'
     
     
@@ -809,7 +817,7 @@ if __name__ == '__main__':
     jday_ref = 2448623
 
     # Min and max permitted eddy radii [degrees]
-    radmin = 0.4 # degrees (Chelton recommends ~50 km minimum)
+    radmin = 0.35 # degrees (Chelton recommends ~50 km minimum)
     radmax = 4.461 # degrees
     
     if 'Q' in diag_type:
@@ -837,8 +845,8 @@ if __name__ == '__main__':
     
     # Set SLA contour spacing
     elif 'sla' in diag_type:
-        slaparameter = np.arange(-100., 101., 1.0) # cm
-        #slaparameter = np.arange(-100., 100.25, 0.25) # cm
+        #slaparameter = np.arange(-100., 101., 1.0) # cm
+        slaparameter = np.arange(-100., 100.25, 0.25) # cm
 
     
     
@@ -861,10 +869,10 @@ if __name__ == '__main__':
     subdomain = True
     if the_domain in 'Global':
         
-        lonmin = -40.     # Canary
-        lonmax = -5.5
-        latmin = 16.
-        latmax = 36.5
+        #lonmin = -40.     # Canary
+        #lonmax = -5.5
+        #latmin = 16.
+        #latmax = 36.5
         
         #lonmin = -30.        # BENCS
         #lonmax =  22.
@@ -1177,6 +1185,7 @@ if __name__ == '__main__':
             if isinstance(smoothing, str):
                     
                 if 'Gaussian' in smoothing:
+                    
                     if 'first_record' not in locals():
                         print '------ applying Gaussian high-pass filter'
                     # Set landpoints to zero
@@ -1185,7 +1194,9 @@ if __name__ == '__main__':
                     # High pass filter, see
                     # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
                     sla -= ndimage.gaussian_filter(sla, [mres, zres])
+                
                 elif 'Hanning' in smoothing:
+                    
                     print '------ applying %s passes of Hanning filter' %smooth_fac
                     # Do smooth_fac passes of 2d Hanning filter
                     sla = func_hann2d_fast(sla, smooth_fac)

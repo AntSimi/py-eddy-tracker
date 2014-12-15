@@ -90,13 +90,27 @@ def detect_local_minima(arr):
     http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
     """
     neighborhood = morphology.generate_binary_structure(len(arr.shape), 2)
-    local_min = (filters.minimum_filter(arr, footprint=neighborhood) == arr)
+    # Get local mimima
+    detected_minima = (filters.minimum_filter(arr, footprint=neighborhood) == arr)
     background = (arr == 0)
     eroded_background = morphology.binary_erosion(
         background, structure=neighborhood, border_value=1)
-    detected_minima = local_min - eroded_background
+    detected_minima -= eroded_background
     return detected_minima
 
+
+def get_local_extrema(sla, mask, sign):
+    '''
+    Inputs:
+      sla
+      mask
+      sign : 1 for cyclones, -1 for anticyclones
+    '''
+    local_extrema = np.ma.copy(sla)
+    local_extrema = np.ma.masked_where(mask == False, local_extrema.ravel())
+    local_extrema = np.reshape(local_extrema, sla.shape)
+    local_extrema *= sign
+    return detect_local_minima(local_extrema)
 
 
 def haversine_cdist(l1, l2):
@@ -314,9 +328,9 @@ def okubo_weiss(grd):
     # Relative vorticity
     xi = vorticity(u, v, pm, pn)
     # Okubo
-    lambda2 = np.power(SN, 2)
-    lambda2 += np.power(ST, 2)
-    lambda2 -= np.power(xi, 2)
+    lambda2 = SN**2
+    lambda2 += ST**2
+    lambda2 -= xi**2
     return lambda2, xi
 
 
@@ -380,8 +394,8 @@ def fit_circle(xvec, yvec):
         yvec = yvec.T
     
     npts = xvec.size
-    xmean = np.mean(xvec)
-    ymean = np.mean(yvec)
+    xmean = xvec.mean()
+    ymean = yvec.mean()
     xsc = ne.evaluate('xvec - xmean')
     ysc = ne.evaluate('yvec - ymean')
     scale = np.max((np.hypot(xsc, ysc).max(), np.finfo(float).eps))
@@ -455,7 +469,7 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
         WEIGHTS AND THEN USING np.average()...
         '''
         uavg = interpolate.griddata(points, uspd.ravel(), (lon, lat), 'linear')
-        return np.mean(uavg[np.isfinite(uavg)])
+        return uavg[np.isfinite(uavg)].mean()
     
     # True for debug figures
     #debug_U = False
@@ -497,8 +511,10 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
             poly_i = False
 
         if poly_i:
+            
             # NOTE: contains_points requires matplotlib 1.3 +
-            mask_i = poly_i.contains_points(points)
+            mask_i_sum = poly_i.contains_points(points).sum()
+            #mask_i_sum = mask_i
             
             # 1. Ensure polygon_i is within polygon_e
             # 2. Ensure polygon_i contains point centlon_e, centlat_e
@@ -507,8 +523,8 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
                 # Iterate until pixel_threshold[0] number of pixels
                 if np.all([poly_eff.contains_path(poly_i),
                            poly_i.contains_point([centlon_e, centlat_e]),
-                           np.logical_and(np.sum(mask_i) >= Eddy.pixel_threshold[0],
-                                          np.sum(mask_i) <= Eddy.pixel_threshold[1])]):
+                           np.logical_and(mask_i_sum >= Eddy.pixel_threshold[0],
+                                          mask_i_sum <= Eddy.pixel_threshold[1])]):
                     proceed = True
                 else: 
                     proceed = False
@@ -517,8 +533,8 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
                 # Iterate until 1 pixel
                 if np.all([poly_eff.contains_path(poly_i),
                            poly_i.contains_point([centlon_e, centlat_e]),
-                           np.logical_and(np.sum(mask_i) >= 1,
-                                          np.sum(mask_i) <= Eddy.pixel_threshold[1])]):
+                           np.logical_and(mask_i_sum >= 1,
+                                          mask_i_sum <= Eddy.pixel_threshold[1])]):
                     proceed = True
                 else: 
                     proceed = False
@@ -564,7 +580,7 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
                 if save_all_uavg:
                     all_uavg.append(Uavgseg)
                 
-                if Uavgseg >= Uavg and np.sum(mask_i) >= Eddy.pixel_threshold[0]:
+                if Uavgseg >= Uavg and mask_i_sum >= Eddy.pixel_threshold[0]:
                     Uavg = Uavgseg.copy()
                     theseglon, theseglat = seglon.copy(), seglat.copy()
                 
@@ -725,7 +741,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                         
                         if proceed1:
                             # Get lon,lat of bounding box around eddy
-                            Eddy.get_bounds(centlon_e, centlat_e,
+                            Eddy.set_bounds(centlon_e, centlat_e,
                                             eddy_radius_e, centi, centj, grd)
                             # Unpack indices for convenience
                             imin = Eddy.imin
@@ -741,20 +757,20 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             Eddy.circlat = circlat
                             
                             # Get a rectangle around the eddy
-                            rectlon = grd.lon()[jmin:jmax,imin:imax].ravel()
-                            rectlat = grd.lat()[jmin:jmax,imin:imax].ravel()
+                            #rectlon = grd.lon()[jmin:jmax,imin:imax].ravel()
+                            #rectlat = grd.lat()[jmin:jmax,imin:imax].ravel()
+                            points = np.array([grd.lon()[jmin:jmax,imin:imax].ravel(),
+                                               grd.lat()[jmin:jmax,imin:imax].ravel()]).T
 
                             # Get mask inside the eddy (effective contour)
                             poly_eff = cont #path.Path(np.array([contlon_e, contlat_e]).T)
                             # NOTE: Path.contains_points requires matplotlib 1.2 or higher
-                            mask_eff = poly_eff.contains_points(np.array([rectlon, rectlat]).T)
+                            mask_eff = poly_eff.contains_points(points)
+                            mask_eff_sum = mask_eff.sum()
                             #print 'np.sum(mask_eff)',np.sum(mask_eff), Eddy.pixel_threshold
                             # sum(mask) between 8 and 1000, CSS11 criterion 2 
-                            if np.logical_and(np.sum(mask_eff) >= Eddy.pixel_threshold[0],
-                                              np.sum(mask_eff) <= Eddy.pixel_threshold[1]):
-                                
-                                points = np.array([grd.lon()[jmin:jmax,imin:imax].ravel(),
-                                                   grd.lat()[jmin:jmax,imin:imax].ravel()]).T
+                            if np.logical_and(mask_eff_sum >= Eddy.pixel_threshold[0],
+                                              mask_eff_sum <= Eddy.pixel_threshold[1]):
                                 # Resample the contour points for a more even radial distribution
                                 contlon_e, contlat_e = eddy_tracker.uniform_resample(contlon_e, contlat_e)
                                 
@@ -768,20 +784,25 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     # CSS11, section B3 (here we assume h0 == CS.cvalues[collind])
                                     h0 = interpolate.griddata(points, Eddy.sla[jmin:jmax,imin:imax].ravel(),
                                                                  (contlon_e, contlat_e), 'linear')
-                                    h0 = np.mean(h0[np.isfinite(h0)]) # Use 'isfinite' in case of NaNs from griddata
+                                    h0 = h0[np.isfinite(h0)].mean() # Use 'isfinite' in case of NaNs from griddata
                                     
                                     if 'Anticyclonic' in sign_type:
                                         # Check CSS11 criterion 1: The SSH values of all of the pixels
                                         # are above a given SSH threshold for anticyclonic eddies.
                                         if np.any(Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff] < h0):
+                                            
                                             amplitude = 0.
+                                        
                                         else:
-                                            local_extrema = np.ma.copy(Eddy.sla[jmin:jmax,imin:imax])
-                                            local_extrema = np.ma.masked_where(mask_eff == False, local_extrema.ravel())
-                                            local_extrema = np.reshape(local_extrema, (Eddy.sla[jmin:jmax,imin:imax].shape))
-                                            local_extrema = detect_local_minima(-local_extrema)
-                                            if np.ma.sum(local_extrema) == 1: 
-                                                amplitude = Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].max() - h0
+                                            #local_extrema = np.ma.copy(Eddy.sla[jmin:jmax,imin:imax])
+                                            #local_extrema = np.ma.masked_where(mask_eff == False, local_extrema.ravel())
+                                            #local_extrema = np.reshape(local_extrema, (Eddy.sla[jmin:jmax,imin:imax].shape))
+                                            #local_extrema = detect_local_minima(-local_extrema)
+                                            local_extrema = get_local_extrema(Eddy.sla[jmin:jmax,imin:imax], mask_eff, -1)
+                                            
+                                            if local_extrema.sum() == 1: 
+                                                amplitude = Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].max()
+                                                amplitude -= h0
                                                 #centlon_lmi, centlat_lmi = get_position_local_extrema(Eddy, local_extrema, CS, grd)
 
                                                 if 0: # Debug
@@ -805,20 +826,27 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                     plt.show()
                                                 
                                             else:
+                                                
                                                 amplitude = 0.
-                                    
+
+    
                                     elif 'Cyclonic' in sign_type:
                                         # Check CSS11 criterion 1: The SSH values of all of the pixels
                                         # are below a given SSH threshold for cyclonic eddies.
                                         if np.any(Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff] > h0):
+                                            
                                             amplitude = 0.
+                                        
                                         else:
-                                            local_extrema = np.ma.copy(Eddy.sla[jmin:jmax,imin:imax])
-                                            local_extrema = np.ma.masked_where(mask_eff == False, local_extrema.ravel())
-                                            local_extrema = np.reshape(local_extrema, (Eddy.sla[jmin:jmax,imin:imax].shape))
-                                            local_extrema = detect_local_minima(local_extrema)
-                                            if np.ma.sum(local_extrema) == 1:
-                                                amplitude = h0 - Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].min()
+                                            #local_extrema = np.ma.copy(Eddy.sla[jmin:jmax,imin:imax])
+                                            #local_extrema = np.ma.masked_where(mask_eff == False, local_extrema.ravel())
+                                            #local_extrema = np.reshape(local_extrema, (Eddy.sla[jmin:jmax,imin:imax].shape))
+                                            #local_extrema = detect_local_minima(local_extrema)
+                                            local_extrema = get_local_extrema(Eddy.sla[jmin:jmax,imin:imax], mask_eff, 1)
+                                            
+                                            if local_extrema.sum() == 1:
+                                                amplitude = h0
+                                                amplitude -= Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].min()
                                                 #centlon_lmi, centlat_lmi = get_position_local_extrema(Eddy, local_extrema, CS, grd)
 
                                                 if 0: # Debug
@@ -854,7 +882,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             if proceed2:
                                 
                                 # Get sum of eke within Ceff
-                                teke = np.sum(grd.eke[jmin:jmax,imin:imax].flat[mask_eff])
+                                teke = grd.eke[jmin:jmax,imin:imax].flat[mask_eff].sum()
                                 
                                 
                                 if 'Q' in Eddy.diag_type:
@@ -945,11 +973,11 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     
                                     # See CSS11 section B4
                                     #centlon, centlat = centlon_e, centlat_e
-                                    centlon_s, centlat_s = np.atleast_1d(np.copy(centlon_lmi)), \
-                                                           np.atleast_1d(np.copy(centlat_lmi))
+                                    centlon_s, centlat_s = np.atleast_1d(centlon_lmi.copy()), \
+                                                           np.atleast_1d(centlat_lmi.copy())
                                     
-                                    centlon, centlat = np.atleast_1d(np.copy(centlon_s)), \
-                                                       np.atleast_1d(np.copy(centlat_s))
+                                    centlon, centlat = np.atleast_1d(centlon_s.copy()), \
+                                                       np.atleast_1d(centlat_s.copy())
                                     
                                     if has_ts: # for ocean model
                                         if 'Anticyclonic' in sign_type:
@@ -1143,7 +1171,7 @@ def track_eddies(Eddy, first_record):
                           np.asfortranarray(X_new),
                           np.asfortranarray(dist_mat))
     #print 'here 0.3'
-    dist_mat_copy = np.copy(dist_mat)
+    dist_mat_copy = dist_mat.copy()
     
     new_eddy_inds = np.ones(Eddy.new_lon_tmp.size, dtype=bool)
     new_eddy = False
@@ -1205,8 +1233,9 @@ def track_eddies(Eddy, first_record):
         for new_ind, new_dist in enumerate(dist_mat[old_ind]):
             
             if 'ellipse' in Eddy.separation_method:
-                if Eddy.search_ellipse.ellipse_path.contains_point(
-                                          (new_x[new_ind], new_y[new_ind])):
+                #if Eddy.search_ellipse.ellipse_path.contains_point(
+                                          #(new_x[new_ind], new_y[new_ind])):
+                if ellipse_path.contains_point((new_x[new_ind], new_y[new_ind])):
                 #if ellipse_path.contains_point(new_x[new_ind], new_y[new_ind]):
                     sep_proceed = True
                 else:
@@ -1223,13 +1252,14 @@ def track_eddies(Eddy, first_record):
             
             # Pass only the eddies within ellipse or sep_dist
             if sep_proceed:
+                
                 oamp = Eddy.old_amp[old_ind]
                 namp = Eddy.new_amp_tmp[new_ind]
                 
                 # Following CSS11, we use effective radius rather than speed based...
-                oarea = np.power(Eddy.old_radii_s[old_ind], 2)
+                oarea = Eddy.old_radii_s[old_ind]**2
                 oarea *= np.pi
-                narea = np.power(Eddy.new_radii_tmp_s[new_ind], 2)
+                narea = Eddy.new_radii_tmp_s[new_ind]**2
                 narea *= np.pi
                                 
                 # Pass only the eddies within min and max times old amplitude and area
@@ -1306,6 +1336,7 @@ def track_eddies(Eddy, first_record):
                 delta_area = np.r_[delta_area, np.abs(np.diff([np.pi*(Eddy.old_radii_e[old_ind]**2),
                                                                np.pi*(new_rd_e[i]**2)]))]
                 delta_amp = np.r_[delta_amp, np.abs(np.diff([Eddy.old_amp[old_ind], new_am[i]]))]
+                
                 if 'ROMS' in Eddy.datatype:
                     delta_temp = np.r_[delta_temp,
                                        np.abs(np.diff([Eddy.old_temp[old_ind], new_tp[i]]))]
@@ -1345,6 +1376,7 @@ def track_eddies(Eddy, first_record):
                 new_shp_err = new_shp_err[dx0]
             
             if 'ROMS' in Eddy.datatype:
+                
                 Eddy = accounting(Eddy, old_ind,
                                   new_ln[dx0], new_lt[dx0], new_rd_s[dx0], new_rd_e[dx0],
                                   new_am[dx0], new_Ua[dx0], new_ek[dx0], new_tm[dx0],
@@ -1352,6 +1384,7 @@ def track_eddies(Eddy, first_record):
                                   contour_e=new_cntr_e, contour_s=new_cntr_s,
                                   Uavg_profile=new_Uavg_prf, shape_error=new_shp_err)#,
                                   #cent_temp=new_tp[dx0], cent_salt=new_st[dx0])
+            
             elif 'AVISO' in Eddy.datatype:
                 
                 Eddy = accounting(Eddy, old_ind,
@@ -1584,6 +1617,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
 
 
 def get_ROMS_data(rfile, grd=None, index=None, sigma_lev=None, diag_type=None):
+    '''
+    '''
     with netcdf.Dataset(rfile) as nc:
         if index is None:
             time = nc.variables['ocean_time'][:]
