@@ -107,8 +107,9 @@ def get_local_extrema(sla, mask, sign):
       sign : 1 for cyclones, -1 for anticyclones
     '''
     local_extrema = np.ma.copy(sla)
-    local_extrema = np.ma.masked_where(mask == False, local_extrema.ravel())
-    local_extrema = np.reshape(local_extrema, sla.shape)
+    #local_extrema = np.ma.masked_where(mask == False, local_extrema.ravel())
+    local_extrema = np.ma.masked_where(mask == False, local_extrema)
+    #local_extrema = np.reshape(local_extrema, sla.shape)
     local_extrema *= sign
     return detect_local_minima(local_extrema)
 
@@ -463,13 +464,17 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
     
     If save_all_uavg == True we want Uavg for every contour
     '''
-    def calc_uavg(points, uspd, lon, lat):
+    #def calc_uavg(points, uspd, lon, lat):
+        #'''
+        #TO DO: IT SHOULD BE QUICKER, AND POSSIBLY BETTER, TO DO THIS BY CALCULATING
+        #WEIGHTS AND THEN USING np.average()...
+        #'''
+        #uavg = interpolate.griddata(points, uspd.ravel(), (lon, lat), 'linear')
+        #return uavg[np.isfinite(uavg)].mean()
+    def calc_uavg(rbspline, lon, lat):
         '''
-        TO DO: IT SHOULD BE QUICKER, AND POSSIBLY BETTER, TO DO THIS BY CALCULATING
-        WEIGHTS AND THEN USING np.average()...
         '''
-        uavg = interpolate.griddata(points, uspd.ravel(), (lon, lat), 'linear')
-        return uavg[np.isfinite(uavg)].mean()
+        return rbspline.ev(lon, lat).mean()
     
     # True for debug figures
     #debug_U = False
@@ -488,10 +493,15 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
     points = np.array([grd.lon()[jmin:jmax,imin:imax].ravel(),
                        grd.lat()[jmin:jmax,imin:imax].ravel()]).T
     
+    rbspline = interpolate.RectBivariateSpline(grd.lat()[jmin:jmax,0],
+                                               grd.lon()[0,imin:imax],
+                                               Eddy.Uspd[jmin:jmax,imin:imax], kx=1, ky=1)
+    
     # First contour is the outer one (effective)
     theseglon, theseglat = poly_eff.vertices[:,0].copy(), poly_eff.vertices[:,1].copy()
     theseglon, theseglat = eddy_tracker.uniform_resample(theseglon, theseglat)
-    Uavg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], theseglon[:-1], theseglat[:-1])
+    #Uavg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], theseglon[:-1], theseglat[:-1])
+    Uavg = calc_uavg(rbspline, theseglon[:-1], theseglat[:-1])
     
     if save_all_uavg:
         all_uavg = [Uavg]
@@ -502,9 +512,12 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
         
         # Get contour around centlon_e, centlat_e at level [collind:][iuavg]
         try:
-            conti, segi, junk, junk, junk, junk = CS.find_nearest_contour(
-                    centlon_e, centlat_e,  indices=np.array([citer.index]),
-                                                         pixel=False)
+            #conti, segi, junk, junk, junk, junk = CS.find_nearest_contour(
+                    #centlon_e, centlat_e,  indices=np.array([citer.index]),
+                                                         #pixel=False)
+            conti, segi = eddy_tracker.find_nearest_contour(CS,
+                                       centlon_e, centlat_e,
+                                       indices=np.array([citer.index]))
             poly_i = CS.collections[conti].get_paths()[segi]                   
         
         except Exception:
@@ -575,7 +588,8 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
                     #plt.scatter(centlon_e, centlat_e, s=125, c='r')
                 
                 # Interpolate Uspd to seglon, seglat, then get mean
-                Uavgseg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], seglon[:-1], seglat[:-1])
+                #Uavgseg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], seglon[:-1], seglat[:-1])
+                Uavgseg = calc_uavg(rbspline, seglon[:-1], seglat[:-1])
                 
                 if save_all_uavg:
                     all_uavg.append(Uavgseg)
@@ -740,25 +754,21 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             raise Exception
                         
                         if proceed1:
-                            # Get lon,lat of bounding box around eddy
+                            
+                            # Set indices to bounding box around eddy
                             Eddy.set_bounds(centlon_e, centlat_e,
                                             eddy_radius_e, centi, centj, grd)
+                            
                             # Unpack indices for convenience
-                            imin = Eddy.imin
-                            imax = Eddy.imax
-                            jmin = Eddy.jmin
-                            jmax = Eddy.jmax
+                            imin, imax, jmin, jmax = Eddy.imin, Eddy.imax, Eddy.jmin, Eddy.jmax
                             
                             # Get eddy circumference using eddy_radius_e
                             centx, centy = Eddy.M(centlon_e, centlat_e)
                             circlon, circlat = get_circle(centx, centy, eddy_radius_e, 180)
                             circlon[:], circlat[:] = Eddy.M.projtran(circlon, circlat, inverse=True)
-                            Eddy.circlon = circlon
-                            Eddy.circlat = circlat
+                            Eddy.circlon, Eddy.circlat = circlon, circlat
                             
-                            # Get a rectangle around the eddy
-                            #rectlon = grd.lon()[jmin:jmax,imin:imax].ravel()
-                            #rectlat = grd.lat()[jmin:jmax,imin:imax].ravel()
+                            # Get points within bounding box around eddy
                             points = np.array([grd.lon()[jmin:jmax,imin:imax].ravel(),
                                                grd.lat()[jmin:jmax,imin:imax].ravel()]).T
 
@@ -767,29 +777,62 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             # NOTE: Path.contains_points requires matplotlib 1.2 or higher
                             mask_eff = poly_eff.contains_points(points)
                             mask_eff_sum = mask_eff.sum()
+                            #mask_eff = mask_eff
+                            #plt.pcolormesh(grd.lon()[jmin:jmax,imin:imax],
+					   #grd.lat()[jmin:jmax,imin:imax],
+					   #Eddy.sla[jmin:jmax,imin:imax])
+			    #plt.contour(grd.lon()[jmin:jmax,imin:imax],
+					   #grd.lat()[jmin:jmax,imin:imax],
+					   #mask_eff.reshape(grd.lon()[jmin:jmax,imin:imax].shape),[0.5])
+			    #plt.axis('image')
+                            #plt.show()
                             #print 'np.sum(mask_eff)',np.sum(mask_eff), Eddy.pixel_threshold
                             # sum(mask) between 8 and 1000, CSS11 criterion 2 
                             if np.logical_and(mask_eff_sum >= Eddy.pixel_threshold[0],
                                               mask_eff_sum <= Eddy.pixel_threshold[1]):
+                                
+                                mask_eff = mask_eff.reshape(grd.lon()[jmin:jmax,imin:imax].shape)
+                                
                                 # Resample the contour points for a more even radial distribution
                                 contlon_e, contlat_e = eddy_tracker.uniform_resample(contlon_e, contlat_e)
                                 
                                 if 'Q' in Eddy.diag_type:
                                     # Note, eddy amplitude == max(abs(vort/f)) within eddy, KCCMC11
-                                    amplitude = np.abs(xi[jmin:jmax,imin:imax].flat[mask_eff]).max()
+                                    #amplitude = np.abs(xi[jmin:jmax,imin:imax].flat[mask_eff]).max()
+                                    amplitude = np.abs(xi[jmin:jmax,imin:imax][mask_eff]).max()
                                     
                                 elif 'sla' in Eddy.diag_type:
+                                    
+                                    # Prepare spline for interpolations
+                                    #print 'grd.lon()[0,imin:imax]',grd.lon()[0,imin:imax].shape
+                                    #print 'grd.lat()[jmin:jmax,0]',grd.lat()[jmin:jmax,0].shape
+                                    #print 'Eddy.sla[jmin:jmax,imin:imax]',Eddy.sla[jmin:jmax,imin:imax].shape
+                                    # kx = ky = 1 for 'linear'
+                                    # NOTE careful ith kx = ky = 3 for 'spline', sometimes gives bad values
+                                    rbspline = interpolate.RectBivariateSpline(grd.lat()[jmin:jmax,0],
+                                                                               grd.lon()[0,imin:imax],
+                                                                               Eddy.sla[jmin:jmax,imin:imax], kx=1, ky=1)
+                                    
                                     # Define as difference between extremum value for SLA anomaly and
                                     # the identifying contour value
                                     # CSS11, section B3 (here we assume h0 == CS.cvalues[collind])
-                                    h0 = interpolate.griddata(points, Eddy.sla[jmin:jmax,imin:imax].ravel(),
-                                                                 (contlon_e, contlat_e), 'linear')
-                                    h0 = h0[np.isfinite(h0)].mean() # Use 'isfinite' in case of NaNs from griddata
+                                    #h0 = interpolate.griddata(points, Eddy.sla[jmin:jmax,imin:imax].ravel(),
+                                                                 #(contlon_e, contlat_e), 'linear')
+                                    h0 = rbspline.ev(contlat_e, contlon_e)
+                                    #plt.figure()
+                                    #plt.plot(h0, 'g')
+                                    #plt.plot(h1, 'r')
+                                    #plt.show()
+                                    #h0 = h0[np.isfinite(h0)].mean() # Use 'isfinite' in case of NaNs from griddata
+                                    h0 = h0[np.isfinite(h0)].mean()
+                                    
+                                    #print 'h0, h1', h0, h1
                                     
                                     if 'Anticyclonic' in sign_type:
                                         # Check CSS11 criterion 1: The SSH values of all of the pixels
                                         # are above a given SSH threshold for anticyclonic eddies.
-                                        if np.any(Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff] < h0):
+                                        #if np.any(Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff] < h0):
+                                        if np.any(Eddy.sla[jmin:jmax,imin:imax][mask_eff] < h0):
                                             
                                             amplitude = 0.
                                         
@@ -800,20 +843,21 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                             #local_extrema = detect_local_minima(-local_extrema)
                                             local_extrema = get_local_extrema(Eddy.sla[jmin:jmax,imin:imax], mask_eff, -1)
                                             
-                                            if local_extrema.sum() == 1: 
-                                                amplitude = Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].max()
+                                            if local_extrema.sum() == 1:
+                                                #amplitude = Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].max()
+                                                amplitude = Eddy.sla[jmin:jmax,imin:imax][mask_eff].max()
                                                 amplitude -= h0
-                                                #centlon_lmi, centlat_lmi = get_position_local_extrema(Eddy, local_extrema, CS, grd)
 
                                                 if 0: # Debug
+                                                    #centlon_lmi, centlat_lmi = get_position_local_extrema(Eddy, local_extrema, CS, grd)
                                                     plt.figure(511)
                                                     plt.title('Anticyclones')
                                                     x511, y511 = Eddy.M(grd.lon(), grd.lat())
                                                     Eddy.M.pcolormesh(x511, y511, Eddy.slacopy-Eddy.slacopy.mean())
                                                     plt.clim(-10,10)
                                                     print 'Eddy.slacopy-Eddy.slacopy.mean()',(Eddy.slacopy-Eddy.slacopy.mean()).max()
-                                                    x_lmi, y_lmi = Eddy.M(centlon_lmi, centlat_lmi)
-                                                    Eddy.M.scatter(x_lmi, y_lmi, c='k')
+                                                    #x_lmi, y_lmi = Eddy.M(centlon_lmi, centlat_lmi)
+                                                    #Eddy.M.scatter(x_lmi, y_lmi, c='k')
                                                     x_e, y_e = Eddy.M(centlon_e, centlat_e)
                                                     Eddy.M.scatter(x_e, y_e, c='w')
                                                     lmi_j, lmi_i = np.where(local_extrema)
@@ -833,7 +877,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     elif 'Cyclonic' in sign_type:
                                         # Check CSS11 criterion 1: The SSH values of all of the pixels
                                         # are below a given SSH threshold for cyclonic eddies.
-                                        if np.any(Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff] > h0):
+                                        #if np.any(Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff] > h0):
+                                        if np.any(Eddy.sla[jmin:jmax,imin:imax][mask_eff] > h0):
                                             
                                             amplitude = 0.
                                         
@@ -846,7 +891,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                             
                                             if local_extrema.sum() == 1:
                                                 amplitude = h0
-                                                amplitude -= Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].min()
+                                                #amplitude -= Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].min()
+                                                amplitude -= Eddy.sla[jmin:jmax,imin:imax][mask_eff].min()
                                                 #centlon_lmi, centlat_lmi = get_position_local_extrema(Eddy, local_extrema, CS, grd)
 
                                                 if 0: # Debug
@@ -882,7 +928,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             if proceed2:
                                 
                                 # Get sum of eke within Ceff
-                                teke = grd.eke[jmin:jmax,imin:imax].flat[mask_eff].sum()
+                                #teke = grd.eke[jmin:jmax,imin:imax].flat[mask_eff].sum()
+                                teke = grd.eke[jmin:jmax,imin:imax][mask_eff].sum()
                                 
                                 
                                 if 'Q' in Eddy.diag_type:
@@ -1035,7 +1082,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     xi[jmin:jmax, imin:imax].flat[mask_eff] = Eddy.fillval
                                     
                                 elif 'sla' in Eddy.diag_type:
-                                    Eddy.sla[jmin:jmax, imin:imax].flat[mask_eff] = Eddy.fillval
+                                    #Eddy.sla[jmin:jmax, imin:imax].flat[mask_eff] = Eddy.fillval
+                                    Eddy.sla[jmin:jmax, imin:imax][mask_eff] = Eddy.fillval
                                 
                                 
                                 # Debug. Figure showing individual contours with centroid
@@ -1225,17 +1273,16 @@ def track_eddies(Eddy, first_record):
         # (See CSS11 sec. B4, pg. 208)
         if 'ellipse' in Eddy.separation_method:
             
-            ellipse_path = Eddy.search_ellipse.get_search_ellipse(
-                                             old_x[old_ind], old_y[old_ind])
+            Eddy.search_ellipse.get_search_ellipse(old_x[old_ind], old_y[old_ind])
             
             
         # Loop over separation distances between old and new
         for new_ind, new_dist in enumerate(dist_mat[old_ind]):
             
             if 'ellipse' in Eddy.separation_method:
-                #if Eddy.search_ellipse.ellipse_path.contains_point(
-                                          #(new_x[new_ind], new_y[new_ind])):
-                if ellipse_path.contains_point((new_x[new_ind], new_y[new_ind])):
+                if Eddy.search_ellipse.ellipse_path.contains_point(
+                                          (new_x[new_ind], new_y[new_ind])):
+                #if ellipse_path.contains_point((new_x[new_ind], new_y[new_ind])):
                 #if ellipse_path.contains_point(new_x[new_ind], new_y[new_ind]):
                     sep_proceed = True
                 else:

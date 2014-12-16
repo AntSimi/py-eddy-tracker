@@ -486,10 +486,12 @@ class AvisoGrid (PyEddyTracker):
             self.fillval = self.read_nc_att(AVISO_file, 'sla', '_FillValue')
             base_date = self.read_nc_att(AVISO_file, 'time', 'units')
             self.base_date = dt.date2num(parser.parse(base_date.split(' ')[2:4][0]))
+        
         except Exception: # old AVISO
             self._lon = self.read_nc(AVISO_file, 'NbLongitudes')
             self._lat = self.read_nc(AVISO_file, 'NbLatitudes')
             self.fillval = self.read_nc_att(AVISO_file, 'Grid_0001', '_FillValue')
+        
         if np.logical_and(lonmin < 0, lonmax <=0):
             self._lon -= 360.
         self._lon, self._lat = np.meshgrid(self._lon, self._lat)
@@ -510,6 +512,7 @@ class AvisoGrid (PyEddyTracker):
         Read nc data from AVISO file
         '''
         if self.zero_crossing:
+            
             try: # new AVISO (2014)
                 ssh1 = self.read_nc(AVISO_file, 'sla',
                        indices='[:, self.jp0:self.jp1, :self.ip0]')
@@ -518,18 +521,23 @@ class AvisoGrid (PyEddyTracker):
                 ssh0, ssh1 = ssh0.squeeze(), ssh1.squeeze()
                 ssh0 *= 100. # m to cm
                 ssh1 *= 100. # m to cm
+            
             except Exception: # old AVISO
                 ssh1 = self.read_nc(AVISO_file, 'Grid_0001',
                        indices='[:self.ip0, self.jp0:self.jp1]').T
                 ssh0 = self.read_nc(AVISO_file, 'Grid_0001',
                        indices='[self.ip1:,self.jp0:self.jp1]').T
+            
             zeta = np.ma.concatenate((ssh0, ssh1), axis=1)
+        
         else:
+            
             try: # new AVISO (2014)
                 zeta = self.read_nc(AVISO_file, 'sla',
                        indices='[:, self.jp0:self.jp1, self.ip0:self.ip1]')
                 zeta = zeta.squeeze()
                 zeta *= 100. # m to cm
+            
             except Exception: # old AVISO
                 zeta = self.read_nc(AVISO_file, 'Grid_0001',
                        indices='[self.ip0:self.ip1, self.jp0:self.jp1]').T
@@ -799,10 +807,11 @@ if __name__ == '__main__':
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_SUBSAMP-3days/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    savedir = '/marula/emason/aviso_eddy_tracking/junk/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
     #savedir = '/marula/emason/aviso_eddy_tracking/Corridor_V3_Dec2014/'
-    savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_1_acd66ba338a9/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_1_acd66ba338a9/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_2/'
     #savedir = '/path/to/save/your/outputs/'
     
     

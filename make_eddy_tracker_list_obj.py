@@ -80,7 +80,7 @@ def nearest(lon_pt, lat_pt, lon2d, lat2d):
     return i, j
     
 
-def uniform_resample(x, y, num_fac=4, kind='linear'):
+def uniform_resample(x, y, num_fac=2, kind='linear'):
     '''
     Resample contours to have (nearly) equal spacing
     '''
@@ -89,6 +89,7 @@ def uniform_resample(x, y, num_fac=4, kind='linear'):
     ##x = ndimage.zoom(x.copy(), 2)
     ##y = ndimage.zoom(y.copy(), 2)
     #plt.plot(x, y, '.-r', lw=2)
+    
     # Get distances
     d = np.r_[0, np.cumsum(haversine_distance_vector(x[:-1],y[:-1], x[1:],y[1:]))]
     # Get uniform distances
@@ -98,7 +99,15 @@ def uniform_resample(x, y, num_fac=4, kind='linear'):
     yfunc = interpolate.interp1d(d, y, kind=kind)
     xnew = xfunc(d_uniform)
     ynew = yfunc(d_uniform)
-    #plt.plot(xnew, ynew, '.-r', lw=2)
+    
+    # Akima is slightly slower, but may be more accurate
+    #xfunc = interpolate.Akima1DInterpolator(d, x)
+    #yfunc = interpolate.Akima1DInterpolator(d, y)
+    #xxnew = xfunc(d_uniform)
+    #yynew = yfunc(d_uniform)
+
+    #plt.plot(xnew, ynew, '.-r', lw=1.5)
+    #plt.plot(xxnew, yynew, '+-b', lw=1.)
     #plt.axis('image')
     #plt.show()
     return xnew, ynew
@@ -107,7 +116,104 @@ def uniform_resample(x, y, num_fac=4, kind='linear'):
 def strcompare(str1, str2):
     return str1 in str2 and str2 in str1
 
- 
+
+
+
+
+
+
+def _find_closest_point_on_leg(p1, p2, p0):
+    """find closest point to p0 on line segment connecting p1 and p2"""
+
+    # handle degenerate case
+    if np.all(p2 == p1):
+        d = p0 - p1
+        d **= 2
+        return d.sum()
+
+    d21 = p2 - p1
+    d01 = p0 - p1
+
+    # project on to line segment to find closest point
+    proj = np.dot(d01, d21) 
+    proj /= np.dot(d21, d21)
+    if proj < 0:
+        proj = 0
+    elif proj > 1:
+        proj = 1
+    pc = p1 + proj * d21
+
+    # find squared distance
+    d = pc - p0
+    d **= 2
+
+    return d.sum()#, pc
+
+
+def _find_closest_point_on_path(lc, point):
+    """
+    lc: coordinates of vertices
+    point: coordinates of test point
+    """
+    # Find index of closest vertex for this segment
+    ds = np.sum((lc - point[None, :])**2, 1)
+    imin = ds.argmin()
+
+    dmin = np.inf
+    closed = np.alltrue([lc[0,0] == lc[-1,0], lc[0,1] == y[-1,1]])
+    
+    # Build list of legs before and after this vertex
+    legs = []
+    if imin > 0 or closed:
+        legs.append(((imin-1) % len(lc), imin))
+    if imin < len(lc) - 1 or closed:
+        legs.append((imin, (imin+1) % len(lc)))
+
+    for leg in legs:
+        #d, xc = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
+        d = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
+        if d < dmin:
+            dmin = d
+
+    return dmin
+
+
+def find_nearest_contour(cont_coll, x, y, indices):
+    """
+    Finds contour that is closest to a point.
+
+    Returns a tuple containing the contour, segment of minimum point.
+
+    Call signature::
+
+      conmin, segmin = find_nearest_contour(cont_coll, x, y, indices)
+    """
+    dmin = np.inf
+    conmin = None
+    segmin = None
+    
+    point = np.array([x, y])
+
+    for icon in indices:
+        con = cont_coll.collections[icon]
+        paths = con.get_paths()
+
+        for segNum, linepath in enumerate(paths):
+            lc = linepath.vertices
+            d = _find_closest_point_on_path(lc, point)
+            
+            if d < dmin:
+                dmin = d
+                conmin = icon
+                segmin = segNum
+
+    return conmin, segmin
+
+
+
+
+
+
 
 
 
@@ -1087,7 +1193,7 @@ class SearchEllipse (object):
         ew_x = np.hstack((e_verts[:e_size,0], w_verts[w_size:,0]))
         ew_y = np.hstack((e_verts[:e_size,1], w_verts[w_size:,1]))
         self.ellipse_path = path.Path(np.array([ew_x, ew_y]).T)
-        return self.ellipse_path
+        return self#.ellipse_path
         
     def _set_black_sea_ellipse(self):
         '''
@@ -1097,13 +1203,14 @@ class SearchEllipse (object):
         verts = self.black_sea_ellipse.get_verts()
         self.ellipse_path = path.Path(np.array([verts[:,0],
                                                 verts[:,1]]).T)
-            
+        return self
             
     def get_search_ellipse(self, x, y):
         '''
         '''
         self.x = x
         self.y = y
+        
         if self.domain in ('Global', 'ROMS'):
             self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.days_btwn_recs)
             self.rw_d_mod[:] = 1.75
@@ -1118,8 +1225,10 @@ class SearchEllipse (object):
             self.rw_d_mod *= self.rw_d
             self._set_black_sea_ellipse()
         
-        else: Exception
-            
+        else:
+            Exception
+        
+        return self
             
     def view_search_ellipse(self, Eddy):
         '''
