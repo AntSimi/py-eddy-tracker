@@ -907,6 +907,11 @@ if __name__ == '__main__':
         #lonmax = 51.
         #latmin = -47.
         #latmax = -24.
+
+        #lonmin = -32.     # small test
+        #lonmax = -25.
+        #latmin = 20.
+        #latmax = 28.
     
     
     elif the_domain in 'MedSea':
@@ -1182,7 +1187,7 @@ if __name__ == '__main__':
             
             #rec_start_time = time.time()
             print '--- AVISO_file:', AVISO_file
-                
+            
             # Holding variables
             A_eddy.reset_holding_variables()
             C_eddy.reset_holding_variables()
@@ -1228,8 +1233,6 @@ if __name__ == '__main__':
                 
             # Remove padded boundary
             sla = sla[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-            #u = sla_grd.u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-            #v = sla_grd.v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
                 
             # Calculate EKE
             sla_grd.getEKE()
@@ -1240,14 +1243,8 @@ if __name__ == '__main__':
                 okubo, xi = okubo_weiss(sla_grd)
             
                 qparam = np.ma.multiply(-0.25, okubo) # see Kurian etal 2011
-            
-                #u = u[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                #v = v[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                #u = u2rho_2d(u)
-                #v = v2rho_2d(v)
                 
                 qparam = func_hann2d_fast(qparam, hanning_passes)
-                #xi = func_hann2d_fast(xi, hanning_passes)
                     
                 # Set Q over land to zero
                 qparam *= sla_grd.mask[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
@@ -1257,9 +1254,7 @@ if __name__ == '__main__':
                                                      sla_grd.iup0:sla_grd.iup1] == False,
                                                      xi / sla_grd.f()[sla_grd.jup0:sla_grd.jup1,
                                                                       sla_grd.iup0:sla_grd.iup1])
-                # Remove padded boundary
-                #qparam = qparam[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                #xi = xi[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
+                
                 xicopy = np.ma.copy(xi)
             
             elif 'sla' in diag_type:
@@ -1280,7 +1275,7 @@ if __name__ == '__main__':
             # Get contours of Q/sla parameter
             if 'first_record' not in locals():
                 
-                print '------ getting SLA contours'
+                print '------ processing SLA contours for eddies'
                 contfig = plt.figure(99)
                 ax = contfig.add_subplot(111)
                 
@@ -1370,9 +1365,10 @@ if __name__ == '__main__':
                 A_eddy.set_old_variables()
                 C_eddy.set_old_variables()
                 start = False
+                print '------ tracking eddies'
             else:
                 first_record = False
-
+            
             
             # Track the eddies
             #print 'start A tracking'

@@ -244,7 +244,9 @@ class track (object):
 
         self.eddy_index = eddy_index
         self.datatype   = datatype
-        self.lon        = np.atleast_1d(lon)
+        #self.lon        = np.atleast_1d(lon)
+        self.lon        = [lon]
+        #print 'bbbbbbbbbbbbbbbbbbbbbb', type(self.lon)
         self.lat        = np.atleast_1d(lat)
         self.ocean_time = np.atleast_1d(time)
         self.Uavg       = np.atleast_1d(Uavg)
@@ -274,7 +276,9 @@ class track (object):
         '''
         Append track updates
         '''
-        self.lon = np.r_[self.lon, lon]
+        #self.lon = np.r_[self.lon, lon]
+        #print 'ccccccccccccccccccccccc', type(lon)
+        self.lon.append(lon)
         self.lat = np.r_[self.lat, lat]
         self.ocean_time = np.r_[self.ocean_time, time]
         self.Uavg = np.r_[self.Uavg, Uavg]
@@ -336,7 +340,7 @@ class track_list (object):
         self.datatype = datatype
         self.track_duration_min = track_duration_min
         self.track_extra_variables = track_extra_variables
-        self.new_lon    = np.array([])
+        self.new_lon    = [] #np.array([])
         self.new_lat    = np.array([])
         self.new_radii_s = np.array([])
         self.new_radii_e = np.array([])
@@ -348,7 +352,7 @@ class track_list (object):
             self.new_salt = np.array([])
         self.new_time   = np.array([])
         self.new_bounds = np.atleast_2d(np.empty(4, dtype=np.int16))
-        self.old_lon    = np.array([])
+        self.old_lon    = [] #np.array([])
         self.old_lat    = np.array([])
         self.old_radii_s  = np.array([])
         self.old_radii_e  = np.array([])
@@ -378,13 +382,12 @@ class track_list (object):
         assert datatype in ('ROMS', 'AVISO'), "Unknown string in 'datatype' parameter"
 
 
-    def append_list(self, lon, lat, time, Uavg, teke,
+    def add_new_track(self, lon, lat, time, Uavg, teke,
             radius_s, radius_e, amplitude, bounds, temp=None, salt=None,
             contour_e=None, contour_s=None, Uavg_profile=None, shape_error=None):
         '''
         Append a new 'track' object to the list
         '''
-        #print 'AAAAAAAAA', time
         self.tracklist.append(track(self.index, self.datatype,
                                     lon, lat, time, Uavg, teke,
                                     radius_s, radius_e, amplitude, bounds,
@@ -406,11 +409,52 @@ class track_list (object):
                                          Uavg_profile=Uavg_profile, shape_error=shape_error)
 
 
+    def update_eddy_properties(self, centlon, centlat, eddy_radius_s, eddy_radius_e,
+                               amplitude, Uavg, teke, rtime, bounds,
+                               contour_e=None, contour_s=None,
+                               Uavg_profile=None, shape_error=None,
+                               cent_temp=None, cent_salt=None):
+        '''
+        Append new variable values to track arrays
+        '''
+        #print 'self.new_lon_tmp', self.new_lon_tmp
+        #print 'centlon', centlon
+        #self.new_lon_tmp = np.r_[self.new_lon_tmp, centlon]
+        #print '///////////////',type(centlon),centlon
+        self.new_lon_tmp.append(centlon)
+        self.new_lat_tmp = np.r_[self.new_lat_tmp, centlat]
+        self.new_radii_tmp_s = np.r_[self.new_radii_tmp_s, eddy_radius_s]
+        self.new_radii_tmp_e = np.r_[self.new_radii_tmp_e, eddy_radius_e]
+        self.new_amp_tmp = np.r_[self.new_amp_tmp, amplitude]
+        self.new_Uavg_tmp = np.r_[self.new_Uavg_tmp, Uavg]
+        self.new_teke_tmp = np.r_[self.new_teke_tmp, teke]
+        self.new_time_tmp = np.r_[self.new_time_tmp, rtime]
+        #print self.new_time_tmp
+        #print self.new_lon_tmp
+        if 'ROMS' in self.datatype:
+            #self.new_temp_tmp = np.r_[self.new_temp_tmp, cent_temp]
+            #self.new_salt_tmp = np.r_[self.new_salt_tmp, cent_salt]
+            pass
+        try:
+            self.new_bounds_tmp = np.vstack((self.new_bounds_tmp, bounds))
+        except Exception:    
+            self.new_bounds_tmp = np.hstack((self.new_bounds_tmp, bounds))
+        if self.track_extra_variables:
+	    #print 'self.new_shape_error_tmp', self.new_shape_error_tmp
+	    #print 'shape_error', shape_error
+            self.new_contour_e_tmp.append(contour_e)
+            self.new_contour_s_tmp.append(contour_s)
+            self.new_Uavg_profile_tmp.append(Uavg_profile)
+            self.new_shape_error_tmp = np.r_[self.new_shape_error_tmp, shape_error]
+        return self
+
+
+
     def reset_holding_variables(self):
         '''
         Reset temporary holding variables to empty arrays
         '''
-        self.new_lon_tmp = np.array([])
+        self.new_lon_tmp = [] #np.array([])
         self.new_lat_tmp = np.array([])
         self.new_radii_tmp_s = np.array([])
         self.new_radii_tmp_e = np.array([])
@@ -433,7 +477,7 @@ class track_list (object):
         '''
         Pass all values at time k+1 to k
         '''
-        self.old_lon = np.copy(self.new_lon_tmp)
+        self.old_lon = list(self.new_lon_tmp)
         self.old_lat = np.copy(self.new_lat_tmp)
         self.old_radii_s = np.copy(self.new_radii_tmp_s)
         self.old_radii_e = np.copy(self.new_radii_tmp_e)
@@ -699,25 +743,6 @@ class track_list (object):
         return
     
     
-    #def get_non_lin_param(self, i):
-        #'''
-        #Return the non-linearity parameter along a track
-        #'''
-        ##start_time = time.time()
-        #distances = haversine_distance_vector(self.tracklist[i].lon[:-1],
-                               #self.tracklist[i].lat[:-1],
-                               #self.tracklist[i].lon[1:],
-                               #self.tracklist[i].lat[1:])
-        #distances = np.concatenate((distances[0][np.newaxis],
-                                    #distances,
-                                    #distances[-1][np.newaxis]))
-        #distances = distances[:-1]
-        #distances += distances[1:]
-        #distances *= 0.5
-        #distances /= (self.days_btwn_recs * 86400.)
-        #return np.array([self.tracklist[i].Uavg]) / distances
-    
-    
     def write2netcdf(self, rtime):
         '''
         Write inactive tracks to netcdf file.
@@ -725,82 +750,86 @@ class track_list (object):
         already written tracks.
         Each inactive track is 'emptied' after saving
         '''
-        nc = netcdf.Dataset(self.savedir, 'a')
         inactive_tracks = self.get_inactive_tracks(rtime)
         tracks2save = np.asarray(inactive_tracks)
+        
+        #print '+++++++++++++++++++++++++++++++++++++++++++++'
+        #print 'self.new_lon',self.new_lon
+        ##self.old_lon     = self.new_lon
+        #print 'self.old_lon',self.old_lon
+        #print '+++++++++++++++++++++++++++++++++++++++++++++'
         
         #print 'tracks2save', tracks2save
         
         if np.any(tracks2save): # Note, this could break if all eddies become inactive at same time
             
-            for i in np.nditer(tracks2save):
+            with netcdf.Dataset(self.savedir, 'a') as nc:
+                for i in np.nditer(tracks2save):
 
-                # saved2nc is a flag indicating if track[i] has been saved
-                if np.logical_and(not self.tracklist[i].saved2nc,
+                    # saved2nc is a flag indicating if track[i] has been saved
+                    if np.logical_and(not self.tracklist[i].saved2nc,
                                   np.all(self.tracklist[i].ocean_time)):
      
-                    #tsize = self.tracklist[i].ocean_time.size
-                    tsize = len(self.tracklist[i].lon)
-                    #print 'ncindncindncind',self.ncind
-                    if tsize >= self.track_duration_min / self.days_btwn_recs and tsize > 1.:
+                        #tsize = self.tracklist[i].ocean_time.size
+                        tsize = len(self.tracklist[i].lon)
+                        #print 'ncindncindncind',self.ncind
+                        if tsize >= self.track_duration_min / self.days_btwn_recs and tsize > 1.:
 
-                        tend = self.ncind + tsize
+                            tend = self.ncind + tsize
                         
-                        #if self.sign_type in 'Anticyclonic':
-                            #print '\ntsize', tsize
-                            #print self.ncind, tend
-                            #print 'np.array([self.tracklist[i].lon])',np.asarray([self.tracklist[i].lon])
+                            #if self.sign_type in 'Anticyclonic':
+                                #print '\ntsize', tsize
+                                #print self.ncind, tend
+                                #print 'np.array([self.tracklist[i].lon])',np.asarray([self.tracklist[i].lon])
                             
-                            #print "\nnc.variables['lon'][:tend]", nc.variables['lon'][:tend]
-                            #print "nc.variables['lon'][self.ncind:tend]", nc.variables['lon'][self.ncind:tend]
+                                #print "\nnc.variables['lon'][:tend]", nc.variables['lon'][:tend]
+                                #print "nc.variables['lon'][self.ncind:tend]", nc.variables['lon'][self.ncind:tend]
                         
                         
-                        nc.variables['lon'][self.ncind:tend] = np.asarray(self.tracklist[i].lon)
-                        nc.variables['lat'][self.ncind:tend] = np.asarray([self.tracklist[i].lat])
-                        nc.variables['A'][self.ncind:tend] = np.array([self.tracklist[i].amplitude])
-                        self.tracklist[i].Uavg *= np.array(100.) # to cm/s
-                        nc.variables['U'][self.ncind:tend] = self.tracklist[i].Uavg
-                        nc.variables['Teke'][self.ncind:tend] = np.array([self.tracklist[i].teke])
-                        self.tracklist[i].radius_s *= np.array(1e-3) # to km
-                        nc.variables['L'][self.ncind:tend] = self.tracklist[i].radius_s
-                        self.tracklist[i].radius_e *= np.array(1e-3) # to km
-                        nc.variables['radius_e'][self.ncind:tend] = self.tracklist[i].radius_e
-                        if 'ROMS' in self.datatype:
-                            nc.variables['temp'][self.ncind:tend] = np.array([self.tracklist[i].temp])
-                            nc.variables['salt'][self.ncind:tend] = np.array([self.tracklist[i].salt])
-                        nc.variables['bounds'][self.ncind:tend] = np.array([self.tracklist[i].bounds])
-                        if self.interannual:
-                            # We add 1 because 'j1' is an integer in ncsavefile; julian day midnight has .5
-                            # i.e., dt.julian2num(2448909.5) -> 727485.0
-                            nc.variables['j1'][self.ncind:tend] = dt.num2julian(np.array([self.tracklist[i].ocean_time])) + 1
-                        else:
-                            nc.variables['ocean_time'][self.ncind:tend] = np.array([self.tracklist[i].ocean_time])
-                        nc.variables['n'][self.ncind:tend] = np.arange(tsize, dtype=np.int32)
-                        nc.variables['track'][self.ncind:tend] = np.full(tsize, self.ch_index)
-                        nc.variables['track'].max_val = np.int32(self.ch_index)
-                        nc.variables['eddy_duration'][self.ncind:tend] = np.array([self.tracklist[i].ocean_time]).size \
-                                                                                 * self.days_btwn_recs
-                        if self.track_extra_variables:
-                            nc.variables['shape_error'][self.ncind:tend] = np.array([self.tracklist[i].shape_error])
-                            for j in np.arange(tend - self.ncind):
-                                jj = j + self.ncind
-                                contour_e_arr = np.asarray(self.tracklist[i].contour_e[j]).ravel()
-                                nc.variables['contour_e'][:contour_e_arr.size,jj] = contour_e_arr
-                                contour_s_arr = np.asarray(self.tracklist[i].contour_s[j]).ravel()
-                                nc.variables['contour_s'][:contour_s_arr.size,jj] = contour_s_arr
-                                #print 'BBBBBBBB', np.asarray(self.tracklist[i].Uavg_profile).ravel()
-                                #print 'j',j
-                                Uavg_profile_arr = np.asarray(self.tracklist[i].Uavg_profile[j]).ravel()
-                                nc.variables['Uavg_profile'][:Uavg_profile_arr.size,jj] = Uavg_profile_arr #np.asarray(self.tracklist[i].Uavg_profile[j]).ravel()
+                            nc.variables['lon'][self.ncind:tend] = np.asarray(self.tracklist[i].lon)
+                            nc.variables['lat'][self.ncind:tend] = np.asarray([self.tracklist[i].lat])
+                            nc.variables['A'][self.ncind:tend] = np.array([self.tracklist[i].amplitude])
+                            self.tracklist[i].Uavg *= np.array(100.) # to cm/s
+                            nc.variables['U'][self.ncind:tend] = self.tracklist[i].Uavg
+                            nc.variables['Teke'][self.ncind:tend] = np.array([self.tracklist[i].teke])
+                            self.tracklist[i].radius_s *= np.array(1e-3) # to km
+                            nc.variables['L'][self.ncind:tend] = self.tracklist[i].radius_s
+                            self.tracklist[i].radius_e *= np.array(1e-3) # to km
+                            nc.variables['radius_e'][self.ncind:tend] = self.tracklist[i].radius_e
+                            if 'ROMS' in self.datatype:
+                                nc.variables['temp'][self.ncind:tend] = np.array([self.tracklist[i].temp])
+                                nc.variables['salt'][self.ncind:tend] = np.array([self.tracklist[i].salt])
+                            nc.variables['bounds'][self.ncind:tend] = np.array([self.tracklist[i].bounds])
+                            if self.interannual:
+                                # We add 1 because 'j1' is an integer in ncsavefile; julian day midnight has .5
+                                # i.e., dt.julian2num(2448909.5) -> 727485.0
+                                nc.variables['j1'][self.ncind:tend] = dt.num2julian(np.array([self.tracklist[i].ocean_time])) + 1
+                            else:
+                                nc.variables['ocean_time'][self.ncind:tend] = np.array([self.tracklist[i].ocean_time])
+                            nc.variables['n'][self.ncind:tend] = np.arange(tsize, dtype=np.int32)
+                            nc.variables['track'][self.ncind:tend] = np.full(tsize, self.ch_index)
+                            nc.variables['track'].max_val = np.int32(self.ch_index)
+                            nc.variables['eddy_duration'][self.ncind:tend] = np.array([self.tracklist[i].ocean_time]).size \
+                                                                                     * self.days_btwn_recs
+                            if self.track_extra_variables:
+                                nc.variables['shape_error'][self.ncind:tend] = np.array([self.tracklist[i].shape_error])
+                                for j in np.arange(tend - self.ncind):
+                                    jj = j + self.ncind
+                                    contour_e_arr = np.asarray(self.tracklist[i].contour_e[j]).ravel()
+                                    nc.variables['contour_e'][:contour_e_arr.size,jj] = contour_e_arr
+                                    contour_s_arr = np.asarray(self.tracklist[i].contour_s[j]).ravel()
+                                    nc.variables['contour_s'][:contour_s_arr.size,jj] = contour_s_arr
+                                    #print 'BBBBBBBB', np.asarray(self.tracklist[i].Uavg_profile).ravel()
+                                    #print 'j',j
+                                    Uavg_profile_arr = np.asarray(self.tracklist[i].Uavg_profile[j]).ravel()
+                                    nc.variables['Uavg_profile'][:Uavg_profile_arr.size,jj] = Uavg_profile_arr #np.asarray(self.tracklist[i].Uavg_profile[j]).ravel()
                         
-                        # Flag indicating track[i] is now saved
-                        self.tracklist[i].saved2nc = True
-                        self.ncind += tsize
-                        self.ch_index += 1
-                        nc.sync()
+                            # Flag indicating track[i] is now saved
+                            self.tracklist[i].saved2nc = True
+                            self.ncind += tsize
+                            self.ch_index += 1
+                            nc.sync()
         
-        nc.close()
-
         # Get index to first currently active track
         try:
             lasti = self.get_active_tracks(rtime)[0]
@@ -814,7 +843,11 @@ class track_list (object):
         self._reduce_inactive_tracks()
         
         # Update old_lon and old_lat...
-        self.old_lon     = self.new_lon[lasti:]
+        #print '0000000000000000000000000000000000000000000000000000'
+        #print 'self.new_lon[lasti:]',self.new_lon[lasti:]
+        self.old_lon     = list(self.new_lon[lasti:])
+        #print 'self.old_lon',self.old_lon
+        #print '0000000000000000000000000000000000000000000000000000'
         self.old_lat     = self.new_lat[lasti:]
         self.old_radii_s = self.new_radii_s[lasti:]
         self.old_radii_e = self.new_radii_e[lasti:]
@@ -823,7 +856,7 @@ class track_list (object):
         self.old_teke    = self.new_teke[lasti:]
         self.old_bounds  = self.new_bounds[lasti:]
         
-        self.new_lon     = np.array([])
+        self.new_lon     = [] #np.array([])
         self.new_lat     = np.array([])
         self.new_radii_s = np.array([])
         self.new_radii_e = np.array([])
@@ -885,6 +918,11 @@ class track_list (object):
         ------------------------------------------------------------------
         
         '''
+        try:
+            x = x[0]
+        except Exception:
+            pass
+        
         tmp = eval('self.' + xarr)
         
         if isinstance(tmp, np.ndarray):
@@ -895,22 +933,21 @@ class track_list (object):
                 newsize = ind + 1
         
         elif isinstance(tmp, list):
-            tmp = list(tmp)
+            tmp = tmp[:]
             if ind < len(tmp):
                 newsize = len(tmp)
             else:
                 newsize = ind + 1
             
-        
         else:
             Exception
         
-        # First, numpy arrays...
-        if strcompare('new_lon', xarr):
-            self.new_lon = np.zeros((newsize))
-            self.new_lon[:tmp.size] = tmp
-            self.new_lon[ind] = x
-        elif strcompare('new_lat', xarr):
+        ## First, numpy arrays...
+        #if strcompare('new_lon', xarr):
+            #self.new_lon = np.zeros((newsize))
+            #self.new_lon[:tmp.size] = tmp
+            #self.new_lon[ind] = x
+        if strcompare('new_lat', xarr):
             self.new_lat = np.zeros((newsize))
             self.new_lat[:tmp.size] = tmp
             self.new_lat[ind] = x
@@ -956,6 +993,17 @@ class track_list (object):
             self.new_bounds[ind] = x
         
         # Second, lists...
+        elif strcompare('new_lon', xarr):
+	    #print '\nLLLLLLLLLLLLLL', self.new_lon
+            try:
+                self.new_lon[ind] = x
+            except:
+                self.new_lon.extend([0] * (ind - len(self.new_lon) + 1))
+                self.new_lon[ind] = x
+            #print 'x', x
+            ##print '(((((((((((((((',type(self.new_lon),self.new_lon
+	    #print 'LLLLLLLLLLLLLL', self.new_lon, '\n'
+	    
         elif strcompare('new_contour_e', xarr):
             try:
                 self.new_contour_e[ind] = x
@@ -977,44 +1025,6 @@ class track_list (object):
                 self.new_Uavg_profile[ind] = x
         else:
             raise Exception
-        return self
-
-
-    def update_eddy_properties(self, centlon, centlat, eddy_radius_s, eddy_radius_e,
-                               amplitude, Uavg, teke, rtime, bounds,
-                               contour_e=None, contour_s=None,
-                               Uavg_profile=None, shape_error=None,
-                               cent_temp=None, cent_salt=None):
-        '''
-        Append new variable values to track arrays
-        '''
-        #print 'self.new_lon_tmp', self.new_lon_tmp
-        #print 'centlon', centlon
-        self.new_lon_tmp = np.r_[self.new_lon_tmp, centlon]
-        self.new_lat_tmp = np.r_[self.new_lat_tmp, centlat]
-        self.new_radii_tmp_s = np.r_[self.new_radii_tmp_s, eddy_radius_s]
-        self.new_radii_tmp_e = np.r_[self.new_radii_tmp_e, eddy_radius_e]
-        self.new_amp_tmp = np.r_[self.new_amp_tmp, amplitude]
-        self.new_Uavg_tmp = np.r_[self.new_Uavg_tmp, Uavg]
-        self.new_teke_tmp = np.r_[self.new_teke_tmp, teke]
-        self.new_time_tmp = np.r_[self.new_time_tmp, rtime]
-        #print self.new_time_tmp
-        #print self.new_lon_tmp
-        if 'ROMS' in self.datatype:
-            #self.new_temp_tmp = np.r_[self.new_temp_tmp, cent_temp]
-            #self.new_salt_tmp = np.r_[self.new_salt_tmp, cent_salt]
-            pass
-        try:
-            self.new_bounds_tmp = np.vstack((self.new_bounds_tmp, bounds))
-        except Exception:    
-            self.new_bounds_tmp = np.hstack((self.new_bounds_tmp, bounds))
-        if self.track_extra_variables:
-	    #print 'self.new_shape_error_tmp', self.new_shape_error_tmp
-	    #print 'shape_error', shape_error
-            self.new_contour_e_tmp.append(contour_e)
-            self.new_contour_s_tmp.append(contour_s)
-            self.new_Uavg_profile_tmp.append(Uavg_profile)
-            self.new_shape_error_tmp = np.r_[self.new_shape_error_tmp, shape_error]
         return self
     
     
