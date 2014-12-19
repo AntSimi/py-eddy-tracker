@@ -47,7 +47,7 @@ def haversine_distance_vector(lon1, lat1, lon2, lat2):
     lat1 = np.asfortranarray(lat1.copy())
     lon2 = np.asfortranarray(lon2.copy())
     lat2 = np.asfortranarray(lat2.copy())
-    dist = np.asfortranarray(np.empty_like(lon1))
+    dist = np.asfortranarray(np.empty(lon1.shape))
     hav.haversine_distvec(lon1, lat1, lon2, lat2, dist)
     return dist
 
@@ -57,28 +57,41 @@ def newPosition(lonin, latin, angle, distance):
     Given the inputs (base lon, base lat, angle, distance) return
      the lon, lat of the new position...
     '''
-    lonin = np.asfortranarray(np.copy(lonin))
-    latin = np.asfortranarray(np.copy(latin))
-    angle = np.asfortranarray(np.copy(angle))
-    distance = np.asfortranarray(np.copy(distance))
-    lon = np.asfortranarray(np.empty_like(lonin))
-    lat = np.asfortranarray(np.empty_like(lonin))
-    hav.waypoint_vec(lonin, latin, angle, distance, lon, lat)
-    return lon, lat
+    lon = np.asfortranarray(lonin.copy())
+    lat = np.asfortranarray(latin.copy())
+    angle = np.asfortranarray(angle.copy())
+    distance = np.asfortranarray(distance.copy())
+    lonout = np.asfortranarray(np.empty(lonin.shape))
+    latout = np.asfortranarray(np.empty(lonin.shape))
+    hav.waypoint_vec(lon, lat, angle, distance, lonout, latout)
+    return lon[0], lat[0]
 
 
-def nearest(lon_pt, lat_pt, lon2d, lat2d):
+#def nearest(lon_pt, lat_pt, lon2d, lat2d):
+    #"""
+    #Return the nearest i, j point to a given lon, lat point
+    #in a lat/lon grid
+    #"""
+    #lon2d, lat2d = lon2d.copy(), lat2d.copy()
+    #lon2d -= lon_pt
+    #lat2d -= lat_pt
+    #d = np.hypot(lon2d, lat2d)
+    #j, i = np.unravel_index(d.argmin(), d.shape)
+    #return i, j
+    
+
+def nearest(lon_pt, lat_pt, lon2d, lat2d, theshape):
     """
     Return the nearest i, j point to a given lon, lat point
     in a lat/lon grid
     """
-    lon2d, lat2d = lon2d.copy(), lat2d.copy()
-    lon2d -= lon_pt
-    lat2d -= lat_pt
-    d = np.hypot(lon2d, lat2d)
-    j, i = np.unravel_index(d.argmin(), d.shape)
+    #print type(lon_pt), lon_pt
+    lon_pt += -lon2d
+    lat_pt += -lat2d
+    d = np.sqrt(lon_pt**2 + lat_pt**2)
+    j, i = np.unravel_index(d.argmin(), theshape)
     return i, j
-    
+
 
 def uniform_resample(x, y, num_fac=2, kind='linear'):
     '''
@@ -1111,17 +1124,18 @@ class track_list (object):
             return deg - np.rad2deg(ang)
         
         grdangle = grd.angle()[j,i]
-        
+        #print type(centlon), type(centlat)
         a_lon, a_lat = newPosition(centlon, centlat, get_angle(0, grdangle), radius)
         b_lon, b_lat = newPosition(centlon, centlat, get_angle(90, grdangle), radius)
         c_lon, c_lat = newPosition(centlon, centlat, get_angle(180, grdangle), radius)
         d_lon, d_lat = newPosition(centlon, centlat, get_angle(270, grdangle), radius)
                             
         # Get i,j of bounding box around eddy
-        a_i, a_j = nearest(a_lon, a_lat, grd.lon(), grd.lat())
-        b_i, b_j = nearest(b_lon, b_lat, grd.lon(), grd.lat())
-        c_i, c_j = nearest(c_lon, c_lat, grd.lon(), grd.lat())
-        d_i, d_j = nearest(d_lon, d_lat, grd.lon(), grd.lat())
+        #print grd.lon().shape, grd.lat().shape, grd.shape
+        a_i, a_j = nearest(a_lon, a_lat, grd.lon(), grd.lat(), grd.shape)
+        b_i, b_j = nearest(b_lon, b_lat, grd.lon(), grd.lat(), grd.shape)
+        c_i, c_j = nearest(c_lon, c_lat, grd.lon(), grd.lat(), grd.shape)
+        d_i, d_j = nearest(d_lon, d_lat, grd.lon(), grd.lat(), grd.shape)
                                         
         self.imin = np.maximum(np.min([a_i, b_i, c_i, d_i]) - 5, 0) # Must not go
         self.jmin = np.maximum(np.min([a_j, b_j, c_j, d_j]) - 5, 0) # below zero

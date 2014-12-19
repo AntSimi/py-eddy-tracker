@@ -161,6 +161,8 @@ class PyEddyTracker (object):
         '''
         print '--- Setting padding indices with pad=%s' %pad
         
+        self.pad = pad
+        
         def get_str(thestr, pad):
             '''
             Get start indices for pad
@@ -238,7 +240,7 @@ class PyEddyTracker (object):
         '''
         Get indices to a point (lon, lat) in the grid
         '''
-        i, j = eddy_tracker.nearest(lon, lat, self._lon, self._lat)
+        i, j = eddy_tracker.nearest(lon, lat, self._lon, self._lat, self._lon.shape)
         return i, j
     
     
@@ -505,6 +507,8 @@ class AvisoGrid (PyEddyTracker):
         self.make_gridmask(with_pad, use_maskoceans).uvmask()
         self.get_AVISO_f_pm_pn()
         self.set_u_v_eke()
+        pad2 = 2 * self.pad
+        self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
         
 
     def get_AVISO_data(self, AVISO_file):
@@ -807,12 +811,12 @@ if __name__ == '__main__':
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_SUBSAMP-3days/'
-    #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    savedir = '/marula/emason/aviso_eddy_tracking/junk/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
     #savedir = '/marula/emason/aviso_eddy_tracking/Corridor_V3_Dec2014/'
     #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_1_acd66ba338a9/'
     #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_2/'
-    savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_3/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_3/'
     #savedir = '/path/to/save/your/outputs/'
     
     
@@ -909,10 +913,10 @@ if __name__ == '__main__':
         #latmin = -47.
         #latmax = -24.
 
-        #lonmin = -38.     # small test
-        #lonmax = -25.
-        #latmin = 30.
-        #latmax = 38.
+        lonmin = -38.     # small test
+        lonmax = -25.
+        latmin = 30.
+        latmax = 38.
     
     
     elif the_domain in 'MedSea':

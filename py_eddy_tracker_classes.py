@@ -702,12 +702,16 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                 cx, cy = Eddy.M(contlon_e, contlat_e)
                 centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(cx, cy)
                 #print centlon_e, centlat_e
+                
                 aerr = np.atleast_1d(aerr)
                 # Filter for shape: >35% (>55%) is not an eddy for Q (SLA)
                 if np.logical_and(aerr >= 0., aerr <= Eddy.shape_err[collind]):
                                 
-                    # Get centroid in lon lat
+                    # Get centroid in lon lat  
+                    #print type(centlon_e), type(centlat_e), 1111
                     centlon_e, centlat_e = Eddy.M.projtran(centlon_e, centlat_e, inverse=True)
+                    # For some reason centlat_e is transformed to 'float'...
+                    centlon_e, centlat_e = np.float64(centlon_e), np.float64(centlat_e)
                     
                     # Get eddy_radius_e (NOTE: if Q, we overwrite eddy_radius_e defined ~8 lines above)
                     if 'Q' in Eddy.diag_type:
@@ -729,10 +733,15 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                     
                     if proceed0:
                         # Get indices of centroid
+                        
+                        #print type(centlon_e), type(centlat_e)
                         centi, centj = eddy_tracker.nearest(centlon_e, centlat_e,
                                                             grd.lon(),
-                                                            grd.lat())
+                                                            grd.lat(), grd.shape)
                         # If condition not True this eddy has already been detected
+                        
+                        #print type(centlon_e), type(centlat_e)
+                        
                         if 'Q' in Eddy.diag_type:
                             
                             if xi[centj, centi] != Eddy.fillval:
@@ -983,7 +992,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     
                                     # Get indices of speed-based centroid
                                     centi, centj = eddy_tracker.nearest(centlon_s, centlat_s,
-                                                                        grd.lon(), grd.lat())
+                                                                        grd.lon(), grd.lat(), grd.shape)
                                         
                                 # Set the bounds
                                 #bounds = np.atleast_2d(np.int16([imin, imax, jmin, jmax]))
