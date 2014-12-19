@@ -795,7 +795,7 @@ if __name__ == '__main__':
     #date_str, date_end = 19980107, 19991110 # 
     #date_str, date_end = 20081107, 20100110 # 
     #date_str, date_end = 19921014, 20120718 # 
-    date_str, date_end = 20020101, 20021231 # 
+    date_str, date_end = 20020101, 20020630 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
     #diag_type = 'Q' #<<< not implemented in 1.2.0
@@ -807,11 +807,12 @@ if __name__ == '__main__':
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_SUBSAMP-3days/'
-    savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
     #savedir = '/marula/emason/aviso_eddy_tracking/Corridor_V3_Dec2014/'
     #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_1_acd66ba338a9/'
     #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_2/'
+    savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_3/'
     #savedir = '/path/to/save/your/outputs/'
     
     
@@ -908,10 +909,10 @@ if __name__ == '__main__':
         #latmin = -47.
         #latmax = -24.
 
-        #lonmin = -32.     # small test
+        #lonmin = -38.     # small test
         #lonmax = -25.
-        #latmin = 20.
-        #latmax = 28.
+        #latmin = 30.
+        #latmax = 38.
     
     
     elif the_domain in 'MedSea':
@@ -1005,8 +1006,8 @@ if __name__ == '__main__':
         hanning_passes = 5
         
     elif 'sla' in diag_type:
-        #shape_err = 55. * np.ones(slaparameter.size)
-        shape_err = 1000. * np.ones(slaparameter.size)
+        shape_err = 55. * np.ones(slaparameter.size)
+        #shape_err = 1000. * np.ones(slaparameter.size)
         #shape_err = np.power(np.linspace(85., 40,  slaparameter.size), 2) / 100.
         #shape_err[shape_err < 50.] = 50.
     
