@@ -799,6 +799,7 @@ if __name__ == '__main__':
     #date_str, date_end = 19980107, 19991110 # 
     #date_str, date_end = 20081107, 20100110 # 
     #date_str, date_end = 19921014, 20120718 # 
+    date_str, date_end = 20020101, 20020110 # 
     date_str, date_end = 20020101, 20020630 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
@@ -811,12 +812,14 @@ if __name__ == '__main__':
     #savedir = '/marula/emason/aviso_eddy_tracking/pablo_exp/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_SUBSAMP-3days/'
-    savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/junk/'
+    savedir = '/marula/emason/aviso_eddy_tracking/junk2/'
     #savedir = '/marula/emason/aviso_eddy_tracking/new_AVISO_test/BlackSea/'
     #savedir = '/marula/emason/aviso_eddy_tracking/Corridor_V3_Dec2014/'
     #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_1_acd66ba338a9/'
     #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_2/'
     #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_3/'
+    #savedir = '/marula/emason/aviso_eddy_tracking/CLS_test_4/'
     #savedir = '/path/to/save/your/outputs/'
     
     
@@ -917,6 +920,11 @@ if __name__ == '__main__':
         lonmax = -25.
         latmin = 30.
         latmax = 38.
+        
+        #lonmin = .15     # big test
+        #lonmax = 359.15
+        #latmin = -70.
+        #latmax = 70.
     
     
     elif the_domain in 'MedSea':
@@ -1159,6 +1167,7 @@ if __name__ == '__main__':
     
     # Loop through the AVISO files...
     start = True
+    
     start_time = time.time()
     
     print '\nStart tracking'

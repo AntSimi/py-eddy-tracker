@@ -37,6 +37,7 @@ import haversine_distmat as hav # needs compiling with f2py
 #from make_eddy_track import *
 from py_eddy_tracker_classes import *
 
+#import find_closest_point_on_leg as fcpl
 
 def haversine_distance_vector(lon1, lat1, lon2, lat2):
     '''
@@ -135,32 +136,34 @@ def strcompare(str1, str2):
 
 
 
-def _find_closest_point_on_leg(p1, p2, p0):
-    """find closest point to p0 on line segment connecting p1 and p2"""
+#def _find_closest_point_on_leg(p1, p2, p0):
+    #"""find closest point to p0 on line segment connecting p1 and p2"""
 
-    # handle degenerate case
-    if np.all(p2 == p1):
-        d = p0 - p1
-        d **= 2
-        return d.sum()
+    ##print type(p1), type(p2), type(p0)
 
-    d21 = p2 - p1
-    d01 = p0 - p1
+    ## handle degenerate case
+    #if np.all(p2 == p1):
+        #d = p0 - p1
+        #d **= 2
+        #return d.sum()
 
-    # project on to line segment to find closest point
-    proj = np.dot(d01, d21) 
-    proj /= np.dot(d21, d21)
-    if proj < 0:
-        proj = 0
-    elif proj > 1:
-        proj = 1
-    pc = p1 + proj * d21
+    #d21 = p2 - p1
+    #d01 = p0 - p1
 
-    # find squared distance
-    d = pc - p0
-    d **= 2
+    ## project on to line segment to find closest point
+    #proj = np.dot(d01, d21) 
+    #proj /= np.dot(d21, d21)
+    #if proj < 0:
+        #proj = 0
+    #elif proj > 1:
+        #proj = 1
+    #pc = p1 + proj * d21
 
-    return d.sum()#, pc
+    ## find squared distance
+    #d = pc - p0
+    #d **= 2
+
+    #return d.sum()#, pc
 
 
 #def _find_closest_point_on_leg(p1, p2, p0):
@@ -222,73 +225,107 @@ def _find_closest_point_on_leg(p1, p2, p0):
 
     #return dmin#, xcmin, legmin)
 
-def _find_closest_point_on_path(lc, point):
-    """
-    lc: coordinates of vertices
-    point: coordinates of test point
-    """
-    #import matplotlib.mlab as mlab; print 'delete me'
-    # Find index of closest vertex for this segment
-    ds = np.sum((lc - point[None, :])**2, 1)
-    imin = ds.argmin()
+#def _find_closest_point_on_path(lc, point):
+    #"""
+    #lc: coordinates of vertices
+    #point: coordinates of test point
+    #"""
+    ##import matplotlib.mlab as mlab; print 'delete me'
+    ## Find index of closest vertex for this segment
+    #ds = np.sum((lc - point[None, :])**2, 1)
+    #imin = ds.argmin()
 
-    dmin = np.inf
-    closed = np.alltrue([lc[0,0] == lc[-1,0], lc[0,1] == lc[-1,1]])
-    #closedd = mlab.is_closed_polygon(lc)
+    #dmin = np.inf
+    #closed = np.alltrue([lc[0,0] == lc[-1,0], lc[0,1] == lc[-1,1]])
+    ##closedd = mlab.is_closed_polygon(lc)
     
-    #assert closed == closedd, 'should be same'
-    #print '***************************'
+    ##assert closed == closedd, 'should be same'
+    ##print '***************************'
     
-    # Build list of legs before and after this vertex
-    legs = []
-    if imin > 0 or closed:
-        legs.append(((imin-1) % len(lc), imin))
-    if imin < len(lc) - 1 or closed:
-        legs.append((imin, (imin+1) % len(lc)))
+    ## Build list of legs before and after this vertex
+    #legs = []
+    #if imin > 0 or closed:
+        #legs.append(((imin-1) % len(lc), imin))
+    #if imin < len(lc) - 1 or closed:
+        #legs.append((imin, (imin+1) % len(lc)))
 
-    for leg in legs:
-        #d, xc = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
-        d = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
-        if d < dmin:
-            dmin = d
+    #for leg in legs:
+        ##d, xc = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
+        ##dd = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
+        ##print type(point), type(lc[leg[0]]), type(lc[leg[1]])
+        #d = fcpl.find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
+        
+        ##assert dd == d, 'not the same'
+        
+        #if d < dmin:
+            #dmin = d
 
-    return dmin
+    #return dmin
 
 
-def find_nearest_contour(contour_obj, x, y, indices):
+#def find_nearest_contour(contour_obj, x, y, indices):
+    #"""
+    #Finds contour that is closest to a point.
+
+    #Returns a tuple containing the contour, segment of minimum point.
+
+    #Call signature::
+
+      #conmin, segmin = find_nearest_contour(contour_obj, x, y, indices)
+    #"""
+    #dmin = np.inf
+    ##conmin = None
+    #segmin = None
+    
+    #point = np.array([x, y])
+
+    #for icon in indices:
+        #con = contour_obj.collections[icon]
+        #paths = con.get_paths()
+
+        #for segNum, linepath in enumerate(paths):
+            #lc = linepath.vertices
+            ##d = _find_closest_point_on_path(lc, point)
+            #d = fcpl.find_closest_point_on_path(lc, point)
+            
+            #if d < dmin:
+                #dmin = d
+                ##conmin = icon
+                #segmin = segNum
+
+    #return segmin
+
+
+
+def find_nearest_contour(contcoll, x, y):
     """
     Finds contour that is closest to a point.
 
-    Returns a tuple containing the contour, segment of minimum point.
+    Returns a tuple containing the contour & segment.
 
     Call signature::
 
-      conmin, segmin = find_nearest_contour(contour_obj, x, y, indices)
+      segmin = find_nearest_contour(contcoll, x, y)
+
     """
-    dmin = np.inf
-    #conmin = None
+    dmin = 1e10
     segmin = None
-    
-    point = np.array([x, y])
+    linepathmin = None
 
-    for icon in indices:
-        con = contour_obj.collections[icon]
-        paths = con.get_paths()
-
-        for segNum, linepath in enumerate(paths):
-            lc = linepath.vertices
-            d = _find_closest_point_on_path(lc, point)
-            
-            if d < dmin:
-                dmin = d
-                #conmin = icon
-                segmin = segNum
-
-    return segmin
-
-
-
-
+    paths = contcoll.get_paths()
+    for segNum, linepath in enumerate(paths):
+        lc = linepath.vertices
+        ds = lc[:,0] - x
+        ds **= 2
+        dss = lc[:,1] - y
+        dss **= 2
+        ds += dss
+        d = ds.min()
+        if d < dmin:
+            dmin = d
+            segmin = segNum
+            linepathmin = linepath
+    return (segmin, linepathmin)
 
 
 

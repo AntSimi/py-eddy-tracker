@@ -45,6 +45,7 @@ import matplotlib.path as path
 import matplotlib.patches as patch
 import scipy.ndimage.filters as filters
 import scipy.ndimage.morphology as morphology
+import find_closest_point_on_leg as fcpl
 
 # py-eddy-tracker modules
 import make_eddy_tracker_list_obj as eddy_tracker
@@ -387,6 +388,7 @@ def fit_circle(xvec, yvec):
     Adapted from ETRACK (KCCMC11)
     '''
     xvec, yvec = xvec.copy(), yvec.copy()
+    
     if xvec.ndim == 1:
         xvec = xvec[np.newaxis]
     if yvec.ndim == 1:
@@ -401,18 +403,21 @@ def fit_circle(xvec, yvec):
     ymean = yvec.mean()
     xsc = ne.evaluate('xvec - xmean')
     ysc = ne.evaluate('yvec - ymean')
-    scale = np.max((np.hypot(xsc, ysc).max(), np.finfo(float).eps))
+    
+    scale = np.max((np.sqrt(xsc**2 + ysc**2).max(), np.finfo(float).eps))
     xsc /= scale
     ysc /= scale
 
-    # Form matrix equation to be solved and solve it
-    xyz  = np.linalg.lstsq(
+    # Form matrix equation and solve it
+    xyz = np.linalg.lstsq(
              np.concatenate((2. * xsc, 2. * ysc, np.ones((npts, 1))), axis=1),
-             np.hypot(xsc, ysc)**2)
+             np.sqrt(xsc**2 + ysc**2)**2)
+    
     # Unscale data and get circle variables
-    p = np.array([xmean, ymean, 0.]) +  \
-        np.concatenate((xyz[0][0], xyz[0][1],
-                        np.sqrt(xyz[0][2] + np.hypot(xyz[0][0], xyz[0][1])**2))) * scale
+    p = np.concatenate((xyz[0][0], xyz[0][1],
+           np.sqrt(xyz[0][2] + np.sqrt(xyz[0][0]**2 + xyz[0][1]**2)**2)))
+    p *= scale
+    p += np.array([xmean, ymean, 0.])
 
     ccx = p[0] # center X-position of fitted circle
     ccy = p[1] # center Y-position of fitted circle
@@ -432,7 +437,7 @@ def fit_circle(xvec, yvec):
     parea = ne.evaluate('abs(polar)')
     
     # Find distance between circle center and contour points_inside_poly
-    dist_poly = np.hypot(xvec - ccx, yvec - ccy)
+    dist_poly = np.sqrt((xvec - ccx)**2 + (yvec - ccy)**2)
 
     sintheta = ne.evaluate('(yvec - ccy) / dist_poly')
     ptmp_y = ne.evaluate('ccy + ( r * sintheta )')
@@ -446,8 +451,8 @@ def fit_circle(xvec, yvec):
     p_inon_y[pout_id] = ptmp_y[pout_id]
 
     # Area of closed contour/polygon enclosed by the circle
-    tmp = (p_inon_x[0:npts-1] * p_inon_y[1:npts])  -    \
-          (p_inon_x[1:npts]   * p_inon_y[0:npts-1])
+    tmp = ((p_inon_x[0:npts-1] * p_inon_y[1:npts]) - 
+             (p_inon_x[1:npts] * p_inon_y[0:npts-1]))
     
     parea_incirc = ne.evaluate('sum(tmp, axis=None)')
     parea_incirc = ne.evaluate('0.5 * abs(parea_incirc)')
@@ -513,48 +518,30 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
     while not citer.finished:
         
         # Get contour around centlon_e, centlat_e at level [collind:][iuavg]
-        try:
-            #contii, segii, junk, junk, junk, junk = CS.find_nearest_contour(
-                    #centlon_e, centlat_e,  indices=np.array([citer.index]),
-                                                         #pixel=False)
-            segi = eddy_tracker.find_nearest_contour(CS,
-                                       centlon_e, centlat_e,
-                                       indices=np.array([citer.index]))
-	    #print 'contii, segii', contii, segii
-	    #print 'conti, segi', conti, segi
-            poly_i = CS.collections[citer.index].get_paths()[segi]                   
+        segi, poly_i = eddy_tracker.find_nearest_contour(CS.collections[citer.index],
+                                                         centlon_e, centlat_e)
         
-        except Exception:
-            poly_i = False
-
-        if poly_i:
+        if poly_i is not None:
             
             # NOTE: contains_points requires matplotlib 1.3 +
             mask_i_sum = poly_i.contains_points(points).sum()
-            #mask_i_sum = mask_i
             
             # 1. Ensure polygon_i is within polygon_e
             # 2. Ensure polygon_i contains point centlon_e, centlat_e
             # 3. Respect size range
             if not save_all_uavg:
                 # Iterate until pixel_threshold[0] number of pixels
-                if np.all([poly_eff.contains_path(poly_i),
-                           poly_i.contains_point([centlon_e, centlat_e]),
-                           np.logical_and(mask_i_sum >= Eddy.pixel_threshold[0],
-                                          mask_i_sum <= Eddy.pixel_threshold[1])]):
-                    proceed = True
-                else: 
-                    proceed = False
-            
+                pixel_min = Eddy.pixel_threshold[0]
             else:
-                # Iterate until 1 pixel
-                if np.all([poly_eff.contains_path(poly_i),
-                           poly_i.contains_point([centlon_e, centlat_e]),
-                           np.logical_and(mask_i_sum >= 1,
-                                          mask_i_sum <= Eddy.pixel_threshold[1])]):
-                    proceed = True
-                else: 
-                    proceed = False
+                pixel_min = 1 # iterate until 1 pixel
+            
+            if np.all([poly_eff.contains_path(poly_i),
+                       poly_i.contains_point([centlon_e, centlat_e]),
+                       np.logical_and(mask_i_sum >= pixel_min,
+                                      mask_i_sum <= Eddy.pixel_threshold[1])]):
+                proceed = True
+            else: 
+                proceed = False
             
             
             if proceed:
@@ -710,7 +697,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                     # Get centroid in lon lat  
                     #print type(centlon_e), type(centlat_e), 1111
                     centlon_e, centlat_e = Eddy.M.projtran(centlon_e, centlat_e, inverse=True)
-                    # For some reason centlat_e is transformed to 'float'...
+                    # For some reason centlat_e is transformed by projtran to 'float'...
                     centlon_e, centlat_e = np.float64(centlon_e), np.float64(centlat_e)
                     
                     # Get eddy_radius_e (NOTE: if Q, we overwrite eddy_radius_e defined ~8 lines above)
@@ -755,13 +742,10 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 acyc_not_cyc = Eddy.sla[centj, centi] >= CS.cvalues[collind]
                                 if 'Anticyclonic' in sign_type and acyc_not_cyc:
                                     proceed1 = True
-                                    #print 'AC acyc_not_cyc',acyc_not_cyc
                                 elif 'Cyclonic' in sign_type and not acyc_not_cyc:
                                     proceed1 = True
-                                    #print 'CC acyc_not_cyc',acyc_not_cyc
                                 else:
-                                    proceed1 = False
-                                    #print 'no eddy'
+                                    proceed1 = False # no eddy
                             else:
                                 proceed1 = False
                         else:
@@ -1288,8 +1272,6 @@ def track_eddies(Eddy, first_record):
             if 'ellipse' in Eddy.separation_method:
                 if Eddy.search_ellipse.ellipse_path.contains_point(
                                           (new_x[new_ind], new_y[new_ind])):
-                #if ellipse_path.contains_point((new_x[new_ind], new_y[new_ind])):
-                #if ellipse_path.contains_point(new_x[new_ind], new_y[new_ind]):
                     sep_proceed = True
                 else:
                     sep_proceed = False
@@ -1333,6 +1315,7 @@ def track_eddies(Eddy, first_record):
                     new_Ua.append(Eddy.new_Uavg_tmp[new_ind])
                     new_ek.append( Eddy.new_teke_tmp[new_ind])
                     new_tm.append(Eddy.new_time_tmp[new_ind])
+                    
                     if 'ROMS' in Eddy.datatype:
                         #new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
                         #new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
@@ -1341,6 +1324,7 @@ def track_eddies(Eddy, first_record):
                         #new_bnds = np.vstack((new_bnds, Eddy.new_bounds_tmp[new_ind]))
                     #except Exception:
                         #new_bnds = np.hstack((new_bnds, Eddy.new_bounds_tmp[new_ind]))
+                    
                     if Eddy.track_extra_variables:
                         new_cntr_e.append(Eddy.new_contour_e_tmp[new_ind])
                         new_cntr_s.append(Eddy.new_contour_s_tmp[new_ind])
@@ -1355,24 +1339,22 @@ def track_eddies(Eddy, first_record):
                                              Eddy.new_lon_tmp[new_ind])] = False
                     dist_mat[:,new_ind] = 1e9 # km
         
-        #print 'loop22'
-        #print 'ifs1'
+        
         # Only one eddy within range
-        if dist_arr.size == 1:                
-            # Nothing to be done except update the eddy tracks
-            # NOTE accounting should be part of Eddy object...
+        if dist_arr.size == 1: # nothing to be done except update the eddy tracks
+            
+            # NOTE accounting should be part of Eddy (or some other) object...
             if 'ROMS' in Eddy.datatype:
-                new_tp = new_st = 99 #; print 'fix me 1177'
-                #print new_ln, new_lt
+                new_tp = new_st = 99
+                
                 Eddy = accounting(Eddy, old_ind, new_ln[0], new_lt, new_rd_s, new_rd_e,
                                   new_am, new_Ua, new_ek, new_tm, new_eddy, first_record,
                                   contour_e=new_cntr_e, contour_s=new_cntr_s,
                                   Uavg_profile=new_Uavg_prf, shape_error=new_shp_err,
                                   cent_temp=new_tp, cent_salt=new_st)
             elif 'AVISO' in Eddy.datatype:
+                
                 # Use index 0 because type is list, but we want the float
-	        #print 'here 1.1'
-                #print type(new_eddy), new_eddy, type(first_record), first_record
                 Eddy = accounting(Eddy, old_ind, new_ln[0], new_lt[0], new_rd_s[0], new_rd_e[0],
                                   new_am[0], new_Ua[0], new_ek[0], new_tm[0], new_eddy, first_record,
                                   contour_e=new_cntr_e, contour_s=new_cntr_s,
@@ -1380,7 +1362,7 @@ def track_eddies(Eddy, first_record):
         
         # More than one eddy within range
         elif dist_arr.size > 1:
-            #print 'eeeeeee'
+            
             # Loop to find the right eddy
             delta_area = np.array([])
             delta_amp = np.array([])
@@ -1419,8 +1401,8 @@ def track_eddies(Eddy, first_record):
             deltaX = ne.evaluate('sqrt((delta_area / area0)**2 + (delta_amp / amp0)**2 + (dist_arr / dist0)**2)')
 
             dx = deltaX.argsort()
-            dx0 = dx[0] # Index to the right eddy
-            dx_unused = dx[1:] # Index/indices to the unused eddy/eddies
+            dx0 = dx[0] # index to the nearest eddy
+            dx_unused = dx[1:] # index/indices to the unused eddy/eddies
             
             
             # Update eddy track dx0
@@ -1443,7 +1425,7 @@ def track_eddies(Eddy, first_record):
                                   #cent_temp=new_tp[dx0], cent_salt=new_st[dx0])
             
             elif 'AVISO' in Eddy.datatype:
-                #print '222'; print type(new_ln[dx0]);ddddddd
+                
                 Eddy = accounting(Eddy, old_ind,
                                   new_ln[dx0], new_lt[dx0], new_rd_s[dx0], new_rd_e[dx0],
                                   new_am[dx0], new_Ua[dx0], new_ek[dx0], new_tm[dx0],
@@ -1478,15 +1460,12 @@ def track_eddies(Eddy, first_record):
                 plt.title('after')
                 plt.tight_layout()
                 plt.show()
-    
-        #print 'ifs2'
-    #print 'out2'        
+          
     # Finished looping over old eddy tracks
     
-    #print 'here 2'
     # Now we need to add new eddies defined by new_eddy_inds
     if np.any(new_eddy_inds):
-        if False:#Eddy.verbose:
+        if False:
             print '------adding %s new eddies' %new_eddy_inds.sum()
             
         for neind, a_new_eddy in enumerate(new_eddy_inds):
@@ -1502,6 +1481,7 @@ def track_eddies(Eddy, first_record):
                     new_shape_error_tmp = Eddy.new_shape_error_tmp[neind]
                 
                 if 'ROMS' in Eddy.datatype:
+                    
                     Eddy = accounting(Eddy, False,
                                       Eddy.new_lon_tmp[neind], 
                                       Eddy.new_lat_tmp[neind],
@@ -1518,9 +1498,9 @@ def track_eddies(Eddy, first_record):
                                       shape_error=new_shape_error_tmp)#,
                                       #cent_temp=Eddy.new_temp_tmp[neind],
                                       #cent_salt=Eddy.new_salt_tmp[neind])
+                
                 elif 'AVISO' in Eddy.datatype:
-                    #print '\n\n3333333333'; print type(Eddy.new_lon_tmp[neind]);print Eddy.new_lon_tmp[neind]
-                    #if len(Eddy.new_lon_tmp[neind]) > 1: print Eddy.new_lon_tmp[neind]; qqqqqqqq
+                    
                     Eddy = accounting(Eddy, False,
                                       Eddy.new_lon_tmp[neind], 
                                       Eddy.new_lat_tmp[neind],
@@ -1546,8 +1526,6 @@ def accounting(Eddy, old_ind, centlon, centlat,
                eddy_radius_s, eddy_radius_e, amplitude, Uavg, teke, rtime, 
                new_eddy, first_record, contour_e=None, contour_s=None,
                Uavg_profile=None, shape_error=None, cent_temp=None, cent_salt=None):
-    #try:print 'EEEEEEEEEEEEE', len(centlon)
-    #except: print 'EEEEEEEEEEEEE', centlon.size
     '''
     Accounting for new or old eddy (either cyclonic or anticyclonic)
       Eddy  : eddy_tracker.tracklist object
@@ -1565,49 +1543,13 @@ def accounting(Eddy, old_ind, centlon, centlat,
       new_eddy   : flag indicating a new eddy
       first_record : flag indicating that we're on the first record
     '''
-    #print 'Entering accounting'
-    
-    #centlon = centlon[0]
-    #centlat = np.float(centlat)
-    #eddy_radius_s = np.float(eddy_radius_s)
-    #eddy_radius_e = np.float(eddy_radius_e)
-    #amplitude = np.float(amplitude)
-    #Uavg = np.float(Uavg)
-    #teke = np.float(teke)
-    #rtime = np.float(rtime)
-    
     if first_record: # is True then all eddies are new...
         if Eddy.verbose:
             print '------ writing first record'
         new_eddy = True
     
-    #print 'BBBBBBBBBBB',rtime
-    if not new_eddy: # It's an old (ie, active) eddy
+    if not new_eddy: # it's an old (i.e., active) eddy
         
-        # SHOULD BE NO NEED FOR TRY->EXCEPT HERE,
-        # IF IT'S AN OLD EDDY IT SHOULD HAVE AN INDEX...
-        #try: # Works if old_ind is within range of array
-
-            #Eddy.new_lon.insert(old_ind, centlon)
-            #Eddy.new_lat[old_ind] = centlat
-            #Eddy.new_radii_s[old_ind] = eddy_radius_s
-            #Eddy.new_radii_e[old_ind] = eddy_radius_e
-            #Eddy.new_amp[old_ind] = amplitude
-            #Eddy.new_Uavg[old_ind] = Uavg
-            #Eddy.new_teke[old_ind] = teke
-            #Eddy.new_bounds[old_ind] = bounds
-            #if 'ROMS' in Eddy.datatype:
-                #Eddy.new_temp[old_ind] = cent_temp
-                #Eddy.new_salt[old_ind] = cent_salt
-            #if Eddy.track_extra_variables:
-                #Eddy.new_contour_e[old_ind] = contour_e
-                #Eddy.new_contour_s[old_ind] = contour_s
-                #Eddy.new_Uavg_profile[old_ind] = Uavg_profile
-                #Eddy.new_shape_error[old_ind] = shape_error
-            ##print 'aa'
-        
-        #except Exception: # ... otherwise we extend the range of new array to old_ind
-            #print 'wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww'
         Eddy.insert_at_index('new_lon', old_ind, centlon)
         Eddy.insert_at_index('new_lat', old_ind, centlat)
         Eddy.insert_at_index('new_radii_s', old_ind, eddy_radius_s)
@@ -1615,19 +1557,19 @@ def accounting(Eddy, old_ind, centlon, centlat,
         Eddy.insert_at_index('new_amp', old_ind, amplitude)
         Eddy.insert_at_index('new_Uavg', old_ind, Uavg)
         Eddy.insert_at_index('new_teke', old_ind, teke)
-        #print 'aaaaaaaa', bounds.shape
-        #Eddy.insert_at_index('new_bounds', old_ind, bounds)
+        
         if 'ROMS' in Eddy.datatype:
             Eddy.insert_at_index('new_temp', old_ind, cent_temp)
             Eddy.insert_at_index('new_salt', old_ind, cent_salt)
+        
         if Eddy.track_extra_variables:
             Eddy.insert_at_index('new_contour_e', old_ind, contour_e)
             Eddy.insert_at_index('new_contour_s', old_ind, contour_s)
             Eddy.insert_at_index('new_Uavg_profile', old_ind, Uavg_profile)
             Eddy.insert_at_index('new_shape_error', old_ind, shape_error)
-        #print 'bb',old_ind
-
+        
         if 'ROMS' in Eddy.datatype:
+            
             Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg, teke,
                               eddy_radius_s, eddy_radius_e, amplitude,
                               temp=cent_temp, salt=cent_salt,
@@ -1635,15 +1577,14 @@ def accounting(Eddy, old_ind, centlon, centlat,
                               Uavg_profile=Uavg_profile, shape_error=shape_error)
         
         elif 'AVISO' in Eddy.datatype:
-            #print 'FFFFFFFFFF', old_ind, centlon, centlat, rtime, Uavg, teke, \
-              #eddy_radius_s, eddy_radius_e, amplitude, contour_e, contour_s, Uavg_profile, shape_error
+            
             Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg, teke,
                               eddy_radius_s, eddy_radius_e, amplitude,
                               temp=None, salt=None,
                               contour_e=contour_e, contour_s=contour_s,
                               Uavg_profile=Uavg_profile, shape_error=shape_error)
 
-    else: # It's a new eddy
+    else: # it's a new eddy
         
         # We extend the range of array to old_ind
         Eddy.insert_at_index('new_lon', Eddy.index, centlon)
@@ -1653,29 +1594,29 @@ def accounting(Eddy, old_ind, centlon, centlat,
         Eddy.insert_at_index('new_amp', Eddy.index, amplitude)
         Eddy.insert_at_index('new_Uavg', Eddy.index, Uavg)
         Eddy.insert_at_index('new_teke', Eddy.index, teke)
-        #print 'bbbbbbbbb', bounds.shape, bounds
-        #print 'bbbbbbbbb', Eddy.new_bounds.shape, Eddy.new_bounds
-        #Eddy.insert_at_index('new_bounds', Eddy.index, bounds)
+        
         if 'ROMS' in Eddy.datatype:
             Eddy.insert_at_index('new_temp', Eddy.index, cent_temp)
             Eddy.insert_at_index('new_salt', Eddy.index, cent_salt)
+        
         if Eddy.track_extra_variables:
             Eddy.insert_at_index('new_contour_e', Eddy.index, contour_e)
             Eddy.insert_at_index('new_contour_s', Eddy.index, contour_s)
             Eddy.insert_at_index('new_Uavg_profile', Eddy.index, Uavg_profile)
             Eddy.insert_at_index('new_shape_error', Eddy.index, shape_error)
         
-        if Eddy.new_list is True: # Initialise a new list
+        if Eddy.new_list is True: # initialise a new list
             print '------ starting a new track list for %ss' %Eddy.sign_type
             Eddy.new_list = False
         
         if 'ROMS' in Eddy.datatype:
+            
             Eddy.add_new_track(centlon, centlat, rtime, Uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude, temp=cent_temp, salt=cent_salt,
                 contour_e=contour_e, contour_s=contour_s,
                 Uavg_profile=Uavg_profile, shape_error=shape_error)
         elif 'AVISO' in Eddy.datatype:
-	    #print '------------------', type(centlon), centlon
+	    
             Eddy.add_new_track(centlon, centlat, rtime, Uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude,
                 contour_e=contour_e, contour_s=contour_s,
@@ -1768,6 +1709,33 @@ def func_hann2d_fast(var, numpasses):
     return var
 
 
+#def get_circle(x0, y0, r, npts):
+    #'''
+    #Return points on a circle, with specified (x0,y0) center and radius
+                    #(and optional number of points too!).
+  
+    #Input     : 1  - x0, scalar, center X of circle
+                #2  - y0, scalar, center Y of circle
+                #3  - r,  scalar, radius
+                #4  - npts, scalar, number of points (optional)
+
+    #Output    : 1  - cx, circle x-points
+                #2  - cy, circle y-points
+
+    #Example   :  [cx cy] = func_get_circle (5, 5, 3, 256)
+                #plot (cx, cy, '-')
+
+    #Written By : UCLA ROMS Team (jaison@atmos.ucla.edu) 
+    #Written On : June/05/2008
+    #Tool       : Eddy Tracker
+    #'''
+    #theta = np.arange(npts)
+    #theta = ne.evaluate('theta * 2. * (4. * arctan(1.)) / npts')
+    #cx  = ne.evaluate('x0 + r * cos(theta)')
+    #cy  = ne.evaluate('y0 + r * sin(theta)')
+    #return cx, cy
+
+
 def get_circle(x0, y0, r, npts):
     '''
     Return points on a circle, with specified (x0,y0) center and radius
@@ -1789,9 +1757,10 @@ def get_circle(x0, y0, r, npts):
     Tool       : Eddy Tracker
     '''
     theta = np.arange(npts)
-    theta = ne.evaluate('theta * 2. * (4. * arctan(1.)) / npts')
-    cx  = ne.evaluate('x0 + r * cos(theta)')
-    cy  = ne.evaluate('y0 + r * sin(theta)')
+    #cx = np.empty_like(theta)
+    #cy = np.empty_like(theta)
+    theta[:] = theta * 2. * (4. * np.arctan(1.)) / npts
+    cx = x0 + r * np.cos(theta)
+    cy = y0 + r * np.sin(theta)
     return cx, cy
-
-
+      
