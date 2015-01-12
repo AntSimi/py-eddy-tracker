@@ -401,10 +401,11 @@ def fit_circle(xvec, yvec):
     npts = xvec.size
     xmean = xvec.mean()
     ymean = yvec.mean()
-    xsc = ne.evaluate('xvec - xmean')
-    ysc = ne.evaluate('yvec - ymean')
+    xsc = xvec - xmean
+    ysc = yvec - ymean
     
-    scale = np.max((np.sqrt(xsc**2 + ysc**2).max(), np.finfo(float).eps))
+    scale = np.array([np.sqrt(xsc**2 + ysc**2).max(),
+		                np.finfo(float).eps]).max()
     xsc /= scale
     ysc /= scale
 
@@ -422,8 +423,7 @@ def fit_circle(xvec, yvec):
     ccx = p[0] # center X-position of fitted circle
     ccy = p[1] # center Y-position of fitted circle
     r = p[2] # radius of fitted circle
-    carea = np.pi       
-    carea = ne.evaluate('carea * r**2') # area of fitted circle
+    carea = r**2 * np.pi # area of fitted circle
     
     # Shape test
     # Area and centroid of closed contour/polygon
@@ -431,10 +431,10 @@ def fit_circle(xvec, yvec):
     yvec1 = yvec[1:npts]
     xvec2 = xvec[1:npts]
     yvec2 = yvec[:npts-1]
-    tmp = ne.evaluate('(xvec1 * yvec1) - (xvec2 * yvec2)')
+    tmp = (xvec1 * yvec1) - (xvec2 * yvec2)
     polar = ne.evaluate('sum(tmp, axis=None)')
-    polar = ne.evaluate('0.5 * polar')
-    parea = ne.evaluate('abs(polar)')
+    polar *= 0.5
+    parea = np.abs(polar)
     
     # Find distance between circle center and contour points_inside_poly
     dist_poly = np.sqrt((xvec - ccx)**2 + (yvec - ccy)**2)

@@ -799,7 +799,7 @@ if __name__ == '__main__':
     #date_str, date_end = 19980107, 19991110 # 
     #date_str, date_end = 20081107, 20100110 # 
     #date_str, date_end = 19921014, 20120718 # 
-    date_str, date_end = 20020101, 20020110 # 
+    #date_str, date_end = 20020101, 20020131 # 
     date_str, date_end = 20020101, 20020630 # 
     
     # Choose type of diagnostic: either q-parameter ('Q') or sea level anomaly ('sla')
@@ -921,10 +921,10 @@ if __name__ == '__main__':
         latmin = 30.
         latmax = 38.
         
-        #lonmin = .15     # big test
-        #lonmax = 359.15
-        #latmin = -70.
-        #latmax = 70.
+        lonmin = .15     # big test
+        lonmax = 359.15
+        latmin = -70.
+        latmax = 70.
     
     
     elif the_domain in 'MedSea':

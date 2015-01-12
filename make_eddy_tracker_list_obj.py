@@ -48,7 +48,7 @@ def haversine_distance_vector(lon1, lat1, lon2, lat2):
     lat1 = np.asfortranarray(lat1.copy())
     lon2 = np.asfortranarray(lon2.copy())
     lat2 = np.asfortranarray(lat2.copy())
-    dist = np.asfortranarray(np.empty(lon1.shape))
+    dist = np.asfortranarray(np.empty_like(lon1))
     hav.haversine_distvec(lon1, lat1, lon2, lat2, dist)
     return dist
 
@@ -958,25 +958,25 @@ class track_list (object):
         # Update old_lon and old_lat...
         #print '0000000000000000000000000000000000000000000000000000'
         #print 'self.new_lon[lasti:]',self.new_lon[lasti:]
-        self.old_lon     = list(self.new_lon[lasti:])
+        self.old_lon = list(self.new_lon[lasti:])
         #print 'self.old_lon',self.old_lon
         #print '0000000000000000000000000000000000000000000000000000'
-        self.old_lat     = self.new_lat[lasti:]
+        self.old_lat = self.new_lat[lasti:]
         self.old_radii_s = self.new_radii_s[lasti:]
         self.old_radii_e = self.new_radii_e[lasti:]
-        self.old_amp     = self.new_amp[lasti:]
-        self.old_Uavg    = self.new_Uavg[lasti:]
-        self.old_teke    = self.new_teke[lasti:]
+        self.old_amp = self.new_amp[lasti:]
+        self.old_Uavg = self.new_Uavg[lasti:]
+        self.old_teke = self.new_teke[lasti:]
         #self.old_bounds  = self.new_bounds[lasti:]
         
-        self.new_lon     = [] #np.array([])
-        self.new_lat     = []
+        self.new_lon = [] #np.array([])
+        self.new_lat = []
         self.new_radii_s = []
         self.new_radii_e = []
-        self.new_amp     = []
-        self.new_Uavg    = []
-        self.new_teke    = []
-        self.new_time    = []
+        self.new_amp = []
+        self.new_Uavg = []
+        self.new_teke = []
+        self.new_time = []
         #self.new_bounds  = np.atleast_2d(np.empty(4, dtype=np.int16))
         
         if 'ROMS' in self.datatype:
