@@ -94,31 +94,55 @@ def nearest(lon_pt, lat_pt, lon2d, lat2d, theshape):
     return i, j
 
 
-def uniform_resample(x, y, num_fac=2, kind='linear'):
-    '''
+def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
+    """
     Resample contours to have (nearly) equal spacing
-    '''
+       x, y    : input contour coordinates
+       num_fac : factor to increase lengths of output coordinates
+       method  : currently only 'interp1d' or 'Akima'
+                 (Akima is slightly slower, but may be more accurate)
+       kind    : type of interpolation (interp1d only)
+    """
     #plt.figure(706)
     #plt.plot(x, y, '.-g', lw=2)
     ##x = ndimage.zoom(x.copy(), 2)
     ##y = ndimage.zoom(y.copy(), 2)
     #plt.plot(x, y, '.-r', lw=2)
+    if kwargs.has_key('method'):
+        method = kwargs['method']
+    else:
+        method = 'interp1d'
+    
+    if kwargs.has_key('num_fac'):
+        num_fac = kwargs['num_fac']
+    else:
+        num_fac = 2
     
     # Get distances
     d = np.r_[0, np.cumsum(haversine_distance_vector(x[:-1],y[:-1], x[1:],y[1:]))]
     # Get uniform distances
     d_uniform = np.linspace(0, d.max(), num=d.size * num_fac, endpoint=True)
+    
     # Do 1d interpolations
-    xfunc = interpolate.interp1d(d, x, kind=kind)
-    yfunc = interpolate.interp1d(d, y, kind=kind)
+    if strcompare('interp1d', method):
+        
+        if kwargs.has_key('kind'):
+            kind = kwargs['kind']
+        else:
+            kind = 'linear'
+        xfunc = interpolate.interp1d(d, x, kind=kind)
+        yfunc = interpolate.interp1d(d, y, kind=kind)
+    
+    elif strcompare('akima', method):
+        
+        xfunc = interpolate.Akima1DInterpolator(d, x)
+        yfunc = interpolate.Akima1DInterpolator(d, y)
+    
+    else:
+        Exception
+    
     xnew = xfunc(d_uniform)
     ynew = yfunc(d_uniform)
-    
-    # Akima is slightly slower, but may be more accurate
-    #xfunc = interpolate.Akima1DInterpolator(d, x)
-    #yfunc = interpolate.Akima1DInterpolator(d, y)
-    #xxnew = xfunc(d_uniform)
-    #yynew = yfunc(d_uniform)
 
     #plt.plot(xnew, ynew, '.-r', lw=1.5)
     #plt.plot(xxnew, yynew, '+-b', lw=1.)
@@ -332,7 +356,7 @@ def find_nearest_contour(contcoll, x, y):
 
 
 
-class track (object):
+class Track (object):
     '''
     Class that holds eddy tracks and related info
         index  - index to each 'track', or track_number
@@ -436,7 +460,7 @@ class track (object):
         
         
 
-class track_list (object):
+class TrackList (object):
     '''
     Class that holds list of eddy tracks:
         tracklist - the list of 'track' objects
@@ -501,7 +525,7 @@ class track_list (object):
         '''
         Append a new 'track' object to the list
         '''
-        self.tracklist.append(track(self.index, self.datatype,
+        self.tracklist.append(Track(self.index, self.datatype,
                                     lon, lat, time, Uavg, teke,
                                     radius_s, radius_e, amplitude,
                                     temp, salt, self.track_extra_variables,
@@ -650,22 +674,22 @@ class track_list (object):
         nc = netcdf.Dataset(self.savedir, 'w', format='NETCDF4')
         nc.title = ''.join((title, ' eddy tracks'))
         nc.directory = directory
-        nc.days_between_records = np.float64(self.days_btwn_recs)
+        nc.days_between_records = np.float64(self.DAYS_BTWN_RECORDS)
         nc.track_duration_min = np.float64(self.track_duration_min)
         
-        if 'Q' in self.diag_type:
+        if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.Q_parameter_contours = self.qparameter
-        elif 'sla' in self.diag_type:
+        elif 'sla' in self.DIAGNOSTIC_TYPE:
             nc.sla_parameter_contours = self.slaparameter
             nc.shape_error = self.shape_err
             nc.pixmin = self.pixel_threshold[0]
             nc.pixmax = self.pixel_threshold[1]
         
-        if self.smoothing in locals():
-            nc.smoothing = np.str(self.smoothing)
-            nc.smoothing_fac = np.float(self.smooth_fac)
+        if self.SMOOTHING in locals():
+            nc.SMOOTHING = np.str(self.SMOOTHING)
+            nc.SMOOTHING_fac = np.float(self.smooth_fac)
         else:
-            nc.smoothing = 'None'
+            nc.SMOOTHING = 'None'
         
         nc.i0 = np.int32(self.i0)
         nc.i1 = np.int32(self.i1)
@@ -684,10 +708,10 @@ class track_list (object):
             if 'ip_roms' in model:
                 nc.rho_ntr = rho_ntr
         
-        nc.evolve_amp_min = self.evolve_ammin
-        nc.evolve_amp_max = self.evolve_ammax
-        nc.evolve_area_min = self.evolve_armin
-        nc.evolve_area_max = self.evolve_armax
+        nc.evolve_amplitude_min = self.EVOLVE_AMP_MIN
+        nc.evolve_amplitude_max = self.EVOLVE_AMP_MAX
+        nc.evolve_area_min = self.EVOLVE_AREA_MIN
+        nc.evolve_area_max = self.EVOLVE_AREA_MAX
         
         # Create dimensions     
         nc.createDimension('Nobs', None)#len(Eddy.tracklist))
@@ -700,7 +724,7 @@ class track_list (object):
         nc.createVariable('track', np.int32, ('Nobs'), fill_value=self.fillval)   
         nc.createVariable('n', np.int32, ('Nobs'), fill_value=self.fillval)  
         # Use of jday should depend on clim vs interann
-        if self.interannual: # AVISO or interannual ROMS solution
+        if self.INTERANNUAL: # AVISO or INTERANNUAL ROMS solution
             nc.createVariable('j1', np.int32, ('Nobs'), fill_value=self.fillval)
         else: # climatological ROMS solution
             nc.createVariable('ocean_time', 'f8', ('Nobs'), fill_value=self.fillval)
@@ -711,7 +735,7 @@ class track_list (object):
         nc.createVariable('U', 'f4', ('Nobs'), fill_value=self.fillval)
         nc.createVariable('Teke', 'f4', ('Nobs'), fill_value=self.fillval)
         nc.createVariable('radius_e', 'f4', ('Nobs'), fill_value=self.fillval)
-        if 'Q' in self.diag_type:
+        if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.createVariable('qparameter', 'f4', ('Nobs'), fill_value=self.fillval)
         if 'ROMS' in self.datatype:
             nc.createVariable('temp', 'f4', ('Nobs'), fill_value=self.fillval)
@@ -735,31 +759,31 @@ class track_list (object):
         nc.variables['n'].description = 'observation sequence number (XX day intervals)'
         
         ## Use of jday should depend on clim vs interann
-        if self.interannual: # AVISO or interannual ROMS solution
+        if self.INTERANNUAL: # AVISO or INTERANNUAL ROMS solution
             nc.variables['j1'].units = 'days'
             #nc.variables['j1'].min_val = 2448910
             #nc.variables['j1'].max_val = 2455560
             nc.variables['j1'].long_name = 'Julian date'
             nc.variables['j1'].description = 'date of this observation'
-            nc.variables['j1'].reference = self.jday_ref
-            nc.variables['j1'].reference_description = 'Julian date at Jan 1, 1992'
+            nc.variables['j1'].reference = self.JDAY_REFERENCE
+            nc.variables['j1'].reference_description = 'Julian date on Jan 1, 1992'
         else: # climatological ROMS solution
             nc.variables['ocean_time'].units = 'ROMS ocean_time (seconds)'
         
         nc.variables['eddy_duration'].units = 'days'
         nc.variables['lon'].units = 'deg. longitude'
-        nc.variables['lon'].min_val = self.lonmin
-        nc.variables['lon'].max_val = self.lonmax
+        nc.variables['lon'].min_val = self.LONMIN
+        nc.variables['lon'].max_val = self.LONMAX
         nc.variables['lat'].units = 'deg. latitude'
-        nc.variables['lat'].min_val = self.latmin
-        nc.variables['lat'].max_val = self.latmax
+        nc.variables['lat'].min_val = self.LATMIN
+        nc.variables['lat'].max_val = self.LATMAX
 
-        if 'Q' in self.diag_type:
+        if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.variables['A'].units = 'None, normalised vorticity (abs(xi)/f)'
-        elif 'sla' in self.diag_type:
+        elif 'sla' in self.DIAGNOSTIC_TYPE:
             nc.variables['A'].units = 'cm'
-        nc.variables['A'].min_val = self.ampmin
-        nc.variables['A'].max_val = self.ampmax
+        nc.variables['A'].min_val = self.AMPMIN
+        nc.variables['A'].max_val = self.AMPMAX
         nc.variables['A'].long_name = 'amplitude'
         nc.variables['A'].description = 'magnitude of the height difference ' + \
                                         'between the extremum of SSH within ' + \
@@ -767,8 +791,8 @@ class track_list (object):
                                         'defining the eddy perimeter'
         
         nc.variables['L'].units = 'km'
-        nc.variables['L'].min_val = self.radmin / 1000.
-        nc.variables['L'].max_val = self.radmax / 1000.
+        nc.variables['L'].min_val = self.RADMIN / 1000.
+        nc.variables['L'].max_val = self.RADMAX / 1000.
         nc.variables['L'].long_name = 'speed radius scale'
         nc.variables['L'].description = 'radius of a circle whose area is equal ' + \
                                         'to that enclosed by the contour of ' + \
@@ -788,13 +812,13 @@ class track_list (object):
                                         'the effective radius'
         
         nc.variables['radius_e'].units = 'km'
-        nc.variables['radius_e'].min_val = self.radmin / 1000.
-        nc.variables['radius_e'].max_val = self.radmax / 1000.
+        nc.variables['radius_e'].min_val = self.RADMIN / 1000.
+        nc.variables['radius_e'].max_val = self.RADMAX / 1000.
         nc.variables['radius_e'].long_name = 'effective radius scale'
         nc.variables['radius_e'].description = 'effective eddy radius'
         
         
-        if 'Q' in self.diag_type:
+        if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.variables['qparameter'].units = 's^{-2}'
         #nc.variables['NLP'].units = 'None, swirl vel. / propagation vel.'
         #nc.variables['NLP'].long_name = 'Non-linear parameter'
@@ -886,7 +910,7 @@ class track_list (object):
                         #tsize = self.tracklist[i].ocean_time.size
                         tsize = len(self.tracklist[i].lon)
                         #print 'ncindncindncind',self.ncind
-                        if tsize >= self.track_duration_min / self.days_btwn_recs and tsize > 1.:
+                        if tsize >= self.track_duration_min / self.DAYS_BTWN_RECORDS and tsize > 1.:
 
                             tend = self.ncind + tsize
                         
@@ -913,7 +937,7 @@ class track_list (object):
                                 nc.variables['temp'][self.ncind:tend] = np.array([self.tracklist[i].temp])
                                 nc.variables['salt'][self.ncind:tend] = np.array([self.tracklist[i].salt])
                             #nc.variables['bounds'][self.ncind:tend] = np.array([self.tracklist[i].bounds])
-                            if self.interannual:
+                            if self.INTERANNUAL:
                                 # We add 1 because 'j1' is an integer in ncsavefile; julian day midnight has .5
                                 # i.e., dt.julian2num(2448909.5) -> 727485.0
                                 nc.variables['j1'][self.ncind:tend] = dt.num2julian(np.array([self.tracklist[i].ocean_time])) + 1
@@ -923,7 +947,7 @@ class track_list (object):
                             nc.variables['track'][self.ncind:tend] = np.full(tsize, self.ch_index)
                             nc.variables['track'].max_val = np.int32(self.ch_index)
                             nc.variables['eddy_duration'][self.ncind:tend] = np.array([self.tracklist[i].ocean_time]).size \
-                                                                                     * self.days_btwn_recs
+                                                                                     * self.DAYS_BTWN_RECORDS
                             if self.track_extra_variables:
                                 nc.variables['shape_error'][self.ncind:tend] = np.array([self.tracklist[i].shape_error])
                                 for j in np.arange(tend - self.ncind):
@@ -1180,8 +1204,30 @@ class track_list (object):
         self.jmax = np.max([a_j, b_j, c_j, d_j]) + 5
         return self
     
+    
+    
+    def set_mask_eff(self, contour, grd):
+        """
+        Set points within bounding box around eddy and calculate mask
+        """
+        self.points = np.array([grd.lon()[self.jmin:self.jmax,
+                                          self.imin:self.imax].ravel(),
+                                grd.lat()[self.jmin:self.jmax,
+                                          self.imin:self.imax].ravel()]).T
+        # NOTE: Path.contains_points requires matplotlib 1.2 or higher
+        self.mask_eff = contour.contains_points(self.points)
+        self.mask_eff_sum = self.mask_eff.sum()
+        return self
+    
+    
+    def reshape_mask_eff(self, grd):
+        """
+        """
+        shape = grd.lon()[self.jmin:self.jmax, self.imin:self.imax].shape
+        self.mask_eff = self.mask_eff.reshape(shape)
 
-
+        
+        
 class RossbyWaveSpeed (object):
   
     def __init__(self, domain, limits, rw_path=None):
@@ -1194,9 +1240,9 @@ class RossbyWaveSpeed (object):
             assert self.rw_path is not None, \
                 'Must supply a path for the Rossby deformation radius data'
             data = np.loadtxt(rw_path)
-            self._lon = data[:,1] - 360.
-            self._lat = data[:,0]
-            self._defrad = data[:,3]
+            self._lon = data[:, 1] - 360.
+            self._lat = data[:, 0]
+            self._defrad = data[:, 3]
             self.limits = limits
             self._make_subset()
             self.vartype = 'variable'
@@ -1219,8 +1265,8 @@ class RossbyWaveSpeed (object):
             self.distance[:] = 15000. # e.g., Blokhina & Afanasyev, 2003
         elif 'MedSea' in self.domain:
             self.distance[:] = 20000.
-        else:
-            Exception # Unknown domain
+        else: Exception # Unknown domain
+        
         if self.start:
             print '--------- setting ellipse for %s domain' %self.domain
             print '--------- using %s Rossby deformation radius of %s m' \
@@ -1234,11 +1280,11 @@ class RossbyWaveSpeed (object):
         '''
         '''
         pad = 1.5 # degrees
-        lonmin, lonmax, latmin, latmax = self.limits
-        lloi = np.logical_and(self._lon >= lonmin - pad,
-                              self._lon <= lonmax + pad)
-        lloi *= np.logical_and(self._lat >= latmin - pad,
-                               self._lat <= latmax + pad)
+        LONMIN, LONMAX, LATMIN, LATMAX = self.limits
+        lloi = np.logical_and(self._lon >= LONMIN - pad,
+                              self._lon <= LONMAX + pad)
+        lloi *= np.logical_and(self._lat >= LATMIN - pad,
+                               self._lat <= LATMAX + pad)
         self._lon = self._lon[lloi]
         self._lat = self._lat[lloi]
         self._defrad = self._defrad[lloi]
@@ -1282,38 +1328,39 @@ class RossbyWaveSpeed (object):
     
 class SearchEllipse (object):
     
-    def __init__(self, domain, days_btwn_recs, rw_path, limits):
+    def __init__(self, domain, DAYS_BTWN_RECORDS, rw_path, limits):
         '''Class to construct a search ellipse/circle around a specified point.
-        
-        
         
         '''
         self.domain = domain
-        self.days_btwn_recs = days_btwn_recs
+        self.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
         self.rw_path = rw_path
         self.limits = limits
         self.rw_d_fac = 1.75
-        self.e_w_major = self.days_btwn_recs * 3e5 / 7.
-        self.n_s_minor = self.days_btwn_recs * 15e4 / 7.
+        self.e_w_major = self.DAYS_BTWN_RECORDS * 3e5 / 7.
+        self.n_s_minor = self.DAYS_BTWN_RECORDS * 15e4 / 7.
         self.rwv = RossbyWaveSpeed(self.domain,
                                self.limits, rw_path=self.rw_path)
         self.rw_d = np.empty(1)
         self.rw_d_mod = np.empty(1)
-        
+    
+    
     def _set_east_ellipse(self):
         '''
         '''
         self.east_ellipse = patch.Ellipse((self.x, self.y),
                                            self.e_w_major, self.n_s_minor)
         return self
-        
+    
+    
     def _set_west_ellipse(self):
         '''
         '''
         self.west_ellipse = patch.Ellipse((self.x, self.y),
                                            self.rw_d_mod, self.n_s_minor)
         return self
-        
+    
+    
     def _set_global_ellipse(self):
         '''
         '''
@@ -1328,7 +1375,8 @@ class SearchEllipse (object):
         ew_y = np.hstack((e_verts[:e_size,1], w_verts[w_size:,1]))
         self.ellipse_path = path.Path(np.array([ew_x, ew_y]).T)
         return self#.ellipse_path
-        
+    
+    
     def _set_black_sea_ellipse(self):
         '''
         '''
@@ -1338,32 +1386,31 @@ class SearchEllipse (object):
         self.ellipse_path = path.Path(np.array([verts[:,0],
                                                 verts[:,1]]).T)
         return self
-            
-    def get_search_ellipse(self, x, y):
+    
+    
+    def set_search_ellipse(self, x, y):
         '''
         '''
         self.x = x
         self.y = y
         
         if self.domain in ('Global', 'ROMS'):
-            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.days_btwn_recs)
+            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.DAYS_BTWN_RECORDS)
             self.rw_d_mod[:] = 1.75
             self.rw_d_mod *= self.rw_d
             self.rw_d_mod[:] = np.maximum(self.rw_d_mod, self.n_s_minor)
             self.rw_d_mod *= 2.
             self._set_global_ellipse()
-            
         elif 'BlackSea'  in self.domain:
             self.rw_d_mod[:] = 1.75
-            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.days_btwn_recs)
+            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.DAYS_BTWN_RECORDS)
             self.rw_d_mod *= self.rw_d
             self._set_black_sea_ellipse()
-        
-        else:
-            Exception
+        else: Exception
         
         return self
-            
+    
+    
     def view_search_ellipse(self, Eddy):
         '''
         Input A_eddy or C_eddy

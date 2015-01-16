@@ -85,7 +85,7 @@
       real(kind=8), dimension(:), intent(inout) :: dist
       external :: haversine
 
-      d2r = atan2(0.,-1.)/ 180. ! atan2(0.,-1.) == pi
+      d2r = atan2(0.,-1.) / 180. ! atan2(0.,-1.) == pi
       m = size(lon1)
       
 !     Loop over empty dist matrix and fill
@@ -109,7 +109,7 @@
       real(kind=8), intent(out) :: thedist
       external :: haversine
       
-      d2r = atan2(0.,-1.)/ 180. ! atan2(0.,-1.) == pi
+      d2r = atan2(0.,-1.) / 180. ! atan2(0.,-1.) == pi
       call haversine(lon1, lat1, lon2, lat2, d2r, thedist)
       thedist = thedist * erad
     
