@@ -30,9 +30,9 @@ Version 1.4.2
 Scroll down to line ~640 to get started
 ===============================================================================
 """
-
+import sys
 import glob as glob
-from py_eddy_tracker_classes import plt, np, dt, netcdf, ndimage, time, \
+from py_eddy_tracker_classes import plt, np, dt, Dataset, ndimage, time, \
                                     datestr2datetime, gaussian_resolution, \
                                     get_cax, collection_loop, track_eddies, \
                                     anim_figure
@@ -75,7 +75,7 @@ class PyEddyTracker (object):
           varname : variable ('temp', 'mask_rho', etc) to read
           indices : string of index ranges, eg. '[0,:,0]'
         '''
-        with netcdf.Dataset(varfile) as nc:
+        with Dataset(varfile) as nc:
             try:
                 var = eval(''.join(("nc.variables[varname]", indices)))
             except Exception:
@@ -90,7 +90,7 @@ class PyEddyTracker (object):
           varname : variable ('temp', 'mask_rho', etc) to read
           att : string of attribute, eg. 'valid_range'
         '''
-        with netcdf.Dataset(varfile) as nc:
+        with Dataset(varfile) as nc:
             return eval(''.join(("nc.variables[varname].", att)))
 
 
@@ -488,13 +488,13 @@ class AvisoGrid (PyEddyTracker):
             self.fillval = self.read_nc_att(AVISO_FILE,
                                            'Grid_0001', '_FillValue')
         
-        if np.logical_and(LONMIN < 0, LONMAX <=0):
+        if LONMIN < 0 and LONMAX <=0:
             self._lon -= 360.
         self._lon, self._lat = np.meshgrid(self._lon, self._lat)
         self._angle = np.zeros_like(self._lon)
         # To be used for handling a longitude range that
         # crosses 0 degree meridian
-        if np.logical_and(LONMIN < 0, LONMAX >= 0):
+        if LONMIN < 0 and LONMAX >= 0:
             self.ZERO_CROSSING = True
         
         self.set_initial_indices(LONMIN, LONMAX, LATMIN, LATMAX)
@@ -720,8 +720,12 @@ class AvisoGrid (PyEddyTracker):
 
 if __name__ == '__main__':
     
+    
+    
+    YAML_FILE = sys.argv[1]
+    print "\nLaunching with yaml file: %s" % YAML_FILE
     # Choose a yaml configuration file
-    YAML_FILE = 'eddy_tracker_configuration.yaml'
+    #YAML_FILE = 'eddy_tracker_configuration.yaml'
     #YAML_FILE = 'BlackSea.yaml'
    
    #--------------------------------------------------------------------------
@@ -765,7 +769,7 @@ if __name__ == '__main__':
         MAX_SLA = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['MAX_SLA']
         INTERVAL = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['INTERVAL']
         CONTOUR_PARAMETER = np.arange(-MAX_SLA, MAX_SLA + INTERVAL, INTERVAL)
-        SHAPE_ERROR = 55. * np.ones(CONTOUR_PARAMETER.size)
+        SHAPE_ERROR = config['SHAPE_ERROR'] * np.ones(CONTOUR_PARAMETER.size)
     elif 'Q' in DIAGNOSTIC_TYPE:
         MAX_Q = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['MAX_Q']
         NUM_LEVS = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['NUM_LEVS']
@@ -811,6 +815,8 @@ if __name__ == '__main__':
     EVOLVE_AREA_MAX = config['EVOLVE_AREA_MAX']
     
     SEPARATION_METHOD = config['SEPARATION_METHOD']
+    
+    MAX_LOCAL_EXTREMA = config['MAX_LOCAL_EXTREMA']
     
     TRACK_EXTRA_VARIABLES = config['TRACK_EXTRA_VARIABLES']
 
@@ -897,8 +903,9 @@ if __name__ == '__main__':
     
     A_eddy.SMOOTHING = SMOOTHING
     C_eddy.SMOOTHING = SMOOTHING
-    #A_eddy.smooth_fac = smooth_fac
-    #C_eddy.smooth_fac = smooth_fac
+    
+    A_eddy.MAX_LOCAL_EXTREMA = MAX_LOCAL_EXTREMA
+    C_eddy.MAX_LOCAL_EXTREMA = MAX_LOCAL_EXTREMA
     
     A_eddy.M = sla_grd.M
     C_eddy.M = sla_grd.M
@@ -991,7 +998,7 @@ if __name__ == '__main__':
     
     for AVISO_FILE in AVISO_FILES:
         
-        with netcdf.Dataset(AVISO_FILE) as nc:
+        with Dataset(AVISO_FILE) as nc:
     
             try:
                 thedate = nc.OriginalName
@@ -1007,8 +1014,7 @@ if __name__ == '__main__':
         
         rtime = thedate
         
-        if np.logical_and(thedate >= thestartdate,
-                          thedate <= theenddate):
+        if thedate >= thestartdate and thedate <= theenddate:
             active = True
         else:
             active = False
@@ -1257,6 +1263,7 @@ if __name__ == '__main__':
 
                     #print 'figure saving'
                     #tt = time.time()
+                    
                     anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
                                 SAVE_DIR, 'SLA ' + tit, animax, animax_cbar)
                     #print 'figure saving done in %s seconds\n' %(time.time() - tt)

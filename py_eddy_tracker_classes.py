@@ -30,7 +30,7 @@ Version 1.4.2
 
 """
 # External modules
-import netCDF4 as netcdf
+from netCDF4 import Dataset
 import matplotlib.pyplot as plt
 import numpy as np
 import numexpr as ne 
@@ -43,12 +43,14 @@ from scipy import spatial
 from scipy import io
 import matplotlib.path as path
 import matplotlib.patches as patch
-import scipy.ndimage.filters as filters
-import scipy.ndimage.morphology as morphology
+#import scipy.ndimage.filters as filters
+#import scipy.ndimage.morphology as morphology
 #import find_closest_point_on_leg as fcpl
+
 
 # py-eddy-tracker modules
 import make_eddy_tracker_list_obj as eddy_tracker
+from py_eddy_tracker_amplitude import Amplitude, EddyProperty
 #import roms_grid as rg
 import haversine_distmat as hav # needs compiling with f2py
 
@@ -463,12 +465,12 @@ def fit_circle(xvec, yvec):
 
 
 
-def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius_e, save_all_uavg=False):
+def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius_e, save_all_uavg=False):
     '''
     Calculate geostrophic speed around successive contours
     Returns the average
     
-    If save_all_uavg == True we want Uavg for every contour
+    If save_all_uavg == True we want uavg for every contour
     '''
     #def calc_uavg(points, uspd, lon, lat):
         #'''
@@ -506,11 +508,11 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
     # First contour is the outer one (effective)
     theseglon, theseglat = poly_eff.vertices[:,0].copy(), poly_eff.vertices[:,1].copy()
     theseglon, theseglat = eddy_tracker.uniform_resample(theseglon, theseglat, method='akima')
-    #Uavg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], theseglon[:-1], theseglat[:-1])
-    Uavg = calc_uavg(rbspline, theseglon[:-1], theseglat[:-1])
+    #uavg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], theseglon[:-1], theseglat[:-1])
+    uavg = calc_uavg(rbspline, theseglon[:-1], theseglat[:-1])
     
     if save_all_uavg:
-        all_uavg = [Uavg]
+        all_uavg = [uavg]
     
     start = True
     citer = np.nditer(CS.cvalues, flags=['f_index'])
@@ -578,14 +580,14 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
                     #plt.scatter(centlon_e, centlat_e, s=125, c='r')
                 
                 # Interpolate Uspd to seglon, seglat, then get mean
-                #Uavgseg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], seglon[:-1], seglat[:-1])
-                Uavgseg = calc_uavg(rbspline, seglon[:-1], seglat[:-1])
+                #uavgseg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], seglon[:-1], seglat[:-1])
+                uavgseg = calc_uavg(rbspline, seglon[:-1], seglat[:-1])
                 
                 if save_all_uavg:
-                    all_uavg.append(Uavgseg)
+                    all_uavg.append(uavgseg)
                 
-                if Uavgseg >= Uavg and mask_i_sum >= Eddy.PIXEL_THRESHOLD[0]:
-                    Uavg = Uavgseg.copy()
+                if uavgseg >= uavg and mask_i_sum >= Eddy.PIXEL_THRESHOLD[0]:
+                    uavg = uavgseg.copy()
                     theseglon, theseglat = seglon.copy(), seglat.copy()
                 
                 inner_seglon, inner_seglat = seglon.copy(), seglat.copy()
@@ -621,9 +623,9 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
             #schem_dic['Leff_centroid'] = np.array([centlon_e, centlat_e])
             #io.savemat('schematic_fig_%s' %np.round(eddy_radius_s/1e3, 3), schem_dic)
         if not save_all_uavg:
-            return Uavg, centlon_s, centlat_s, eddy_radius_s, theseglon, theseglat, inner_seglon, inner_seglat
+            return uavg, centlon_s, centlat_s, eddy_radius_s, theseglon, theseglat, inner_seglon, inner_seglat
         else:  
-            return Uavg, centlon_s, centlat_s, eddy_radius_s, theseglon, theseglat, inner_seglon, inner_seglat, all_uavg
+            return uavg, centlon_s, centlat_s, eddy_radius_s, theseglon, theseglat, inner_seglon, inner_seglat, all_uavg
     
     except Exception: # If no interior contours found, use eddy_radius_e
         
@@ -635,9 +637,9 @@ def get_Uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff, grd, eddy_radius
             #plt.axis('image')
             #plt.show()
         if not save_all_uavg:
-            return Uavg, centlon_e, centlat_e, eddy_radius_e, theseglon, theseglat, theseglon, theseglat
+            return uavg, centlon_e, centlat_e, eddy_radius_e, theseglon, theseglat, theseglon, theseglat
         else:
-            return Uavg, centlon_e, centlat_e, eddy_radius_e, theseglon, theseglat, theseglon, theseglat, all_uavg
+            return uavg, centlon_e, centlat_e, eddy_radius_e, theseglon, theseglat, theseglon, theseglat, all_uavg
     
 
 
@@ -665,6 +667,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
     # Unpack indices for convenience
     istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
     
+    
     # Loop over each collection
     for collind, coll in enumerate(CS.collections):
 
@@ -674,28 +677,30 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
         # Loop over individual CS contours (i.e., every eddy in field)
         for cont in coll.get_paths():
                         
-            contlon_e, contlat_e = cont.vertices[:,0].copy(), \
-                                   cont.vertices[:,1].copy()
+            contlon_e, contlat_e = cont.vertices[:, 0].copy(), \
+                                   cont.vertices[:, 1].copy()
                         
             # Filter for closed contours
             if np.alltrue([contlon_e[0] == contlon_e[-1],
                            contlat_e[0] == contlat_e[-1],
                            contlon_e.ptp(),
                            contlat_e.ptp()]):
-
+                
+                # Instantiate new EddyProperty object
+                properties = EddyProperty()
+                
                 # Prepare for shape test and get eddy_radius_e
                 cx, cy = Eddy.M(contlon_e, contlat_e)
                 centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(cx, cy)
-                #print centlon_e, centlat_e
                 
                 aerr = np.atleast_1d(aerr)
+                
                 # Filter for shape: >35% (>55%) is not an eddy for Q (SLA)
-                #if np.logical_and(aerr >= 0., aerr <= Eddy.SHAPE_ERROR[collind]):
                 if aerr >= 0. and aerr <= Eddy.SHAPE_ERROR[collind]:
                                 
                     # Get centroid in lon lat  
-                    #print type(centlon_e), type(centlat_e), 1111
                     centlon_e, centlat_e = Eddy.M.projtran(centlon_e, centlat_e, inverse=True)
+                    
                     # For some reason centlat_e is transformed by projtran to 'float'...
                     centlon_e, centlat_e = np.float64(centlon_e), np.float64(centlat_e)
                     
@@ -704,28 +709,24 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                         junk, junk, junk, xilon, xilat, junk = CSxi.find_nearest_contour(
                                                                centlon_e, centlat_e, pixel=False)
                         eddy_radius_e = hav.haversine_dist(centlon_e, centlat_e, xilon, xilat)
-                        #print eddy_radius_e, Eddy.radmin, Eddy.radmax
                         if eddy_radius_e >= Eddy.radmin and eddy_radius_e <= Eddy.radmax:
                             proceed0 = True
                         else:
                             proceed0 = False
-                        #print 'proceed0', proceed0
+                    
                     elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
                         # If 'SLA' is defined we filter below with pixel count
                         proceed0 = True
-                    else:
-                        raise Exception
+                    
+                    else: raise Exception
+                    
                     
                     if proceed0:
-                        # Get indices of centroid
                         
-                        #print type(centlon_e), type(centlat_e)
+                        # Get indices of centroid
                         centi, centj = eddy_tracker.nearest(centlon_e, centlat_e,
                                                             grd.lon(),
                                                             grd.lat(), grd.shape)
-                        # If condition not True this eddy has already been detected
-                        
-                        #print type(centlon_e), type(centlat_e)
                         
                         if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                             
@@ -733,7 +734,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 proceed1 = True
                             else:
                                 proceed1 = False
-                            #print 'proceed1', proceed1
+                        
                         elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
                             
                             if Eddy.sla[centj, centi] != Eddy.fillval:
@@ -749,10 +750,11 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                         else:
                             raise Exception
                         
+                        
                         if proceed1:
                             
                             # Set indices to bounding box around eddy
-                            Eddy.set_bounds(centlon_e, centlat_e,
+                            Eddy.set_bounds(contlon_e, contlat_e,
                                             eddy_radius_e, centi, centj, grd)
                             
                             # Unpack indices for convenience
@@ -764,7 +766,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             circlon[:], circlat[:] = Eddy.M.projtran(circlon, circlat, inverse=True)
                             Eddy.circlon, Eddy.circlat = circlon, circlat
                             
-                            # Set points within bounding box around eddy
+                            # Set masked points within bounding box around eddy
                             Eddy.set_mask_eff(cont, grd)
 
                             # sum(mask) between 8 and 1000, CSS11 criterion 2 
@@ -773,8 +775,11 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 
                                 Eddy.reshape_mask_eff(grd)
                                 
-                                # Resample the contour points for a more even radial distribution
-                                contlon_e, contlat_e = eddy_tracker.uniform_resample(contlon_e, contlat_e, method='akima')
+                                # Resample the contour points for a more even
+                                # circumferential distribution
+                                contlon_e, contlat_e = \
+                                    eddy_tracker.uniform_resample(contlon_e,
+                                                     contlat_e, method='akima')
                                 
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                                     # Note, eddy amplitude == max(abs(vort/f)) within eddy, KCCMC11
@@ -783,170 +788,68 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     
                                 elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
                                     
-                                    # Prepare spline for interpolations
-                                    #print 'grd.lon()[0,imin:imax]',grd.lon()[0,imin:imax].shape
-                                    #print 'grd.lat()[jmin:jmax,0]',grd.lat()[jmin:jmax,0].shape
-                                    #print 'Eddy.sla[jmin:jmax,imin:imax]',Eddy.sla[jmin:jmax,imin:imax].shape
-                                    # kx = ky = 1 for 'linear'
-                                    # NOTE careful ith kx = ky = 3 for 'spline', sometimes gives bad values
-                                    rbspline = interpolate.RectBivariateSpline(grd.lat()[jmin:jmax,0],
-                                                                               grd.lon()[0,imin:imax],
-                                                                               Eddy.sla[jmin:jmax,imin:imax], kx=1, ky=1)
-                                    
-                                    # Define as difference between extremum value for SLA anomaly and
-                                    # the identifying contour value
-                                    # CSS11, section B3 (here we assume h0 == CS.cvalues[collind])
-                                    #h0 = interpolate.griddata(points, Eddy.sla[jmin:jmax,imin:imax].ravel(),
-                                                                 #(contlon_e, contlat_e), 'linear')
-                                    h0 = rbspline.ev(contlat_e, contlon_e)
-                                    #plt.figure()
-                                    #plt.plot(h0, 'g')
-                                    #plt.plot(h1, 'r')
-                                    #plt.show()
-                                    #h0 = h0[np.isfinite(h0)].mean() # Use 'isfinite' in case of NaNs from griddata
-                                    h0 = h0[np.isfinite(h0)].mean()
-                                    
-                                    #print 'h0, h1', h0, h1
+                                    # Instantiate Amplitude object
+                                    amp = Amplitude(contlon_e, contlat_e, Eddy, grd)
                                     
                                     if 'Anticyclonic' in sign_type:
-                                        # Check CSS11 criterion 1: The SSH values of all of the pixels
-                                        # are above a given SSH threshold for anticyclonic eddies.
-                                        #if np.any(Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff] < h0):
-                                        if np.any(Eddy.sla[jmin:jmax,imin:imax][Eddy.mask_eff] < h0):
-                                            
-                                            amplitude = 0.
+                                        amp.all_pixels_above_h0()
                                         
-                                        else:
-
-                                            local_extrema = get_local_extrema(Eddy.sla[jmin:jmax,imin:imax], Eddy.mask_eff, -1)
-                                            
-                                            if local_extrema.sum() == 1:
-                                                #amplitude = Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].max()
-                                                amplitude = Eddy.sla[jmin:jmax,imin:imax][Eddy.mask_eff].max()
-                                                amplitude -= h0
-
-                                                if 0: # Debug
-                                                    #centlon_lmi, centlat_lmi = get_position_local_extrema(Eddy, local_extrema, CS, grd)
-                                                    plt.figure(511)
-                                                    plt.title('Anticyclones')
-                                                    x511, y511 = Eddy.M(grd.lon(), grd.lat())
-                                                    Eddy.M.pcolormesh(x511, y511, Eddy.slacopy-Eddy.slacopy.mean())
-                                                    plt.clim(-10,10)
-                                                    print 'Eddy.slacopy-Eddy.slacopy.mean()',(Eddy.slacopy-Eddy.slacopy.mean()).max()
-                                                    #x_lmi, y_lmi = Eddy.M(centlon_lmi, centlat_lmi)
-                                                    #Eddy.M.scatter(x_lmi, y_lmi, c='k')
-                                                    x_e, y_e = Eddy.M(centlon_e, centlat_e)
-                                                    Eddy.M.scatter(x_e, y_e, c='w')
-                                                    lmi_j, lmi_i = np.where(local_extrema)
-                                                    lmi_i = lmi_i[0] + imin
-                                                    lmi_j = lmi_j[0] + jmin
-                                                    x_i, y_i = Eddy.M(grd.lon()[lmi_j, lmi_i],
-                                                                      grd.lat()[lmi_j, lmi_i])
-                                                    Eddy.M.scatter(x_i, y_i, c='gray')
-                                                    Eddy.M.fillcontinents()
-                                                    plt.show()
-                                                
-                                            else:
-                                                
-                                                amplitude = 0.
-
-    
                                     elif 'Cyclonic' in sign_type:
-                                        # Check CSS11 criterion 1: The SSH values of all of the pixels
-                                        # are below a given SSH threshold for cyclonic eddies.
-                                        if np.any(Eddy.sla[jmin:jmax,imin:imax][Eddy.mask_eff] > h0):
-                                            
-                                            amplitude = 0.
+                                        amp.all_pixels_below_h0()
                                         
-                                        else:
-
-                                            local_extrema = get_local_extrema(Eddy.sla[jmin:jmax,imin:imax], Eddy.mask_eff, 1)
-                                            
-                                            if local_extrema.sum() == 1:
-                                                amplitude = h0
-                                                #amplitude -= Eddy.sla[jmin:jmax,imin:imax].flat[mask_eff].min()
-                                                amplitude -= Eddy.sla[jmin:jmax,imin:imax][Eddy.mask_eff].min()
-                                                #centlon_lmi, centlat_lmi = get_position_local_extrema(Eddy, local_extrema, CS, grd)
-
-                                                if 0: # Debug
-                                                    plt.figure(511)
-                                                    plt.title('Cyclones')
-                                                    x511, y511 = Eddy.M(grd.lon(), grd.lat())
-                                                    Eddy.M.pcolormesh(x511, y511, Eddy.slacopy-Eddy.slacopy.mean())
-                                                    plt.clim(-10,10)
-                                                    print 'Eddy.slacopy-Eddy.slacopy.mean()',(Eddy.slacopy-Eddy.slacopy.mean()).max()
-                                                    x_lmi, y_lmi = Eddy.M(centlon_lmi, centlat_lmi)
-                                                    Eddy.M.scatter(x_lmi, y_lmi, c='k')
-                                                    x_e, y_e = Eddy.M(centlon_e, centlat_e)
-                                                    Eddy.M.scatter(x_e, y_e, c='w')
-                                                    lmi_j, lmi_i = np.where(local_extrema)
-                                                    lmi_i = lmi_i[0] + imin
-                                                    lmi_j = lmi_j[0] + jmin
-                                                    x_i, y_i = Eddy.M(grd.lon()[lmi_j, lmi_i], grd.lat()[lmi_j, lmi_i])
-                                                    Eddy.M.scatter(x_i, y_i, c='gray')
-                                                    Eddy.M.fillcontinents()
-                                                    plt.show()
-                                            else:
-                                                amplitude = 0.
+                                    else: Exception
+                                    
+                                    if amp.within_amplitude_limits():
+                                        properties.amplitude = amp.amplitude
                             
-                            else:
-                                amplitude = 0.
                             
-                            #if np.logical_and(amplitude >= Eddy.AMPMIN, amplitude <= Eddy.AMPMAX):
-                            
-                            if amplitude >= Eddy.AMPMIN and amplitude <= Eddy.AMPMAX:
-                                proceed2 = True
-                                #print amplitude, Eddy.AMPMIN, Eddy.AMPMAX
-                            else:
-                                proceed2 = False
-                            #print 'proceed2', proceed2
-                            if proceed2:
+                            if properties.amplitude:
                                 
                                 # Get sum of eke within Ceff
-                                #teke = grd.eke[jmin:jmax,imin:imax].flat[mask_eff].sum()
                                 teke = grd.eke[jmin:jmax,imin:imax][Eddy.mask_eff].sum()
                                 
-                                
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
-                                    if 0:
-                                        plt.figure()
-                                        tmpx, tmpy = pcol_2dxy(grd.lon()[jmin:jmax,imin:imax],
-                                                               grd.lat()[jmin:jmax,imin:imax])
-                                        print 'tmpx, tmpy, Uavg',tmpx, tmpy, Uavg
-                                        plt.pcolormesh(tmpx, tmpy, Uavg)
-                                        plt.axis('image')
-                                        plt.plot(circlon, circlat, 'w')
-                                        plt.plot(contlon_e, contlat_e, 'k')
-                                        plt.contour(grd.lon()[jmin:jmax,imin:imax],
-                                                    grd.lat()[jmin:jmax,imin:imax],
-                                                    xicopy[jmin:jmax,imin:imax], [0.], colors='g')
-                                        #print 'aerr', aerr
-                                        #print interpolate.griddata(points, Uavg.ravel(),(contlon_e, contlat_e), 'linear')        
-                                        plt.show()
-                                    print 'change to rectbispline'
-                                    Uavg = interpolate.griddata(points, Eddy.Uspd[jmin:jmax,imin:imax].ravel(),
-                                                                (contlon_e, contlat_e), 'linear')
-                                    Uavg = np.nan_to_num(Uavg).max()
-                                    #Uavg = 0; print 'fix me'
+                                    #if 0:
+                                        #plt.figure()
+                                        #tmpx, tmpy = pcol_2dxy(grd.lon()[jmin:jmax,imin:imax],
+                                                               #grd.lat()[jmin:jmax,imin:imax])
+                                        #print 'tmpx, tmpy, uavg',tmpx, tmpy, uavg
+                                        #plt.pcolormesh(tmpx, tmpy, uavg)
+                                        #plt.axis('image')
+                                        #plt.plot(circlon, circlat, 'w')
+                                        #plt.plot(contlon_e, contlat_e, 'k')
+                                        #plt.contour(grd.lon()[jmin:jmax,imin:imax],
+                                                    #grd.lat()[jmin:jmax,imin:imax],
+                                                    #xicopy[jmin:jmax,imin:imax], [0.], colors='g')
+                                        ##print 'aerr', aerr
+                                        ##print interpolate.griddata(points, uavg.ravel(),(contlon_e, contlat_e), 'linear')        
+                                        #plt.show()
+                                    #print 'change to rectbispline'
+                                    #uavg = interpolate.griddata(points, Eddy.Uspd[jmin:jmax,imin:imax].ravel(),
+                                                                #(contlon_e, contlat_e), 'linear')
+                                    #uavg = np.nan_to_num(uavg).max()
+                                    ##uavg = 0; print 'fix me'
+                                    
+                                    ## Get indices of speed-based centroid
+                                    #centi, centj = eddy_tracker.nearest(centlon_s, centlat_s,
+                                                                        #grd.lon(), grd.lat(), grd.shape)
+                                    pass
                                 
                                 elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
-                                   #tt = time.time()
+                                    
                                     if not Eddy.track_extra_variables:
-                                        Uavg, centlon_s, centlat_s, eddy_radius_s,\
-                                             contlon_s, contlat_s, inner_contlon, inner_contlat = get_Uavg(Eddy, CS, collind,
+                                        uavg, centlon_s, centlat_s, eddy_radius_s,\
+                                             contlon_s, contlat_s, inner_contlon, inner_contlat = get_uavg(Eddy, CS, collind,
                                                                        centlon_e, centlat_e, cont, grd, eddy_radius_e)
                                     else:
-                                        Uavg, centlon_s, centlat_s, eddy_radius_s,\
-                                             contlon_s, contlat_s, inner_contlon, inner_contlat, Uavg_profile = get_Uavg(Eddy, CS, collind,
+                                        uavg, centlon_s, centlat_s, eddy_radius_s,\
+                                             contlon_s, contlat_s, inner_contlon, inner_contlat, uavg_profile = get_uavg(Eddy, CS, collind,
                                                                        centlon_e, centlat_e, cont, grd, eddy_radius_e, save_all_uavg=True)
+                                    
                                     
                                     centlon_lmi, centlat_lmi, junk, junk = fit_circle(inner_contlon,
                                                                                       inner_contlat)
                                     #print '------- got fit_circle in %s seconds' %(time.time() - tt)
-                                    
-                                    # Get indices of speed-based centroid
-                                    centi, centj = eddy_tracker.nearest(centlon_s, centlat_s,
-                                                                        grd.lon(), grd.lat(), grd.shape)
                                         
                                 # Set the bounds
                                 #bounds = np.atleast_2d(np.int16([imin, imax, jmin, jmax]))
@@ -956,6 +859,15 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     cent_temp = temp[centj, centi] # Temperature at centroid
                                     cent_salt = salt[centj, centi] # Salinity at centroid
                                 
+                                
+                                properties.eddy_radius_s = eddy_radius_s
+                                properties.uavg = uavg
+                                properties.eddy_radius_e = eddy_radius_e
+                                properties.rtime = rtime
+                                properties.teke = teke
+                                
+                                
+                                
                                 # Update Q eddy properties
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                                     # We pass eddy_radius_e as a dummy for eddy_radius_s
@@ -964,51 +876,45 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                         if xi[centj, centi] <= 0.: # Anticyclone
                                             A_list_obj.update_eddy_properties(centlon_e, centlat_e,
                                                                           eddy_radius_e, eddy_radius_e,
-                                                                          amplitude, Uavg, teke, rtime,
+                                                                          amplitude, uavg, teke, rtime,
                                                                           cent_temp=cent_temp,
                                                                           cent_salt=cent_salt)
                                         elif xi[centj, centi] >= 0.: # Cyclone
                                             C_list_obj.update_eddy_properties(centlon_e, centlat_e,
                                                                           eddy_radius_e, eddy_radius_e,
-                                                                          amplitude, Uavg, teke, rtime,
+                                                                          amplitude, uavg, teke, rtime,
                                                                           cent_temp=cent_temp,
                                                                           cent_salt=cent_salt)
                                     else: # for AVISO
                                         if xi[centj, centi] <= 0.: # Anticyclone
                                             A_list_obj.update_eddy_properties(centlon_e, centlat_e,
                                                                           eddy_radius_e, eddy_radius_e,
-                                                                          amplitude, Uavg, teke, rtime,)
+                                                                          amplitude, uavg, teke, rtime,)
                                         elif xi[centj, centi] >= 0.: # Cyclone
                                             C_list_obj.update_eddy_properties(centlon_e, centlat_e,
                                                                           eddy_radius_e, eddy_radius_e,
-                                                                          amplitude, Uavg, teke, rtime,)
+                                                                          amplitude, uavg, teke, rtime,)
                                 
                                 
-                                # Update sla eddy properties
+                                # Update SLA eddy properties
                                 elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
                                     
                                     # See CSS11 section B4
-                                    #centlon, centlat = centlon_e, centlat_e
-                                    #centlon_s, centlat_s = np.atleast_1d(centlon_lmi.copy()), \
-                                                           #np.atleast_1d(centlat_lmi.copy())
-                                    
-                                    #centlon, centlat = np.atleast_1d(centlon_s.copy()), \
-                                                       #np.atleast_1d(centlat_s.copy())
                                     centlon_s, centlat_s = centlon_lmi.copy(), centlat_lmi.copy()
                                     
-                                    centlon, centlat = centlon_s.copy(), centlat_s.copy()
+                                    properties.centlon, properties.centlat = centlon_s.copy(), centlat_s.copy()
                                     
                                     if has_ts: # for ocean model
                                         if 'Anticyclonic' in sign_type:
                                             A_list_obj.update_eddy_properties(centlon, centlat,
                                                                               eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, Uavg, teke, rtime,
+                                                                              amplitude, uavg, teke, rtime,
                                                                               cent_temp=cent_temp,
                                                                               cent_salt=cent_salt)
                                         elif 'Cyclonic' in sign_type:
                                             C_list_obj.update_eddy_properties(centlon, centlat,
                                                                               eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, Uavg, teke, rtime,
+                                                                              amplitude, uavg, teke, rtime,
                                                                               cent_temp=cent_temp,
                                                                               cent_salt=cent_salt)
                                     else: # for AVISO
@@ -1019,26 +925,20 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                 contour_e = np.concatenate([contlon_e, contlat_e], axis=0)
                                                 contour_s = np.concatenate([contlon_s, contlat_s], axis=0)
                                             else:
-                                                contour_e = contour_s = Uavg_profile = None
+                                                contour_e = contour_s = uavg_profile = None
                                             
-                                            A_list_obj.update_eddy_properties(centlon, centlat,
-                                                                              eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, Uavg, teke, rtime,
-                                                                              contour_e=contour_e, contour_s=contour_s,
-                                                                              Uavg_profile=Uavg_profile, shape_error=aerr)
+                                            A_list_obj.update_eddy_properties(properties)
+                                        
                                         elif 'Cyclonic' in sign_type:
                                             
                                             if C_list_obj.track_extra_variables:
                                                 contour_e = np.concatenate([contlon_e, contlat_e], axis=0)
                                                 contour_s = np.concatenate([contlon_s, contlat_s], axis=0)
                                             else:
-                                                contour_e = contour_s = Uavg_profile = None
+                                                contour_e = contour_s = uavg_profile = None
                                                 
-                                            C_list_obj.update_eddy_properties(centlon, centlat,
-                                                                              eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, Uavg, teke, rtime,
-                                                                              contour_e=contour_e, contour_s=contour_s,
-                                                                              Uavg_profile=Uavg_profile, shape_error=aerr)
+                                            C_list_obj.update_eddy_properties(properties)
+                                            
                                         #print '------- updated properties i %s seconds' %(time.time() - tt)
 
                                 # Mask out already found eddies
@@ -1054,7 +954,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 
                                 # Debug. Figure showing individual contours with centroid
                                 # Note: do not use with ipython
-                                if 0 and np.any(Eddy.sla[jmin:jmax, imin:imax].flat[mask_eff] == Eddy.fillval):
+                                if 0 and np.any(Eddy.sla[jmin:jmax, imin:imax][Eddy.mask_eff] == Eddy.fillval):
                                     plt.figure(100)
                                     jjj, iii = grd.lon()[jmin:jmax,imin:imax].shape
                                     if not(iii == 1 or jjj == 1):
@@ -1081,7 +981,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                         plt.colorbar(pcm, orientation='horizontal')
                                         plt.scatter(centlon_e, centlat_e, s=150, c='m')
                                         plt.scatter(centlon_s, centlat_s, s=50, c='g')
-                                        plt.scatter(centlon, centlat, s=50, c='r')
+                                        #plt.scatter(centlon, centlat, s=50, c='r')
                                         print centlon_e, centlat_e
                                         plt.show()
                                         
@@ -1209,7 +1109,7 @@ def track_eddies(Eddy, first_record):
         #if Eddy.track_extra_variables:
         new_cntr_e = []
         new_cntr_s = []
-        new_Uavg_prf = []
+        new_uavg_prf = []
         new_shp_err = np.array([])
         #new_bnds = np.array([], dtype=np.int16)
         new_inds = np.array([], dtype=np.int16)
@@ -1270,7 +1170,7 @@ def track_eddies(Eddy, first_record):
                 
                 # Following CSS11, we use effective radius rather than speed based...
                 old_area[:] = Eddy.old_radii_s[old_ind]**2
-                old_area *= np.pi * 
+                old_area *= np.pi
                 new_area[:] = Eddy.new_radii_tmp_s[new_ind]**2
                 new_area *= np.pi
                                 
@@ -1294,7 +1194,7 @@ def track_eddies(Eddy, first_record):
                     new_rd_s.append(Eddy.new_radii_tmp_s[new_ind])
                     new_rd_e.append(Eddy.new_radii_tmp_e[new_ind])
                     new_am.append(Eddy.new_amp_tmp[new_ind])
-                    new_Ua.append(Eddy.new_Uavg_tmp[new_ind])
+                    new_Ua.append(Eddy.new_uavg_tmp[new_ind])
                     new_ek.append( Eddy.new_teke_tmp[new_ind])
                     new_tm.append(Eddy.new_time_tmp[new_ind])
                     
@@ -1310,7 +1210,7 @@ def track_eddies(Eddy, first_record):
                     if Eddy.track_extra_variables:
                         new_cntr_e.append(Eddy.new_contour_e_tmp[new_ind])
                         new_cntr_s.append(Eddy.new_contour_s_tmp[new_ind])
-                        new_Uavg_prf.append(Eddy.new_Uavg_profile_tmp[new_ind])
+                        new_uavg_prf.append(Eddy.new_uavg_profile_tmp[new_ind])
                         new_shp_err = np.r_[new_shp_err, Eddy.new_shape_error_tmp[new_ind]]
                     new_inds = np.r_[new_inds, new_ind]
                     backup_ind = np.r_[backup_ind, new_ind]
@@ -1332,7 +1232,7 @@ def track_eddies(Eddy, first_record):
                 Eddy = accounting(Eddy, old_ind, new_ln[0], new_lt, new_rd_s, new_rd_e,
                                   new_am, new_Ua, new_ek, new_tm, new_eddy, first_record,
                                   contour_e=new_cntr_e, contour_s=new_cntr_s,
-                                  Uavg_profile=new_Uavg_prf, shape_error=new_shp_err,
+                                  uavg_profile=new_uavg_prf, shape_error=new_shp_err,
                                   cent_temp=new_tp, cent_salt=new_st)
             elif 'AVISO' in Eddy.datatype:
                 
@@ -1340,7 +1240,7 @@ def track_eddies(Eddy, first_record):
                 Eddy = accounting(Eddy, old_ind, new_ln[0], new_lt[0], new_rd_s[0], new_rd_e[0],
                                   new_am[0], new_Ua[0], new_ek[0], new_tm[0], new_eddy, first_record,
                                   contour_e=new_cntr_e, contour_s=new_cntr_s,
-                                  Uavg_profile=new_Uavg_prf, shape_error=new_shp_err)
+                                  uavg_profile=new_uavg_prf, shape_error=new_shp_err)
         
         # More than one eddy within range
         elif dist_arr.size > 1:
@@ -1389,11 +1289,11 @@ def track_eddies(Eddy, first_record):
             
             # Update eddy track dx0
             if not Eddy.track_extra_variables:
-                new_cntr_e = new_cntr_s = new_Uavg_prf = new_shp_err = None
+                new_cntr_e = new_cntr_s = new_uavg_prf = new_shp_err = None
             else:
                 new_cntr_e = new_cntr_e[dx0]
                 new_cntr_s = new_cntr_s[dx0]
-                new_Uavg_prf = new_Uavg_prf[dx0]
+                new_uavg_prf = new_uavg_prf[dx0]
                 new_shp_err = new_shp_err[dx0]
             
             if 'ROMS' in Eddy.datatype:
@@ -1403,7 +1303,7 @@ def track_eddies(Eddy, first_record):
                                   new_am[dx0], new_Ua[dx0], new_ek[dx0], new_tm[dx0],
                                   new_eddy, first_record,
                                   contour_e=new_cntr_e, contour_s=new_cntr_s,
-                                  Uavg_profile=new_Uavg_prf, shape_error=new_shp_err)#,
+                                  uavg_profile=new_uavg_prf, shape_error=new_shp_err)#,
                                   #cent_temp=new_tp[dx0], cent_salt=new_st[dx0])
             
             elif 'AVISO' in Eddy.datatype:
@@ -1413,7 +1313,7 @@ def track_eddies(Eddy, first_record):
                                   new_am[dx0], new_Ua[dx0], new_ek[dx0], new_tm[dx0],
                                   new_eddy, first_record,
                                   contour_e=new_cntr_e, contour_s=new_cntr_s,
-                                  Uavg_profile=new_Uavg_prf, shape_error=new_shp_err)
+                                  uavg_profile=new_uavg_prf, shape_error=new_shp_err)
             
             if debug_dist:
                 plt.subplot(132)
@@ -1455,11 +1355,11 @@ def track_eddies(Eddy, first_record):
             if a_new_eddy: # Update the eddy tracks
                 
                 if not Eddy.track_extra_variables:
-                    new_contour_e_tmp = new_contour_s_tmp = new_Uavg_profile_tmp = new_shape_error_tmp = None
+                    new_contour_e_tmp = new_contour_s_tmp = new_uavg_profile_tmp = new_shape_error_tmp = None
                 else:
                     new_contour_e_tmp = Eddy.new_contour_e_tmp[neind]
                     new_contour_s_tmp = Eddy.new_contour_s_tmp[neind]
-                    new_Uavg_profile_tmp = Eddy.new_Uavg_profile_tmp[neind]
+                    new_uavg_profile_tmp = Eddy.new_uavg_profile_tmp[neind]
                     new_shape_error_tmp = Eddy.new_shape_error_tmp[neind]
                 
                 if 'ROMS' in Eddy.datatype:
@@ -1470,13 +1370,13 @@ def track_eddies(Eddy, first_record):
                                       Eddy.new_radii_tmp_s[neind],
                                       Eddy.new_radii_tmp_e[neind],
                                       Eddy.new_amp_tmp[neind],
-                                      Eddy.new_Uavg_tmp[neind],
+                                      Eddy.new_uavg_tmp[neind],
                                       Eddy.new_teke_tmp[neind],
                                       Eddy.new_time_tmp[neind],
                                       True, False,
                                       contour_e=new_contour_e_tmp,
                                       contour_s=new_contour_s_tmp,
-                                      Uavg_profile=new_Uavg_profile_tmp,
+                                      uavg_profile=new_uavg_profile_tmp,
                                       shape_error=new_shape_error_tmp)#,
                                       #cent_temp=Eddy.new_temp_tmp[neind],
                                       #cent_salt=Eddy.new_salt_tmp[neind])
@@ -1489,13 +1389,13 @@ def track_eddies(Eddy, first_record):
                                       Eddy.new_radii_tmp_s[neind],
                                       Eddy.new_radii_tmp_e[neind],
                                       Eddy.new_amp_tmp[neind],
-                                      Eddy.new_Uavg_tmp[neind],
+                                      Eddy.new_uavg_tmp[neind],
                                       Eddy.new_teke_tmp[neind],
                                       Eddy.new_time_tmp[neind],
                                       True, False,
                                       contour_e=new_contour_e_tmp,
                                       contour_s=new_contour_s_tmp,
-                                      Uavg_profile=new_Uavg_profile_tmp,
+                                      uavg_profile=new_uavg_profile_tmp,
                                       shape_error=new_shape_error_tmp)  
     #print 'Leaving track_eddies'
     return Eddy
@@ -1505,9 +1405,9 @@ def track_eddies(Eddy, first_record):
 
 
 def accounting(Eddy, old_ind, centlon, centlat,
-               eddy_radius_s, eddy_radius_e, amplitude, Uavg, teke, rtime, 
+               eddy_radius_s, eddy_radius_e, amplitude, uavg, teke, rtime, 
                new_eddy, first_record, contour_e=None, contour_s=None,
-               Uavg_profile=None, shape_error=None, cent_temp=None, cent_salt=None):
+               uavg_profile=None, shape_error=None, cent_temp=None, cent_salt=None):
     '''
     Accounting for new or old eddy (either cyclonic or anticyclonic)
       Eddy  : eddy_tracker.tracklist object
@@ -1516,7 +1416,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
       eddy_radius_s:  speed-based eddy radius
       eddy_radius_e:  effective eddy radius from fit_circle
       amplitude  :  eddy amplitude/intensity (max abs vorticity/f in eddy)
-      Uavg       :  average velocity within eddy contour
+      uavg       :  average velocity within eddy contour
       teke       : sum of EKE within Ceff
       rtime      :  ROMS time in seconds
       cent_temp  :  array of temperature at centroids
@@ -1537,7 +1437,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
         Eddy.insert_at_index('new_radii_s', old_ind, eddy_radius_s)
         Eddy.insert_at_index('new_radii_e', old_ind, eddy_radius_e)
         Eddy.insert_at_index('new_amp', old_ind, amplitude)
-        Eddy.insert_at_index('new_Uavg', old_ind, Uavg)
+        Eddy.insert_at_index('new_uavg', old_ind, uavg)
         Eddy.insert_at_index('new_teke', old_ind, teke)
         
         if 'ROMS' in Eddy.datatype:
@@ -1547,24 +1447,24 @@ def accounting(Eddy, old_ind, centlon, centlat,
         if Eddy.track_extra_variables:
             Eddy.insert_at_index('new_contour_e', old_ind, contour_e)
             Eddy.insert_at_index('new_contour_s', old_ind, contour_s)
-            Eddy.insert_at_index('new_Uavg_profile', old_ind, Uavg_profile)
+            Eddy.insert_at_index('new_uavg_profile', old_ind, uavg_profile)
             Eddy.insert_at_index('new_shape_error', old_ind, shape_error)
         
         if 'ROMS' in Eddy.datatype:
             
-            Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg, teke,
+            Eddy.update_track(old_ind, centlon, centlat, rtime, uavg, teke,
                               eddy_radius_s, eddy_radius_e, amplitude,
                               temp=cent_temp, salt=cent_salt,
                               contour_e=contour_e, contour_s=contour_s,
-                              Uavg_profile=Uavg_profile, shape_error=shape_error)
+                              uavg_profile=uavg_profile, shape_error=shape_error)
         
         elif 'AVISO' in Eddy.datatype:
             
-            Eddy.update_track(old_ind, centlon, centlat, rtime, Uavg, teke,
+            Eddy.update_track(old_ind, centlon, centlat, rtime, uavg, teke,
                               eddy_radius_s, eddy_radius_e, amplitude,
                               temp=None, salt=None,
                               contour_e=contour_e, contour_s=contour_s,
-                              Uavg_profile=Uavg_profile, shape_error=shape_error)
+                              uavg_profile=uavg_profile, shape_error=shape_error)
 
     else: # it's a new eddy
         
@@ -1574,7 +1474,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
         Eddy.insert_at_index('new_radii_s', Eddy.index, eddy_radius_s)
         Eddy.insert_at_index('new_radii_e', Eddy.index, eddy_radius_e)
         Eddy.insert_at_index('new_amp', Eddy.index, amplitude)
-        Eddy.insert_at_index('new_Uavg', Eddy.index, Uavg)
+        Eddy.insert_at_index('new_uavg', Eddy.index, uavg)
         Eddy.insert_at_index('new_teke', Eddy.index, teke)
         
         if 'ROMS' in Eddy.datatype:
@@ -1584,7 +1484,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
         if Eddy.track_extra_variables:
             Eddy.insert_at_index('new_contour_e', Eddy.index, contour_e)
             Eddy.insert_at_index('new_contour_s', Eddy.index, contour_s)
-            Eddy.insert_at_index('new_Uavg_profile', Eddy.index, Uavg_profile)
+            Eddy.insert_at_index('new_uavg_profile', Eddy.index, uavg_profile)
             Eddy.insert_at_index('new_shape_error', Eddy.index, shape_error)
         
         if Eddy.new_list is True: # initialise a new list
@@ -1593,16 +1493,16 @@ def accounting(Eddy, old_ind, centlon, centlat,
         
         if 'ROMS' in Eddy.datatype:
             
-            Eddy.add_new_track(centlon, centlat, rtime, Uavg, teke,
+            Eddy.add_new_track(centlon, centlat, rtime, uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude, temp=cent_temp, salt=cent_salt,
                 contour_e=contour_e, contour_s=contour_s,
-                Uavg_profile=Uavg_profile, shape_error=shape_error)
+                uavg_profile=uavg_profile, shape_error=shape_error)
         elif 'AVISO' in Eddy.datatype:
 	    
-            Eddy.add_new_track(centlon, centlat, rtime, Uavg, teke,
+            Eddy.add_new_track(centlon, centlat, rtime, uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude,
                 contour_e=contour_e, contour_s=contour_s,
-                Uavg_profile=Uavg_profile, shape_error=shape_error)
+                uavg_profile=uavg_profile, shape_error=shape_error)
         
         Eddy.index += 1
 
@@ -1613,7 +1513,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
 def get_ROMS_data(rfile, grd=None, index=None, sigma_lev=None, DIAGNOSTIC_TYPE=None):
     '''
     '''
-    with netcdf.Dataset(rfile) as nc:
+    with Dataset(rfile) as nc:
         if index is None:
             time = nc.variables['ocean_time'][:]
             return time
