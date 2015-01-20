@@ -62,19 +62,20 @@ class PyEddyTracker (object):
     
     """
     def __init__(self):
-        '''
+        """
         Set some constants
-        '''
+        """
         self.GRAVITY = 9.81
         self.EARTH_RADIUS = 6371315.0
         self.ZERO_CROSSING = False
     
+    
     def read_nc(self, varfile, varname, indices="[:]"):
-        '''
+        """
         Read data from nectdf file
           varname : variable ('temp', 'mask_rho', etc) to read
           indices : string of index ranges, eg. '[0,:,0]'
-        '''
+        """
         with Dataset(varfile) as nc:
             try:
                 var = eval(''.join(("nc.variables[varname]", indices)))
@@ -85,19 +86,19 @@ class PyEddyTracker (object):
 
 
     def read_nc_att(self, varfile, varname, att):
-        '''
+        """
         Read data attribute from nectdf file
           varname : variable ('temp', 'mask_rho', etc) to read
           att : string of attribute, eg. 'valid_range'
-        '''
+        """
         with Dataset(varfile) as nc:
             return eval(''.join(("nc.variables[varname].", att)))
 
 
     def set_initial_indices(self, LONMIN, LONMAX, LATMIN, LATMAX):
-        '''
+        """
         Get indices for desired domain
-        '''
+        """
         print '--- Setting initial indices to LONMIN, LONMAX, LATMIN, LATMAX'
         self.i0, junk = self.nearest_point(LONMIN, 
                                            LATMIN + 0.5 * (LATMAX - LATMIN))
@@ -122,9 +123,9 @@ class PyEddyTracker (object):
         if 'AvisoGrid' in self.__class__.__name__:
             
             if self.ZERO_CROSSING is True:
-                '''
+                """
                 Used for a zero crossing, e.g., across Agulhas region
-                '''
+                """
                 def half_limits(lon, lat):
                     return np.array([np.array([lon.min(), lon.max(),
                                                lon.max(), lon.min()]),
@@ -147,37 +148,37 @@ class PyEddyTracker (object):
 
 
     def set_index_padding(self, pad=2):
-        '''
+        """
         Set start and end indices for temporary padding and later unpadding
         around 2d variables.
         Padded matrices are needed only for geostrophic velocity computation.
-        '''
+        """
         print '--- Setting padding indices with pad=%s' %pad
         
         self.pad = pad
         
         def get_str(thestr, pad):
-            '''
+            """
             Get start indices for pad
             Returns:
               pad_str   - index to add pad
               unpad_str - index for later unpadding
-            '''
-            pad_str = np.max([0, thestr - pad])
+            """
+            pad_str = np.array([0, thestr - pad]).max()
             if pad > 0:
-                unpad_str = np.max([0, np.diff([pad_str, thestr])])
+                unpad_str = np.array([0, np.diff([pad_str, thestr])]).max()
                 return pad_str, unpad_str
             else:
-                unpad_str = np.min([0, np.diff([pad_str, thestr])])
+                unpad_str = np.array([0, np.diff([pad_str, thestr])]).min()
                 return pad_str, -1 * unpad_str
     
         def get_end(theend, shape, pad):
-            '''
+            """
             Get end indices for pad
             Returns:
               pad_end   - index to add pad
               unpad_end - index for later unpadding
-            '''
+            """
             if theend is None:
                 pad_end = None
                 unpad_end = None
@@ -207,7 +208,7 @@ class PyEddyTracker (object):
 
 
     def haversine_dist(self, lon1, lat1, lon2, lat2):
-        '''
+        """
         TO DO: change to use f2py version
         Haversine formula to calculate distance between two lon/lat points
         Uses mean earth radius in metres (from ROMS scalars.h) = 6371315.0
@@ -215,7 +216,7 @@ class PyEddyTracker (object):
           lon1, lat1, lon2, lat2
         Return:
           distance (m)
-        '''
+        """
         lon1, lat1, lon2, lat2 = (lon1.copy(), lat1.copy(),
                                   lon2.copy(), lat2.copy())
         dlat = np.deg2rad(lat2 - lat1)
@@ -231,30 +232,30 @@ class PyEddyTracker (object):
 
 
     def nearest_point(self, lon, lat):
-        '''
+        """
         Get indices to a point (lon, lat) in the grid
-        '''
+        """
         i, j = eddy_tracker.nearest(lon, lat, self._lon, self._lat,
                                                     self._lon.shape)
         return i, j
     
     
     def half_interp(self, h_one, h_two):
-        '''
+        """
         Speed up frequent operations of type 0.5 * (arr[:-1] + arr[1:])
-        '''
+        """
         h_one += h_two
         h_one *= 0.5
         return h_one
 
 
     def get_AVISO_f_pm_pn(self):
-        '''
+        """
         Padded matrices are used here because Coriolis (f), pm and pn
         are needed for the geostrophic velocity computation in 
         method getSurfGeostrVel()
         NOTE: this should serve for ROMS too
-        '''
+        """
         print '--- Computing Coriolis (f), dx (pm), dy (pn) for padded grid'
         # Get GRAVITY / Coriolis
         self._gof = np.sin(np.deg2rad(self.latpad()))
@@ -289,9 +290,9 @@ class PyEddyTracker (object):
 
 
     def u2rho_2d(self, uu_in):
-        '''
+        """
         Convert a 2D field at u points to a field at rho points
-        '''
+        """
         def uu2ur(uu_in, Mp, Lp):
             L = Lp - 1
             Lm = L  - 1
@@ -319,9 +320,9 @@ class PyEddyTracker (object):
 
 
     def rho2u_2d(self, rho_in):
-        '''
+        """
         Convert a 2D field at rho points to a field at u points
-        '''
+        """
         def _r2u(rho_in, Lp):
             u_out = rho_in[:, :Lp - 1]
             u_out += rho_in[:, 1:Lp]
@@ -333,9 +334,9 @@ class PyEddyTracker (object):
 
 
     def rho2v_2d(self, rho_in):
-        '''
+        """
         Convert a 2D field at rho points to a field at v points
-        '''
+        """
         def _r2v(rho_in, Mp):
             v_out = rho_in[:Mp - 1]
             v_out += rho_in[1:Mp]
@@ -347,10 +348,10 @@ class PyEddyTracker (object):
 
 
     def uvmask(self):
-        '''
+        """
         Get mask at U and V points
-        '''
-        print '--- Computing umask and vmask for padded grid'
+        """
+        #print '--- Computing umask and vmask for padded grid'
         Mp, Lp = self.mask.shape
         M = Mp - 1
         L = Lp - 1
@@ -360,53 +361,55 @@ class PyEddyTracker (object):
 
 
     def make_gridmask(self, with_pad=True, use_maskoceans=False):
-        '''
+        """
         Use Basemap to make a landmask
-        '''
+        Format is 1 == ocean, 0 == land
+        """
         print '--- Computing Basemap'
         # Create Basemap instance for Mercator projection.
         self.M = Basemap(projection='merc', llcrnrlon = self.LONMIN - 1,
                                             urcrnrlon = self.LONMAX + 1,
                                             llcrnrlat = self.LATMIN - 1,
                                             urcrnrlat = self.LATMAX + 1,
-                                            lat_ts = 0.5 * (LATMIN + LATMAX),
+                                            lat_ts = 0.5 * (self.LATMIN +
+                                                            self.LATMAX),
                                             resolution = 'h')
         if with_pad:
             x, y = self.M(self.lonpad(), self.latpad())
         else:
             x, y = self.M(self.lon(), self.lat())
-        print '--- Computing Basemap mask'
-        self.mask = np.ones_like(x, dtype=bool)
-        if use_maskoceans:
-            print "------ using Basemap *maskoceans*: this is fast but may be"
-            print "------ marginally less accurate than Basemap's *is_land* method..."
-            from mpl_toolkits.basemap import maskoceans
-            if with_pad:
-                self.mask = maskoceans(self.lonpad(), self.latpad(), self.mask,
-                                      inlands=False, resolution='f', grid=1.25)
-            else:
-                self.mask = maskoceans(self.lon(), self.lat())
-            self.mask = self.mask.mask.astype(int)
-        else:
-            print "------ using Basemap *is_land*: this is slow for larger domains"
-            print "------ but can be speeded up once Basemap's *maskoceans* method is introduced"
-            print "------ (currently longitude wrapping behaviour is unclear...)"
-            it = np.nditer([x, y], flags=['multi_index'])
-            while not it.finished:
-                self.mask[it.multi_index] = self.M.is_land(x[it.multi_index],
-                                                           y[it.multi_index])
-                it.iternext()
-            self.mask = np.atleast_2d(-self.mask).astype(int)
+        #print '--- Computing Basemap mask'
+        #self.mask = np.ones_like(x, dtype=bool)
+        #if use_maskoceans:
+            #print "------ using Basemap *maskoceans*: this is fast but may be"
+            #print "------ marginally less accurate than Basemap's *is_land* method..."
+            #from mpl_toolkits.basemap import maskoceans
+            #if with_pad:
+                #self.mask = maskoceans(self.lonpad(), self.latpad(), self.mask,
+                                      #inlands=False, resolution='f', grid=1.25)
+            #else:
+                #self.mask = maskoceans(self.lon(), self.lat())
+            #self.mask = self.mask.mask.astype(int)
+        #else:
+            #print "------ using Basemap *is_land*: this is slow for larger domains"
+            #print "------ but can be speeded up once Basemap's *maskoceans* method is introduced"
+            #print "------ (currently longitude wrapping behaviour is unclear...)"
+            #it = np.nditer([x, y], flags=['multi_index'])
+            #while not it.finished:
+                #self.mask[it.multi_index] = self.M.is_land(x[it.multi_index],
+                                                           #y[it.multi_index])
+                #it.iternext()
+            #self.mask = np.atleast_2d(-self.mask).astype(int)
         self.Mx, self.My = x, y
         return self
 
 
     def set_geostrophic_velocity(self, zeta):
-        '''
+        """
         Set u and v geostrophic velocity at
         surface from variables f, zeta, pm, pn...
         Note: output at rho points
-        '''
+        """
         gof = self.gof().view()
         
         vmask = self.vmask().view()
@@ -426,9 +429,8 @@ class PyEddyTracker (object):
 
 
     def set_u_v_eke(self, pad=2):
-        '''
-        '''
-        #double_pad = pad * 2
+        """
+        """
         if self.ZERO_CROSSING:
             u1 = np.empty((self.jp1 - self.jp0, self.ip0))
             u0 = np.empty((self.jp1 - self.jp0, self._lon.shape[1] - self.ip1))
@@ -444,8 +446,8 @@ class PyEddyTracker (object):
     
     
     def getEKE(self):
-        '''
-        '''
+        """
+        """
         self.u[:] = self.upad[self.jup0:self.jup1, self.iup0:self.iup1]
         self.v[:] = self.vpad[self.jup0:self.jup1, self.iup0:self.iup1]
         u, v = self.u.view(), self.v.view()
@@ -456,15 +458,15 @@ class PyEddyTracker (object):
 
 
 class AvisoGrid (PyEddyTracker):
-    '''
+    """
     Class to satisfy the need of the eddy tracker
     to have a grid class
-    '''
+    """
     def __init__(self, AVISO_FILE, LONMIN, LONMAX, LATMIN, LATMAX,
                  with_pad=True, use_maskoceans=False):
-        '''
+        """
         Initialise the grid object
-        '''
+        """
         super(AvisoGrid, self).__init__()
         print '\nInitialising the AVISO_grid'
         self.i0, self.j0 = 0, 0
@@ -499,7 +501,7 @@ class AvisoGrid (PyEddyTracker):
         
         self.set_initial_indices(LONMIN, LONMAX, LATMIN, LATMAX)
         self.set_index_padding()
-        self.make_gridmask(with_pad, use_maskoceans).uvmask()
+        self.make_gridmask(with_pad, use_maskoceans)
         self.get_AVISO_f_pm_pn()
         self.set_u_v_eke()
         pad2 = 2 * self.pad
@@ -507,9 +509,9 @@ class AvisoGrid (PyEddyTracker):
         
 
     def get_AVISO_data(self, AVISO_FILE):
-        '''
+        """
         Read nc data from AVISO file
-        '''
+        """
         if self.ZERO_CROSSING:
             
             try: # new AVISO (2014)
@@ -540,7 +542,6 @@ class AvisoGrid (PyEddyTracker):
             except Exception: # old AVISO
                 zeta = self.read_nc(AVISO_FILE, 'Grid_0001',
                        indices='[self.ip0:self.ip1, self.jp0:self.jp1]').T
-                #date = self.read_nc_att(AVISO_FILE, 'Grid_0001', 'date') # cm
 
         try: # Extrapolate over land points with fillmask
             zeta = fillmask(zeta, self.mask == 1)
@@ -550,15 +551,23 @@ class AvisoGrid (PyEddyTracker):
         return zeta.astype(np.float64)
 
 
-
+    def set_mask(self, sla):
+        """
+        """
+        if sla.mask.size == 1:
+            self.mask = np.ones_like(sla.data)
+        else:
+            self.mask = sla.mask.astype(np.int) - 1
+            self.mask = np.abs(self.mask)
+        return self
     
     
     def fillmask(self, x, mask):
-        '''
+        """
         Fill missing values in an array with an average of nearest  
         neighbours
         From http://permalink.gmane.org/gmane.comp.python.scientific.user/19610
-        '''
+        """
         assert x.ndim == 2, 'x must be a 2D array.'
         fill_value = 9999.99
         x[mask == 0] = fill_value
@@ -597,6 +606,7 @@ class AvisoGrid (PyEddyTracker):
             # shouldn't need to happen with every call to self.lon()
             lon0 = self._lon[self.j0:self.j1,  self.i1:]
             lon1 = self._lon[self.j0:self.j1, :self.i0]
+            print 'fix this so called only once'
             return np.concatenate((lon0 - 360., lon1), axis=1)
         else:
             return self._lon[self.j0:self.j1, self.i0:self.i1]
@@ -654,23 +664,19 @@ class AvisoGrid (PyEddyTracker):
         return self._pn
 
 
-
-
     def get_resolution(self):
         return np.sqrt(np.diff(self.lon()[1:], axis=1) *
                        np.diff(self.lat()[:,1:], axis=0)).mean()
 
 
-
-
     def boundary(self):
-        '''
+        """
         Return lon, lat of perimeter around a ROMS grid
         Input:
           indices to get boundary of specified subgrid
         Returns:
           lon/lat boundary points
-        '''
+        """
         lon = np.r_[(self.lon()[:,0],     self.lon()[-1],
                      self.lon()[::-1,-1], self.lon()[0,::-1])]
         lat = np.r_[(self.lat()[:,0],     self.lat()[-1],
@@ -679,34 +685,34 @@ class AvisoGrid (PyEddyTracker):
 
 
     def brypath(self, imin=0, imax=-1, jmin=0, jmax=-1):
-        '''
+        """
         Return Path object of perimeter around a ROMS grid
         Indices to get boundary of specified subgrid
-        '''
+        """
         lon, lat = self.boundary()
         brypath = np.array([lon, lat]).T
         return path.Path(brypath)
 
 
-    def pcol_2dxy(self, x, y):
-        '''
-        Function to shift x, y for subsequent use with pcolor
-        by Jeroen Molemaker UCLA 2008
-        '''
-        Mp, Lp = x.shape
-        M = Mp - 1
-        L = Lp - 1
-        x_pcol = np.zeros((Mp, Lp))
-        y_pcol = np.zeros((Mp, Lp))
-        x_tmp = self.half_interp(x[:,:L], x[:,1:Lp])
-        x_pcol[1:Mp,1:Lp] = self.half_interp(x_tmp[0:M,:], x_tmp[1:Mp,:])
-        x_pcol[0,:] = 2. * x_pcol[1,:] - x_pcol[2,:]
-        x_pcol[:,0] = 2. * x_pcol[:,1] - x_pcol[:,2]
-        y_tmp = self.half_interp(y[:,0:L], y[:,1:Lp]    )
-        y_pcol[1:Mp,1:Lp] = self.half_interp(y_tmp[0:M,:], y_tmp[1:Mp,:])
-        y_pcol[0,:] = 2. * y_pcol[1,:] - y_pcol[2,:]
-        y_pcol[:,0] = 2. * y_pcol[:,1] - y_pcol[:,2]
-        return x_pcol, y_pcol
+    #def pcol_2dxy(self, x, y):
+        #"""
+        #Function to shift x, y for subsequent use with pcolor
+        #by Jeroen Molemaker UCLA 2008
+        #"""
+        #Mp, Lp = x.shape
+        #M = Mp - 1
+        #L = Lp - 1
+        #x_pcol = np.zeros((Mp, Lp))
+        #y_pcol = np.zeros((Mp, Lp))
+        #x_tmp = self.half_interp(x[:,:L], x[:,1:Lp])
+        #x_pcol[1:Mp,1:Lp] = self.half_interp(x_tmp[0:M,:], x_tmp[1:Mp,:])
+        #x_pcol[0,:] = 2. * x_pcol[1,:] - x_pcol[2,:]
+        #x_pcol[:,0] = 2. * x_pcol[:,1] - x_pcol[:,2]
+        #y_tmp = self.half_interp(y[:,0:L], y[:,1:Lp]    )
+        #y_pcol[1:Mp,1:Lp] = self.half_interp(y_tmp[0:M,:], y_tmp[1:Mp,:])
+        #y_pcol[0,:] = 2. * y_pcol[1,:] - y_pcol[2,:]
+        #y_pcol[:,0] = 2. * y_pcol[:,1] - y_pcol[:,2]
+        #return x_pcol, y_pcol
 
 
 
@@ -720,9 +726,13 @@ class AvisoGrid (PyEddyTracker):
 
 if __name__ == '__main__':
     
-    
-    
-    YAML_FILE = sys.argv[1]
+    # Run using:
+    # python make_eddy_track_AVISO.py eddy_tracker_configuration.yaml
+    try:
+        YAML_FILE = sys.argv[1]
+    except Exception:
+        print "To run use 'python make_eddy_track_AVISO.py eddy_tracker_configuration.yaml'"
+        
     print "\nLaunching with yaml file: %s" % YAML_FILE
     # Choose a yaml configuration file
     #YAML_FILE = 'eddy_tracker_configuration.yaml'
@@ -796,8 +806,10 @@ if __name__ == '__main__':
         if 'SLA' in DIAGNOSTIC_TYPE:
             ZWL = config['SMOOTHING_SLA']['ZWL']
             MWL = config['SMOOTHING_SLA']['MWL']
+            SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
         elif 'Q' in DIAGNOSTIC_TYPE:
             SMOOTH_FAC = config['SMOOTHING_Q']['SMOOTH_FAC']
+            SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
         else: Exception
         
     DIST0 = config['DIST0']
@@ -851,7 +863,7 @@ if __name__ == '__main__':
 
     Mx, My = (sla_grd.Mx[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1],
               sla_grd.My[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1])
-    pMx, pMy = sla_grd.pcol_2dxy(Mx, My)
+    #pMx, pMy = sla_grd.pcol_2dxy(Mx, My)
     
     
 
@@ -862,11 +874,10 @@ if __name__ == '__main__':
                                     RW_PATH, [LONMIN, LONMAX, LATMIN, LATMAX])
     
     
-    if isinstance(SMOOTHING, str):
-        if 'Gaussian' in SMOOTHING:
-            # Get parameters for ndimage.gaussian_filter
-            zres, mres = gaussian_resolution(sla_grd.get_resolution(),
-                         zwl, mwl)
+    if 'Gaussian' in SMOOTHING_TYPE:
+        # Get parameters for ndimage.gaussian_filter
+        zres, mres = gaussian_resolution(sla_grd.get_resolution(),
+                         ZWL, MWL)
 
     fig  = plt.figure(1)
 
@@ -1032,10 +1043,11 @@ if __name__ == '__main__':
             #grdmask = grd.mask()[j0:j1,i0:i1]
             
             sla = sla_grd.get_AVISO_data(AVISO_FILE)
-                
-            if isinstance(SMOOTHING, str):
+            sla_grd.set_mask(sla).uvmask()
+            
+            if SMOOTHING:
                     
-                if 'Gaussian' in SMOOTHING:
+                if 'Gaussian' in SMOOTHING_TYPE:
                     
                     if 'first_record' not in locals():
                         print '------ applying Gaussian high-pass filter'
@@ -1045,15 +1057,16 @@ if __name__ == '__main__':
                     # High pass filter, see
                     # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
                     sla -= ndimage.gaussian_filter(sla, [mres, zres])
-                
-                elif 'Hanning' in SMOOTHING:
+                    
+                elif 'Hanning' in SMOOTHING_TYPE:
                     
                     print '------ applying %s passes of Hanning filter' \
                                                                % smooth_fac
                     # Do smooth_fac passes of 2d Hanning filter
                     sla = func_hann2d_fast(sla, smooth_fac)
                 
-                
+                else: Exception
+            
             # Expand the landmask
             sla = np.ma.masked_where(sla_grd.mask == False, sla)
                 
@@ -1100,18 +1113,20 @@ if __name__ == '__main__':
             
             elif 'SLA' in DIAGNOSTIC_TYPE:
             
-                A_eddy.sla = np.ma.copy(sla)
-                C_eddy.sla = np.ma.copy(sla)
-                A_eddy.slacopy = np.ma.copy(sla)
-                C_eddy.slacopy = np.ma.copy(sla)
+                A_eddy.sla = sla.copy()
+                C_eddy.sla = sla.copy()
+                A_eddy.slacopy = sla.copy()
+                C_eddy.slacopy = sla.copy()
             
             # Get scalar speed
-            Uspd = np.hypot(sla_grd.u, sla_grd.v)
+            Uspd = sla_grd.u**2 + sla_grd.v**2
+            Uspd *= 0.5
             Uspd = np.ma.masked_where(
                         sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
-                        sla_grd.iup0:sla_grd.iup1] == False, Uspd)
-            A_eddy.Uspd = np.ma.copy(Uspd)
-            C_eddy.Uspd = np.ma.copy(Uspd)
+                                      sla_grd.iup0:sla_grd.iup1] == False,
+                                      Uspd)
+            A_eddy.Uspd = Uspd.copy()
+            C_eddy.Uspd = Uspd.copy()
             
             
             # Get contours of Q/sla parameter
@@ -1122,6 +1137,7 @@ if __name__ == '__main__':
                 ax = contfig.add_subplot(111)
                 
                 if SAVE_FIGURES:
+                    
                     animfig = plt.figure(999)
                     animax = animfig.add_subplot(111)
                     # Colorbar axis
@@ -1188,22 +1204,24 @@ if __name__ == '__main__':
                 
                 if 'Q' in DIAGNOSTIC_TYPE:
                     plt.title('Q ' + tit)
-                    sla_grd.M.pcolormesh(pMx, pMy, xi, CMAP=CMAP)
+                    sla_grd.M.pcolormesh(Mx, My, xi, CMAP=CMAP)
                     sla_grd.M.contour(Mx, My, xi, [0.],
                                       colors='k',linewidths=0.5)
                     sla_grd.M.contour(Mx, My, qparam, qparameter,
                                       colors='w', linewidths=0.3)
                     sla_grd.M.contour(Mx, My, qparam, [qparameter[0]],
                                       colors='m', linewidths=0.25)
+                
                 elif 'SLA' in DIAGNOSTIC_TYPE:
                     plt.title('sla ' + tit)
-                    sla_grd.M.pcolormesh(pMx, pMy, sla, CMAP=CMAP)
+                    sla_grd.M.pcolormesh(Mx, My, sla, CMAP=CMAP)
                     sla_grd.M.contour(Mx, My, sla, [0.],
                                       colors='k', linewidths=0.5)
                     sla_grd.M.contour(Mx, My, sla, CONTOUR_PARAMETER,
                                       colors='w', linewidths=0.3)
                     sla_grd.M.contour(Mx, My, sla, [CONTOUR_PARAMETER[0]],
                                       colors='m', linewidths=0.25)
+                
                 plt.colorbar(orientation='horizontal')
                 plt.clim(-.5, .5)
                 sla_grd.M.fillcontinents()
@@ -1225,49 +1243,21 @@ if __name__ == '__main__':
             
             
             # Track the eddies
-            #print 'start A tracking'
-            #tt = time.time()
             A_eddy = track_eddies(A_eddy, first_record)
-            #print 'end A tracking in %s seconds\n' %(time.time() - tt)
-            
-            #print 'start C tracking'
-            #tt = time.time()
             C_eddy = track_eddies(C_eddy, first_record)
-            #print 'end C tracking in %s seconds\n' %(time.time() - tt)
-            #print 'dddddddd'
             
             if SAVE_FIGURES: # Make figures for animations
                 
-                #tit = 'Y' + str(yr) + 'M' + str(mo).zfill(2) + 'D' + str(da).zfill(2)
                 tit = ''.join((str(yr), str(mo).zfill(2), str(da).zfill(2)))
-                #tit = str(yr) + str(mo).zfill(2) + str(da).zfill(2)
-                
-                #if 'anim_fig' in locals():
-                    ## Wait if there is a still-active anim_fig thread
-                    #anim_fig.join()
                 
                 if 'Q' in DIAGNOSTIC_TYPE:
-                    #anim_fig = threading.Thread(name='anim_figure', target=anim_figure,
-                             #args=(33, M, pMx, pMy, xicopy, CMAP, rtime, DIAGNOSTIC_TYPE, Mx, My, 
-                                   #xi.copy(), qparam.copy(), qparameter, A_eddy, C_eddy,
-                                   #SAVE_DIR, plt, 'Q ' + tit))
-                    anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
+                    anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
                                 SAVE_DIR, 'Q-parameter ' + tit, animax, animax_cbar,
                                 qparam=qparam, qparameter=qparameter, xi=xi, xicopy=xicopy)
                 
                 elif 'SLA' in DIAGNOSTIC_TYPE:
-                    """anim_fig = threading.Thread(name='anim_figure', target=anim_figure,
-                             args=(33, M, pMx, pMy, slacopy, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, Mx, My, 
-                                   slacopy, slacopy, CONTOUR_PARAMETER, A_eddy, C_eddy,
-                                   SAVE_DIR, plt, 'SLA ' + tit))"""
-
-                    #print 'figure saving'
-                    #tt = time.time()
-                    
-                    anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
+                    anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
                                 SAVE_DIR, 'SLA ' + tit, animax, animax_cbar)
-                    #print 'figure saving done in %s seconds\n' %(time.time() - tt)
-                #anim_fig.start()
                 
             # Save inactive eddies to nc file
             # IMPORTANT: this must be done at every time step!!
@@ -1277,12 +1267,9 @@ if __name__ == '__main__':
                     print '--- saving to nc', A_eddy.SAVE_DIR
                     print '--- saving to nc', C_eddy.SAVE_DIR
                     print '+++'
+                
                 A_eddy.write2netcdf(rtime)
                 C_eddy.write2netcdf(rtime)
-                
-            #print 'Saving the eddies', time.time() - saving_start_time, 'seconds'
-            # Running time for a single monthly file
-            #print '--- duration', str((time.time() - file_time) / 60.), 'minutes'
         
         if str(DATE_END) in AVISO_FILE:
             active = False

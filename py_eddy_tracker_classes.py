@@ -30,10 +30,12 @@ Version 1.4.2
 
 """
 # External modules
-from netCDF4 import Dataset
+#import matplotlib
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-import numexpr as ne 
+from netCDF4 import Dataset
+#import numexpr as ne 
 import time
 #from mpl_toolkits.basemap import Basemap
 import matplotlib.dates as dt
@@ -167,7 +169,7 @@ def do_basemap(M, ax):
     return
 
 
-def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, DIAGNOSTIC_TYPE,
+def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
                 savedir, tit, ax, ax_cbar, qparam=None, qparameter=None,
                 xi=None, xicopy=None):
     '''
@@ -187,14 +189,14 @@ def anim_figure(A_eddy, C_eddy, Mx, My, pMx, pMy, cmap, rtime, DIAGNOSTIC_TYPE,
     M = A_eddy.M
     
     if 'Q' in DIAGNOSTIC_TYPE:
-        pcm = M.pcolormesh(pMx, pMy, xicopy, cmap=cmap, ax=ax)
+        pcm = M.pcolormesh(Mx, My, xicopy, cmap=cmap, ax=ax)
         M.contour(Mx, My, xi, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, qparam, qparameter, ax=ax, colors='g', linewidths=0.25)
         pcm.set_clim(-.5, .5)
         M.contour(Mx, My, qparam, [qparameter[0]], ax=ax, colors='m', linewidths=0.25)
     
     elif 'SLA' in DIAGNOSTIC_TYPE:
-        pcm = M.pcolormesh(pMx, pMy, A_eddy.slacopy, cmap=cmap, ax=ax)
+        pcm = M.pcolormesh(Mx, My, A_eddy.slacopy, cmap=cmap, ax=ax)
         M.contour(Mx, My, A_eddy.slacopy, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, A_eddy.slacopy, A_eddy.CONTOUR_PARAMETER, ax=ax, colors='g',
                   linestyles='solid', linewidths=0.15)
