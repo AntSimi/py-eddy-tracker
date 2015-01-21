@@ -310,10 +310,10 @@ if __name__ == '__main__':
         C_savefile = "".join([savedir, 'eddy_tracks_cyclonic.nc'])
         C_eddy.qparameter = qparameter
         C_eddy.shape_err = shape_err  
-        A_eddy.radmin = np.float(radmin)
-        A_eddy.radmax = np.float(radmax)
-        C_eddy.radmin = np.float(radmin)
-        C_eddy.radmax = np.float(radmax)
+        A_eddy.radmin = np.float64(radmin)
+        A_eddy.radmax = np.float64(radmax)
+        C_eddy.radmin = np.float64(radmin)
+        C_eddy.radmax = np.float64(radmax)
         
     elif 'sla' in diag_type:
         A_savefile = "".join([savedir, 'eddy_tracks_SLA_anticyclonic.nc'])
@@ -328,16 +328,16 @@ if __name__ == '__main__':
         print '--- Pixel range = %s-%s' %(np.int(pixmin), np.int(pixmax))
         A_eddy.pixel_threshold = [pixmin, pixmax]
         C_eddy.pixel_threshold = [pixmin, pixmax]
-        A_eddy.radmin = np.float(grd.get_resolution(radmin))
-        A_eddy.radmax = np.float(grd.get_resolution(radmax))
-        C_eddy.radmin = np.float(grd.get_resolution(radmin))
-        C_eddy.radmax = np.float(grd.get_resolution(radmax))
+        A_eddy.radmin = np.float64(grd.get_resolution(radmin))
+        A_eddy.radmax = np.float64(grd.get_resolution(radmax))
+        C_eddy.radmin = np.float64(grd.get_resolution(radmin))
+        C_eddy.radmax = np.float64(grd.get_resolution(radmax))
     
     
-    A_eddy.ampmin = np.float(ampmin)
-    A_eddy.ampmax = np.float(ampmax)
-    C_eddy.ampmin = np.float(ampmin)
-    C_eddy.ampmax = np.float(ampmax)
+    A_eddy.ampmin = np.float64(ampmin)
+    A_eddy.ampmax = np.float64(ampmax)
+    C_eddy.ampmin = np.float64(ampmin)
+    C_eddy.ampmax = np.float64(ampmax)
     
     A_eddy.interannual = False
     C_eddy.interannual = False
@@ -368,25 +368,25 @@ if __name__ == '__main__':
         A_eddy.sep_dist_fac = sep_dist_fac
         C_eddy.sep_dist_fac = sep_dist_fac
     
-    A_eddy.evolve_ammin = np.float(evolve_ammin)
-    A_eddy.evolve_ammax = np.float(evolve_ammax)
-    A_eddy.evolve_armin = np.float(evolve_armin)
-    A_eddy.evolve_armax = np.float(evolve_armax)
+    A_eddy.evolve_ammin = np.float64(evolve_ammin)
+    A_eddy.evolve_ammax = np.float64(evolve_ammax)
+    A_eddy.evolve_armin = np.float64(evolve_armin)
+    A_eddy.evolve_armax = np.float64(evolve_armax)
     
-    C_eddy.evolve_ammin = np.float(evolve_ammin)
-    C_eddy.evolve_ammax = np.float(evolve_ammax)
-    C_eddy.evolve_armin = np.float(evolve_armin)
-    C_eddy.evolve_armax = np.float(evolve_armax)
+    C_eddy.evolve_ammin = np.float64(evolve_ammin)
+    C_eddy.evolve_ammax = np.float64(evolve_ammax)
+    C_eddy.evolve_armin = np.float64(evolve_armin)
+    C_eddy.evolve_armax = np.float64(evolve_armax)
 
     A_eddy.i0, A_eddy.i1 = grd.i0, grd.i1
     A_eddy.j0, A_eddy.j1 = grd.j0, grd.j1
     C_eddy.i0, C_eddy.i1 = grd.i0, grd.i1
     C_eddy.j0, C_eddy.j1 = grd.j0, grd.j1
     
-    A_eddy.lonmin, A_eddy.lonmax = np.float(lonmin), np.float(lonmax)
-    A_eddy.latmin, A_eddy.latmax = np.float(latmin), np.float(latmax)
-    C_eddy.lonmin, C_eddy.lonmax = np.float(lonmin), np.float(lonmax)
-    C_eddy.latmin, C_eddy.latmax = np.float(latmin), np.float(latmax)
+    A_eddy.lonmin, A_eddy.lonmax = np.float64(lonmin), np.float64(lonmax)
+    A_eddy.latmin, A_eddy.latmax = np.float64(latmin), np.float64(latmax)
+    C_eddy.lonmin, C_eddy.lonmax = np.float64(lonmin), np.float64(lonmax)
+    C_eddy.latmin, C_eddy.latmax = np.float64(latmin), np.float64(latmax)
     
     A_eddy.fillval = fillval
     C_eddy.fillval = fillval
@@ -394,12 +394,12 @@ if __name__ == '__main__':
     C_eddy.verbose = verbose
 
     
-    A_eddy.area0 = np.float(area0)
-    C_eddy.area0 = np.float(area0)
-    A_eddy.amp0 = np.float(amp0)
-    C_eddy.amp0 = np.float(amp0)
-    A_eddy.dist0 = np.float(dist0)
-    C_eddy.dist0 = np.float(dist0)
+    A_eddy.area0 = np.float64(area0)
+    C_eddy.area0 = np.float64(area0)
+    A_eddy.amp0 = np.float64(amp0)
+    C_eddy.amp0 = np.float64(amp0)
+    A_eddy.dist0 = np.float64(dist0)
+    C_eddy.dist0 = np.float64(dist0)
 
     start = True
     start_time = time.time()

@@ -450,8 +450,7 @@ class PyEddyTracker (object):
         """
         self.u[:] = self.upad[self.jup0:self.jup1, self.iup0:self.iup1]
         self.v[:] = self.vpad[self.jup0:self.jup1, self.iup0:self.iup1]
-        u, v = self.u.view(), self.v.view()
-        self.eke[:] = u**2 + v**2
+        self.eke[:] = self.u**2 + self.v**2
         self.eke *= 0.5
         return self
 
@@ -804,8 +803,8 @@ if __name__ == '__main__':
     SMOOTHING = config['SMOOTHING']
     if SMOOTHING:
         if 'SLA' in DIAGNOSTIC_TYPE:
-            ZWL = config['SMOOTHING_SLA']['ZWL']
-            MWL = config['SMOOTHING_SLA']['MWL']
+            ZWL = np.atleast_1d(config['SMOOTHING_SLA']['ZWL'])
+            MWL = np.atleast_1d(config['SMOOTHING_SLA']['MWL'])
             SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
         elif 'Q' in DIAGNOSTIC_TYPE:
             SMOOTH_FAC = config['SMOOTHING_Q']['SMOOTH_FAC']
@@ -941,34 +940,34 @@ if __name__ == '__main__':
     C_eddy.points = np.array([sla_grd.lon().ravel(),
                               sla_grd.lat().ravel()]).T
     
-    A_eddy.EVOLVE_AMP_MIN = np.float(EVOLVE_AMP_MIN)
-    A_eddy.EVOLVE_AMP_MAX = np.float(EVOLVE_AMP_MAX)
-    A_eddy.EVOLVE_AREA_MIN = np.float(EVOLVE_AREA_MIN)
-    A_eddy.EVOLVE_AREA_MAX = np.float(EVOLVE_AREA_MAX)
+    A_eddy.EVOLVE_AMP_MIN = np.float64(EVOLVE_AMP_MIN)
+    A_eddy.EVOLVE_AMP_MAX = np.float64(EVOLVE_AMP_MAX)
+    A_eddy.EVOLVE_AREA_MIN = np.float64(EVOLVE_AREA_MIN)
+    A_eddy.EVOLVE_AREA_MAX = np.float64(EVOLVE_AREA_MAX)
     
-    C_eddy.EVOLVE_AMP_MIN = np.float(EVOLVE_AMP_MIN)
-    C_eddy.EVOLVE_AMP_MAX = np.float(EVOLVE_AMP_MAX)
-    C_eddy.EVOLVE_AREA_MIN = np.float(EVOLVE_AREA_MIN)
-    C_eddy.EVOLVE_AREA_MAX = np.float(EVOLVE_AREA_MAX)
+    C_eddy.EVOLVE_AMP_MIN = np.float64(EVOLVE_AMP_MIN)
+    C_eddy.EVOLVE_AMP_MAX = np.float64(EVOLVE_AMP_MAX)
+    C_eddy.EVOLVE_AREA_MIN = np.float64(EVOLVE_AREA_MIN)
+    C_eddy.EVOLVE_AREA_MAX = np.float64(EVOLVE_AREA_MAX)
 
     A_eddy.i0, A_eddy.i1 = sla_grd.i0, sla_grd.i1
     A_eddy.j0, A_eddy.j1 = sla_grd.j0, sla_grd.j1
     C_eddy.i0, C_eddy.i1 = sla_grd.i0, sla_grd.i1
     C_eddy.j0, C_eddy.j1 = sla_grd.j0, sla_grd.j1
     
-    A_eddy.LONMIN, A_eddy.LONMAX = np.float(LONMIN), np.float(LONMAX)
-    A_eddy.LATMIN, A_eddy.LATMAX = np.float(LATMIN), np.float(LATMAX)
-    C_eddy.LONMIN, C_eddy.LONMAX = np.float(LONMIN), np.float(LONMAX)
-    C_eddy.LATMIN, C_eddy.LATMAX = np.float(LATMIN), np.float(LATMAX)
+    A_eddy.LONMIN, A_eddy.LONMAX = np.float64(LONMIN), np.float64(LONMAX)
+    A_eddy.LATMIN, A_eddy.LATMAX = np.float64(LATMIN), np.float64(LATMAX)
+    C_eddy.LONMIN, C_eddy.LONMAX = np.float64(LONMIN), np.float64(LONMAX)
+    C_eddy.LATMIN, C_eddy.LATMAX = np.float64(LATMIN), np.float64(LATMAX)
     
-    A_eddy.RADMIN = np.float(RADMIN)
-    A_eddy.RADMAX = np.float(RADMAX)
-    A_eddy.AMPMIN = np.float(AMPMIN)
-    A_eddy.AMPMAX = np.float(AMPMAX)
-    C_eddy.RADMIN = np.float(RADMIN)
-    C_eddy.RADMAX = np.float(RADMAX)
-    C_eddy.AMPMIN = np.float(AMPMIN)
-    C_eddy.AMPMAX = np.float(AMPMAX)
+    A_eddy.RADMIN = np.float64(RADMIN)
+    A_eddy.RADMAX = np.float64(RADMAX)
+    A_eddy.AMPMIN = np.float64(AMPMIN)
+    A_eddy.AMPMAX = np.float64(AMPMAX)
+    C_eddy.RADMIN = np.float64(RADMIN)
+    C_eddy.RADMAX = np.float64(RADMAX)
+    C_eddy.AMPMIN = np.float64(AMPMIN)
+    C_eddy.AMPMAX = np.float64(AMPMAX)
     
     A_eddy.fillval = sla_grd.fillval
     C_eddy.fillval = sla_grd.fillval
@@ -985,12 +984,12 @@ if __name__ == '__main__':
     A_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
     C_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
     
-    A_eddy.AREA0 = np.float(AREA0)
-    C_eddy.AREA0 = np.float(AREA0)
-    A_eddy.AMP0 = np.float(AMP0)
-    C_eddy.AMP0 = np.float(AMP0)
-    A_eddy.DIST0 = np.float(DIST0)
-    C_eddy.DIST0 = np.float(DIST0)
+    A_eddy.AREA0 = np.float64(AREA0)
+    C_eddy.AREA0 = np.float64(AREA0)
+    A_eddy.AMP0 = np.float64(AMP0)
+    C_eddy.AMP0 = np.float64(AMP0)
+    A_eddy.DIST0 = np.float64(DIST0)
+    C_eddy.DIST0 = np.float64(DIST0)
     
     A_eddy.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
     C_eddy.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
@@ -1061,9 +1060,9 @@ if __name__ == '__main__':
                 elif 'Hanning' in SMOOTHING_TYPE:
                     
                     print '------ applying %s passes of Hanning filter' \
-                                                               % smooth_fac
-                    # Do smooth_fac passes of 2d Hanning filter
-                    sla = func_hann2d_fast(sla, smooth_fac)
+                                                               % SMOOTH_FAC
+                    # Do SMOOTH_FAC passes of 2d Hanning filter
+                    sla = func_hann2d_fast(sla, SMOOTH_FAC)
                 
                 else: Exception
             
@@ -1119,11 +1118,10 @@ if __name__ == '__main__':
                 C_eddy.slacopy = sla.copy()
             
             # Get scalar speed
-            Uspd = sla_grd.u**2 + sla_grd.v**2
-            Uspd *= 0.5
+            Uspd = np.sqrt(sla_grd.u**2 + sla_grd.v**2)
             Uspd = np.ma.masked_where(
                         sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
-                                      sla_grd.iup0:sla_grd.iup1] == False,
+                                     sla_grd.iup0:sla_grd.iup1] == False,
                                       Uspd)
             A_eddy.Uspd = Uspd.copy()
             C_eddy.Uspd = Uspd.copy()

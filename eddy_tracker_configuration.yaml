@@ -22,7 +22,6 @@ DOMAIN:
 # Specify the AVISO product
 AVISO:
   AVISO_DT14: Yes # Use new AVISO DT14 data (e.g., Capet et al, 2014)
-#   AVISO_FILES: 'dt_global_twosat_msla_h_XXXXXXXX_20140106.nc'
   AVISO_FILES: 'dt_global_twosat_msla_h_????????_20140106.nc'
   AVISO_DT14_SUBSAMP: No # subsample the dqily AVISO DT14
   DAYS_BTWN_RECORDS: 3  # sampling rate (days)
@@ -38,11 +37,8 @@ PATHS:
   # Path for saving of outputs
   SAVE_DIR: '/homelocal/emason/outputs/'
 
-  
 # Reference Julian day (Julian date at Jan 1, 1992)
 JDAY_REFERENCE: 2448623.
-
-
 
 # Define contouring parameters
 CONTOUR_PARAMETER:
