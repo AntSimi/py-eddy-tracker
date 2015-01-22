@@ -473,10 +473,10 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     
     If save_all_uavg == True we want uavg for every contour
     """
-    def calc_uavg(rbspline, lon, lat):
-        """
-        """
-        return rbspline.ev(lon, lat).mean()
+    #def calc_uavg(rbspline, lon, lat):
+        #"""
+        #"""
+        #return rbspline.ev(lon, lat).mean()
     
     # True for debug figures
     #debug_U = False
@@ -495,20 +495,25 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     points = np.array([grd.lon()[jmin:jmax,imin:imax].ravel(),
                        grd.lat()[jmin:jmax,imin:imax].ravel()]).T
     
-    rbspline = interpolate.RectBivariateSpline(
-                           grd.lat()[jmin:jmax,0],
-                           grd.lon()[0,imin:imax],
-                           Eddy.Uspd[jmin:jmax,imin:imax], kx=1, ky=1)
+    #rbspline = interpolate.RectBivariateSpline(
+                           #grd.lat()[jmin:jmax,0],
+                           #grd.lon()[0,imin:imax],
+                           #Eddy.uspd[jmin:jmax,imin:imax], kx=1, ky=1)
     
     # First contour is the outer one (effective)
     theseglon, theseglat = poly_eff.vertices[:,0].copy(), \
                            poly_eff.vertices[:,1].copy()
     theseglon, theseglat = eddy_tracker.uniform_resample(
                                 theseglon, theseglat, method='akima')
-    uavg = calc_uavg(rbspline, theseglon[:-1], theseglat[:-1])
+    uavg = Eddy.uspd_coeffs.ev(theseglon[:-1], theseglat[:-1]).mean()
     
     if save_all_uavg:
         all_uavg = [uavg]
+        pixel_min = 1 # iterate until 1 pixel
+    
+    else:
+        # Iterate until PIXEL_THRESHOLD[0] number of pixels
+        pixel_min = Eddy.PIXEL_THRESHOLD[0]
     
     start = True
     citer = np.nditer(CS.cvalues, flags=['f_index'])
@@ -526,16 +531,10 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
             # 1. Ensure polygon_i is within polygon_e
             # 2. Ensure polygon_i contains point centlon_e, centlat_e
             # 3. Respect size range
-            if not save_all_uavg:
-                # Iterate until PIXEL_THRESHOLD[0] number of pixels
-                pixel_min = Eddy.PIXEL_THRESHOLD[0]
-            else:
-                pixel_min = 1 # iterate until 1 pixel
-            
             if np.all([poly_eff.contains_path(poly_i),
                        poly_i.contains_point([centlon_e, centlat_e]),
-                       np.logical_and(mask_i_sum >= pixel_min,
-                                      mask_i_sum <= Eddy.PIXEL_THRESHOLD[1])]):
+                       (mask_i_sum >= pixel_min and
+                        mask_i_sum <= Eddy.PIXEL_THRESHOLD[1])]):
                 proceed = True
             else: 
                 proceed = False
@@ -547,9 +546,8 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                 seglon, seglat = eddy_tracker.uniform_resample(
                                       seglon, seglat, method='akima')
                 
-                # Interpolate Uspd to seglon, seglat, then get mean
-                #uavgseg = calc_uavg(points, Eddy.Uspd[jmin:jmax,imin:imax], seglon[:-1], seglat[:-1])
-                uavgseg = calc_uavg(rbspline, seglon[:-1], seglat[:-1])
+                # Interpolate uspd to seglon, seglat, then get mean
+                uavgseg = Eddy.uspd_coeffs.ev(seglon[:-1], seglat[:-1]).mean()
                 
                 if save_all_uavg:
                     all_uavg.append(uavgseg)
@@ -765,7 +763,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                                     #print 'change to rectbispline'
-                                    #uavg = interpolate.griddata(points, Eddy.Uspd[jmin:jmax,imin:imax].ravel(),
+                                    #uavg = interpolate.griddata(points, Eddy.uspd[jmin:jmax,imin:imax].ravel(),
                                                                 #(contlon_e, contlat_e), 'linear')
                                     #uavg = np.nan_to_num(uavg).max()
                                     ##uavg = 0; print 'fix me'

@@ -35,7 +35,7 @@ import glob as glob
 from py_eddy_tracker_classes import plt, np, dt, Dataset, ndimage, time, \
                                     datestr2datetime, gaussian_resolution, \
                                     get_cax, collection_loop, track_eddies, \
-                                    anim_figure
+                                    anim_figure, interpolate
 import make_eddy_tracker_list_obj as eddy_tracker
 from dateutil import parser
 from mpl_toolkits.basemap import Basemap
@@ -505,8 +505,8 @@ class AvisoGrid (PyEddyTracker):
         self.set_u_v_eke()
         pad2 = 2 * self.pad
         self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
+    
         
-
     def get_AVISO_data(self, AVISO_FILE):
         """
         Read nc data from AVISO file
@@ -517,7 +517,7 @@ class AvisoGrid (PyEddyTracker):
                 ssh1 = self.read_nc(AVISO_FILE, 'SLA',
                        indices='[:, self.jp0:self.jp1, :self.ip0]')
                 ssh0 = self.read_nc(AVISO_FILE, 'SLA',
-                       indices='[:,self.jp0:self.jp1, self.ip1:]')
+                       indices='[:, self.jp0:self.jp1, self.ip1:]')
                 ssh0, ssh1 = ssh0.squeeze(), ssh1.squeeze()
                 ssh0 *= 100. # m to cm
                 ssh1 *= 100. # m to cm
@@ -526,7 +526,7 @@ class AvisoGrid (PyEddyTracker):
                 ssh1 = self.read_nc(AVISO_FILE, 'Grid_0001',
                        indices='[:self.ip0, self.jp0:self.jp1]').T
                 ssh0 = self.read_nc(AVISO_FILE, 'Grid_0001',
-                       indices='[self.ip1:,self.jp0:self.jp1]').T
+                       indices='[self.ip1:, self.jp0:self.jp1]').T
             
             zeta = np.ma.concatenate((ssh0, ssh1), axis=1)
         
@@ -591,11 +591,11 @@ class AvisoGrid (PyEddyTracker):
 
         # Multiply the queried good points by the weight, selecting only the
         # nearest points. Divide by the number of nearest points to get average
-        xfill = weight * x[igood[:,0][iquery], igood[:,1][iquery]]
-        xfill = (xfill / weight.sum(axis=1)[:,np.newaxis]).sum(axis=1)
+        xfill = weight * x[igood[:, 0][iquery], igood[:,1][iquery]]
+        xfill = (xfill / weight.sum(axis=1)[:, np.newaxis]).sum(axis=1)
 
         # Place average of nearest good points, xfill, into bad point locations
-        x[ibad[:,0], ibad[:,1]] = xfill
+        x[ibad[:, 0], ibad[:, 1]] = xfill
         return x
 
 
@@ -603,7 +603,7 @@ class AvisoGrid (PyEddyTracker):
         if self.ZERO_CROSSING:
             # TO DO: These concatenations are possibly expensive, they
             # shouldn't need to happen with every call to self.lon()
-            lon0 = self._lon[self.j0:self.j1,  self.i1:]
+            lon0 = self._lon[self.j0:self.j1, self.i1:]
             lon1 = self._lon[self.j0:self.j1, :self.i0]
             print 'fix this so called only once'
             return np.concatenate((lon0 - 360., lon1), axis=1)
@@ -612,7 +612,7 @@ class AvisoGrid (PyEddyTracker):
     
     def lat(self):
         if self.ZERO_CROSSING:
-            lat0 = self._lat[self.j0:self.j1,  self.i1:]
+            lat0 = self._lat[self.j0:self.j1, self.i1:]
             lat1 = self._lat[self.j0:self.j1, :self.i0]
             return np.concatenate((lat0, lat1), axis=1)
         else:            
@@ -620,7 +620,7 @@ class AvisoGrid (PyEddyTracker):
 
     def lonpad(self):
         if self.ZERO_CROSSING:
-            lon0 = self._lon[self.jp0:self.jp1,  self.ip1:]
+            lon0 = self._lon[self.jp0:self.jp1, self.ip1:]
             lon1 = self._lon[self.jp0:self.jp1, :self.ip0]
             return np.concatenate((lon0 - 360., lon1), axis=1)
         else:
@@ -628,7 +628,7 @@ class AvisoGrid (PyEddyTracker):
     
     def latpad(self):
         if self.ZERO_CROSSING:
-            lat0 = self._lat[self.jp0:self.jp1,  self.ip1:]
+            lat0 = self._lat[self.jp0:self.jp1, self.ip1:]
             lat1 = self._lat[self.jp0:self.jp1, :self.ip0]
             return np.concatenate((lat0, lat1), axis=1)
         else:            
@@ -665,7 +665,7 @@ class AvisoGrid (PyEddyTracker):
 
     def get_resolution(self):
         return np.sqrt(np.diff(self.lon()[1:], axis=1) *
-                       np.diff(self.lat()[:,1:], axis=0)).mean()
+                       np.diff(self.lat()[:, 1:], axis=0)).mean()
 
 
     def boundary(self):
@@ -676,10 +676,10 @@ class AvisoGrid (PyEddyTracker):
         Returns:
           lon/lat boundary points
         """
-        lon = np.r_[(self.lon()[:,0],     self.lon()[-1],
-                     self.lon()[::-1,-1], self.lon()[0,::-1])]
-        lat = np.r_[(self.lat()[:,0],     self.lat()[-1],
-                     self.lat()[::-1,-1], self.lat()[0,::-1])]
+        lon = np.r_[(self.lon()[:, 0], self.lon()[-1],
+                     self.lon()[::-1, -1], self.lon()[0, ::-1])]
+        lat = np.r_[(self.lat()[:, 0], self.lat()[-1],
+                     self.lat()[::-1, -1], self.lat()[0, ::-1])]
         return lon, lat
 
 
@@ -693,32 +693,15 @@ class AvisoGrid (PyEddyTracker):
         return path.Path(brypath)
 
 
-    #def pcol_2dxy(self, x, y):
-        #"""
-        #Function to shift x, y for subsequent use with pcolor
-        #by Jeroen Molemaker UCLA 2008
-        #"""
-        #Mp, Lp = x.shape
-        #M = Mp - 1
-        #L = Lp - 1
-        #x_pcol = np.zeros((Mp, Lp))
-        #y_pcol = np.zeros((Mp, Lp))
-        #x_tmp = self.half_interp(x[:,:L], x[:,1:Lp])
-        #x_pcol[1:Mp,1:Lp] = self.half_interp(x_tmp[0:M,:], x_tmp[1:Mp,:])
-        #x_pcol[0,:] = 2. * x_pcol[1,:] - x_pcol[2,:]
-        #x_pcol[:,0] = 2. * x_pcol[:,1] - x_pcol[:,2]
-        #y_tmp = self.half_interp(y[:,0:L], y[:,1:Lp]    )
-        #y_pcol[1:Mp,1:Lp] = self.half_interp(y_tmp[0:M,:], y_tmp[1:Mp,:])
-        #y_pcol[0,:] = 2. * y_pcol[1,:] - y_pcol[2,:]
-        #y_pcol[:,0] = 2. * y_pcol[:,1] - y_pcol[:,2]
-        #return x_pcol, y_pcol
-
-
-
-
-
-
-
+        
+    def set_interp_coeffs(self, sla, uspd):
+        """
+        """
+        self.sla_coeffs = interpolate.RectBivariateSpline(
+            self.lat()[:, 0], self.lon()[0], sla, kx=1, ky=1)
+        self.uspd_coeffs = interpolate.RectBivariateSpline(
+            self.lat()[:, 0], self.lon()[0], uspd, kx=1, ky=1)
+        return self
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -840,7 +823,7 @@ if __name__ == '__main__':
     #--------------------------------------------------------------------------
     
     assert DATE_STR < DATE_END, 'DATE_END must be larger than DATE_STR'
-    assert DIAGNOSTIC_TYPE in ('Q', 'SLA'), 'DIAGNOSTIC_TYPE not properly defined'
+    assert DIAGNOSTIC_TYPE in ('Q', 'SLA'), 'Undefined DIAGNOSTIC_TYPE'
     
     thestartdate = dt.date2num(datestr2datetime(str(DATE_STR)))
     theenddate = dt.date2num(datestr2datetime(str(DATE_END)))
@@ -848,8 +831,8 @@ if __name__ == '__main__':
     # Get complete AVISO file list
     AVISO_FILES = sorted(glob.glob(DATA_DIR + AVISO_FILES))
     
-    # Use this for subsampling to get identical list as old_AVISO
-    #AVISO_FILES = AVISO_FILES[5:-5:7]
+    # For subsampling to get identical list as old_AVISO use:
+    # AVISO_FILES = AVISO_FILES[5:-5:7]
     if AVISO_DT14 and AVISO_DT14_SUBSAMP:
         AVISO_FILES = AVISO_FILES[5:-5:np.int(DAYS_BTWN_RECORDS)]
     
@@ -1118,14 +1101,20 @@ if __name__ == '__main__':
                 C_eddy.slacopy = sla.copy()
             
             # Get scalar speed
-            Uspd = np.sqrt(sla_grd.u**2 + sla_grd.v**2)
-            Uspd = np.ma.masked_where(
+            uspd = np.sqrt(sla_grd.u**2 + sla_grd.v**2)
+            uspd = np.ma.masked_where(
                         sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
                                      sla_grd.iup0:sla_grd.iup1] == False,
-                                      Uspd)
-            A_eddy.Uspd = Uspd.copy()
-            C_eddy.Uspd = Uspd.copy()
+                                      uspd)
+            A_eddy.uspd = uspd.copy()
+            C_eddy.uspd = uspd.copy()
             
+            # Set interpolation coefficients
+            sla_grd.set_interp_coeffs(sla, uspd)
+            A_eddy.sla_coeffs = sla_grd.sla_coeffs
+            A_eddy.uspd_coeffs = sla_grd.uspd_coeffs
+            C_eddy.sla_coeffs = sla_grd.sla_coeffs
+            C_eddy.uspd_coeffs = sla_grd.uspd_coeffs
             
             # Get contours of Q/sla parameter
             if 'first_record' not in locals():

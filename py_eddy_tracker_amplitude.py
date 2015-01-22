@@ -111,10 +111,7 @@ class Amplitude (object):
         self.jmin, self.jmax = self.eddy.jmin, self.eddy.jmax
         self.sla = self.eddy.sla[self.jmin:self.jmax,
                                  self.imin:self.imax].copy()
-        self.rbspline = interpolate.RectBivariateSpline(
-                          self.eddy.grd.lat()[self.jmin:self.jmax, 0],
-                          self.eddy.grd.lon()[0, self.imin:self.imax],
-                          self.sla, kx=1, ky=1)
+        self.rbspline = grd.sla_coeffs
         h0 = self.rbspline.ev(self.contlat, self.contlon)
         self.h0 = h0[np.isfinite(h0)].mean()
         self.amplitude = np.atleast_1d(0.)
