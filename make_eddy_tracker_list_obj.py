@@ -514,7 +514,7 @@ class TrackList (object):
         self.index = 0 # counter
         self.ncind = 0 # index to write to nc files, will increase and increase...
         self.ch_index = 0 # index for Chelton style nc files
-        
+        self.PAD = 2
         # Check for a correct configuration
         assert DATATYPE in ('ROMS', 'AVISO'), "Unknown string in 'DATATYPE' parameter"
 
@@ -1148,7 +1148,7 @@ class TrackList (object):
         #self.jmax = np.max([a_j, b_j, c_j, d_j]) + 5
         #return self
     
-    def set_bounds(self, contlon, contlat, radius, i, j, grd):
+    def set_bounds(self, contlon, contlat, grd):
         """
         Get indices to a bounding box around the eddy
         WARNING won't work for a rotated grid
@@ -1164,12 +1164,11 @@ class TrackList (object):
         jarr = np.array([bl_j, tl_j, br_j, tr_j])
         self.imin, self.imax = iarr.min(), iarr.max()
         self.jmin, self.jmax = jarr.min(), jarr.max()
-        pad = 2
         # For indexing the mins must not be less than zero
-        self.imin = np.maximum(self.imin - pad, 0)
-        self.jmin = np.maximum(self.jmin - pad, 0)
-        self.imax += pad + 1
-        self.jmax += pad + 1
+        self.imin = np.maximum(self.imin - self.PAD, 0)
+        self.jmin = np.maximum(self.jmin - self.PAD, 0)
+        self.imax += self.PAD + 1
+        self.jmax += self.PAD + 1
         return self
     
     

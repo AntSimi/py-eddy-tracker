@@ -516,7 +516,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
         pixel_min = Eddy.PIXEL_THRESHOLD[0]
     
     start = True
-    citer = np.nditer(CS.cvalues, flags=['f_index'])
+    citer = np.nditer(CS.cvalues, flags=['c_index'])
     while not citer.finished:
         
         # Get contour around centlon_e, centlat_e at level [collind:][iuavg]
@@ -710,6 +710,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             Eddy.set_bounds(contlon_e, contlat_e,
                                             eddy_radius_e, centi, centj, grd)
                             
+                            
+                            
                             # Unpack indices for convenience
                             imin, imax, jmin, jmax = Eddy.imin, Eddy.imax, Eddy.jmin, Eddy.jmax
                             
@@ -755,6 +757,19 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     if amp.within_amplitude_limits():
                                         properties.amplitude = amp.amplitude
                             
+
+
+
+                            
+                            
+                            #plt.figure()
+                            #plt.plot(contlon_e, contlat_e)
+                            #plt.pcolormesh(grd.lon()[jmin:jmax,imin:imax],
+					   #grd.lat()[jmin:jmax,imin:imax],
+					   #Eddy.sla[jmin:jmax,imin:imax])
+			    #plt.axis('image')
+                            #plt.show()
+
                             
                             if properties.amplitude:
                                 
@@ -903,7 +918,7 @@ def track_eddies(Eddy, first_record):
     the contours which are slow
     """
     DIST0 = Eddy.DIST0
-    AMP0  = Eddy.AMP0
+    AMP0 = Eddy.AMP0
     AREA0 = Eddy.AREA0
     #TEMP0 = 20.
     #SALT0 = 35.
