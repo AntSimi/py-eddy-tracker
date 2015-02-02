@@ -514,7 +514,7 @@ class TrackList (object):
         self.index = 0 # counter
         self.ncind = 0 # index to write to nc files, will increase and increase...
         self.ch_index = 0 # index for Chelton style nc files
-        
+        self.PAD = 2
         # Check for a correct configuration
         assert DATATYPE in ('ROMS', 'AVISO'), "Unknown string in 'DATATYPE' parameter"
 
@@ -956,7 +956,7 @@ class TrackList (object):
         self._reduce_inactive_tracks()
         
         # Update old_lon and old_lat...
-        self.old_lon = list(self.new_lon[lasti:])
+        self.old_lon = self.new_lon[lasti:]
         self.old_lat = self.new_lat[lasti:]
         self.old_radii_s = self.new_radii_s[lasti:]
         self.old_radii_e = self.new_radii_e[lasti:]
@@ -1003,7 +1003,8 @@ class TrackList (object):
         clat = self.old_lat.copy()
         clon.fill(centlon)
         clat.fill(centlat)
-        return haversine_distance_vector(clon, clat, self.old_lon, self.old_lat)
+        return haversine_distance_vector(clon, clat,
+                                         self.old_lon, self.old_lat)
 
 
     def insert_at_index(self, xarr, ind, x):
@@ -1028,90 +1029,93 @@ class TrackList (object):
             try:
                 self.new_lon[ind] = x
             except:
-                self.new_lon.extend([0] * (ind - len(self.new_lon) + 1))
+                self.new_lon.extend([0] *
+                    (ind - len(self.new_lon) + 1))
                 self.new_lon[ind] = x
         elif strcompare('new_lat', xarr):
             try:
                 self.new_lat[ind] = x
             except:
-                self.new_lat.extend([0] * (ind - len(self.new_lat) + 1))
+                self.new_lat.extend([0] *
+                    (ind - len(self.new_lat) + 1))
                 self.new_lat[ind] = x
         elif strcompare('new_radii_s', xarr):
             try:
                 self.new_radii_s[ind] = x
             except:
-                self.new_radii_s.extend([0] * (ind - len(self.new_radii_s) + 1))
+                self.new_radii_s.extend([0] *
+                    (ind - len(self.new_radii_s) + 1))
                 self.new_radii_s[ind] = x
         elif strcompare('new_radii_e', xarr):
             try:
                 self.new_radii_e[ind] = x
             except:
-                self.new_radii_e.extend([0] * (ind - len(self.new_radii_e) + 1))
+                self.new_radii_e.extend([0] *
+                    (ind - len(self.new_radii_e) + 1))
                 self.new_radii_e[ind] = x
         elif strcompare('new_amp', xarr):
             try:
                 self.new_amp[ind] = x
             except:
-                self.new_amp.extend([0] * (ind - len(self.new_amp) + 1))
+                self.new_amp.extend([0] *
+                    (ind - len(self.new_amp) + 1))
                 self.new_amp[ind] = x
         elif strcompare('new_uavg', xarr):
             try:
                 self.new_uavg[ind] = x
             except:
-                self.new_uavg.extend([0] * (ind - len(self.new_uavg) + 1))
+                self.new_uavg.extend([0] *
+                    (ind - len(self.new_uavg) + 1))
                 self.new_uavg[ind] = x
         elif strcompare('new_teke', xarr):
             try:
                 self.new_teke[ind] = x
             except:
-                self.new_teke.extend([0] * (ind - len(self.new_teke) + 1))
+                self.new_teke.extend([0] *
+                    (ind - len(self.new_teke) + 1))
                 self.new_teke[ind] = x
         elif strcompare('new_temp', xarr):
             try:
                 self.new_temp[ind] = x
             except:
-                self.new_temp.extend([0] * (ind - len(self.new_temp) + 1))
+                self.new_temp.extend([0] *
+                    (ind - len(self.new_temp) + 1))
                 self.new_temp[ind] = x
         elif strcompare('new_salt', xarr):
             try:
                 self.new_salt[ind] = x
             except:
-                self.new_salt.extend([0] * (ind - len(self.new_salt) + 1))
+                self.new_salt.extend([0] *
+                    (ind - len(self.new_salt) + 1))
                 self.new_salt[ind] = x
         elif strcompare('new_shape_error', xarr):
             try:
                 self.new_shape_error[ind] = x
             except:
-                self.new_shape_error.extend([0] * (ind - len(self.new_shape_error) + 1))
+                self.new_shape_error.extend([0] *
+                    (ind - len(self.new_shape_error) + 1))
                 self.new_shape_error[ind] = x
-        #elif strcompare('new_bounds', xarr):
-            #if ind < tmp.shape[0]:
-                #newsize = tmp.size
-            #else:
-                #newsize = ind + 1
-            #self.new_bounds = np.zeros((newsize, 4))
-            #self.new_bounds[:tmp.shape[0]] = tmp
-            #self.new_bounds[ind] = x
-        
 
         elif strcompare('new_contour_e', xarr):
             try:
                 self.new_contour_e[ind] = x
             except:
-                #self.new_contour_e += [0] * (ind - len(self.new_contour_e) + 1)
-                self.new_contour_e.append([0] * (ind - len(self.new_contour_e) + 1))
+                self.new_contour_e.append([0] *
+                    (ind - len(self.new_contour_e) + 1))
                 self.new_contour_e[ind] = x
         elif strcompare('new_contour_s', xarr):
             try:
                 self.new_contour_s[ind] = x
             except:
-                self.new_contour_s.append([0] * (ind - len(self.new_contour_s) + 1))
+                self.new_contour_s.append([0] *
+                    (ind - len(self.new_contour_s) + 1))
                 self.new_contour_s[ind] = x
         elif strcompare('new_uavg_profile', xarr):
             try:
                 self.new_uavg_profile[ind] = x
             except:
-                self.new_uavg_profile.append([0] * (ind - len(self.new_uavg_profile) + 1))
+                self.new_uavg_profile.append([0] *
+                    (ind - len(self.new_uavg_profile) + 1))
                 self.new_uavg_profile[ind] = x
         else:
             raise Exception
@@ -1148,7 +1152,7 @@ class TrackList (object):
         #self.jmax = np.max([a_j, b_j, c_j, d_j]) + 5
         #return self
     
-    def set_bounds(self, contlon, contlat, radius, i, j, grd):
+    def set_bounds(self, contlon, contlat, grd):
         """
         Get indices to a bounding box around the eddy
         WARNING won't work for a rotated grid
@@ -1164,18 +1168,19 @@ class TrackList (object):
         jarr = np.array([bl_j, tl_j, br_j, tr_j])
         self.imin, self.imax = iarr.min(), iarr.max()
         self.jmin, self.jmax = jarr.min(), jarr.max()
-        pad = 2
+        
         # For indexing the mins must not be less than zero
-        self.imin = np.maximum(self.imin - pad, 0)
-        self.jmin = np.maximum(self.jmin - pad, 0)
-        self.imax += pad + 1
-        self.jmax += pad + 1
+        self.imin = np.maximum(self.imin - self.PAD, 0)
+        self.jmin = np.maximum(self.jmin - self.PAD, 0)
+        self.imax += self.PAD + 1
+        self.jmax += self.PAD + 1
         return self
     
     
     def set_mask_eff(self, contour, grd):
         """
-        Set points within bounding box around eddy and calculate mask
+        Set points within bounding box around eddy and calculate
+        mask for effective contour
         """
         self.points = np.array([grd.lon()[self.jmin:self.jmax,
                                           self.imin:self.imax].ravel(),
@@ -1296,7 +1301,8 @@ class RossbyWaveSpeed (object):
 class SearchEllipse (object):
     
     def __init__(self, domain, DAYS_BTWN_RECORDS, rw_path, limits):
-        """Class to construct a search ellipse/circle around a specified point.
+        """
+        Class to construct a search ellipse/circle around a specified point.
         
         """
         self.domain = domain
@@ -1333,13 +1339,13 @@ class SearchEllipse (object):
         """
         self._set_east_ellipse()._set_west_ellipse()
         e_verts = self.east_ellipse.get_verts()
-        e_size = e_verts[:,0].size
+        e_size = e_verts[:, 0].size
         e_size *= 0.5
         w_verts = self.west_ellipse.get_verts()
-        w_size = w_verts[:,0].size
+        w_size = w_verts[:, 0].size
         w_size *= 0.5
-        ew_x = np.hstack((e_verts[:e_size,0], w_verts[w_size:,0]))
-        ew_y = np.hstack((e_verts[:e_size,1], w_verts[w_size:,1]))
+        ew_x = np.hstack((e_verts[:e_size, 0], w_verts[w_size:, 0]))
+        ew_y = np.hstack((e_verts[:e_size, 1], w_verts[w_size:, 1]))
         self.ellipse_path = path.Path(np.array([ew_x, ew_y]).T)
         return self#.ellipse_path
     
@@ -1350,8 +1356,8 @@ class SearchEllipse (object):
         self.black_sea_ellipse = patch.Ellipse((self.x, self.y),
                                2. * self.rw_d_mod, 2. * self.rw_d_mod)
         verts = self.black_sea_ellipse.get_verts()
-        self.ellipse_path = path.Path(np.array([verts[:,0],
-                                                verts[:,1]]).T)
+        self.ellipse_path = path.Path(np.array([verts[:, 0],
+                                                verts[:, 1]]).T)
         return self
     
     
@@ -1362,7 +1368,8 @@ class SearchEllipse (object):
         self.y = y
         
         if self.domain in ('Global', 'ROMS'):
-            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.DAYS_BTWN_RECORDS)
+            self.rw_d[:] = self.rwv.get_rwdistance(x, y,
+                                                   self.DAYS_BTWN_RECORDS)
             self.rw_d_mod[:] = 1.75
             self.rw_d_mod *= self.rw_d
             self.rw_d_mod[:] = np.maximum(self.rw_d_mod, self.n_s_minor)
@@ -1370,7 +1377,8 @@ class SearchEllipse (object):
             self._set_global_ellipse()
         elif 'BlackSea'  in self.domain:
             self.rw_d_mod[:] = 1.75
-            self.rw_d[:] = self.rwv.get_rwdistance(x, y, self.DAYS_BTWN_RECORDS)
+            self.rw_d[:] = self.rwv.get_rwdistance(x, y,
+                                                   self.DAYS_BTWN_RECORDS)
             self.rw_d_mod *= self.rw_d
             self._set_black_sea_ellipse()
         else: Exception
@@ -1386,10 +1394,8 @@ class SearchEllipse (object):
         ax = plt.subplot(111)
         ax.set_title('Rossby def. rad %s m' %self.rw_d[0])
         Eddy.M.scatter(self.x, self.y, c='b')
-        #Eddy.M.plot(ee[:,0], ee[:,1], 'b')
-        #Eddy.M.plot(ww[:,0], ww[:,1], 'g')
-        Eddy.M.plot(self.ellipse_path.vertices[:,0],
-                    self.ellipse_path.vertices[:,1], 'r')
+        Eddy.M.plot(self.ellipse_path.vertices[:, 0],
+                    self.ellipse_path.vertices[:, 1], 'r')
         Eddy.M.drawcoastlines()
         plt.show()
     

@@ -478,7 +478,7 @@ class AvisoGrid (PyEddyTracker):
         try: # new AVISO (2014)
             self._lon = self.read_nc(AVISO_FILE, 'lon')
             self._lat = self.read_nc(AVISO_FILE, 'lat')
-            self.fillval = self.read_nc_att(AVISO_FILE, 'SLA', '_FillValue')
+            self.fillval = self.read_nc_att(AVISO_FILE, 'sla', '_FillValue')
             base_date = self.read_nc_att(AVISO_FILE, 'time', 'units')
             self.base_date = dt.date2num(
                                 parser.parse(base_date.split(' ')[2:4][0]))
@@ -514,9 +514,9 @@ class AvisoGrid (PyEddyTracker):
         if self.ZERO_CROSSING:
             
             try: # new AVISO (2014)
-                ssh1 = self.read_nc(AVISO_FILE, 'SLA',
+                ssh1 = self.read_nc(AVISO_FILE, 'sla',
                        indices='[:, self.jp0:self.jp1, :self.ip0]')
-                ssh0 = self.read_nc(AVISO_FILE, 'SLA',
+                ssh0 = self.read_nc(AVISO_FILE, 'sla',
                        indices='[:, self.jp0:self.jp1, self.ip1:]')
                 ssh0, ssh1 = ssh0.squeeze(), ssh1.squeeze()
                 ssh0 *= 100. # m to cm
@@ -533,7 +533,7 @@ class AvisoGrid (PyEddyTracker):
         else:
             
             try: # new AVISO (2014)
-                zeta = self.read_nc(AVISO_FILE, 'SLA',
+                zeta = self.read_nc(AVISO_FILE, 'sla',
                        indices='[:, self.jp0:self.jp1, self.ip0:self.ip1]')
                 zeta = zeta.squeeze()
                 zeta *= 100. # m to cm
