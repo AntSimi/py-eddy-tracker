@@ -36,6 +36,7 @@ from py_eddy_tracker_classes import plt, np, dt, Dataset, ndimage, time, \
                                     datestr2datetime, gaussian_resolution, \
                                     get_cax, collection_loop, track_eddies, \
                                     anim_figure, interpolate
+from py_eddy_tracker_amplitude import SwirlSpeed
 import make_eddy_tracker_list_obj as eddy_tracker
 from dateutil import parser
 from mpl_toolkits.basemap import Basemap
@@ -153,7 +154,7 @@ class PyEddyTracker (object):
         around 2d variables.
         Padded matrices are needed only for geostrophic velocity computation.
         """
-        print '--- Setting padding indices with pad=%s' %pad
+        print '--- Setting padding indices with PAD=%s' %pad
         
         self.pad = pad
         
@@ -1163,7 +1164,10 @@ if __name__ == '__main__':
                 plt.axis('image')
                 plt.show()
             
-
+            # Set contour coordinates and indices for calculation of
+            # speed-based radius
+            A_eddy.swirl = SwirlSpeed(A_CS)
+            C_eddy.swirl = SwirlSpeed(C_CS)
 
             # Now we loop over the CS collection
             A_eddy.sign_type = 'Anticyclonic'

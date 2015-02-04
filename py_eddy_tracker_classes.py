@@ -522,44 +522,56 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     citer = np.nditer(CS.cvalues, flags=['c_index'])
     #print '************************************************'
     while not citer.finished:
+         
+        ## Get contour around centlon_e, centlat_e at level [collind:][iuavg]
+        #segi, poly_i = eddy_tracker.find_nearest_contour(
+                         #CS.collections[citer.index], centlon_e, centlat_e)
+         
         
-        # Get contour around centlon_e, centlat_e at level [collind:][iuavg]
-        segi, poly_i = eddy_tracker.find_nearest_contour(
-                         CS.collections[citer.index], centlon_e, centlat_e)
+        # 
+        Eddy.swirl.set_dist_array_size(citer.index)
+        Eddy.swirl.set_nearest_contour_index(centlon_e, centlat_e)
+        segi = Eddy.swirl.get_index_nearest_path()
         
-        if poly_i is not None:
+        
+        if segi:
             
-            # NOTE: contains_points requires matplotlib 1.3 +
-            mask_i_sum = poly_i.contains_points(points).sum()
+            poly_i = CS.collections[citer.index].get_paths()[segi]
+        
+            ##print poly_ii is poly_i
+        
+        #if poly_i is not None:
+            
             
             # 1. Ensure polygon_i is within polygon_e
             # 2. Ensure polygon_i contains point centlon_e, centlat_e
             # 3. Respect size range
-            if np.all([poly_eff.contains_path(poly_i),
-                       poly_i.contains_point([centlon_e, centlat_e]),
-                       (mask_i_sum >= pixel_min and
-                        mask_i_sum <= Eddy.PIXEL_THRESHOLD[1])]):
+            #if np.all([poly_eff.contains_path(poly_i),
+                       #poly_i.contains_point([centlon_e, centlat_e]),
+                       #(mask_i_sum >= pixel_min and
+                        #mask_i_sum <= Eddy.PIXEL_THRESHOLD[1])]):
+            if poly_i.contains_point([centlon_e, centlat_e]):
+                if poly_eff.contains_path(poly_i):
+                    # NOTE: contains_points requires matplotlib 1.3 +
+                    mask_i_sum = poly_i.contains_points(points).sum()
+                    if (mask_i_sum >= pixel_min and
+                        mask_i_sum <= Eddy.PIXEL_THRESHOLD[1]):
                 
-                seglon, seglat = poly_i.vertices[:, 0], poly_i.vertices[:, 1]
-                seglon, seglat = eddy_tracker.uniform_resample(
-                                      seglon, seglat, method='akima')
-                
-                # Interpolate uspd to seglon, seglat, then get mean
-                uavgseg = Eddy.uspd_coeffs.ev(seglat[:-1], seglon[:-1]).mean()
-                #uavgseg = uavgseg
-                #uavgseg = rbspline.ev(seglat[:-1], seglon[:-1]).mean()
-                #uavgseg =  uavgseg.mean()
-                #print uavgseg
-                #assert uavgseg == uavgsegsss, 'fffffffffffff'
-                
-                if save_all_uavg:
-                    all_uavg.append(uavgseg)
-                
-                if (uavgseg >= uavg) and (mask_i_sum >= pixel_min):
-                    uavg = uavgseg.copy()
-                    theseglon, theseglat = seglon.copy(), seglat.copy()
-                
-                inner_seglon, inner_seglat = seglon.copy(), seglat.copy()
+                        seglon, seglat = poly_i.vertices[:, 0], poly_i.vertices[:, 1]
+                        seglon, seglat = eddy_tracker.uniform_resample(
+                                            seglon, seglat, method='akima')
+                        
+                        # Interpolate uspd to seglon, seglat, then get mean
+                        uavgseg = Eddy.uspd_coeffs.ev(seglat[:-1], seglon[:-1]).mean()
+                        
+                        if save_all_uavg:
+                            all_uavg.append(uavgseg)
+                        
+                        if uavgseg >= uavg:
+                            uavg = uavgseg.copy()
+                            theseglon, theseglat = seglon.copy(), seglat.copy()
+                        
+                        inner_seglon, inner_seglat = seglon.copy(), seglat.copy()
                 
         citer.iternext()
     
@@ -747,7 +759,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
         if VERBOSE:
             message = '------ doing collection %s, contour value %s'
             print message %  (collind, CS.cvalues[collind])
-                    
+        
         # Loop over individual CS contours (i.e., every eddy in field)
         for cont in coll.get_paths():
                         

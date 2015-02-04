@@ -215,3 +215,81 @@ class Amplitude (object):
         x_i, y_i = self.grd.lon()[lmi_j, lmi_i], self.grd.lat()[lmi_j, lmi_i]
         plt.scatter(x_i, y_i, c='gray')
         plt.show()
+
+        
+        
+class SwirlSpeed(object):
+    """
+    """
+    def __init__(self, contour):
+        """
+        ci : index to contours
+        li : index to levels
+        """
+        self.x = []
+        self.y = []
+        self.ci = []
+        self.li = []
+
+        for lind, cont in enumerate(contour.collections):
+            for cind, coll in enumerate(cont.get_paths()):
+                self.x.append(coll.vertices[:, 0])
+                self.y.append(coll.vertices[:, 1])
+                thelen = len(coll.vertices[:, 0])
+                self.ci.append([cind] * thelen)
+                self.li.append([lind] * thelen)
+    
+        self.x = np.array([val for sublist in self.x for val in sublist])
+        self.y = np.array([val for sublist in self.y for val in sublist])
+        self.ci = np.array([val for sublist in self.ci for val in sublist],
+                                                               dtype=np.int)
+        self.li = np.array([val for sublist in self.li for val in sublist],
+                                                               dtype=np.int)
+        
+        self.nearesti = None
+        self.dist = None
+        self.lbool = None
+        
+    
+    def _set_level_bool(self, thelevel):
+        """
+        Set a boolean to select only values to a discrete
+        contour level in self.li
+        """
+        self.lbool = self.li == thelevel
+        return self
+        
+    
+    def set_dist_array_size(self, thelevel):
+        """
+        """
+        self._set_level_bool(thelevel)
+        self.dist = np.empty_like(self.li[self.lbool])
+        return self
+        
+    
+    def set_nearest_contour_index(self, xpt, ypt):
+        """
+        """
+        self.dist[:] = (self.x[self.lbool] - xpt)**2
+        self.dist += (self.y[self.lbool] - ypt)**2
+        try:
+            self.nearesti = self.dist.argmin()
+        except:
+            self.nearesti = None
+        return self
+    
+    
+    def get_index_nearest_path(self):
+        """
+        """
+        ind = self.nearesti
+        if ind is not None:
+            return self.ci[self.lbool[ind]]
+        else:
+            return False
+    
+    
+        
+        
+        
