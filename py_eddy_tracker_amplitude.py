@@ -280,11 +280,9 @@ class SwirlSpeed(object):
         #print self.y[self.level_slice]
         self.dist = (self.x[self.level_slice] - xpt)**2
         self.dist += (self.y[self.level_slice] - ypt)**2
-        #print 'self.dist',self.dist
         try:
             self.nearesti = self.dist.argmin()
         except:
-            #print 'except'
             self.nearesti = None
         return self
     
@@ -298,10 +296,8 @@ class SwirlSpeed(object):
             for i, index_of_first_pt in enumerate(indices_of_first_pts):
                 if (index_of_first_pt - indices_of_first_pts[0]) > self.nearesti:
                     return i - 1
-            #print '/////'
             return i
         else:
-            #print '-----'
             return False
     
     
