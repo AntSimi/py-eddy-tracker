@@ -12,12 +12,12 @@ DOMAIN:
   THE_DOMAIN: 'Global'
   #THE_DOMAIN = 'BlackSea'
   #THE_DOMAIN = 'MedSea' # not yet implemented
-  LONMIN: -70.
+  LONMIN: -40.
   LONMAX: -5.
-  LATMIN: 5.
-  LATMAX: 55.
+  LATMIN: 20.
+  LATMAX: 30.
   DATE_STR: 20020101
-  DATE_END: 20020630
+  DATE_END: 20020331
 
 # Specify the AVISO product
 AVISO:
@@ -37,6 +37,9 @@ PATHS:
   #RW_PATH: '/home/emason/data_tmp/chelton_eddies/rossrad.dat'
 
   # Path for saving of outputs
+#   SAVE_DIR: '/homelocal/emason/outputs/before_swirl/'
+#   SAVE_DIR: '/homelocal/emason/outputs/after_swirl/'
+#   SAVE_DIR: '/homelocal/emason/outputs/after_swirl_slice/'
   SAVE_DIR: '/homelocal/emason/outputs/'
   #SAVE_DIR: '/marula/emason/aviso_eddy_tracking/fd0cdb4b2bd9/'
 

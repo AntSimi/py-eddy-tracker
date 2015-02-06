@@ -1168,7 +1168,7 @@ if __name__ == '__main__':
             # speed-based radius
             A_eddy.swirl = SwirlSpeed(A_CS)
             C_eddy.swirl = SwirlSpeed(C_CS)
-
+            
             # Now we loop over the CS collection
             A_eddy.sign_type = 'Anticyclonic'
             C_eddy.sign_type = 'Cyclonic'

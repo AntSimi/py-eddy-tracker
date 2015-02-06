@@ -344,6 +344,7 @@ def find_nearest_contour(contcoll, x, y):
         dss = lc[:,1] - y
         dss **= 2
         ds += dss
+        #print 'ds', ds
         d = ds.min()
         if d < dmin:
             dmin = d

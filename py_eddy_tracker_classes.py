@@ -402,19 +402,23 @@ def fit_circle(xvec, yvec):
     xsc = xvec - xmean
     ysc = yvec - ymean
     
-    scale = np.array([np.sqrt(xsc**2 + ysc**2).max(),
-                                 np.finfo(float).eps]).max()
+    scale = np.sqrt((xsc**2 + ysc**2).max())
+    
     xsc /= scale
     ysc /= scale
 
     # Form matrix equation and solve it
+    #print np.concatenate((2. * xsc, 2. * ysc, np.ones((npts, 1))), axis=1)
+    #print xsc**2 + ysc**2
     xyz = np.linalg.lstsq(
              np.concatenate((2. * xsc, 2. * ysc, np.ones((npts, 1))), axis=1),
-             np.sqrt(xsc**2 + ysc**2)**2)
-    
+             xsc**2 + ysc**2)
+    #print xyz
+    #plt.plot(2. * xsc)
+    #exit()
     # Unscale data and get circle variables
     p = np.concatenate((xyz[0][0], xyz[0][1],
-           np.sqrt(xyz[0][2] + np.sqrt(xyz[0][0]**2 + xyz[0][1]**2)**2)))
+           np.sqrt(xyz[0][2] + xyz[0][0]**2 + xyz[0][1]**2)))
     p *= scale
     p += np.array([xmean, ymean, 0.])
 
@@ -474,41 +478,19 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     If save_all_uavg == True we want uavg for every contour
     """
     # Unpack indices for convenience
-    #istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
     imin, imax, jmin, jmax = Eddy.imin, Eddy.imax, Eddy.jmin, Eddy.jmax
-    
-    # TO DO: these would be passed in instead of grd if using Cython
-    #brypath = grd.brypath(istr, iend, jstr, jend)
     
     points = np.array([grd.lon()[jmin:jmax, imin:imax].ravel(),
                        grd.lat()[jmin:jmax, imin:imax].ravel()]).T
-    
-    #rbspline = interpolate.RectBivariateSpline(
-                           #grd.lat()[jmin:jmax, 0],
-                           #grd.lon()[0, imin:imax],
-                           #Eddy.uspd[jmin:jmax, imin:imax], kx=1, ky=1)
     
     # First contour is the outer one (effective)
     theseglon, theseglat = poly_eff.vertices[:, 0].copy(), \
                            poly_eff.vertices[:, 1].copy()
     
-    #plt.figure()
-    
-    #plt.pcolormesh(grd.lon()[jmin:jmax, imin:imax],
-                   #grd.lat()[jmin:jmax, imin:imax],
-                   #Eddy.uspd[jmin:jmax, imin:imax])
-    #plt.plot(theseglon, theseglat, 'b')
-    
     theseglon, theseglat = eddy_tracker.uniform_resample(
         theseglon, theseglat, method='akima')
     
-    #plt.plot(theseglon, theseglat, 'or')
-    
-    uavg = Eddy.uspd_coeffs.ev(theseglat[:-1], theseglon[:-1]).mean()
-    #uavg = rbspline.ev(theseglon[:-1], theseglat[:-1]).mean()
-    
-    #plt.axis('image')
-    #plt.show()
+    uavg = Eddy.uspd_coeffs.ev(theseglat[1:], theseglon[1:]).mean()
     
     if save_all_uavg:
         all_uavg = [uavg]
@@ -518,51 +500,54 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
         # Iterate until PIXEL_THRESHOLD[0] number of pixels
         pixel_min = Eddy.PIXEL_THRESHOLD[0]
     
-    #start = True
+    # Flag as True if contours found within effective contour
+    any_inner_contours = False
+    
     citer = np.nditer(CS.cvalues, flags=['c_index'])
     #print '************************************************'
     while not citer.finished:
-         
-        ## Get contour around centlon_e, centlat_e at level [collind:][iuavg]
-        #segi, poly_i = eddy_tracker.find_nearest_contour(
-                         #CS.collections[citer.index], centlon_e, centlat_e)
-         
         
-        # 
+        #print '--------------' * 10
+        #print '--------------' * 10
+        #print '\nciter.index ::', citer.index
+        ## Get contour around centlon_e, centlat_e at level [collind:][iuavg]
+        #segii, poly_i = eddy_tracker.find_nearest_contour(
+                         #CS.collections[citer.index], centlon_e, centlat_e)
+        
         Eddy.swirl.set_dist_array_size(citer.index)
+        
+        # Leave loop if no contours at level citer.index
+        if Eddy.swirl.level_slice is None:
+            #print '------------------------------------------'
+            citer.iternext()
+            continue
+        
         Eddy.swirl.set_nearest_contour_index(centlon_e, centlat_e)
         segi = Eddy.swirl.get_index_nearest_path()
-        
         
         if segi:
             
             poly_i = CS.collections[citer.index].get_paths()[segi]
-        
-            ##print poly_ii is poly_i
-        
-        #if poly_i is not None:
             
-            
-            # 1. Ensure polygon_i is within polygon_e
-            # 2. Ensure polygon_i contains point centlon_e, centlat_e
-            # 3. Respect size range
-            #if np.all([poly_eff.contains_path(poly_i),
-                       #poly_i.contains_point([centlon_e, centlat_e]),
-                       #(mask_i_sum >= pixel_min and
-                        #mask_i_sum <= Eddy.PIXEL_THRESHOLD[1])]):
+            # 1. Ensure polygon_i contains point centlon_e, centlat_e
             if poly_i.contains_point([centlon_e, centlat_e]):
+                
+                # 2. Ensure polygon_i is within polygon_e
                 if poly_eff.contains_path(poly_i):
-                    # NOTE: contains_points requires matplotlib 1.3 +
+                    
+                    # 3. Respect size range
                     mask_i_sum = poly_i.contains_points(points).sum()
                     if (mask_i_sum >= pixel_min and
                         mask_i_sum <= Eddy.PIXEL_THRESHOLD[1]):
-                
+                        
+                        any_inner_contours = True
+                        
                         seglon, seglat = poly_i.vertices[:, 0], poly_i.vertices[:, 1]
                         seglon, seglat = eddy_tracker.uniform_resample(
                                             seglon, seglat, method='akima')
                         
                         # Interpolate uspd to seglon, seglat, then get mean
-                        uavgseg = Eddy.uspd_coeffs.ev(seglat[:-1], seglon[:-1]).mean()
+                        uavgseg = Eddy.uspd_coeffs.ev(seglat[1:], seglon[1:]).mean()
                         
                         if save_all_uavg:
                             all_uavg.append(uavgseg)
@@ -575,160 +560,26 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                 
         citer.iternext()
     
-    try: # Assuming interior contours have been found
-        
+    
+    if any_inner_contours:
         cx, cy = Eddy.M(theseglon, theseglat)
-        # Speed based eddy radius (eddy_radius_s)
+        # Get speed based eddy radius (eddy_radius_s)
         centx_s, centy_s, eddy_radius_s, junk = fit_circle(cx, cy)
         centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
-        if not save_all_uavg:
-            return (uavg, centlon_s, centlat_s, eddy_radius_s,
-                    theseglon, theseglat, inner_seglon, inner_seglat)
-        else:  
-            return (uavg, centlon_s, centlat_s, eddy_radius_s,
-                    theseglon, theseglat, inner_seglon, inner_seglat, all_uavg)
     
-    except Exception: # If no interior contours found, use eddy_radius_e
-    
-        if not save_all_uavg:
-            return (uavg, centlon_e, centlat_e, eddy_radius_e,
-                    theseglon, theseglat, theseglon, theseglat)
-        else:
-            return (uavg, centlon_e, centlat_e, eddy_radius_e,
-                    theseglon, theseglat, theseglon, theseglat, all_uavg)
-    
-
-
-
-#def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_e, grd, eddy_radius_e, save_all_uavg=False):
-    #'''
-    #Calculate geostrophic speed around successive contours
-    #Returns the average
-    
-    #If save_all_uavg == True we want Uavg for every contour
-    #'''
-    #def calc_uavg(points, uspd, lon, lat):
-        #'''
-        #TO DO: IT SHOULD BE QUICKER, AND POSSIBLY BETTER, TO DO THIS BY CALCULATING
-        #WEIGHTS AND THEN USING np.average()...
-        #'''
-        #uavg = interpolate.griddata(points, uspd.ravel(), (lon, lat), 'linear')
-        #return np.mean(uavg[np.isfinite(uavg)])
-    
-    ## True for debug figures
-    ##debug_U = False
-    ##if debug_U:
-    ##schem_dic = {}
-    ##conts_x = np.array([])
-    ##conts_y = np.array([])
-    
-    ## Unpack indices for convenience
-    ##istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
-    #imin, imax, jmin, jmax = Eddy.imin, Eddy.imax, Eddy.jmin, Eddy.jmax
-    
-    ## TO DO: these would be passed in instead of grd if using Cython
-    ##brypath = grd.brypath(istr, iend, jstr, jend)
-    
-    #points = np.array([grd.lon()[jmin:jmax,imin:imax].ravel(),
-                       #grd.lat()[jmin:jmax,imin:imax].ravel()]).T
-    
-    ## First contour is the outer one (effective)
-    #theseglon, theseglat = poly_e.vertices[:,0].copy(), poly_e.vertices[:,1].copy()
-    #theseglon, theseglat = eddy_tracker.uniform_resample(theseglon, theseglat)
-    #Uavg = calc_uavg(points, Eddy.uspd[jmin:jmax,imin:imax], theseglon[:-1], theseglat[:-1])
-    
-    #if save_all_uavg:
-        #all_uavg = [Uavg]
-
-    #start = True
-    #citer = np.nditer(CS.cvalues, flags=['f_index'])
-    #while not citer.finished:
+    else:
+        centlon_s, centlat_s = centlon_e, centlat_e
+        eddy_radius_s = eddy_radius_e
+        inner_seglon, inner_seglat = theseglon, theseglat
         
-        ## Get contour around centlon_e, centlat_e at level [collind:][iuavg]
-        #try:
-            #conti, segi, junk, junk, junk, junk = CS.find_nearest_contour(
-                #centlon_e, centlat_e,  indices=np.array([citer.index]),
-                #pixel=False)
-            #poly_i = CS.collections[conti].get_paths()[segi]
-            
-        #except Exception:
-            #poly_i = False
-                
-        #if poly_i:
-            ## NOTE: contains_points requires matplotlib 1.3 +
-            #mask_i = poly_i.contains_points(points)
-                    
-            ## 1. Ensure polygon_i is within polygon_e
-            ## 2. Ensure polygon_i contains point centlon_e, centlat_e
-            ## 3. Respect size range
-            #if not save_all_uavg:
-                ## Iterate until pixel_threshold[0] number of pixels
-                #if np.all([poly_e.contains_path(poly_i),
-                           #poly_i.contains_point([centlon_e, centlat_e]),
-                           #np.logical_and(np.sum(mask_i) >= Eddy.PIXEL_THRESHOLD[0],
-                                          #np.sum(mask_i) <= Eddy.PIXEL_THRESHOLD[1])]):
-                    #proceed = True
-                #else:
-                    #proceed = False
-                                           
-            #else:
-                ## Iterate until 1 pixel
-                #if np.all([poly_e.contains_path(poly_i),
-                              #poly_i.contains_point([centlon_e, centlat_e]),
-                           #np.logical_and(np.sum(mask_i) >= 1,
-                          #np.sum(mask_i) <= Eddy.PIXEL_THRESHOLD[1])]):
-                    #proceed = True
-                #else:
-                    #proceed = False
-
-            #if proceed:
-                
-                #seglon, seglat = poly_i.vertices[:,0], poly_i.vertices[:,1]
-                #seglon, seglat = eddy_tracker.uniform_resample(seglon, seglat)
-                ## Interpolate Uspd to seglon, seglat, then get mean
-                #Uavgseg = calc_uavg(points, Eddy.uspd[jmin:jmax,imin:imax], seglon[:-1], seglat[:-1])
-                
-                #if save_all_uavg:
-                    #all_uavg.append(Uavgseg)
-                    
-                #if Uavgseg >= Uavg and np.sum(mask_i) >= Eddy.PIXEL_THRESHOLD[0]:
-                    #Uavg = Uavgseg.copy()
-                    #theseglon, theseglat = seglon.copy(), seglat.copy()
-                        
-                #inner_seglon, inner_seglat = seglon.copy(), seglat.copy()
-                        
-        #citer.iternext()
+        
+    if not save_all_uavg:
+        return (uavg, centlon_s, centlat_s, eddy_radius_s,
+                theseglon, theseglat, inner_seglon, inner_seglat)
+    else:  
+        return (uavg, centlon_s, centlat_s, eddy_radius_s,
+                theseglon, theseglat, inner_seglon, inner_seglat, all_uavg)
     
-    #try: # Assuming interior contours have been found
-                        
-        #cx, cy = Eddy.M(theseglon, theseglat)
-        ## Speed based eddy radius (eddy_radius_s)
-        #centx_s, centy_s, eddy_radius_s, junk, junk = fit_circle(cx, cy)
-        #centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
-        #if not save_all_uavg:
-            #return Uavg, centlon_s, centlat_s, eddy_radius_s, theseglon, theseglat, inner_seglon, inner_seglat
-        #else:
-            #return Uavg, centlon_s, centlat_s, eddy_radius_s, theseglon, theseglat, inner_seglon, inner_seglat, all_uavg
-        
-    #except Exception: # If no interior contours found, use eddy_radius_e
-        
-
-        #if not save_all_uavg:
-            #return Uavg, centlon_e, centlat_e, eddy_radius_e, theseglon, theseglat, theseglon, theseglat
-        #else:
-            ##print 'cbcbcbcbv'
-            #return Uavg, centlon_e, centlat_e, eddy_radius_e, theseglon, theseglat, theseglon, theseglat, all_uavg
-
-
-
-
-
-
-
-
-
-
-
 
 
 def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
@@ -752,6 +603,10 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
     # Unpack indices for convenience
     istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
     
+            
+    # Set contour coordinates and indices for calculation of
+    # speed-based radius
+    #swirl = SwirlSpeed(Eddy, CS)
     
     # Loop over each collection
     for collind, coll in enumerate(CS.collections):
