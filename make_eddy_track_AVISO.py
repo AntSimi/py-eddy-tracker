@@ -853,8 +853,9 @@ if __name__ == '__main__':
     
     
     # Instantiate search ellipse object
-    search_ellipse = eddy_tracker.SearchEllipse(THE_DOMAIN, DAYS_BTWN_RECORDS,
-                                    RW_PATH, [LONMIN, LONMAX, LATMIN, LATMAX])
+    search_ellipse = eddy_tracker.SearchEllipse(THE_DOMAIN, sla_grd,
+            DAYS_BTWN_RECORDS, sla_grd.ZERO_CROSSING, RW_PATH,
+            [LONMIN, LONMAX, LATMIN, LATMAX])
     
     
     if 'Gaussian' in SMOOTHING_TYPE:

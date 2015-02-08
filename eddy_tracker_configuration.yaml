@@ -13,34 +13,37 @@ DOMAIN:
   #THE_DOMAIN = 'BlackSea'
   #THE_DOMAIN = 'MedSea' # not yet implemented
   LONMIN: -40.
-  LONMAX: -5.
-  LATMIN: 20.
-  LATMAX: 30.
-  DATE_STR: 20020101
-  DATE_END: 20020331
+  LONMAX: -30.
+  LATMIN: 30.
+  LATMAX: 40.
+  DATE_STR: 19980101
+  DATE_END: 19980331
 
 # Specify the AVISO product
 AVISO:
   AVISO_DT14: Yes # Use new AVISO DT14 data (e.g., Capet et al, 2014)
-  AVISO_FILES: 'dt_global_twosat_msla_h_????????_20140106.nc'
+  AVISO_FILES: 'dt_global_allsat_msla_h_????????_20140106.nc'
   AVISO_DT14_SUBSAMP: No # subsample the dqily AVISO DT14
   DAYS_BTWN_RECORDS: 7  # sampling rate (days)
 
 PATHS:
   # Path to AVISO data
-  DATA_DIR: '/data/PVA/Externe/global/delayed-time/grids/msla/two-sat-merged/h/2002/'
+  #DATA_DIR: '/data/PVA/Externe/global/delayed-time/grids/msla/two-sat-merged/h/2002/'
+  DATA_DIR: '/Users/emason/data/AVISO/global/delayed-time/grids/msla/all-sat-merged/h/'
   #DATA_DIR: '/marula/emason/data/altimetry/global/delayed-time/grids/msla/two-sat-merged/h/'
   # Path and filename of Chelton et al (1998) Rossby radius data
   # Obtain file from:
   # http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
-  RW_PATH: '/homelocal/emason/rossrad.dat'
+  #RW_PATH: '/homelocal/emason/rossrad.dat'
+  RW_PATH: '/Users/emason/Downloads/rossrad.dat'
   #RW_PATH: '/home/emason/data_tmp/chelton_eddies/rossrad.dat'
 
   # Path for saving of outputs
 #   SAVE_DIR: '/homelocal/emason/outputs/before_swirl/'
 #   SAVE_DIR: '/homelocal/emason/outputs/after_swirl/'
 #   SAVE_DIR: '/homelocal/emason/outputs/after_swirl_slice/'
-  SAVE_DIR: '/homelocal/emason/outputs/'
+  #SAVE_DIR: '/homelocal/emason/outputs/'
+  SAVE_DIR: '/Users/emason/toto/'
   #SAVE_DIR: '/marula/emason/aviso_eddy_tracking/fd0cdb4b2bd9/'
 
   # Reference Julian day (Julian date at Jan 1, 1992)
