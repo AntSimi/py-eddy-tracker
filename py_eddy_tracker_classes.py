@@ -911,8 +911,6 @@ def track_eddies(Eddy, first_record):
         # Make an ellipse at current old_eddy location
         # (See CSS11 sec. B4, pg. 208)
         if 'ellipse' in Eddy.SEPARATION_METHOD:
-            #Eddy.search_ellipse.set_search_ellipse(Eddy.old_lon[old_ind],
-                                                   #Eddy.old_lat[old_ind])
             Eddy.search_ellipse.set_search_ellipse(old_x[old_ind],
                                                    old_y[old_ind])
             
@@ -923,9 +921,6 @@ def track_eddies(Eddy, first_record):
             if 'ellipse' in Eddy.SEPARATION_METHOD:
                 if Eddy.search_ellipse.ellipse_path.contains_point(
                                           (new_x[new_ind], new_y[new_ind])):
-                #if Eddy.search_ellipse.ellipse_path.contains_point(
-                        #(Eddy.new_lon_tmp[new_ind], Eddy.new_lat_tmp[new_ind])):
-                    #Eddy.search_ellipse.view_search_ellipse(Eddy)
                     sep_proceed = True
                 else:
                     sep_proceed = False

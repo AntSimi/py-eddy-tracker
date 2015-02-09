@@ -68,6 +68,9 @@ class PyEddyTracker (object):
     def __init__(self):
         """
         Set some constants
+          
+          *ZERO_CROSSING*:
+            Boolean, *True* if THE_DOMAIN crosses 0 degree meridian
         """
         self.GRAVITY = 9.81
         self.EARTH_RADIUS = 6371315.0
@@ -834,8 +837,7 @@ if __name__ == '__main__':
     
     # Instantiate search ellipse object
     search_ellipse = eddy_tracker.SearchEllipse(THE_DOMAIN, sla_grd,
-            DAYS_BTWN_RECORDS, sla_grd.ZERO_CROSSING, RW_PATH,
-            [LONMIN, LONMAX, LATMIN, LATMAX])
+            DAYS_BTWN_RECORDS, RW_PATH)
     
     
     if 'Gaussian' in SMOOTHING_TYPE:

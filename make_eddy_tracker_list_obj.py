@@ -1001,66 +1001,71 @@ class TrackList (object):
         
 class RossbyWaveSpeed (object):
   
-    def __init__(self, domain, grd, ZERO_CROSSING, limits, rw_path=None):
+    def __init__(self, THE_DOMAIN, grd, RW_PATH=None):
         """
         Initialise the RossbyWaveSpeedsobject
         """
-        self.domain = domain
+        self.THE_DOMAIN = THE_DOMAIN
         self.M = grd.M
-        self.ZERO_CROSSING = ZERO_CROSSING
-        self.rw_path = rw_path
-        if self.domain in ('Global', 'ROMS'):
-            assert self.rw_path is not None, \
+        self.EARTH_RADIUS = grd.EARTH_RADIUS
+        self.ZERO_CROSSING = grd.ZERO_CROSSING
+        self.RW_PATH = RW_PATH
+        if self.THE_DOMAIN in ('Global', 'ROMS'):
+            assert self.RW_PATH is not None, \
                 'Must supply a path for the Rossby deformation radius data'
-            data = np.loadtxt(rw_path)
+            data = np.loadtxt(RW_PATH)
             self._lon = data[:, 1] - 360.
             self._lat = data[:, 0]
             self._defrad = data[:, 3]
-            self.limits = limits
+            self.limits = [grd.LONMIN, grd.LONMAX, grd.LATMIN, grd.LATMAX]
             self._make_subset()._make_kdtree()
             self.vartype = 'variable'
         else:
             self.vartype = 'constant'
         self.distance = np.empty(1)
+        self.beta = np.empty(1)
+        self.r_spd_long = np.empty(1)
         self.start = True
     
         
     def get_rwdistance(self, xpt, ypt, DAYS_BTWN_RECORDS):
         """
         """
-        if self.domain in ('Global', 'ROMS'):
+        if self.THE_DOMAIN in ('Global', 'ROMS'):
 	    #print 'xpt, ypt', xpt, ypt
-            self.distance[:] = self._get_c(xpt, ypt)
+            self.distance[:] = self._get_rlongwave_spd(xpt, ypt)
             self.distance *= 86400.
-            #if self.domain in 'ROMS':
+            #if self.THE_DOMAIN in 'ROMS':
                 #self.distance *= 1.5
-        elif 'BlackSea' in self.domain:
+        elif 'BlackSea' in self.THE_DOMAIN:
             self.distance[:] = 15000. # e.g., Blokhina & Afanasyev, 2003
-        elif 'MedSea' in self.domain:
+        elif 'MedSea' in self.THE_DOMAIN:
             self.distance[:] = 20000.
         else:
-            Exception # Unknown domain
+            Exception # Unknown THE_DOMAIN
         
         if self.start:
-            #print x, y
-            if x < 0.:
-                lon = "".join((str(x), 'W'))
-            elif x >= 0:
-                lon = "".join((str(x), 'E'))
-            if y < 0:
-                lat = "".join((str(y), 'S'))
-            elif y >= 0:
-                lat = "".join((str(y), 'N'))
+            lon, lat = self.M.projtran(xpt, ypt, inverse=True)
+            lon, lat = np.round(lon, 2), np.round(lat, 2)
+            if lon < 0.:
+                lon = "".join((str(lon), 'W'))
+            elif lon >= 0:
+                lon = "".join((str(lon), 'E'))
+            if lat < 0:
+                lat = "".join((str(lat), 'S'))
+            elif lat >= 0:
+                lat = "".join((str(lat), 'N'))
             
             print "".join(('--------- setting ellipse for first tracked ',
                            'eddy at %s, %s in the %s domain'
-                            % (lon, lat, self.domain)))
-            print '--------- using %s Rossby deformation radius of %s m' \
-                                % (self.vartype, np.abs(self.distance[0]))
+                            % (lon, lat, self.THE_DOMAIN)))
+            c = np.abs(self._get_rlongwave_spd(xpt, ypt))[0]
+            print "".join(('--------- with extratropical long baroclinic',
+                           'Rossby wave phase speed of %s m/s' % c))
             self.start = False
-        self.distance *= DAYS_BTWN_RECORDS
-        #print 'aaaa', self.distance
-        return self.distance
+        
+        self.distance = np.abs(self.distance)
+        return self.distance * DAYS_BTWN_RECORDS
     
     
     def _make_subset(self):
@@ -1074,7 +1079,7 @@ class RossbyWaveSpeed (object):
                                self._lat <= LATMAX + pad)
         self._lon = self._lon[lloi]
         self._lat = self._lat[lloi]
-        self._c = self._c[lloi]
+        self._defrad = self._defrad[lloi]
         self.x, self.y = self.M(self._lon, self._lat)
         return self
     
@@ -1085,72 +1090,75 @@ class RossbyWaveSpeed (object):
         self._tree = spatial.cKDTree(points)
     
     
-    #def _get_defrad(self, x, y):
-        #"""
-        #Get a point average of the deformation radius
-        #at x, y
-        #"""
-        #weights, i = self._tree.query(np.array([x, y]), k=4, p=2)
-        #weights /= weights.sum()
-        #self._weights = weights
-        #self.i = i
-        #return np.average(self._defrad[i], weights=weights)
-    
-    def _get_c(self, xpt, ypt):
+    def _get_defrad(self, xpt, ypt):
         """
         Get a point average of the deformation radius
-        at x, y
+        at xpt, ypt
         """
-        weights, i = self._tree.query(np.array([x, y]), k=4, p=2)
+        weights, i = self._tree.query(np.array([xpt, ypt]), k=4, p=2)
         weights /= weights.sum()
         self._weights = weights
         self.i = i
         return np.average(self._defrad[i], weights=weights)
     
     
-    def _get_rlongwave_spd(self, x, y):
+    def _get_rlongwave_spd(self, xpt, ypt):
         """
         Get the longwave phase speed, see Chelton etal (2008) pg 446:
           c = -beta * defrad**2 (this only for extratropical waves...)
         """
-        r_spd_long = self._get_defrad(x, y)
-        r_spd_long *= 1000. # km to m
-        r_spd_long **= 2
-        lat = np.average(self._lat[self.i], weights=self._weights)
-        beta = np.cos(np.deg2rad(lat))
-        beta *= 1458e-7 # 1458e-7 ~ (2 * 7.29*10**-5)
-        beta /= 6371315.0
-        r_spd_long *= -beta
-        return r_spd_long
+        self.r_spd_long[:] = self._get_defrad(xpt, ypt)
+        self.r_spd_long *= 1000. # km to m
+        self.r_spd_long **= 2
+        self.beta[:] = np.average(self._lat[self.i],
+                                  weights=self._weights) # lat
+        self.beta[:] = np.cos(np.deg2rad(self.beta))
+        self.beta *= 1458e-7 # 1458e-7 ~ (2 * 7.29*10**-5)
+        self.beta /= self.EARTH_RADIUS
+        self.r_spd_long *= -self.beta
+        return self.r_spd_long
     
 
     
     
 class SearchEllipse (object):
-    
-    def __init__(self, domain, grd, DAYS_BTWN_RECORDS, ZERO_CROSSING,
-                 rw_path, limits):
+    """
+    Class to construct a search ellipse/circle around a specified point.
+    See CSS11 Appendix B.4. "Automated eddy tracking" for details.
+    """
+    def __init__(self, THE_DOMAIN, grd, DAYS_BTWN_RECORDS, RW_PATH=None):
         """
-        Class to construct a search ellipse/circle around a specified point.
+        Set the constant dimensions of the search ellipse.
+        Instantiate a RossbyWaveSpeed object
         
+        Arguments:
+          
+          *THE_DOMAIN*: string
+            Refers to THE_DOMAIN specified in yaml configuration file
+          
+          *grd*: An AvisoGrid or RomsGrid object.
+          
+          *DAYS_BTWN_RECORDS*: integer
+            Constant defined in yaml configuration file.
+          
+          *RW_PATH*: string
+            Path to rossrad.dat file, specified in yaml configuration file.
         """
-        self.domain = domain
+        self.THE_DOMAIN = THE_DOMAIN
         self.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
-        self.ZERO_CROSSING = ZERO_CROSSING
-        self.rw_path = rw_path
-        self.limits = limits
-        self.rw_d_fac = 1.75
         self.e_w_major = self.DAYS_BTWN_RECORDS * 3e5 / 7.
         self.n_s_minor = self.DAYS_BTWN_RECORDS * 2 * 15e4 / 7.
         self.semi_n_s_minor = 0.5 * self.n_s_minor
-        self.rwv = RossbyWaveSpeed(domain, grd, ZERO_CROSSING,
-                               limits, rw_path=rw_path)
-        self.rw_d = np.empty(1)
-        self.rw_d_mod = np.empty(1)
+        self.rwv = RossbyWaveSpeed(THE_DOMAIN, grd, RW_PATH=RW_PATH)
+        self.rw_c = np.empty(1)
+        self.rw_c_mod = np.empty(1)
+        self.rw_c_fac = 1.75
     
     
     def _set_east_ellipse(self):
         """
+        The east_ellipse is a full ellipse, but only its eastern
+        part is used to build the search ellipse.
         """
         self.east_ellipse = patch.Ellipse((self.xpt, self.ypt),
                                            self.e_w_major, self.n_s_minor)
@@ -1159,14 +1167,17 @@ class SearchEllipse (object):
     
     def _set_west_ellipse(self):
         """
+        The east_ellipse is a full ellipse, but only its eastern
+        part is used to build the search ellipse.
         """
         self.west_ellipse = patch.Ellipse((self.xpt, self.ypt),
-                                           self.rw_d_mod, self.n_s_minor)
+                                           self.rw_c_mod, self.n_s_minor)
         return self
     
     
     def _set_global_ellipse(self):
         """
+        
         """
         self._set_east_ellipse()._set_west_ellipse()
         e_verts = self.east_ellipse.get_verts()
@@ -1185,7 +1196,7 @@ class SearchEllipse (object):
         """
         """
         self.black_sea_ellipse = patch.Ellipse((self.x, self.y),
-                               2. * self.rw_d_mod, 2. * self.rw_d_mod)
+                               2. * self.rw_c_mod, 2. * self.rw_c_mod)
         verts = self.black_sea_ellipse.get_verts()
         self.ellipse_path = path.Path(np.array([verts[:, 0],
                                                 verts[:, 1]]).T)
@@ -1198,26 +1209,21 @@ class SearchEllipse (object):
         self.xpt = xpt
         self.ypt = ypt
         
-        if self.domain in ('Global', 'ROMS'):
-            self.rw_d[:] = self.rwv.get_rwdistance(xpt, ypt,
+        if self.THE_DOMAIN in ('Global', 'ROMS'):
+            self.rw_c[:] = self.rwv.get_rwdistance(xpt, ypt,
                                   self.DAYS_BTWN_RECORDS)
-            #print self.rw_d
-            #exit()
-            self.rw_d_mod[:] = 1.75
-            self.rw_d_mod *= self.rw_d
-            self.rw_d_mod[:] = np.array([self.rw_d_mod,
+            self.rw_c_mod[:] = 1.75
+            self.rw_c_mod *= self.rw_c
+            self.rw_c_mod[:] = np.array([self.rw_c_mod,
                                          self.semi_n_s_minor]).max()
-            
-            #print self.rw_d_mod, self.semi_n_s_minor
-            
-            self.rw_d_mod *= 2.
+            self.rw_c_mod *= 2.
             self._set_global_ellipse()
         
-        elif 'BlackSea'  in self.domain:
-            self.rw_d_mod[:] = 1.75
-            self.rw_d[:] = self.rwv.get_rwdistance(x, y,
-                                                   self.DAYS_BTWN_RECORDS)
-            self.rw_d_mod *= self.rw_d
+        elif 'BlackSea'  in self.THE_DOMAIN:
+            self.rw_c_mod[:] = 1.75
+            self.rw_c[:] = self.rwv.get_rwdistance(x, y,
+                                   self.DAYS_BTWN_RECORDS)
+            self.rw_c_mod *= self.rw_c
             self._set_black_sea_ellipse()
         
         else:
@@ -1232,7 +1238,7 @@ class SearchEllipse (object):
         """
         plt.figure()
         ax = plt.subplot()
-        #ax.set_title('Rossby def. rad %s m' %self.rw_d[0])
+        #ax.set_title('Rossby def. rad %s m' %self.rw_c[0])
         Eddy.M.scatter(self.xpt, self.ypt, c='b')
         Eddy.M.plot(self.ellipse_path.vertices[:, 0],
                     self.ellipse_path.vertices[:, 1], 'r')
@@ -1242,7 +1248,6 @@ class SearchEllipse (object):
                              labels=[1, 0, 0, 0], ax=ax)
         Eddy.M.drawmeridians(np.arange(-360, 360. + stride, stride),
                              labels=[0, 0, 0, 1], ax=ax)
-        #plt.axis('image')
         plt.show()
     
     
