@@ -32,12 +32,15 @@ Scroll down to line ~640 to get started
 """
 import sys
 import glob as glob
-from py_eddy_tracker_classes import plt, np, dt, Dataset, ndimage, time, \
+from py_eddy_tracker_classes import plt, np, dt, Dataset, time, \
                                     datestr2datetime, gaussian_resolution, \
                                     get_cax, collection_loop, track_eddies, \
-                                    anim_figure, interpolate
+                                    anim_figure
 from py_eddy_tracker_amplitude import SwirlSpeed
 import make_eddy_tracker_list_obj as eddy_tracker
+import scipy.ndimage as ndimage
+import scipy.interpolate as interpolate
+import scipy.spatial as spatial
 from dateutil import parser
 from mpl_toolkits.basemap import Basemap
 import yaml
@@ -266,15 +269,15 @@ class PyEddyTracker (object):
         self._f = self._gof.copy()
         self._gof = self.GRAVITY / self._gof
         
-        lonu = self.half_interp(self.lonpad()[:,:-1], self.lonpad()[:,1:])
-        latu = self.half_interp(self.latpad()[:,:-1], self.latpad()[:,1:])
+        lonu = self.half_interp(self.lonpad()[:, :-1], self.lonpad()[:, 1:])
+        latu = self.half_interp(self.latpad()[:, :-1], self.latpad()[:, 1:])
         lonv = self.half_interp(self.lonpad()[:-1], self.lonpad()[1:])
         latv = self.half_interp(self.latpad()[:-1], self.latpad()[1:])
 
         # Get pm and pn
         pm = np.zeros_like(self.lonpad())
-        pm[:,1:-1] = self.haversine_dist(lonu[:,:-1], latu[:,:-1],
-                                         lonu[:,1:],  latu[:,1:])
+        pm[:,1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
+                                         lonu[:, 1:],  latu[:, 1:])
         pm[:,0] = pm[:,1]
         pm[:,-1] = pm[:,-2]
         self._dx = pm
@@ -356,7 +359,7 @@ class PyEddyTracker (object):
         Mp, Lp = self.mask.shape
         M = Mp - 1
         L = Lp - 1
-        self._umask = self.mask[:,:L] * self.mask[:,1:Lp]
+        self._umask = self.mask[:, :L] * self.mask[:, 1:Lp]
         self._vmask = self.mask[:M] * self.mask[1:Mp]
         return self
 
@@ -379,28 +382,6 @@ class PyEddyTracker (object):
             x, y = self.M(self.lonpad(), self.latpad())
         else:
             x, y = self.M(self.lon(), self.lat())
-        #print '--- Computing Basemap mask'
-        #self.mask = np.ones_like(x, dtype=bool)
-        #if use_maskoceans:
-            #print "------ using Basemap *maskoceans*: this is fast but may be"
-            #print "------ marginally less accurate than Basemap's *is_land* method..."
-            #from mpl_toolkits.basemap import maskoceans
-            #if with_pad:
-                #self.mask = maskoceans(self.lonpad(), self.latpad(), self.mask,
-                                      #inlands=False, resolution='f', grid=1.25)
-            #else:
-                #self.mask = maskoceans(self.lon(), self.lat())
-            #self.mask = self.mask.mask.astype(int)
-        #else:
-            #print "------ using Basemap *is_land*: this is slow for larger domains"
-            #print "------ but can be speeded up once Basemap's *maskoceans* method is introduced"
-            #print "------ (currently longitude wrapping behaviour is unclear...)"
-            #it = np.nditer([x, y], flags=['multi_index'])
-            #while not it.finished:
-                #self.mask[it.multi_index] = self.M.is_land(x[it.multi_index],
-                                                           #y[it.multi_index])
-                #it.iternext()
-            #self.mask = np.atleast_2d(-self.mask).astype(int)
         self.Mx, self.My = x, y
         return self
 
@@ -421,8 +402,8 @@ class PyEddyTracker (object):
         self.upad *= -gof
         
         umask = self.umask().view()
-        zeta1, zeta2 = zeta.data[:,1:].view(), zeta.data[:,:-1].view()
-        pm1, pm2 = self.pm()[:,1:].view(), self.pm()[:,:-1].view()
+        zeta1, zeta2 = zeta.data[:, 1:].view(), zeta.data[:, :-1].view()
+        pm1, pm2 = self.pm()[:, 1:].view(), self.pm()[:, :-1].view()
         self.vpad[:] = self.u2rho_2d(umask * (zeta1 - zeta2) *
                                                 0.5 * (pm1 + pm2))
         self.vpad *= gof
@@ -490,7 +471,7 @@ class AvisoGrid (PyEddyTracker):
             self.fillval = self.read_nc_att(AVISO_FILE,
                                            'Grid_0001', '_FillValue')
         
-        if LONMIN < 0 and LONMAX <=0:
+        if LONMIN < 0 and LONMAX <= 0:
             self._lon -= 360.
         self._lon, self._lat = np.meshgrid(self._lon, self._lat)
         self._angle = np.zeros_like(self._lon)
@@ -554,7 +535,7 @@ class AvisoGrid (PyEddyTracker):
     def set_mask(self, sla):
         """
         """
-        if sla.mask.size == 1:
+        if sla.mask.size == 1: # all sea points
             self.mask = np.ones_like(sla.data)
         else:
             self.mask = sla.mask.astype(np.int) - 1
@@ -592,7 +573,7 @@ class AvisoGrid (PyEddyTracker):
 
         # Multiply the queried good points by the weight, selecting only the
         # nearest points. Divide by the number of nearest points to get average
-        xfill = weight * x[igood[:, 0][iquery], igood[:,1][iquery]]
+        xfill = weight * x[igood[:, 0][iquery], igood[:, 1][iquery]]
         xfill = (xfill / weight.sum(axis=1)[:, np.newaxis]).sum(axis=1)
 
         # Place average of nearest good points, xfill, into bad point locations
@@ -606,7 +587,6 @@ class AvisoGrid (PyEddyTracker):
             # shouldn't need to happen with every call to self.lon()
             lon0 = self._lon[self.j0:self.j1, self.i1:]
             lon1 = self._lon[self.j0:self.j1, :self.i0]
-            print 'fix this so called only once'
             return np.concatenate((lon0 - 360., lon1), axis=1)
         else:
             return self._lon[self.j0:self.j1, self.i0:self.i1]

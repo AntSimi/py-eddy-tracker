@@ -32,12 +32,12 @@ Version 1.4.2
 
 
 """
-
-import haversine_distmat as hav # needs compiling with f2py
-#from make_eddy_track import *
 from py_eddy_tracker_classes import *
+import scipy.spatial as spatial
+import scipy.interpolate as interpolate
+import haversine_distmat as hav # needs compiling with f2py
 
-#import find_closest_point_on_leg as fcpl
+
 
 def haversine_distance_vector(lon1, lat1, lon2, lat2):
     """
@@ -68,25 +68,11 @@ def newPosition(lonin, latin, angle, distance):
     return lon[0], lat[0]
 
 
-#def nearest(lon_pt, lat_pt, lon2d, lat2d):
-    #"""
-    #Return the nearest i, j point to a given lon, lat point
-    #in a lat/lon grid
-    #"""
-    #lon2d, lat2d = lon2d.copy(), lat2d.copy()
-    #lon2d -= lon_pt
-    #lat2d -= lat_pt
-    #d = np.hypot(lon2d, lat2d)
-    #j, i = np.unravel_index(d.argmin(), d.shape)
-    #return i, j
-    
-
 def nearest(lon_pt, lat_pt, lon2d, lat2d, theshape):
     """
     Return the nearest i, j point to a given lon, lat point
     in a lat/lon grid
     """
-    #print type(lon_pt), lon_pt
     lon_pt += -lon2d
     lat_pt += -lat2d
     d = np.sqrt(lon_pt**2 + lat_pt**2)
@@ -103,11 +89,6 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
                  (Akima is slightly slower, but may be more accurate)
        kind    : type of interpolation (interp1d only)
     """
-    #plt.figure(706)
-    #plt.plot(x, y, '.-g', lw=2)
-    ##x = ndimage.zoom(x.copy(), 2)
-    ##y = ndimage.zoom(y.copy(), 2)
-    #plt.plot(x, y, '.-r', lw=2)
     if kwargs.has_key('method'):
         method = kwargs['method']
     else:
@@ -125,7 +106,6 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
     
     # Do 1d interpolations
     if strcompare('interp1d', method):
-        
         if kwargs.has_key('kind'):
             kind = kwargs['kind']
         else:
@@ -134,7 +114,6 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
         yfunc = interpolate.interp1d(d, y, kind=kind)
     
     elif strcompare('akima', method):
-        
         xfunc = interpolate.Akima1DInterpolator(d, x)
         yfunc = interpolate.Akima1DInterpolator(d, y)
     
@@ -143,182 +122,11 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
     
     xnew = xfunc(d_uniform)
     ynew = yfunc(d_uniform)
-
-    #plt.plot(xnew, ynew, '.-r', lw=1.5)
-    #plt.plot(xxnew, yynew, '+-b', lw=1.)
-    #plt.axis('image')
-    #plt.show()
     return xnew, ynew
     
 
 def strcompare(str1, str2):
     return str1 in str2 and str2 in str1
-
-
-
-
-
-
-
-#def _find_closest_point_on_leg(p1, p2, p0):
-    #"""find closest point to p0 on line segment connecting p1 and p2"""
-
-    ##print type(p1), type(p2), type(p0)
-
-    ## handle degenerate case
-    #if np.all(p2 == p1):
-        #d = p0 - p1
-        #d **= 2
-        #return d.sum()
-
-    #d21 = p2 - p1
-    #d01 = p0 - p1
-
-    ## project on to line segment to find closest point
-    #proj = np.dot(d01, d21) 
-    #proj /= np.dot(d21, d21)
-    #if proj < 0:
-        #proj = 0
-    #elif proj > 1:
-        #proj = 1
-    #pc = p1 + proj * d21
-
-    ## find squared distance
-    #d = pc - p0
-    #d **= 2
-
-    #return d.sum()#, pc
-
-
-#def _find_closest_point_on_leg(p1, p2, p0):
-    #"""find closest point to p0 on line segment connecting p1 and p2"""
-
-    ## handle degenerate case
-    #if np.all(p2 == p1):
-        #d = np.sum((p0 - p1)**2)
-        #return d, p1
-
-    #d21 = p2 - p1
-    #d01 = p0 - p1
-
-    ## project on to line segment to find closest point
-    #proj = np.dot(d01, d21) / np.dot(d21, d21)
-    #if proj < 0:
-        #proj = 0
-    #if proj > 1:
-        #proj = 1
-    #pc = p1 + proj * d21
-
-    ## find squared distance
-    #d = np.sum((pc-p0)**2)
-
-    #return d, pc
-
-
-#def _find_closest_point_on_path(lc, point):
-    #"""
-    #lc: coordinates of vertices
-    #point: coordinates of test point
-    #"""
-
-    ## find index of closest vertex for this segment
-    #ds = np.sum((lc - point[None, :])**2, 1)
-    #imin = np.argmin(ds)
-
-    #dmin = np.inf
-    #xcmin = None
-    #legmin = (None, None)
-
-    ##closed = mlab.is_closed_polygon(lc)
-    #closed = np.alltrue([lc[0,0] == lc[-1,0], lc[0,1] == lc[-1,1]])
-    
-    ## build list of legs before and after this vertex
-    #legs = []
-    #if imin > 0 or closed:
-        #legs.append(((imin-1) % len(lc), imin))
-    #if imin < len(lc) - 1 or closed:
-        #legs.append((imin, (imin+1) % len(lc)))
-
-    #for leg in legs:
-        ##d, xc = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
-        #d = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
-        #if d < dmin:
-            #dmin = d
-            ##xcmin = xc
-            #legmin = leg
-
-    #return dmin#, xcmin, legmin)
-
-#def _find_closest_point_on_path(lc, point):
-    #"""
-    #lc: coordinates of vertices
-    #point: coordinates of test point
-    #"""
-    ##import matplotlib.mlab as mlab; print 'delete me'
-    ## Find index of closest vertex for this segment
-    #ds = np.sum((lc - point[None, :])**2, 1)
-    #imin = ds.argmin()
-
-    #dmin = np.inf
-    #closed = np.alltrue([lc[0,0] == lc[-1,0], lc[0,1] == lc[-1,1]])
-    ##closedd = mlab.is_closed_polygon(lc)
-    
-    ##assert closed == closedd, 'should be same'
-    ##print '***************************'
-    
-    ## Build list of legs before and after this vertex
-    #legs = []
-    #if imin > 0 or closed:
-        #legs.append(((imin-1) % len(lc), imin))
-    #if imin < len(lc) - 1 or closed:
-        #legs.append((imin, (imin+1) % len(lc)))
-
-    #for leg in legs:
-        ##d, xc = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
-        ##dd = _find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
-        ##print type(point), type(lc[leg[0]]), type(lc[leg[1]])
-        #d = fcpl.find_closest_point_on_leg(lc[leg[0]], lc[leg[1]], point)
-        
-        ##assert dd == d, 'not the same'
-        
-        #if d < dmin:
-            #dmin = d
-
-    #return dmin
-
-
-#def find_nearest_contour(contour_obj, x, y, indices):
-    #"""
-    #Finds contour that is closest to a point.
-
-    #Returns a tuple containing the contour, segment of minimum point.
-
-    #Call signature::
-
-      #conmin, segmin = find_nearest_contour(contour_obj, x, y, indices)
-    #"""
-    #dmin = np.inf
-    ##conmin = None
-    #segmin = None
-    
-    #point = np.array([x, y])
-
-    #for icon in indices:
-        #con = contour_obj.collections[icon]
-        #paths = con.get_paths()
-
-        #for segNum, linepath in enumerate(paths):
-            #lc = linepath.vertices
-            ##d = _find_closest_point_on_path(lc, point)
-            #d = fcpl.find_closest_point_on_path(lc, point)
-            
-            #if d < dmin:
-                #dmin = d
-                ##conmin = icon
-                #segmin = segNum
-
-    #return segmin
-
 
 
 def find_nearest_contour(contcoll, x, y):
@@ -409,13 +217,11 @@ class Track (object):
     
     
     def append_pos(self, lon, lat, time, uavg, teke, radius_s, radius_e,
-                   amplitude, temp=None, salt=None, contour_e=None, contour_s=None,
-                   uavg_profile=None, shape_error=None):
+                   amplitude, temp=None, salt=None, contour_e=None,
+                   contour_s=None, uavg_profile=None, shape_error=None):
         """
         Append track updates
         """
-        #self.lon = np.r_[self.lon, lon]
-        #print 'ccccccccccccccccccccccc', type(lon)
         self.lon.append(lon)
         self.lat.append(lat)
         self.ocean_time.append(time)
@@ -423,15 +229,10 @@ class Track (object):
         self.teke.append(teke)
         self.radius_s.append(radius_s)
         self.radius_e.append(radius_e)
-        #print 'self.amplitude_e222', self.amplitude, amplitude
         self.amplitude.append(amplitude)
         if 'ROMS' in self.DATATYPE:
             self.temp = np.r_[self.temp, temp]
             self.salt = np.r_[self.salt, salt]
-        #try:
-            #self.bounds = np.hstack((self.bounds, bounds))
-        #except Exception:
-            #self.bounds = np.vstack((self.bounds, bounds))
         if self.save_extras:
             self.contour_e.append(contour_e)
             self.contour_s.append(contour_s)
@@ -489,8 +290,7 @@ class TrackList (object):
             self.new_temp = []
             self.new_salt = []
         self.new_time   = []
-        #self.new_bounds = np.atleast_2d(np.empty(4, dtype=np.int16))
-        self.old_lon    = [] #np.array([])
+        self.old_lon    = []
         self.old_lat    = []
         self.old_radii_s  = []
         self.old_radii_e  = []
@@ -501,7 +301,6 @@ class TrackList (object):
             self.old_temp = []
             self.old_salt = []
         self.old_time   = []
-        #self.old_bounds = np.atleast_2d([])
         if self.TRACK_EXTRA_VARIABLES:
             self.new_contour_e = []
             self.new_contour_s = []
@@ -513,16 +312,18 @@ class TrackList (object):
             self.old_shape_error = []
         self.new_list   = True # flag indicating new list
         self.index = 0 # counter
-        self.ncind = 0 # index to write to nc files, will increase and increase...
+        self.ncind = 0 # index to write to nc files, will increase and increase
         self.ch_index = 0 # index for Chelton style nc files
         self.PAD = 2
         # Check for a correct configuration
-        assert DATATYPE in ('ROMS', 'AVISO'), "Unknown string in 'DATATYPE' parameter"
+        assert DATATYPE in ('ROMS', 'AVISO'), "".join(('Unknown string ',
+                                                 'in *DATATYPE* parameter'))
 
 
     def add_new_track(self, lon, lat, time, uavg, teke,
             radius_s, radius_e, amplitude, temp=None, salt=None,
-            contour_e=None, contour_s=None, uavg_profile=None, shape_error=None):
+            contour_e=None, contour_s=None, uavg_profile=None,
+            shape_error=None):
         """
         Append a new 'track' object to the list
         """
@@ -530,28 +331,24 @@ class TrackList (object):
                                     lon, lat, time, uavg, teke,
                                     radius_s, radius_e, amplitude,
                                     temp, salt, self.TRACK_EXTRA_VARIABLES,
-                                    contour_e, contour_s, uavg_profile, shape_error))
+                                    contour_e, contour_s, uavg_profile,
+                                    shape_error))
 
 
     def update_track(self, index, lon, lat, time, uavg, teke,
              radius_s, radius_e, amplitude, temp=None, salt=None,
-             contour_e=None, contour_s=None, uavg_profile=None, shape_error=None):
+             contour_e=None, contour_s=None, uavg_profile=None,
+             shape_error=None):
         """
         Update a track at index
         """
         self.tracklist[index].append_pos(lon, lat, time, uavg, teke,
-                                         radius_s, radius_e,
-                                         amplitude,
-                                         temp=temp, salt=salt,
-                                         contour_e=contour_e, contour_s=contour_s,
-                                         uavg_profile=uavg_profile, shape_error=shape_error)
-
-
-    #def update_eddy_properties(self, centlon, centlat, eddy_radius_s, eddy_radius_e,
-                               #amplitude, uavg, teke, rtime,
-                               #contour_e=None, contour_s=None,
-                               #uavg_profile=None, shape_error=None,
-                               #cent_temp=None, cent_salt=None):
+                         radius_s, radius_e, amplitude, temp=temp,
+                         salt=salt, contour_e=contour_e,
+                         contour_s=contour_s, uavg_profile=uavg_profile,
+                         shape_error=shape_error)
+    
+    
     def update_eddy_properties(self, properties):
         """
         Append new variable values to track arrays
@@ -570,15 +367,12 @@ class TrackList (object):
             #self.new_temp_tmp = np.r_[self.new_temp_tmp, cent_temp]
             #self.new_salt_tmp = np.r_[self.new_salt_tmp, cent_salt]
             pass
-        #try:
-            #self.new_bounds_tmp = np.vstack((self.new_bounds_tmp, bounds))
-        #except Exception:    
-            #self.new_bounds_tmp = np.hstack((self.new_bounds_tmp, bounds))
         if self.TRACK_EXTRA_VARIABLES:
             self.new_contour_e_tmp.append(properties.contour_e)
             self.new_contour_s_tmp.append(properties.contour_s)
             self.new_uavg_profile_tmp.append(properties.uavg_profile)
-            self.new_shape_error_tmp = np.r_[self.new_shape_error_tmp, properties.shape_error]
+            self.new_shape_error_tmp = np.r_[self.new_shape_error_tmp,
+                                             properties.shape_error]
         return self
 
 
@@ -670,16 +464,15 @@ class TrackList (object):
         nc = Dataset(self.savedir, 'w', format='NETCDF4')
         nc.title = ''.join((title, ' eddy tracks'))
         nc.directory = directory
-        nc.days_between_records = np.float64(self.DAYS_BTWN_RECORDS)
+        nc.DAYS_BTWN_RECORDS = np.float64(self.DAYS_BTWN_RECORDS)
         nc.TRACK_DURATION_MIN = np.float64(self.TRACK_DURATION_MIN)
         
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.Q_parameter_contours = self.qparameter
         elif 'SLA' in self.DIAGNOSTIC_TYPE:
-            nc.sla_parameter_contours = self.CONTOUR_PARAMETER
-            nc.shape_error = self.SHAPE_ERROR
-            nc.pixmin = self.PIXEL_THRESHOLD[0]
-            nc.pixmax = self.PIXEL_THRESHOLD[1]
+            nc.CONTOUR_PARAMETER = self.CONTOUR_PARAMETER
+            nc.SHAPE_ERROR = self.SHAPE_ERROR[0]
+            nc.PIXEL_THRESHOLD = self.PIXEL_THRESHOLD
         
         if self.SMOOTHING in locals():
             nc.SMOOTHING = np.str(self.SMOOTHING)
@@ -704,18 +497,16 @@ class TrackList (object):
             if 'ip_roms' in model:
                 nc.rho_ntr = rho_ntr
         
-        nc.evolve_amplitude_min = self.EVOLVE_AMP_MIN
-        nc.evolve_amplitude_max = self.EVOLVE_AMP_MAX
-        nc.evolve_area_min = self.EVOLVE_AREA_MIN
-        nc.evolve_area_max = self.EVOLVE_AREA_MAX
+        nc.EVOLVE_AMP_MIN = self.EVOLVE_AMP_MIN
+        nc.EVOLVE_AMP_MAX = self.EVOLVE_AMP_MAX
+        nc.EVOLVE_AREA_MIN = self.EVOLVE_AREA_MIN
+        nc.EVOLVE_AREA_MAX = self.EVOLVE_AREA_MAX
         
         # Create dimensions     
         nc.createDimension('Nobs', None)#len(Eddy.tracklist))
         #nc.createDimension('time', None) #len(maxlen(ocean_time)))
         #nc.createDimension('four', 4)
-            
-            
-            
+        
         # Create variables     
         nc.createVariable('track', np.int32, ('Nobs'), fill_value=self.fillval)   
         nc.createVariable('n', np.int32, ('Nobs'), fill_value=self.fillval)  
@@ -762,7 +553,8 @@ class TrackList (object):
             nc.variables['j1'].long_name = 'Julian date'
             nc.variables['j1'].description = 'date of this observation'
             nc.variables['j1'].reference = self.JDAY_REFERENCE
-            nc.variables['j1'].reference_description = 'Julian date on Jan 1, 1992'
+            nc.variables['j1'].reference_description = "".join(('Julian '
+                'date on Jan 1, 1992'))
         else: # climatological ROMS solution
             nc.variables['ocean_time'].units = 'ROMS ocean_time (seconds)'
         
@@ -781,31 +573,29 @@ class TrackList (object):
         nc.variables['A'].min_val = self.AMPMIN
         nc.variables['A'].max_val = self.AMPMAX
         nc.variables['A'].long_name = 'amplitude'
-        nc.variables['A'].description = 'magnitude of the height difference ' + \
-                                        'between the extremum of SSH within ' + \
-                                        'the eddy and the SSH around the contour ' + \
-                                        'defining the eddy perimeter'
-        
+        nc.variables['A'].description = "".join(('magnitude of the height ',
+            'difference between the extremum of SSH within the eddy and the ',
+            'SSH around the contour defining the eddy perimeter'))
         nc.variables['L'].units = 'km'
         nc.variables['L'].min_val = self.RADMIN / 1000.
         nc.variables['L'].max_val = self.RADMAX / 1000.
         nc.variables['L'].long_name = 'speed radius scale'
-        nc.variables['L'].description = 'radius of a circle whose area is equal ' + \
-                                        'to that enclosed by the contour of ' + \
-                                        'maximum circum-average speed'
+        nc.variables['L'].description = "".join(('radius of a circle whose ',
+            'area is equal to that enclosed by the contour of maximum ',
+            'circum-average speed'))
         
         nc.variables['U'].units = 'cm/sec'
         #nc.variables['U'].min = 0.
         #nc.variables['U'].max = 376.6
         nc.variables['U'].long_name = 'maximum circum-averaged speed'
-        nc.variables['U'].description = 'average speed of the contour defining ' + \
-                                        'the radius scale L'
+        nc.variables['U'].description = "".join(('average speed of the ',
+            'contour defining the radius scale L'))
         nc.variables['Teke'].units = 'm^2/sec^2'
         #nc.variables['Teke'].min = 0.
         #nc.variables['Teke'].max = 376.6
         nc.variables['Teke'].long_name = 'sum EKE within contour Ceff'
-        nc.variables['Teke'].description = 'sum of eddy kinetic energy within contour defining ' + \
-                                        'the effective radius'
+        nc.variables['Teke'].description = "".join(('sum of eddy kinetic ',
+            'energy within contour defining the effective radius'))
         
         nc.variables['radius_e'].units = 'km'
         nc.variables['radius_e'].min_val = self.RADMIN / 1000.
@@ -822,31 +612,38 @@ class TrackList (object):
         if 'ROMS' in self.DATATYPE:
             nc.variables['temp'].units = 'deg. C'
             nc.variables['salt'].units = 'psu'
-        #nc.variables['bounds'].units = 'indices to eddy location (imin,imax,jmin,jmax);' +  \
-            ' use like this: var[jstr:jend,istr:iend][jmin:jmax,imin:imax]'
         
         if self.TRACK_EXTRA_VARIABLES:
             
             nc.createDimension('contour_points', None)
-            nc.createDimension('uavg_contour_count', np.int(self.slaparameter.size * 0.333))
-            nc.createVariable('contour_e', 'f4', ('contour_points','Nobs'), fill_value=self.fillval)
-            nc.createVariable('contour_s', 'f4', ('contour_points','Nobs'), fill_value=self.fillval)
-            nc.createVariable('uavg_profile', 'f4', ('uavg_contour_count','Nobs'), fill_value=self.fillval)
-            nc.createVariable('shape_error', 'f4', ('Nobs'), fill_value=self.fillval)
+            nc.createDimension('uavg_contour_count',
+                np.int(self.slaparameter.size * 0.333))
+            nc.createVariable('contour_e', 'f4',
+                ('contour_points','Nobs'), fill_value=self.fillval)
+            nc.createVariable('contour_s', 'f4',
+                ('contour_points','Nobs'), fill_value=self.fillval)
+            nc.createVariable('uavg_profile', 'f4',
+                ('uavg_contour_count','Nobs'), fill_value=self.fillval)
+            nc.createVariable('shape_error', 'f4',
+                ('Nobs'), fill_value=self.fillval)
             
-            nc.variables['contour_e'].long_name = 'positions of effective contour points'
-            nc.variables['contour_e'].description = 'lons/lats of effective contour points; ' + \
-                                                    'lons (lats) in first (last) half of vector'
-            nc.variables['contour_s'].long_name = 'positions of speed-based contour points'
-            nc.variables['contour_s'].description = 'lons/lats of speed-based contour points; ' + \
-                                                    'lons (lats) in first (last) half of vector'
+            nc.variables['contour_e'].long_name = "".join(('positions of ',
+                'effective contour points'))
+            nc.variables['contour_e'].description = "".join(('lons/lats of ',
+                'effective contour points; lons (lats) in first (last) ',
+                'half of vector'))
+            nc.variables['contour_s'].long_name = "".join(('positions of ',
+                'speed-based contour points'))
+            nc.variables['contour_s'].description = "".join(('lons/lats of ',
+                'speed-based contour points; lons (lats) in first (last) ',
+                'half of vector'))
             nc.variables['uavg_profile'].long_name = 'radial profile of uavg'
-            nc.variables['uavg_profile'].description = 'all uavg values from effective contour inwards to ' + \
-                                                       'smallest inner contour (pixel == 1)'
+            nc.variables['uavg_profile'].description = "".join(('all uavg ',
+                'values from effective contour inwards to ',
+                'smallest inner contour (pixel == 1)'))
             nc.variables['shape_error'].units = '%'
         
         nc.close()
-        return self
         
 
 
@@ -872,7 +669,6 @@ class TrackList (object):
                     track.contour_s = []
                     track.uavg_profile = []
                     track.shape_error = []
-        #print '_reduce_inactive_tracks', str(time.time() - start_time), ' seconds!'
         return
     
     
@@ -930,11 +726,11 @@ class TrackList (object):
                                 for j in np.arange(tend - self.ncind):
                                     jj = j + self.ncind
                                     contour_e_arr = np.asarray(self.tracklist[i].contour_e[j]).ravel()
-                                    nc.variables['contour_e'][:contour_e_arr.size,jj] = contour_e_arr
+                                    nc.variables['contour_e'][:contour_e_arr.size, jj] = contour_e_arr
                                     contour_s_arr = np.asarray(self.tracklist[i].contour_s[j]).ravel()
-                                    nc.variables['contour_s'][:contour_s_arr.size,jj] = contour_s_arr
+                                    nc.variables['contour_s'][:contour_s_arr.size, jj] = contour_s_arr
                                     uavg_profile_arr = np.asarray(self.tracklist[i].uavg_profile[j]).ravel()
-                                    nc.variables['uavg_profile'][:uavg_profile_arr.size,jj] = uavg_profile_arr #np.asarray(self.tracklist[i].uavg_profile[j]).ravel()
+                                    nc.variables['uavg_profile'][:uavg_profile_arr.size, jj] = uavg_profile_arr #np.asarray(self.tracklist[i].uavg_profile[j]).ravel()
                         
                             # Flag indicating track[i] is now saved
                             self.tracklist[i].saved2nc = True
@@ -1241,9 +1037,21 @@ class RossbyWaveSpeed (object):
         else: Exception # Unknown domain
         
         if self.start:
-            print '--------- setting ellipse for %s domain' %self.domain
+            #print x, y
+            if x < 0.:
+                lon = "".join((str(x), 'W'))
+            elif x >= 0:
+                lon = "".join((str(x), 'E'))
+            if y < 0:
+                lat = "".join((str(y), 'S'))
+            elif y >= 0:
+                lat = "".join((str(y), 'N'))
+            
+            print "".join(('--------- setting ellipse for first tracked ',
+                           'eddy at %s, %s in the %s domain'
+                            % (lon, lat, self.domain)))
             print '--------- using %s Rossby deformation radius of %s m' \
-                                %(self.vartype, np.abs(self.distance[0]))
+                                % (self.vartype, np.abs(self.distance[0]))
             self.start = False
         self.distance *= days_between_records
         return np.abs(self.distance)
@@ -1266,6 +1074,7 @@ class RossbyWaveSpeed (object):
     
     def _make_kdtree(self):
         points = np.vstack([self._lon, self._lat]).T
+        #print points
         self._tree = spatial.cKDTree(points)
     
     
@@ -1373,16 +1182,19 @@ class SearchEllipse (object):
                                                    self.DAYS_BTWN_RECORDS)
             self.rw_d_mod[:] = 1.75
             self.rw_d_mod *= self.rw_d
-            self.rw_d_mod[:] = np.maximum(self.rw_d_mod, self.n_s_minor)
+            self.rw_d_mod[:] = np.array([self.rw_d_mod, self.n_s_minor]).max()
             self.rw_d_mod *= 2.
             self._set_global_ellipse()
+        
         elif 'BlackSea'  in self.domain:
             self.rw_d_mod[:] = 1.75
             self.rw_d[:] = self.rwv.get_rwdistance(x, y,
                                                    self.DAYS_BTWN_RECORDS)
             self.rw_d_mod *= self.rw_d
             self._set_black_sea_ellipse()
-        else: Exception
+        
+        else:
+            Exception
         
         return self
     

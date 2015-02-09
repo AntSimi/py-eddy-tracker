@@ -35,25 +35,13 @@ Version 1.4.2
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
-import numexpr as ne 
 import time
-#from mpl_toolkits.basemap import Basemap
 import matplotlib.dates as dt
-from scipy import ndimage
-from scipy import interpolate
-from scipy import spatial
-from scipy import io
 import matplotlib.path as path
 import matplotlib.patches as patch
-#import scipy.ndimage.filters as filters
-#import scipy.ndimage.morphology as morphology
-#import find_closest_point_on_leg as fcpl
 
-
-# py-eddy-tracker modules
 import make_eddy_tracker_list_obj as eddy_tracker
-from py_eddy_tracker_amplitude import Amplitude, EddyProperty
-#import roms_grid as rg
+from py_eddy_tracker_property_classes import Amplitude, EddyProperty
 import haversine_distmat as hav # needs compiling with f2py
 
 
@@ -89,83 +77,26 @@ def gaussian_resolution(res, zwl, mwl):
 
 
 
-#def detect_local_minima(arr):
-    #"""
-    #Takes an array and detects the troughs using the local maximum filter.
-    #Returns a boolean mask of the troughs (i.e. 1 when
-    #the pixel's value is the neighborhood maximum, 0 otherwise)
-    #http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
-    #"""
-    #neighborhood = morphology.generate_binary_structure(len(arr.shape), 2)
-    ## Get local mimima
-    #detected_minima = (filters.minimum_filter(arr, footprint=neighborhood) == arr)
-    #background = (arr == 0)
-    #eroded_background = morphology.binary_erosion(
-        #background, structure=neighborhood, border_value=1)
-    #detected_minima -= eroded_background
-    #return detected_minima
-
-
-#def get_local_extrema(sla, mask, sign):
-    #"""
-    #Inputs:
-      #sla
-      #mask
-      #sign : 1 for cyclones, -1 for anticyclones
-    #"""
-    #local_extrema = np.ma.copy(sla)
-    #local_extrema = np.ma.masked_where(mask == False, local_extrema)
-    #local_extrema *= sign
-    #return detect_local_minima(local_extrema)
-
-
-#def haversine_cdist(l1, l2):
-    #"""
-    #Haversine formula to be used by scipy.spatial.cdist
-    #Input:
-        #(lon1, lat1), (lon2, lat2)
-    #Return:
-        #distance (m)
-    #THIS FUNCTION IS REPEATED IN 
-    #"""
-    #lon1, lat1, lon2, lat2 = l1[0], l1[1], l2[0], l2[1]
-    ##print 'lon1.shape',lon1
-    ##print 'lon2.shape',lon2
-    #dlat = np.deg2rad(lat2 - lat1)
-    #dlon = np.deg2rad(lon2 - lon1)
-    #lat1 = np.deg2rad(lat1)
-    #lat2 = np.deg2rad(lat2)
-    ##print 'dlat.shape',dlat
-    ##print 'dlon.shape',dlon
-    #a = ne.evaluate('sin(0.5 * dlon) * sin(0.5 * dlon)')
-    #a = ne.evaluate('a * cos(lat1) * cos(lat2)')
-    #a = ne.evaluate('a + (sin(0.5 * dlat) * sin(0.5 * dlat))')
-    #c = ne.evaluate('2 * arctan2(sqrt(a), sqrt(1 - a))')
-    #return ne.evaluate('6371315.0 * c') # Return the distance
-
-
 def do_basemap(M, ax):
     """
     Convenience method for Basemap functions
     """
-    if np.logical_or(np.diff([M.lonmin, M.lonmax]) > 60,
-                     np.diff([M.latmin, M.latmax]) > 60):
-        stride = 10
-    elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 40,
-                     np.diff([M.latmin, M.latmax]) > 40):
-        stride = 8
-    elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 30,
-                       np.diff([M.latmin, M.latmax]) > 30):
-        stride = 5
-    elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 15,
-                       np.diff([M.latmin, M.latmax]) > 15):
-        stride = 3
+    londiff = np.array([M.lonmin, M.lonmax]).ptp()
+    latdiff = np.array([M.latmin, M.latmax]).ptp()
+    if (londiff > 60) or (latdiff > 60):
+        stride = 12.
+    elif (londiff > 40) or (latdiff > 40):
+        stride = 8.
+    elif (londiff > 30) or (latdiff > 30):
+        stride = 5.
+    elif (londiff > 15) or (latdiff > 15):
+        stride = 3.
     else:
         stride = 2
-    M.drawparallels(np.arange(-90, 90.+stride, stride), labels=[1,0,0,0],
-                    linewidth=0.25, size=8, ax=ax)
-    M.drawmeridians(np.arange(-360, 360.+stride, stride), labels=[0,0,0,1],
-                    linewidth=0.25, size=8, ax=ax)
+    M.drawparallels(np.arange(-90, 90 + stride, stride),
+        labels=[1,0,0,0], linewidth=0.25, size=8, ax=ax)
+    M.drawmeridians(np.arange(-360, 360 + stride, stride),
+        labels=[0,0,0,1], linewidth=0.25, size=8, ax=ax)
     M.fillcontinents('k', ax=ax)
     M.drawcoastlines(linewidth=0.5, ax=ax)
     return
@@ -181,12 +112,11 @@ def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
             if len(Eddy.tracklist[i].lon) > track_length: # filter for longer tracks
                 aex, aey = Eddy.M(np.asarray(Eddy.tracklist[i].lon),
                                   np.asarray(Eddy.tracklist[i].lat))
-                M.plot(aex, aey, col, lw=0.5, ax=ax)
-                M.scatter([aex[-1]], [aey[-1]], s=7, c=col, ax=ax)
+                M.plot(aex, aey, col, lw=0.5, ax=ax, zorder=5)
+                M.scatter(aex[-1], aey[-1], s=7, c=col, edgecolor='w',
+                          ax=ax, zorder=6)
         return
     
-    #plt.figure(fignum)
-    #thax = plt.subplot(111)
     track_length = 0 # for filtering below
     M = A_eddy.M
     
@@ -507,7 +437,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     
     while not citer.finished:
         ## Get contour around centlon_e, centlat_e at level [collind:][iuavg]
-        #segii, poly_i = eddy_tracker.find_nearest_contour(
+        #theindex, poly_i = eddy_tracker.find_nearest_contour(
                          #CS.collections[citer.index], centlon_e, centlat_e)
         
         Eddy.swirl.set_dist_array_size(citer.index)
@@ -518,11 +448,11 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
             continue
         
         Eddy.swirl.set_nearest_contour_index(centlon_e, centlat_e)
-        segi = Eddy.swirl.get_index_nearest_path()
+        theindex = Eddy.swirl.get_index_nearest_path()
         
-        if segi:
+        if theindex:
             
-            poly_i = CS.collections[citer.index].get_paths()[segi]
+            poly_i = CS.collections[citer.index].get_paths()[theindex]
             
             # 1. Ensure polygon_i contains point centlon_e, centlat_e
             if poly_i.contains_point([centlon_e, centlat_e]):
@@ -981,7 +911,8 @@ def track_eddies(Eddy, first_record):
         # Make an ellipse at current old_eddy location
         # (See CSS11 sec. B4, pg. 208)
         if 'ellipse' in Eddy.SEPARATION_METHOD:
-            
+            #Eddy.search_ellipse.set_search_ellipse(Eddy.old_lon[old_ind],
+                                                   #Eddy.old_lat[old_ind])
             Eddy.search_ellipse.set_search_ellipse(old_x[old_ind],
                                                    old_y[old_ind])
             
@@ -1385,7 +1316,7 @@ def func_hann2d_fast(var, numpasses):
 def get_circle(x0, y0, r, npts):
     """
     Return points on a circle, with specified (x0, y0) center and radius
-                    (and optional number of points too!).
+                    (and optional number of points too).
   
     Input     : 1  - x0, scalar, center X of circle
                 2  - y0, scalar, center Y of circle
@@ -1402,7 +1333,9 @@ def get_circle(x0, y0, r, npts):
     Written On : June/05/2008
     Tool       : Eddy Tracker
     """
-    theta = np.arange(npts)
+    theta = np.arange(npts) # NOTE npts is a constant, so
+    # *cos(theta)* and *sin(theta)* can be predefined 
+    #SHOULD BE PART OF CONTOUR OBJECT
     theta[:] = theta * 2. * (4. * np.arctan(1.)) / npts
     cx = x0 + r * np.cos(theta)
     cy = y0 + r * np.sin(theta)
