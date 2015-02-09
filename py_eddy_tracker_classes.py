@@ -35,25 +35,13 @@ Version 1.4.2
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
-import numexpr as ne 
 import time
-#from mpl_toolkits.basemap import Basemap
 import matplotlib.dates as dt
-from scipy import ndimage
-from scipy import interpolate
-from scipy import spatial
-from scipy import io
 import matplotlib.path as path
 import matplotlib.patches as patch
-#import scipy.ndimage.filters as filters
-#import scipy.ndimage.morphology as morphology
-#import find_closest_point_on_leg as fcpl
 
-
-# py-eddy-tracker modules
 import make_eddy_tracker_list_obj as eddy_tracker
-from py_eddy_tracker_amplitude import Amplitude, EddyProperty
-#import roms_grid as rg
+from py_eddy_tracker_property_classes import Amplitude, EddyProperty
 import haversine_distmat as hav # needs compiling with f2py
 
 
@@ -89,83 +77,26 @@ def gaussian_resolution(res, zwl, mwl):
 
 
 
-#def detect_local_minima(arr):
-    #"""
-    #Takes an array and detects the troughs using the local maximum filter.
-    #Returns a boolean mask of the troughs (i.e. 1 when
-    #the pixel's value is the neighborhood maximum, 0 otherwise)
-    #http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
-    #"""
-    #neighborhood = morphology.generate_binary_structure(len(arr.shape), 2)
-    ## Get local mimima
-    #detected_minima = (filters.minimum_filter(arr, footprint=neighborhood) == arr)
-    #background = (arr == 0)
-    #eroded_background = morphology.binary_erosion(
-        #background, structure=neighborhood, border_value=1)
-    #detected_minima -= eroded_background
-    #return detected_minima
-
-
-#def get_local_extrema(sla, mask, sign):
-    #"""
-    #Inputs:
-      #sla
-      #mask
-      #sign : 1 for cyclones, -1 for anticyclones
-    #"""
-    #local_extrema = np.ma.copy(sla)
-    #local_extrema = np.ma.masked_where(mask == False, local_extrema)
-    #local_extrema *= sign
-    #return detect_local_minima(local_extrema)
-
-
-#def haversine_cdist(l1, l2):
-    #"""
-    #Haversine formula to be used by scipy.spatial.cdist
-    #Input:
-        #(lon1, lat1), (lon2, lat2)
-    #Return:
-        #distance (m)
-    #THIS FUNCTION IS REPEATED IN 
-    #"""
-    #lon1, lat1, lon2, lat2 = l1[0], l1[1], l2[0], l2[1]
-    ##print 'lon1.shape',lon1
-    ##print 'lon2.shape',lon2
-    #dlat = np.deg2rad(lat2 - lat1)
-    #dlon = np.deg2rad(lon2 - lon1)
-    #lat1 = np.deg2rad(lat1)
-    #lat2 = np.deg2rad(lat2)
-    ##print 'dlat.shape',dlat
-    ##print 'dlon.shape',dlon
-    #a = ne.evaluate('sin(0.5 * dlon) * sin(0.5 * dlon)')
-    #a = ne.evaluate('a * cos(lat1) * cos(lat2)')
-    #a = ne.evaluate('a + (sin(0.5 * dlat) * sin(0.5 * dlat))')
-    #c = ne.evaluate('2 * arctan2(sqrt(a), sqrt(1 - a))')
-    #return ne.evaluate('6371315.0 * c') # Return the distance
-
-
 def do_basemap(M, ax):
     """
     Convenience method for Basemap functions
     """
-    if np.logical_or(np.diff([M.lonmin, M.lonmax]) > 60,
-                     np.diff([M.latmin, M.latmax]) > 60):
-        stride = 10
-    elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 40,
-                     np.diff([M.latmin, M.latmax]) > 40):
-        stride = 8
-    elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 30,
-                       np.diff([M.latmin, M.latmax]) > 30):
-        stride = 5
-    elif np.logical_or(np.diff([M.lonmin, M.lonmax]) > 15,
-                       np.diff([M.latmin, M.latmax]) > 15):
-        stride = 3
+    londiff = np.array([M.lonmin, M.lonmax]).ptp()
+    latdiff = np.array([M.latmin, M.latmax]).ptp()
+    if (londiff > 60) or (latdiff > 60):
+        stride = 12.
+    elif (londiff > 40) or (latdiff > 40):
+        stride = 8.
+    elif (londiff > 30) or (latdiff > 30):
+        stride = 5.
+    elif (londiff > 15) or (latdiff > 15):
+        stride = 3.
     else:
         stride = 2
-    M.drawparallels(np.arange(-90, 90.+stride, stride), labels=[1,0,0,0],
-                    linewidth=0.25, size=8, ax=ax)
-    M.drawmeridians(np.arange(-360, 360.+stride, stride), labels=[0,0,0,1],
-                    linewidth=0.25, size=8, ax=ax)
+    M.drawparallels(np.arange(-90, 90 + stride, stride),
+        labels=[1,0,0,0], linewidth=0.25, size=8, ax=ax)
+    M.drawmeridians(np.arange(-360, 360 + stride, stride),
+        labels=[0,0,0,1], linewidth=0.25, size=8, ax=ax)
     M.fillcontinents('k', ax=ax)
     M.drawcoastlines(linewidth=0.5, ax=ax)
     return
@@ -181,12 +112,11 @@ def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
             if len(Eddy.tracklist[i].lon) > track_length: # filter for longer tracks
                 aex, aey = Eddy.M(np.asarray(Eddy.tracklist[i].lon),
                                   np.asarray(Eddy.tracklist[i].lat))
-                M.plot(aex, aey, col, lw=0.5, ax=ax)
-                M.scatter([aex[-1]], [aey[-1]], s=7, c=col, ax=ax)
+                M.plot(aex, aey, col, lw=0.5, ax=ax, zorder=5)
+                M.scatter(aex[-1], aey[-1], s=7, c=col, edgecolor='w',
+                          ax=ax, zorder=6)
         return
     
-    #plt.figure(fignum)
-    #thax = plt.subplot(111)
     track_length = 0 # for filtering below
     M = A_eddy.M
     
@@ -504,30 +434,25 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     any_inner_contours = False
     
     citer = np.nditer(CS.cvalues, flags=['c_index'])
-    #print '************************************************'
+    
     while not citer.finished:
-        
-        #print '--------------' * 10
-        #print '--------------' * 10
-        #print '\nciter.index ::', citer.index
         ## Get contour around centlon_e, centlat_e at level [collind:][iuavg]
-        #segii, poly_i = eddy_tracker.find_nearest_contour(
+        #theindex, poly_i = eddy_tracker.find_nearest_contour(
                          #CS.collections[citer.index], centlon_e, centlat_e)
         
         Eddy.swirl.set_dist_array_size(citer.index)
         
         # Leave loop if no contours at level citer.index
         if Eddy.swirl.level_slice is None:
-            #print '------------------------------------------'
             citer.iternext()
             continue
         
         Eddy.swirl.set_nearest_contour_index(centlon_e, centlat_e)
-        segi = Eddy.swirl.get_index_nearest_path()
+        theindex = Eddy.swirl.get_index_nearest_path()
         
-        if segi:
+        if theindex:
             
-            poly_i = CS.collections[citer.index].get_paths()[segi]
+            poly_i = CS.collections[citer.index].get_paths()[theindex]
             
             # 1. Ensure polygon_i contains point centlon_e, centlat_e
             if poly_i.contains_point([centlon_e, centlat_e]):
@@ -561,13 +486,12 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
         citer.iternext()
     
     
-    if any_inner_contours:
+    if any_inner_contours: # set speed based contour parameters
         cx, cy = Eddy.M(theseglon, theseglat)
-        # Get speed based eddy radius (eddy_radius_s)
         centx_s, centy_s, eddy_radius_s, junk = fit_circle(cx, cy)
         centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
     
-    else:
+    else: # use the effective contour
         centlon_s, centlat_s = centlon_e, centlat_e
         eddy_radius_s = eddy_radius_e
         inner_seglon, inner_seglat = theseglon, theseglat
@@ -576,6 +500,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     if not save_all_uavg:
         return (uavg, centlon_s, centlat_s, eddy_radius_s,
                 theseglon, theseglat, inner_seglon, inner_seglat)
+    
     else:  
         return (uavg, centlon_s, centlat_s, eddy_radius_s,
                 theseglon, theseglat, inner_seglon, inner_seglat, all_uavg)
@@ -775,14 +700,19 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 
                                 elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
                                     
+                                    args = (Eddy, CS, collind,
+                                            centlon_e, centlat_e,
+                                            cont, grd, eddy_radius_e)
+                                    
                                     if not Eddy.TRACK_EXTRA_VARIABLES:
-                                        uavg, centlon_s, centlat_s, eddy_radius_s,\
-                                             contlon_s, contlat_s, inner_contlon, inner_contlat = get_uavg(Eddy, CS, collind,
-                                                                       centlon_e, centlat_e, cont, grd, eddy_radius_e)
+                                        (uavg, centlon_s, centlat_s,
+                                         eddy_radius_s, contlon_s, contlat_s,
+                                         inner_contlon, inner_contlat) = get_uavg(*args)
                                     else:
-                                        uavg, centlon_s, centlat_s, eddy_radius_s,\
-                                             contlon_s, contlat_s, inner_contlon, inner_contlat, uavg_profile = get_uavg(Eddy, CS, collind,
-                                                                       centlon_e, centlat_e, cont, grd, eddy_radius_e, save_all_uavg=True)
+                                        (uavg, centlon_s, centlat_s,
+                                         eddy_radius_s, contlon_s, contlat_s,
+                                         inner_contlon, inner_contlat,
+                                         uavg_profile) = get_uavg(*args, save_all_uavg=True)
                                     
                                     
                                     centlon_lmi, centlat_lmi, junk, junk = fit_circle(inner_contlon,
@@ -799,8 +729,6 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 properties.eddy_radius_e = eddy_radius_e
                                 properties.rtime = rtime
                                 properties.teke = teke
-                                
-                                
                                 
                                 # Update Q eddy properties
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
@@ -913,9 +841,9 @@ def track_eddies(Eddy, first_record):
     debug_dist = False
     
     # We will need these in m for ellipse below
-    old_x, old_y = Eddy.M(np.asarray(Eddy.old_lon), np.asarray(Eddy.old_lat))
-    new_x, new_y = Eddy.M(np.asarray(Eddy.new_lon_tmp),
-                          np.asarray(Eddy.new_lat_tmp))
+    old_x, old_y = Eddy.M(np.array(Eddy.old_lon), np.array(Eddy.old_lat))
+    new_x, new_y = Eddy.M(np.array(Eddy.new_lon_tmp),
+                          np.array(Eddy.new_lat_tmp))
     
     X_old = np.array([Eddy.old_lon, Eddy.old_lat]).T
     X_new = np.array([Eddy.new_lon_tmp, Eddy.new_lat_tmp]).T
@@ -983,7 +911,8 @@ def track_eddies(Eddy, first_record):
         # Make an ellipse at current old_eddy location
         # (See CSS11 sec. B4, pg. 208)
         if 'ellipse' in Eddy.SEPARATION_METHOD:
-            
+            #Eddy.search_ellipse.set_search_ellipse(Eddy.old_lon[old_ind],
+                                                   #Eddy.old_lat[old_ind])
             Eddy.search_ellipse.set_search_ellipse(old_x[old_ind],
                                                    old_y[old_ind])
             
@@ -1058,7 +987,7 @@ def track_eddies(Eddy, first_record):
                     # corresponding new_eddy_inds set to False
                     new_eddy_inds[np.nonzero(Eddy.new_lon_tmp == 
                                             Eddy.new_lon_tmp[new_ind])] = False
-                    dist_mat[:,new_ind] = 1e9 # km
+                    dist_mat[:, new_ind] = 1e9 # km
         
         
         if Eddy.TRACK_EXTRA_VARIABLES:
@@ -1096,8 +1025,8 @@ def track_eddies(Eddy, first_record):
                 
                 # Choice of using effective or speed-based...
                 delta_area = np.r_[delta_area,
-                    np.abs(np.diff([np.pi*(Eddy.old_radii_e[old_ind]**2),
-                    np.pi*(new_rd_e[i]**2)]))]
+                    np.abs(np.diff([np.pi * (Eddy.old_radii_e[old_ind]**2),
+                    np.pi * (new_rd_e[i]**2)]))]
                 delta_amp = np.r_[delta_amp,
                     np.abs(np.diff([Eddy.old_amp[old_ind], new_am[i]]))]
                 
@@ -1150,7 +1079,7 @@ def track_eddies(Eddy, first_record):
             
             # Use backup_ind to reinsert distances into dist_mat for the unused eddy/eddies
             for i, bind in enumerate(backup_ind[dx_unused]):
-                dist_mat[:,bind] = dist_mat_copy[:,bind]
+                dist_mat[:, bind] = dist_mat_copy[:, bind]
             
             if debug_dist:
                 print 'backup_ind[dx_unused].shape',backup_ind[dx_unused].shape
@@ -1232,10 +1161,14 @@ def accounting(Eddy, old_ind, centlon, centlat,
       new_eddy   : flag indicating a new eddy
       first_record : flag indicating that we're on the first record
     """
-    if first_record: # is True then all eddies are new...
+    if first_record: # is True then all eddies are new
+        new_eddy = True
         if Eddy.VERBOSE:
             print '------ writing first record'
-        new_eddy = True
+    
+    kwargs = {'temp':cent_temp, 'salt':cent_salt,
+              'contour_e':contour_e, 'contour_s':contour_s,
+              'uavg_profile':uavg_profile, 'shape_error':shape_error}
     
     if not new_eddy: # it's an old (i.e., active) eddy
         
@@ -1260,19 +1193,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
         args = (old_ind, centlon, centlat, rtime, uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude)
         
-        if 'ROMS' in Eddy.DATATYPE:
-            
-            Eddy.update_track(*args,
-                              temp=cent_temp, salt=cent_salt,
-                              contour_e=contour_e, contour_s=contour_s,
-                              uavg_profile=uavg_profile, shape_error=shape_error)
-        
-        elif 'AVISO' in Eddy.DATATYPE:
-            
-            Eddy.update_track(*args,
-                              temp=None, salt=None,
-                              contour_e=contour_e, contour_s=contour_s,
-                              uavg_profile=uavg_profile, shape_error=shape_error)
+        Eddy.update_track(*args, **kwargs)
 
     else: # it's a new eddy
         
@@ -1301,19 +1222,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
         
         args = (centlon, centlat, rtime, uavg, teke,
                 eddy_radius_s, eddy_radius_e, amplitude)
-        kwargs = {'contour_e':contour_e, 'contour_s':contour_s,
-                  'uavg_profile':uavg_profile, 'shape_error':shape_error}
         
-        if 'ROMS' in Eddy.DATATYPE:
-            
-            kwargs['temp'] = cent_temp
-            kwargs['salt'] = cent_salt
-            
-            Eddy.add_new_track(*args, **kwargs)
-        
-        elif 'AVISO' in Eddy.DATATYPE:
-    
-            Eddy.add_new_track(*args, **kwargs)
+        Eddy.add_new_track(*args, **kwargs)
         
         Eddy.index += 1
 
@@ -1366,14 +1276,14 @@ def func_hann2d_fast(var, numpasses):
         #print 'jsz, isz',jsz, isz
         var_ext = np.ma.zeros((nj, ni)) # add 1-more line parallell to
         var_ext[1:-1, 1:-1] = var        # each of 4-sides
-        var_ext[1:-1, 0] = var[:,0]   # duplicate W-side
-        var_ext[1:-1,-1] = var[:,-1]  # duplicate E-side
-        var_ext[0,1:-1] = var[0,:]   # duplicate N-side
-        var_ext[-1,1:-1] = var[-1,:]  # duplicate S-side
-        var_ext[0,0] = np.nan     # NW-corner
-        var_ext[0,-1] = np.nan     # NE-corner
-        var_ext[-1,0] = np.nan     # SW-corner
-        var_ext[-1,-1] = np.nan     # SE-corner
+        var_ext[1:-1, 0] = var[:, 0]   # duplicate W-side
+        var_ext[1:-1, -1] = var[:, -1]  # duplicate E-side
+        var_ext[0, 1:-1] = var[0]   # duplicate N-side
+        var_ext[-1, 1:-1] = var[-1]  # duplicate S-side
+        var_ext[0, 0] = np.nan     # NW-corner
+        var_ext[0, -1] = np.nan     # NE-corner
+        var_ext[-1, 0] = np.nan     # SW-corner
+        var_ext[-1, -1] = np.nan     # SE-corner
 
         # npts is used to count number of valid neighbors    
         npts = ne.evaluate('var_ext * 0. + 1.')
@@ -1386,7 +1296,7 @@ def func_hann2d_fast(var, numpasses):
         cc = np.ma.zeros((var.shape))
         varS = np.ma.zeros((var.shape))
     
-        cc = npts[1:nj-1, 1:ni-1] * (npts[0:nj-2, 1:ni-1] + npts[2:nj,   1:ni-1] +
+        cc = npts[1:nj-1, 1:ni-1] * (npts[0:nj-2, 1:ni-1] + npts[2:nj, 1:ni-1] +
                                      npts[1:nj-1, 0:ni-2] + npts[1:nj-1, 2:ni])
                                  
         varS = (var_ext[0:nj-2, 1:ni-1] + var_ext[2:nj,   1:ni-1] + 
@@ -1408,8 +1318,8 @@ def func_hann2d_fast(var, numpasses):
 
 def get_circle(x0, y0, r, npts):
     """
-    Return points on a circle, with specified (x0,y0) center and radius
-                    (and optional number of points too!).
+    Return points on a circle, with specified (x0, y0) center and radius
+                    (and optional number of points too).
   
     Input     : 1  - x0, scalar, center X of circle
                 2  - y0, scalar, center Y of circle
@@ -1426,7 +1336,9 @@ def get_circle(x0, y0, r, npts):
     Written On : June/05/2008
     Tool       : Eddy Tracker
     """
-    theta = np.arange(npts)
+    theta = np.arange(npts) # NOTE npts is a constant, so
+    # *cos(theta)* and *sin(theta)* can be predefined 
+    #SHOULD BE PART OF CONTOUR OBJECT
     theta[:] = theta * 2. * (4. * np.arctan(1.)) / npts
     cx = x0 + r * np.cos(theta)
     cy = y0 + r * np.sin(theta)
