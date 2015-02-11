@@ -36,7 +36,7 @@ from py_eddy_tracker_classes import plt, np, dt, Dataset, time, \
                                     datestr2datetime, gaussian_resolution, \
                                     get_cax, collection_loop, track_eddies, \
                                     anim_figure
-from py_eddy_tracker_amplitude import SwirlSpeed
+from py_eddy_tracker_property_classes import SwirlSpeed
 import make_eddy_tracker_list_obj as eddy_tracker
 import scipy.ndimage as ndimage
 import scipy.interpolate as interpolate

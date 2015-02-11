@@ -249,7 +249,7 @@ class SwirlSpeed(object):
                 x.append(coll.vertices[:, 0])
                 y.append(coll.vertices[:, 1])
                 thelen = len(coll.vertices[:, 0])
-                ci.append
+                ci.append(thelen)
             li.append(len(cont.get_paths()))
     
         self.x = np.array([val for sublist in x for val in sublist])
