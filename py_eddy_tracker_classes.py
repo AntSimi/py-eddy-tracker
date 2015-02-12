@@ -925,7 +925,7 @@ def track_eddies(Eddy, first_record):
         if 'ellipse' in Eddy.SEPARATION_METHOD:
             Eddy.search_ellipse.set_search_ellipse(old_x[old_ind],
                                                    old_y[old_ind])
-            
+            #Eddy.search_ellipse.view_search_ellipse(Eddy)
             
         # Loop over separation distances between old and new
         for new_ind, new_dist in enumerate(dist_mat[old_ind]):
@@ -1047,6 +1047,7 @@ def track_eddies(Eddy, first_record):
                     delta_salt = np.r_[delta_salt,
                         np.abs(np.diff([Eddy.old_salt[old_ind], new_st[i]]))]
             
+            #Eddy.search_ellipse.view_search_ellipse(Eddy)
             #print dist_arr, DIST0
             # This from Penven etal (2005)
             deltaX = np.sqrt((delta_area / AREA0)**2 +

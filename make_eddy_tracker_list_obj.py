@@ -1156,7 +1156,7 @@ class SearchEllipse (object):
         self.THE_DOMAIN = THE_DOMAIN
         self.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
         self.e_w_major = self.DAYS_BTWN_RECORDS * 3e5 / 7.
-        self.n_s_minor = self.DAYS_BTWN_RECORDS * 1. * 15e4 / 7.
+        self.n_s_minor = self.DAYS_BTWN_RECORDS * 15e4 / 7.
         self.semi_n_s_minor = 0.5 * self.n_s_minor
         self.rwv = RossbyWaveSpeed(THE_DOMAIN, grd, RW_PATH=RW_PATH)
         self.rw_c = np.empty(1)
@@ -1196,8 +1196,8 @@ class SearchEllipse (object):
         w_verts = self.west_ellipse.get_verts()
         w_size = w_verts[:, 0].size
         w_size *= 0.5
-        ew_x = np.hstack((e_verts[:e_size, 0], w_verts[w_size:, 0]))
-        ew_y = np.hstack((e_verts[:e_size, 1], w_verts[w_size:, 1]))
+        ew_x = np.hstack((e_verts[e_size:, 0], w_verts[:w_size, 0]))
+        ew_y = np.hstack((e_verts[e_size:, 1], w_verts[:w_size, 1]))
         self.ellipse_path = path.Path(np.array([ew_x, ew_y]).T)
         return self#.ellipse_path
     
