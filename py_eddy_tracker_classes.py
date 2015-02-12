@@ -42,8 +42,8 @@ import matplotlib.patches as patch
 
 import make_eddy_tracker_list_obj as eddy_tracker
 from py_eddy_tracker_property_classes import Amplitude, EddyProperty
-import haversine_distmat as hav # needs compiling with f2py
-
+#import haversine_distmat as hav # needs compiling with f2py
+from haversine import haversine # needs compiling with f2py
 
 def datestr2datetime(datestr):
     """
@@ -121,14 +121,15 @@ def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
     M = A_eddy.M
     
     if 'Q' in DIAGNOSTIC_TYPE:
-        pcm = M.pcolormesh(Mx, My, xicopy, cmap=cmap, ax=ax)
+        pcm = M.imshow(xicopy, cmap=cmap, ax=ax, interpolation='none')
         M.contour(Mx, My, xi, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, qparam, qparameter, ax=ax, colors='g', linewidths=0.25)
         pcm.set_clim(-.5, .5)
         M.contour(Mx, My, qparam, [qparameter[0]], ax=ax, colors='m', linewidths=0.25)
     
     elif 'SLA' in DIAGNOSTIC_TYPE:
-        pcm = M.pcolormesh(Mx, My, A_eddy.slacopy, cmap=cmap, ax=ax)
+        #pcm = M.pcolormesh(Mx, My, A_eddy.slacopy, cmap=cmap, ax=ax)
+        pcm = M.imshow(A_eddy.slacopy, cmap=cmap, ax=ax, interpolation='none')
         M.contour(Mx, My, A_eddy.slacopy, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, A_eddy.slacopy, A_eddy.CONTOUR_PARAMETER, ax=ax, colors='g',
                   linestyles='solid', linewidths=0.15)
@@ -579,7 +580,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                     if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                         xilon, xilat = CSxi.find_nearest_contour(
                                        centlon_e, centlat_e, pixel=False)[3:5]
-                        eddy_radius_e = hav.haversine_dist(centlon_e,
+                        eddy_radius_e = haversine.distance(centlon_e,
                                                            centlat_e,
                                                            xilon, xilat)
                         if (eddy_radius_e >= Eddy.radmin and
@@ -849,10 +850,21 @@ def track_eddies(Eddy, first_record):
     X_new = np.array([Eddy.new_lon_tmp, Eddy.new_lat_tmp]).T
     
     # Use haversine distance for distance matrix between every old and new eddy
-    dist_mat = np.empty((X_old.shape[0], X_new.shape[0]))
-    hav.haversine_distmat(np.asfortranarray(X_old),
-                          np.asfortranarray(X_new),
-                          np.asfortranarray(dist_mat))
+    #dist_mat = np.empty((X_old.shape[0], X_new.shape[0]))
+    dist_mat = np.ones((X_old.shape[0], X_new.shape[0]), dtype=np.float64)
+    
+    #print 'BEFORE dist_mat', dist_mat.min(), dist_mat.max()
+    #print dist_mat.flags
+    #print '--------------'
+    dist_mat = np.asfortranarray(dist_mat)
+    haversine.distance_matrix(np.asfortranarray(X_old),
+                              np.asfortranarray(X_new),
+                              dist_mat)
+    dist_mat = np.ascontiguousarray(dist_mat)
+    #print '+++++++++++++++'
+    #print 'AFTER dist_mat', dist_mat.min(), dist_mat.max()
+    #print dist_mat.flags
+    #print 'JUNK', dist_mat_junk.min(), dist_mat_junk.max()
     
     dist_mat_copy = dist_mat.copy()
     
@@ -1019,18 +1031,23 @@ def track_eddies(Eddy, first_record):
             for i in np.nditer(np.arange(dist_arr.size)):
                 
                 # Choice of using effective or speed-based...
-                delta_area = np.r_[delta_area,
-                    np.abs(np.diff([np.pi * (Eddy.old_radii_e[old_ind]**2),
-                    np.pi * (new_rd_e[i]**2)]))]
-                delta_amp = np.r_[delta_amp,
-                    np.abs(np.diff([Eddy.old_amp[old_ind], new_am[i]]))]
+                delta_area_tmp = np.array([np.pi *
+                                    (Eddy.old_radii_e[old_ind]**2),
+                                     np.pi * (new_rd_e[i]**2)]).ptp()
+                delta_amp_tmp = np.array([Eddy.old_amp[old_ind],
+                                                new_am[i]]).ptp()
+                delta_area = np.r_[delta_area, delta_area_tmp]
+                delta_amp = np.r_[delta_amp, delta_amp_tmp]
                 
                 if 'ROMS' in Eddy.DATATYPE:
+                    #delta_temp_tmp = 
+                    #delta_salt_tmp = 
                     delta_temp = np.r_[delta_temp,
                         np.abs(np.diff([Eddy.old_temp[old_ind], new_tp[i]]))]
                     delta_salt = np.r_[delta_salt,
                         np.abs(np.diff([Eddy.old_salt[old_ind], new_st[i]]))]
-        
+            
+            #print dist_arr, DIST0
             # This from Penven etal (2005)
             deltaX = np.sqrt((delta_area / AREA0)**2 +
                              (delta_amp / AMP0)**2 +

@@ -35,8 +35,8 @@ Version 1.4.2
 from py_eddy_tracker_classes import *
 import scipy.spatial as spatial
 import scipy.interpolate as interpolate
-import haversine_distmat as hav # needs compiling with f2py
-
+#import haversine_distmat as hav # needs compiling with f2py
+from haversine import haversine # needs compiling with f2py
 
 
 def haversine_distance_vector(lon1, lat1, lon2, lat2):
@@ -49,23 +49,23 @@ def haversine_distance_vector(lon1, lat1, lon2, lat2):
     lon2 = np.asfortranarray(lon2.copy())
     lat2 = np.asfortranarray(lat2.copy())
     dist = np.asfortranarray(np.empty_like(lon1))
-    hav.haversine_distvec(lon1, lat1, lon2, lat2, dist)
-    return dist
+    haversine.distance_vector(lon1, lat1, lon2, lat2, dist)
+    return np.ascontiguousarray(dist)
 
 
-def newPosition(lonin, latin, angle, distance):
-    """
-    Given the inputs (base lon, base lat, angle, distance) return
-     the lon, lat of the new position...
-    """
-    lon = np.asfortranarray(lonin.copy())
-    lat = np.asfortranarray(latin.copy())
-    angle = np.asfortranarray(angle.copy())
-    distance = np.asfortranarray(distance.copy())
-    lonout = np.asfortranarray(np.empty(lonin.shape))
-    latout = np.asfortranarray(np.empty(lonin.shape))
-    hav.waypoint_vec(lon, lat, angle, distance, lonout, latout)
-    return lon[0], lat[0]
+#def newPosition(lonin, latin, angle, distance):
+    #"""
+    #Given the inputs (base lon, base lat, angle, distance) return
+     #the lon, lat of the new position...
+    #"""
+    #lonin = np.asfortranarray(lonin.copy())
+    #latin = np.asfortranarray(latin.copy())
+    #angle = np.asfortranarray(angle.copy())
+    #distance = np.asfortranarray(distance.copy())
+    #lonout = np.asfortranarray(np.empty(lonin.shape))
+    #latout = np.asfortranarray(np.empty(lonin.shape))
+    #haversine.waypoint_vector(lonin, latin, angle, distance, lonout, latout)
+    #return np.ascontiguousarray(lonout), np.ascontiguousarray(latout)
 
 
 def nearest(lon_pt, lat_pt, lon2d, lat2d, theshape):
@@ -1156,7 +1156,7 @@ class SearchEllipse (object):
         self.THE_DOMAIN = THE_DOMAIN
         self.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
         self.e_w_major = self.DAYS_BTWN_RECORDS * 3e5 / 7.
-        self.n_s_minor = self.DAYS_BTWN_RECORDS * 2 * 15e4 / 7.
+        self.n_s_minor = self.DAYS_BTWN_RECORDS * 1. * 15e4 / 7.
         self.semi_n_s_minor = 0.5 * self.n_s_minor
         self.rwv = RossbyWaveSpeed(THE_DOMAIN, grd, RW_PATH=RW_PATH)
         self.rw_c = np.empty(1)

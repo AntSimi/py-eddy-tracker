@@ -224,6 +224,7 @@ class PyEddyTracker (object):
         Return:
           distance (m)
         """
+        print 'ssssssssssssssss'
         lon1, lat1, lon2, lat2 = (lon1.copy(), lat1.copy(),
                                   lon2.copy(), lat2.copy())
         dlat = np.deg2rad(lat2 - lat1)

@@ -1,4 +1,4 @@
-! haversine_distmat.f90
+module haversine
 !
 ! ===========================================================================
 ! This file is part of py-eddy-tracker.
@@ -22,106 +22,86 @@
 ! ===========================================================================
 !
 !    To compile for f2py do following in terminal:
-!    f2py -m haversine_distmat -h haversine_distmat.pyf haversine_distmat.f90  --overwrite-signature
-!    f2py -c --fcompiler=gfortran haversine_distmat.pyf haversine_distmat.f90
+!    f2py -m haversine -h haversine.pyf haversine.f90  --overwrite-signature
+!    f2py -c --fcompiler=gfortran haversine.pyf haversine.f90
 !
-!    If you have ifort on your system, change 'gfortran' to 'intelem'
+!    If you have ifort on your system, change 'gfortran' to 'intelem'!
 !
 !   Version 1.4.2
 !
 !===========================================================================
+implicit none
+real(kind=8), parameter :: erad = 6371315.0
+real(kind=8), parameter :: d2r = 0.017453292519943295 ! == pi / 180.
 
+contains
 
 !------------------------------------------------------------------------------
 
-    subroutine haversine_distmat(xa, xb, dist)
+    subroutine distance_matrix(xa, xb, dist)
 !------------------------------------------------------------------------------
-      implicit none
+
       real(kind=8), dimension(:,:), intent(in)    :: xa, xb
-      real(kind=8), allocatable, dimension(:)     :: xa1, xa2, xb1, xb2
       integer(kind=8)                             :: i, j, m, n
-      real(kind=8)                                :: thedist, d2r
-      real(kind=8), parameter                     :: erad = 6371315.0
+      real(kind=8)                                :: thedist
       real(kind=8), dimension(:,:), intent(inout) :: dist
-      external :: haversine
-      !write (*,*) 'aaa'
-      d2r = atan2(0.,-1.)/ 180. ! atan2(0.,-1.) == pi
+
       m = size(xa, 1)
       n = size(xb, 1)
-      allocate(xa1(m))
-      allocate(xa2(m))
-      allocate(xb1(n))
-      allocate(xb2(n))
-      xa1 = xa(:,1)
-      xa2 = xa(:,2)
-      xb1 = xb(:,1)
-      xb2 = xb(:,2)
-      !write (*,*) 'bbb', xa1
+!       write (*,*) 'm,n', m, n
 
 !     Loop over empty dist matrix and fill
       do j = 1, m
         do i = 1, n
-          call haversine(xa1(j), xa2(j), xb1(i), xb2(i), d2r, thedist)
+          call get_haversine(xa(j,1), xa(j,2), xb(i,1), xb(i,2), thedist)
           dist(j,i) = thedist
+!           write (*,*) 'dist(j,i)', dist(j,i)
         enddo
       enddo
-      deallocate(xa1)
-      deallocate(xa2)
-      deallocate(xb1)
-      deallocate(xb2)
       dist = dist * erad
-    end subroutine haversine_distmat
+!       write (*,*) 'dist', dist
+    end subroutine distance_matrix
 
 
 !------------------------------------------------------------------------------
-    subroutine haversine_distvec(lon1, lat1, lon2, lat2, dist)
+    subroutine distance_vector(lon1, lat1, lon2, lat2, dist)
 !------------------------------------------------------------------------------
       
-      implicit none
       real(kind=8), dimension(:), intent(in) :: lon1, lat1, lon2, lat2
       integer(kind=8)                        :: i, m
-      real(kind=8)             :: thedist, d2r
-      real(kind=8), parameter  :: erad = 6371315.0
+      real(kind=8)             :: thedist
       real(kind=8), dimension(:), intent(inout) :: dist
-      external :: haversine
-
-      d2r = atan2(0.,-1.) / 180. ! atan2(0.,-1.) == pi
+      
       m = size(lon1)
       
 !     Loop over empty dist matrix and fill
       do i = 1, m
-        call haversine(lon1(i), lat1(i), lon2(i), lat2(i), d2r, thedist)
+        call get_haversine(lon1(i), lat1(i), lon2(i), lat2(i), thedist)
         dist(i) = thedist
       enddo
       dist = dist * erad
     
-    end subroutine haversine_distvec
+    end subroutine distance_vector
 
-
+    
 !------------------------------------------------------------------------------
-    subroutine haversine_dist(lon1, lat1, lon2, lat2, thedist)
+    subroutine distance(lon1, lat1, lon2, lat2, thedist)
 !------------------------------------------------------------------------------
       
-      implicit none
       real(kind=8), intent(in) :: lon1, lat1, lon2, lat2
-      real(kind=8)             :: d2r
-      real(kind=8), parameter  :: erad = 6371315.0
       real(kind=8), intent(out) :: thedist
-      external :: haversine
-      
-      d2r = atan2(0.,-1.) / 180. ! atan2(0.,-1.) == pi
-      call haversine(lon1, lat1, lon2, lat2, d2r, thedist)
+!
+      call get_haversine(lon1, lat1, lon2, lat2, thedist)
       thedist = thedist * erad
     
-    end subroutine haversine_dist
+    end subroutine distance
 
-
+    
 !------------------------------------------------------------------------------
-    subroutine haversine(lon1, lat1, lon2, lat2, d2r, thedist)
+    subroutine get_haversine(lon1, lat1, lon2, lat2, thedist)
 !------------------------------------------------------------------------------
 !
-      implicit none
-      real(kind=8), intent(in)  :: lon1, lat1, lon2, lat2, d2r
+      real(kind=8), intent(in)  :: lon1, lat1, lon2, lat2
       real(kind=8)              :: lt1, lt2, dlat, dlon
       real(kind=8)              :: a
       real(kind=8), intent(out) :: thedist
@@ -136,76 +116,57 @@
       a = a + (sin(0.5 * dlat) * sin(0.5 * dlat))
       thedist = 2 * atan2(sqrt(a), sqrt(1 - a))
 !
-    end subroutine haversine
+    end subroutine get_haversine
 
 
 !------------------------------------------------------------------------------
-    subroutine waypoint_vec(lonin, latin, anglein, distin, lon, lat)
+    subroutine waypoint_vector(lonin, latin, anglein, distin, lon, lat)
 !------------------------------------------------------------------------------
       
-      implicit none
       real(kind=8), dimension(:), intent(in) :: lonin, latin, anglein, distin
       integer(kind=8)                        :: i, m
-      real(kind=8)             :: thelon, thelat, d2r
+      real(kind=8)             :: thelon, thelat
       real(kind=8), dimension(:), intent(inout) :: lon, lat
-      external :: waypoint
+!       external :: waypoint
 
-      d2r = atan2(0.,-1.)/ 180. ! atan2(0.,-1.) == pi
       m = size(lonin)
       
 !     Loop over empty dist matrix and fill
-        do i = 1, m
-          call waypoint(lonin(i), latin(i), anglein(i), distin(i), d2r, thelon, thelat)
-          lon(i) = thelon
-          lat(i) = thelat
-        enddo
+      do i = 1, m
+        call get_waypoint(lonin(i), latin(i), anglein(i), distin(i), thelon, thelat)
+        lon(i) = thelon
+        lat(i) = thelat
+      enddo
     
-    end subroutine waypoint_vec
+    end subroutine waypoint_vector
 
 
 !------------------------------------------------------------------------------
-    subroutine waypoint(lonin, latin, anglein, distin, d2r, thelon, thelat)
+    subroutine get_waypoint(lonin, latin, anglein, distin, thelon, thelat)
 !------------------------------------------------------------------------------
 !
       implicit none
-      real(kind=8), intent(in)  :: lonin, latin, anglein, distin, d2r
-      real(kind=8)              :: ln1, lt1, angle, d_r
-      real(kind=8), parameter   :: erad = 6371315.0
+      real(kind=8), intent(in)  :: lonin, latin, anglein, distin
+      real(kind=8)              :: ln1, lt1, angle, dr
       real(kind=8), intent(out) :: thelon, thelat
 !
-      d_r = distin / erad ! angular distance
+      dr = distin / erad ! angular distance
       thelon = d2r * lonin
       thelat = d2r * latin
       angle = d2r * anglein
       
-      lt1 = asin(sin(thelat) * cos(d_r) + cos(thelat) * sin(d_r) * cos(angle))
-      ln1 = atan2(sin(angle) * sin(d_r) * cos(thelat), cos(d_r) - sin(thelat) * sin(lt1))
+      lt1 = asin(sin(thelat) * cos(dr) + cos(thelat) * sin(dr) * cos(angle))
+      ln1 = atan2(sin(angle) * sin(dr) * cos(thelat), cos(dr) &
+                                      - sin(thelat) * sin(lt1))
       ln1 = ln1 + thelon
       thelat = lt1 / d2r
       thelon = ln1 / d2r
 !
-    end subroutine waypoint
+    end subroutine get_waypoint
 
+    
 
-!      
-! !------------------------------------------------------------------------------
-!     subroutine concat_arrays(a, b)
-! !------------------------------------------------------------------------------
-!       implicit none
-!       real(kind=8), dimension(:) :: a
-!       real(kind=8), dimension(:) :: b
-!       real(kind=8), dimension(:), allocatable :: c
-! !
-!       allocate(c(size(a)+size(b)))
-!       c(1:size(a)) = a
-!       c(size(a)+1:size(a)+size(b)) = b
-!  
-!     end subroutine concat_arrays
-
-
-
-
-
-
-
-
+    
+!------------------------------------------------------------------------------
+end module haversine
+!------------------------------------------------------------------------------
