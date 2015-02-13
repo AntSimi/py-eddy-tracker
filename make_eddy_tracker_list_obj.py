@@ -1199,7 +1199,6 @@ class SearchEllipse (object):
         ew_x = np.hstack((e_verts[e_size:, 0], w_verts[:w_size, 0]))
         ew_y = np.hstack((e_verts[e_size:, 1], w_verts[:w_size, 1]))
         self.ellipse_path = path.Path(np.array([ew_x, ew_y]).T)
-        return self#.ellipse_path
     
     
     def _set_black_sea_ellipse(self):

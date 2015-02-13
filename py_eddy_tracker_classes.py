@@ -94,9 +94,9 @@ def do_basemap(M, ax):
     else:
         stride = 2
     M.drawparallels(np.arange(-90, 90 + stride, stride),
-        labels=[1,0,0,0], linewidth=0.25, size=8, ax=ax)
+        labels=[1, 0, 0, 0], linewidth=0.25, size=8, ax=ax)
     M.drawmeridians(np.arange(-360, 360 + stride, stride),
-        labels=[0,0,0,1], linewidth=0.25, size=8, ax=ax)
+        labels=[0, 0, 0, 1], linewidth=0.25, size=8, ax=ax)
     M.fillcontinents('k', ax=ax)
     M.drawcoastlines(linewidth=0.5, ax=ax)
     return
@@ -170,8 +170,8 @@ def get_cax(subplot, dx=0, width=.015, position='r'):
 
 def oceantime2ymd(ocean_time, integer=False):
     """
-    Return strings y, m, d given ocean_time (seconds)
-    If integer == True return integer rather than string
+    Return strings *yea*r, *month*, *day* given ocean_time (seconds)
+    If kwarg *integer*==*True* return integers rather than strings.
     """
     if np.isscalar(ocean_time):
         ocean_time = np.array([ocean_time])
@@ -184,12 +184,12 @@ def oceantime2ymd(ocean_time, integer=False):
     day = (day.astype(np.int16) + 1)[0]
     if not integer:
         year  = str(year)
-        month = str(month)
-        day   = str(day)
         if len(year) < 2:
             year = year.zfill(2)
+        month = str(month)
         if len(month) < 2:
             month = month.zfill(2)
+        day   = str(day)
         if len(day) < 2:
             day = day.zfill(2)
     return year, month, day
@@ -243,21 +243,21 @@ def okubo_weiss(grd):
     mn_p = np.zeros((M, L))
     uom = np.zeros((M, Lp))
     von = np.zeros((Mp, L))
-    uom = 2. * u / (pm[:,:L] + pm[:,1:Lp])
-    uon = 2. * u / (pn[:,:L] + pn[:,1:Lp])
-    von = 2. * v / (pn[:M,:] + pn[1:Mp,:])
-    vom = 2. * v / (pm[:M,:] + pm[1:Mp,:])
+    uom = 2. * u / (pm[:, :L] + pm[:, 1:Lp])
+    uon = 2. * u / (pn[:, :L] + pn[:, 1:Lp])
+    von = 2. * v / (pn[:M] + pn[1:Mp])
+    vom = 2. * v / (pm[:M] + pm[1:Mp])
     mn = pm * pn
-    mn_p = quart_interp(mn[:M, :L],    mn[:M,  1:Lp],
+    mn_p = quart_interp(mn[:M, :L], mn[:M, 1:Lp],
                         mn[1:Mp,1:Lp], mn[1:Mp, :L])
     # Sigma_T
     ST = mn * psi2rho(von[:,1:Lp] - von[:,:L] + uom[1:Mp,:] - uom[:M,:])
     # Sigma_N
     SN = np.zeros((Mp,Lp))
-    SN[1:-1,1:-1] = mn[1:-1,1:-1] * (uon[1:-1,1:]    \
-                                   - uon[1:-1,:-1]   \
-                                   - vom[1:,1:-1]    \
-                                   + vom[:-1,1:-1])
+    SN[1:-1,1:-1] = mn[1:-1,1:-1] * (uon[1:-1, 1:]    \
+                                   - uon[1:-1, :-1]   \
+                                   - vom[1:, 1:-1]    \
+                                   + vom[:-1, 1:-1])
     # Relative vorticity
     xi = vorticity(u, v, pm, pn)
     # Okubo
@@ -828,9 +828,7 @@ def track_eddies(Eddy, first_record):
     """
     Track the eddies. First a distance matrix is calculated between
     all new and old eddies. Then loop through each old eddy, sorting the
-    distances and selecting that/those within range.
-    This is not so slow, surprisingly, it's the main loops over
-    the contours which are slow
+    distances, and selecting that/those within range.
     """
     DIST0 = Eddy.DIST0
     AMP0 = Eddy.AMP0
@@ -841,7 +839,10 @@ def track_eddies(Eddy, first_record):
     # True to debug
     debug_dist = False
     
-    # We will need these in m for ellipse below
+    
+    far_away = 1e9
+    
+    # We will need these in m for ellipse method below
     old_x, old_y = Eddy.M(np.array(Eddy.old_lon), np.array(Eddy.old_lat))
     new_x, new_y = Eddy.M(np.array(Eddy.new_lon_tmp),
                           np.array(Eddy.new_lat_tmp))
@@ -868,7 +869,12 @@ def track_eddies(Eddy, first_record):
     
     dist_mat_copy = dist_mat.copy()
     
-    new_eddy_inds = np.ones(len(Eddy.new_lon_tmp), dtype=bool)
+    # *new_eddy_inds* contains indices to every newly identified eddy
+    # that are initially set to True on the assumption that it is a new
+    # eddy, i.e, it has just been born.
+    # Later some will be set to False, indicating it is a contination
+    # of an existing eddy.
+    new_eddy_inds = np.ones_like(new_x, dtype=bool)
     new_eddy = False
     
     old_area = np.empty(1)
@@ -906,14 +912,20 @@ def track_eddies(Eddy, first_record):
                                            np.unique(dist_mat[old_ind],
                                                     return_index=True)[1])
         # Move non_unique_inds far away
-        dist_mat[old_ind][non_unique_inds] = 1e9 # km
+        dist_mat[old_ind][non_unique_inds] = far_away # km
         
         if debug_dist:
-            plt.clf()
-            plt.subplot(131)
-            plt.imshow(dist_mat_copy, interpolation='none',
-                       origin='lower', cmap=plt.cm.Accent)
-            plt.clim(0, 5e6)
+            
+            debug_distmax = 5e6
+            debug_cmap = plt.cm.Set3
+            
+            fig = plt.figure(225)
+            #plt.clf()
+            debug_ax = fig.add_subplot(131)
+            im = plt.imshow(dist_mat_copy, interpolation='none',
+                       origin='lower', cmap=debug_cmap)
+            im.cmap.set_over('k')
+            im.set_clim(0, debug_distmax)
             plt.colorbar()
             plt.xlabel('new')
             plt.ylabel('old')
@@ -929,22 +941,26 @@ def track_eddies(Eddy, first_record):
             
         # Loop over separation distances between old and new
         for new_ind, new_dist in enumerate(dist_mat[old_ind]):
+                
+            sep_proceed = False
             
-            if 'ellipse' in Eddy.SEPARATION_METHOD:
-                if Eddy.search_ellipse.ellipse_path.contains_point(
-                                          (new_x[new_ind], new_y[new_ind])):
-                    sep_proceed = True
+            if new_dist < far_away:
+                
+                if 'ellipse' in Eddy.SEPARATION_METHOD:
+                    if Eddy.search_ellipse.ellipse_path.contains_point(
+                                            (new_x[new_ind], new_y[new_ind])):
+                        sep_proceed = True
+                    #else:
+                        #sep_proceed = False
+                
+                elif 'sum_radii' in Eddy.SEPARATION_METHOD:
+                    sep_dist = Eddy.new_radii_tmp_e[new_ind]
+                    sep_dist += Eddy.old_radii_e[old_ind]
+                    sep_dist *= Eddy.sep_dist_fac
+                    sep_proceed = new_dist <= sep_dist
+                
                 else:
-                    sep_proceed = False
-            
-            elif 'sum_radii' in Eddy.SEPARATION_METHOD:
-                sep_dist = Eddy.new_radii_tmp_e[new_ind]
-                sep_dist += Eddy.old_radii_e[old_ind]
-                sep_dist *= Eddy.sep_dist_fac
-                sep_proceed = new_dist <= sep_dist
-            
-            else:
-                Exception
+                    Exception
             
             # Pass only the eddies within ellipse or sep_dist
             if sep_proceed:
@@ -994,7 +1010,8 @@ def track_eddies(Eddy, first_record):
                     # corresponding new_eddy_inds set to False
                     new_eddy_inds[np.nonzero(Eddy.new_lon_tmp == 
                                             Eddy.new_lon_tmp[new_ind])] = False
-                    dist_mat[:, new_ind] = 1e9 # km
+                    #print 'aa', new_eddy_inds
+                    dist_mat[:, new_ind] = far_away # km
         
         
         if Eddy.TRACK_EXTRA_VARIABLES:
@@ -1004,9 +1021,9 @@ def track_eddies(Eddy, first_record):
             kwargs = {}
         
         # Only one eddy within range
-        if dist_arr.size == 1: # then update the eddy tracks only
+        if dist_arr.size == 1: # then update the eddy track only
             
-            # Use index 0 here because type is list, but we want the float
+            # Use index 0 here because type is list and we want the scalar
             args = (Eddy, old_ind, new_ln[0], new_lt[0], new_rd_s[0],
                     new_rd_e[0], new_am[0], new_Ua[0], new_ek[0], new_tm[0],
                     new_eddy, first_record)
@@ -1059,6 +1076,16 @@ def track_eddies(Eddy, first_record):
             dx_unused = dx[1:] # index/indices to the unused eddy/eddies
             
             
+            if debug_dist:
+                print 'delta_area', delta_area
+                print 'delta_amp', delta_amp
+                print 'dist_arr', dist_arr
+                print 'dx', dx
+                print 'dx0', dx0
+                print 'dx_unused', dx_unused
+                    
+            
+            
             # Update eddy track dx0
             if not Eddy.TRACK_EXTRA_VARIABLES:
                 new_cntr_e = new_cntr_s = new_uavg_prf = new_shp_err = None
@@ -1081,37 +1108,55 @@ def track_eddies(Eddy, first_record):
             Eddy = accounting(*args, **kwargs)
             
             if debug_dist:
-                plt.subplot(132)
-                plt.imshow(dist_mat.copy(), interpolation='none',
-                           origin='lower', cmap=plt.cm.Accent)
-                plt.clim(0, 5e6)
+                debug_ax = fig.add_subplot(132)
+                im = plt.imshow(dist_mat, interpolation='none',
+                           origin='lower', cmap=debug_cmap)
+                im.cmap.set_over('k')
+                im.set_clim(0, debug_distmax)
+                plt.axis('image')
                 plt.colorbar()
                 plt.xlabel('new')
                 plt.ylabel('old')
                 plt.title('before')
             
             # Use backup_ind to reinsert distances into dist_mat for the unused eddy/eddies
-            for i, bind in enumerate(backup_ind[dx_unused]):
+            for bind in backup_ind[dx_unused]:
+                #print dist_mat.shape
+                #print dist_mat[:, bind]
+                #print dist_mat_copy[:, bind]
                 dist_mat[:, bind] = dist_mat_copy[:, bind]
-            
+                #print dist_mat[:, bind]
+                #print '\n'
+                #print 'B new_eddy_inds', new_eddy_inds
+                new_eddy_inds[bind] = True
+                #print 'A new_eddy_inds', new_eddy_inds
+                #print '\n'
+                
+                
+                
             if debug_dist:
-                print 'backup_ind[dx_unused].shape',backup_ind[dx_unused].shape
-                print 'backup_ind[dx_unused]',backup_ind[dx_unused]
-                plt.subplot(133)
-                plt.imshow(dist_mat.copy(), interpolation='none',
-                           origin='lower', cmap=plt.cm.Accent)
-                plt.clim(0, 5e6)
+                print 'backup_ind', backup_ind
+                print 'backup_ind[dx_unused]', backup_ind[dx_unused]
+                print 'backup_ind[dx_unused].shape', backup_ind[dx_unused].shape
+                debug_ax = fig.add_subplot(133)
+                im = plt.imshow(dist_mat, interpolation='none',
+                           origin='lower', cmap=debug_cmap)
+                im.cmap.set_over('k')
+                im.set_clim(0, debug_distmax)
+                plt.axis('image')
                 plt.colorbar()
                 plt.xlabel('new')
                 plt.ylabel('old')
                 plt.title('after')
                 plt.tight_layout()
                 plt.show()
+                plt.close(225)
           
     # Finished looping over old eddy tracks
     
     # Now we need to add new eddies defined by new_eddy_inds
     if np.any(new_eddy_inds):
+        
         if False:
             print '------adding %s new eddies' %new_eddy_inds.sum()
             
