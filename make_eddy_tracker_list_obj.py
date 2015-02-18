@@ -129,36 +129,36 @@ def strcompare(str1, str2):
     return str1 in str2 and str2 in str1
 
 
-def find_nearest_contour(contcoll, x, y):
-    """
-    Finds contour that is closest to a point.
+#def find_nearest_contour(contcoll, x, y):
+    #"""
+    #Finds contour that is closest to a point.
 
-    Returns a tuple containing the contour & segment.
+    #Returns a tuple containing the contour & segment.
 
-    Call signature::
+    #Call signature::
 
-      segmin = find_nearest_contour(contcoll, x, y)
+      #segmin = find_nearest_contour(contcoll, x, y)
 
-    """
-    dmin = 1e10
-    segmin = None
-    linepathmin = None
+    #"""
+    #dmin = 1e10
+    #segmin = None
+    #linepathmin = None
 
-    paths = contcoll.get_paths()
-    for segNum, linepath in enumerate(paths):
-        lc = linepath.vertices
-        ds = lc[:,0] - x
-        ds **= 2
-        dss = lc[:,1] - y
-        dss **= 2
-        ds += dss
-        #print 'ds', ds
-        d = ds.min()
-        if d < dmin:
-            dmin = d
-            segmin = segNum
-            linepathmin = linepath
-    return (segmin, linepathmin)
+    #paths = contcoll.get_paths()
+    #for segNum, linepath in enumerate(paths):
+        #lc = linepath.vertices
+        #ds = lc[:,0] - x
+        #ds **= 2
+        #dss = lc[:,1] - y
+        #dss **= 2
+        #ds += dss
+        ##print 'ds', ds
+        #d = ds.min()
+        #if d < dmin:
+            #dmin = d
+            #segmin = segNum
+            #linepathmin = linepath
+    #return (segmin, linepathmin)
 
 
 
@@ -317,11 +317,14 @@ class TrackList (object):
         self.ncind = 0 # index to write to nc files, will increase and increase
         self.ch_index = 0 # index for Chelton style nc files
         self.PAD = 2
+        self.search_ellipse = None
         # Check for a correct configuration
         assert DATATYPE in ('ROMS', 'AVISO'), "".join(('Unknown string ',
                                                  'in *DATATYPE* parameter'))
+    
 
-
+    
+    
     def add_new_track(self, lon, lat, time, uavg, teke,
             radius_s, radius_e, amplitude, temp=None, salt=None,
             contour_e=None, contour_s=None, uavg_profile=None,
@@ -845,13 +848,22 @@ class TrackList (object):
         except Exception:
             pass
         
-        tmp = eval('self.' + xarr)
-        tmp = tmp[:]
-        if ind < len(tmp):
-            newsize = len(tmp)
-        else:
-            newsize = ind + 1
-
+        #tmp = eval('self.' + xarr)
+        #tmp = tmp[:]
+        #if ind < len(tmp):
+            #newsize = len(tmp)
+        #else:
+            #newsize = ind + 1
+        val = getattr(self, xarr)
+        try:
+            val[ind] = x
+        except:
+            val.extend([0] * (ind - len(val) + 1))
+            val[ind] = x
+        setattr(self, xarr, val)
+        
+        
+        '''
         if strcompare('new_lon', xarr):
             try:
                 self.new_lon[ind] = x
@@ -947,7 +959,7 @@ class TrackList (object):
         else:
             raise Exception
         
-        return self
+        return self'''
     
 
     
@@ -1003,13 +1015,14 @@ class RossbyWaveSpeed (object):
   
     def __init__(self, THE_DOMAIN, grd, RW_PATH=None):
         """
-        Initialise the RossbyWaveSpeedsobject
+        Instantiate the RossbyWaveSpeed object
         """
         self.THE_DOMAIN = THE_DOMAIN
         self.M = grd.M
         self.EARTH_RADIUS = grd.EARTH_RADIUS
         self.ZERO_CROSSING = grd.ZERO_CROSSING
         self.RW_PATH = RW_PATH
+        self._tree = None
         if self.THE_DOMAIN in ('Global', 'ROMS'):
             assert self.RW_PATH is not None, \
                 'Must supply a path for the Rossby deformation radius data'
@@ -1027,6 +1040,21 @@ class RossbyWaveSpeed (object):
         self.r_spd_long = np.empty(1)
         self.start = True
     
+    
+    def __getstate__(self):
+        """
+        """
+        result = self.__dict__.copy()
+        result.pop('_tree')
+        return result
+
+    
+    def __setstate__(self, thedict):
+        """
+        """
+        self.__dict__ = thedict
+        self._make_kdtree()
+        
         
     def get_rwdistance(self, xpt, ypt, DAYS_BTWN_RECORDS):
         """

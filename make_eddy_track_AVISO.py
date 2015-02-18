@@ -30,6 +30,8 @@ Version 1.4.2
 Scroll down to line ~640 to get started
 ===============================================================================
 """
+#from matplotlib import use as mpl_use
+#mpl_use('Agg')
 import sys
 import glob as glob
 from py_eddy_tracker_classes import plt, np, dt, Dataset, time, \
@@ -44,6 +46,21 @@ import scipy.spatial as spatial
 from dateutil import parser
 from mpl_toolkits.basemap import Basemap
 import yaml
+from datetime import datetime
+import pickle
+
+
+def timeit(method):
+    """
+    Decorator to time a function
+    """
+    def timed(*args, **kw):
+        ts = datetime.now()
+        result = method(*args, **kw)
+        te = datetime.now()
+        print '-----> %s : %s sec' % (method.__name__, te - ts)
+        return result
+    return timed
 
 
 class PyEddyTracker (object):
@@ -75,7 +92,29 @@ class PyEddyTracker (object):
         self.GRAVITY = 9.81
         self.EARTH_RADIUS = 6371315.0
         self.ZERO_CROSSING = False
-    
+        self.i0, self.i1 = 0, None
+        self.j0, self.j1 = 0, None
+        self.ip0, self.ip1 = 0, None
+        self.jp0, self.jp1 = 0, None
+        self.iup0, self.iup1 = 0, None
+        self.jup0, self.jup1 = 0, None
+        self.eke = None
+        self.u, self.upad = None, None
+        self.v, self.vpad = None, None
+        self.M = None
+        self.Mx = None
+        self.My = None
+        self._lon = None
+        self._lat = None
+        self._f = None
+        self._gof = None
+        self._pm = None
+        self._pn = None
+        self._dx = None
+        self._dy = None
+        self._umask = None
+        self._vmask = None
+
     
     def read_nc(self, varfile, varname, indices="[:]"):
         """
@@ -160,7 +199,7 @@ class PyEddyTracker (object):
         around 2d variables.
         Padded matrices are needed only for geostrophic velocity computation.
         """
-        print '--- Setting padding indices with PAD=%s' %pad
+        print '--- Setting padding indices with PAD=%s' % pad
         
         self.pad = pad
         
@@ -224,7 +263,7 @@ class PyEddyTracker (object):
         Return:
           distance (m)
         """
-        print 'ssssssssssssssss'
+        #print 'ssssssssssssssss'
         lon1, lat1, lon2, lat2 = (lon1.copy(), lat1.copy(),
                                   lon2.copy(), lat2.copy())
         dlat = np.deg2rad(lat2 - lat1)
@@ -280,10 +319,10 @@ class PyEddyTracker (object):
 
         # Get pm and pn
         pm = np.zeros_like(self.lonpad())
-        pm[:,1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
+        pm[:, 1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
                                          lonu[:, 1:],  latu[:, 1:])
-        pm[:,0] = pm[:,1]
-        pm[:,-1] = pm[:,-2]
+        pm[:, 0] = pm[:, 1]
+        pm[:, -1] = pm[:, -2]
         self._dx = pm
         self._pm = np.reciprocal(pm)
                 
@@ -301,58 +340,57 @@ class PyEddyTracker (object):
         """
         Convert a 2D field at u points to a field at rho points
         """
-        def uu2ur(uu_in, Mp, Lp):
-            L = Lp - 1
-            Lm = L  - 1
-            u_out = np.zeros((Mp, Lp))
-            u_out[:, 1:L] = self.half_interp(uu_in[:, 0:Lm], uu_in[:, 1:L])
+        def uu2ur(uu_in, mp, lp):
+            l = lp - 1
+            lm = l  - 1
+            u_out = np.zeros((mp, lp))
+            u_out[:, 1:l] = self.half_interp(uu_in[:, 0:lm], uu_in[:, 1:l])
             u_out[:, 0] = u_out[:, 1]
-            u_out[:, L] = u_out[:, Lm]
+            u_out[:, l] = u_out[:, lm]
             return (u_out.squeeze())
-        Mshp, Lshp = uu_in.shape
-        return uu2ur(uu_in, Mshp, Lshp + 1)
+        mshp, lshp = uu_in.shape
+        return uu2ur(uu_in, mshp, lshp + 1)
 
 
     def v2rho_2d(self, vv_in):
         # Convert a 2D field at v points to a field at rho points
-        def vv2vr(vv_in, Mp, Lp):
-            M = Mp - 1
-            Mm = M  - 1
-            v_out = np.zeros((Mp, Lp))
-            v_out[1:M] = self.half_interp(vv_in[:Mm], vv_in[1:M])
+        def vv2vr(vv_in, mp, lp):
+            m = mp - 1
+            mm = m  - 1
+            v_out = np.zeros((mp, lp))
+            v_out[1:m] = self.half_interp(vv_in[:mm], vv_in[1:m])
             v_out[0] = v_out[1]
-            v_out[M] = v_out[Mm]
+            v_out[m] = v_out[mm]
             return (v_out.squeeze())
-        Mshp, Lshp = vv_in.shape
-        return vv2vr(vv_in, Mshp + 1, Lshp)
+        mshp, lshp = vv_in.shape
+        return vv2vr(vv_in, mshp + 1, lshp)
 
 
     def rho2u_2d(self, rho_in):
         """
         Convert a 2D field at rho points to a field at u points
         """
-        def _r2u(rho_in, Lp):
-            u_out = rho_in[:, :Lp - 1]
-            u_out += rho_in[:, 1:Lp]
+        def _r2u(rho_in, lp):
+            u_out = rho_in[:, :lp - 1]
+            u_out += rho_in[:, 1:lp]
             u_out *= 0.5
             return u_out.squeeze()
         assert rho_in.ndim == 2, 'rho_in must be 2d'
-        Mshp, Lshp = rho_in.shape
-        return _r2u(rho_in, Lshp)
+        mshp, lshp = rho_in.shape
+        return _r2u(rho_in, rho_in.shape[1])
 
 
     def rho2v_2d(self, rho_in):
         """
         Convert a 2D field at rho points to a field at v points
         """
-        def _r2v(rho_in, Mp):
-            v_out = rho_in[:Mp - 1]
-            v_out += rho_in[1:Mp]
+        def _r2v(rho_in, mp):
+            v_out = rho_in[:mp - 1]
+            v_out += rho_in[1:mp]
             v_out *= 0.5
             return v_out.squeeze()
         assert rho_in.ndim == 2, 'rho_in must be 2d'
-        Mshp, Lshp = rho_in.shape
-        return _r2v(rho_in, Mshp)
+        return _r2v(rho_in, rho_in.shape[0])
 
 
     def uvmask(self):
@@ -360,15 +398,15 @@ class PyEddyTracker (object):
         Get mask at U and V points
         """
         #print '--- Computing umask and vmask for padded grid'
-        Mp, Lp = self.mask.shape
-        M = Mp - 1
-        L = Lp - 1
-        self._umask = self.mask[:, :L] * self.mask[:, 1:Lp]
-        self._vmask = self.mask[:M] * self.mask[1:Mp]
+        mp, lp = self.mask.shape
+        m = mp - 1
+        l = lp - 1
+        self._umask = self.mask[:, :l] * self.mask[:, 1:lp]
+        self._vmask = self.mask[:m] * self.mask[1:mp]
         return self
 
 
-    def make_gridmask(self, with_pad=True, use_maskoceans=False):
+    def make_gridmask(self, with_pad=True):
         """
         Use Basemap to make a landmask
         Format is 1 == ocean, 0 == land
@@ -389,7 +427,8 @@ class PyEddyTracker (object):
         self.Mx, self.My = x, y
         return self
 
-
+    
+    #@timeit
     def set_geostrophic_velocity(self, zeta):
         """
         Set u and v geostrophic velocity at
@@ -413,9 +452,11 @@ class PyEddyTracker (object):
         self.vpad *= gof
         return self
 
-
+        
+    #@timeit
     def set_u_v_eke(self, pad=2):
         """
+        Set empty arrays for u, v, upad, vpad
         """
         if self.ZERO_CROSSING:
             u1 = np.empty((self.jp1 - self.jp0, self.ip0))
@@ -433,6 +474,7 @@ class PyEddyTracker (object):
     
     def getEKE(self):
         """
+        Set EKE; also sets u/v from upad/vpad
         """
         self.u[:] = self.upad[self.jup0:self.jup1, self.iup0:self.iup1]
         self.v[:] = self.vpad[self.jup0:self.jup1, self.iup0:self.iup1]
@@ -448,14 +490,12 @@ class AvisoGrid (PyEddyTracker):
     to have a grid class
     """
     def __init__(self, AVISO_FILE, LONMIN, LONMAX, LATMIN, LATMAX,
-                 with_pad=True, use_maskoceans=False):
+                 with_pad=True):
         """
         Initialise the grid object
         """
         super(AvisoGrid, self).__init__()
         print '\nInitialising the AVISO_grid'
-        self.i0, self.j0 = 0, 0
-        self.i1, self.j1 = None, None
         self.LONMIN = LONMIN
         self.LONMAX = LONMAX
         self.LATMIN = LATMIN
@@ -479,20 +519,23 @@ class AvisoGrid (PyEddyTracker):
             self._lon -= 360.
         self._lon, self._lat = np.meshgrid(self._lon, self._lat)
         self._angle = np.zeros_like(self._lon)
-        # To be used for handling a longitude range that
-        # crosses 0 degree meridian
+        # ZERO_CROSSING, used for handling a longitude range that
+        # crosses zero degree meridian
         if LONMIN < 0 and LONMAX >= 0:
             self.ZERO_CROSSING = True
         
+        self.sla_coeffs = None
+        self.uspd_coeffs = None
+        
         self.set_initial_indices(LONMIN, LONMAX, LATMIN, LATMAX)
         self.set_index_padding()
-        self.make_gridmask(with_pad, use_maskoceans)
+        self.make_gridmask(with_pad)
         self.get_AVISO_f_pm_pn()
         self.set_u_v_eke()
         pad2 = 2 * self.pad
         self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
     
-        
+    #@timeit
     def get_AVISO_data(self, AVISO_FILE):
         """
         Read nc data from AVISO file
@@ -571,7 +614,7 @@ class AvisoGrid (PyEddyTracker):
 
         # Create a normalised weight, the nearest points are weighted as 1.
         #   Points greater than one are then set to zero
-        weight = dist / (dist.min(axis=1)[:,np.newaxis])
+        weight = dist / (dist.min(axis=1)[:, np.newaxis])
         weight *= np.ones_like(dist)
         np.place(weight, weight > 1., 0.)
 
@@ -681,6 +724,7 @@ class AvisoGrid (PyEddyTracker):
         
     def set_interp_coeffs(self, sla, uspd):
         """
+        Won't work for rotated grid
         """
         self.sla_coeffs = interpolate.RectBivariateSpline(
             self.lat()[:, 0], self.lon()[0], sla, kx=1, ky=1)
@@ -855,18 +899,18 @@ if __name__ == '__main__':
                                              TRACK_EXTRA_VARIABLES)
 
     if 'Q' in DIAGNOSTIC_TYPE:
-        A_savefile = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_anticyclonic.nc'])
+        A_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_anticyclonic.nc'])
         A_eddy.qparameter = qparameter
         C_eddy.qparameter = qparameter
-        C_savefile = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_cyclonic.nc'])
+        C_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_cyclonic.nc'])
         A_eddy.SHAPE_ERROR = SHAPE_ERROR
         C_eddy.SHAPE_ERROR = SHAPE_ERROR
     
     elif 'SLA' in DIAGNOSTIC_TYPE:
-        A_savefile = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_anticyclonic.nc'])
+        A_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_anticyclonic.nc'])
         A_eddy.CONTOUR_PARAMETER = CONTOUR_PARAMETER
         A_eddy.SHAPE_ERROR = SHAPE_ERROR
-        C_savefile = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_cyclonic.nc'])
+        C_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_cyclonic.nc'])
         C_eddy.CONTOUR_PARAMETER = CONTOUR_PARAMETER[::-1]
         C_eddy.SHAPE_ERROR = SHAPE_ERROR[::-1]
     
@@ -899,8 +943,8 @@ if __name__ == '__main__':
     C_eddy.SEPARATION_METHOD = SEPARATION_METHOD
     
     if 'sum_radii' in SEPARATION_METHOD:
-        A_eddy.sep_dist_fac = sep_dist_fac
-        C_eddy.sep_dist_fac = sep_dist_fac
+        A_eddy.SEP_DIST_FAC = SEP_DIST_FACTOR
+        C_eddy.SEP_DIST_FACTOR = SEP_DIST_FACTOR
     
     
     A_eddy.points = np.array([sla_grd.lon().ravel(),
@@ -947,7 +991,7 @@ if __name__ == '__main__':
     # These should give 8 and 1000 for 0.25 deg resolution
     PIXMIN = np.round((np.pi * RADMIN**2) / sla_grd.get_resolution()**2)
     PIXMAX = np.round((np.pi * RADMAX**2) / sla_grd.get_resolution()**2)
-    print '--- Pixel range = %s-%s' %(np.int(PIXMIN), np.int(PIXMAX))
+    print '--- Pixel range = %s-%s' % (np.int(PIXMIN), np.int(PIXMAX))
     
     A_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
     C_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
@@ -963,14 +1007,14 @@ if __name__ == '__main__':
     C_eddy.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
     
     # Create nc files for saving of eddy tracks
-    A_eddy.create_netcdf(DATA_DIR, A_savefile, 'Anticyclonic')
-    C_eddy.create_netcdf(DATA_DIR, C_savefile, 'Cyclonic')
+    A_eddy.create_netcdf(DATA_DIR, A_SAVEFILE, 'Anticyclonic')
+    C_eddy.create_netcdf(DATA_DIR, C_SAVEFILE, 'Cyclonic')
 
     
     # Loop through the AVISO files...
-    start = True
+    START = True
     
-    start_time = time.time()
+    START_TIME = time.time()
     
     print '\nStart tracking'
     
@@ -1000,7 +1044,7 @@ if __name__ == '__main__':
         
         if active:
             
-            #rec_start_time = time.time()
+            #rec_START_TIME = time.time()
             print '--- AVISO_FILE:', AVISO_FILE
             
             # Holding variables
@@ -1132,7 +1176,8 @@ if __name__ == '__main__':
                                   sla_grd.lat(),
                                   C_eddy.sla, CONTOUR_PARAMETER[::-1])
             
-            else: Exception
+            else:
+                Exception
             
             if True: # clear the current axis
                 ax.cla()
@@ -1170,6 +1215,20 @@ if __name__ == '__main__':
                                    A_list_obj=None, C_list_obj=C_eddy,
                                    sign_type=C_eddy.sign_type, VERBOSE=VERBOSE)
             
+            
+            
+            
+            
+            ## Test pickling
+            #with open('C_eddy.pkl', 'wb') as save_pickle:
+                #pickle.dump(C_eddy, save_pickle)
+    
+            ## Unpickle
+            #with open('C_eddy.pkl', 'rb') as load_pickle:
+                #C_eddy = pickle.load(load_pickle)
+            
+            
+            
             # Debug
             if 'fig250' in locals():
                 
@@ -1206,12 +1265,12 @@ if __name__ == '__main__':
                 plt.close(250)
 
 
-            if start:
+            if START:
                 first_record = True
                 # Set old variables equal to new variables
                 A_eddy.set_old_variables()
                 C_eddy.set_old_variables()
-                start = False
+                START = False
                 print '------ tracking eddies'
             else:
                 first_record = False
@@ -1236,7 +1295,7 @@ if __name__ == '__main__':
                 
             # Save inactive eddies to nc file
             # IMPORTANT: this must be done at every time step!!
-            #saving_start_time = time.time()
+            #saving_START_TIME = time.time()
             if not first_record:
                 if VERBOSE:
                     print '--- saving to nc', A_eddy.SAVE_DIR
@@ -1250,6 +1309,6 @@ if __name__ == '__main__':
             active = False
     
     # Total running time    
-    print 'Duration', str((time.time() - start_time) / 3600.), 'hours!'
+    print 'Duration', str((time.time() - START_TIME) / 3600.), 'hours!'
 
     print '\nOutputs saved to', SAVE_DIR

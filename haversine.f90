@@ -31,8 +31,10 @@ module haversine
 !
 !===========================================================================
 implicit none
-real(kind=8), parameter :: erad = 6371315.0
-real(kind=8), parameter :: d2r = 0.017453292519943295 ! == pi / 180.
+! http://www.fortran90.org/src/best-practices.html#floating-point-numbers
+integer, parameter :: dp = kind(0.d0)
+real(kind=dp), parameter :: erad = 6371315.0_dp
+real(kind=dp), parameter :: d2r = 0.017453292519943295_dp ! == pi / 180.
 
 contains
 
@@ -42,13 +44,12 @@ contains
 !------------------------------------------------------------------------------
 
       real(kind=8), dimension(:,:), intent(in)    :: xa, xb
-      integer(kind=8)                             :: i, j, m, n
-      real(kind=8)                                :: thedist
+      integer(kind=dp)                             :: i, j, m, n
+      real(kind=dp)                                :: thedist
       real(kind=8), dimension(:,:), intent(inout) :: dist
 
       m = size(xa, 1)
       n = size(xb, 1)
-!       write (*,*) 'm,n', m, n
 
 !     Loop over empty dist matrix and fill
       do j = 1, m
@@ -68,8 +69,8 @@ contains
 !------------------------------------------------------------------------------
       
       real(kind=8), dimension(:), intent(in) :: lon1, lat1, lon2, lat2
-      integer(kind=8)                        :: i, m
-      real(kind=8)             :: thedist
+      integer(kind=dp)                        :: i, m
+      real(kind=dp)             :: thedist
       real(kind=8), dimension(:), intent(inout) :: dist
       
       m = size(lon1)
@@ -102,8 +103,7 @@ contains
 !------------------------------------------------------------------------------
 !
       real(kind=8), intent(in)  :: lon1, lat1, lon2, lat2
-      real(kind=8)              :: lt1, lt2, dlat, dlon
-      real(kind=8)              :: a
+      real(kind=dp)              :: lt1, lt2, dlat, dlon, a
       real(kind=8), intent(out) :: thedist
 !
       dlat = d2r * (lat2 - lat1)
@@ -124,7 +124,7 @@ contains
 !------------------------------------------------------------------------------
       
       real(kind=8), dimension(:), intent(in) :: lonin, latin, anglein, distin
-      integer(kind=8)                        :: i, m
+      integer(kind=dp)                        :: i, m
       real(kind=8)             :: thelon, thelat
       real(kind=8), dimension(:), intent(inout) :: lon, lat
 !       external :: waypoint
@@ -145,9 +145,8 @@ contains
     subroutine get_waypoint(lonin, latin, anglein, distin, thelon, thelat)
 !------------------------------------------------------------------------------
 !
-      implicit none
       real(kind=8), intent(in)  :: lonin, latin, anglein, distin
-      real(kind=8)              :: ln1, lt1, angle, dr
+      real(kind=dp)              :: ln1, lt1, angle, dr
       real(kind=8), intent(out) :: thelon, thelat
 !
       dr = distin / erad ! angular distance

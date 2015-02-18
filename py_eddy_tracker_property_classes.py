@@ -35,8 +35,32 @@ from scipy import interpolate
 import numpy as np
 import scipy.ndimage.morphology as morphology
 import scipy.ndimage.filters as filters
+import matplotlib.pyplot as plt
 
 
+
+
+def pcol_2dxy(x, y):
+    """
+    Function to shift x, y for subsequent use with pcolor
+    by Jeroen Molemaker UCLA 2008
+    """
+    mp, lp = x.shape
+    m = mp - 1
+    l = lp - 1
+    x_pcol = np.zeros((mp, lp))
+    y_pcol = np.zeros_like(x_pcol)
+    x_tmp = 0.5 * (x[:, :l] + x[:, 1:lp])
+    x_pcol[1:mp, 1:lp] = 0.5 * (x_tmp[:m] + x_tmp[1:mp])
+    x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
+    x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
+    y_tmp = 0.5 * (y[:, :l] + y[:, 1:lp]    )
+    y_pcol[1:mp, 1:lp] = 0.5 * (y_tmp[:m] + y_tmp[1:mp])
+    y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
+    y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
+    return x_pcol, y_pcol
+
+    
 class EddyProperty (object):
     """
     Class to hold eddy properties *amplitude* and counts of *local maxima/minima*
@@ -111,11 +135,12 @@ class Amplitude (object):
         self.jslice = slice(self.eddy.jmin, self.eddy.jmax)
         self.sla = self.eddy.sla[self.jslice,
                                  self.islice].copy()
-        self.rbspline = grd.sla_coeffs
-        h0 = self.rbspline.ev(self.contlat, self.contlon)
+        h0 = grd.sla_coeffs.ev(self.contlat, self.contlon)
+        self.h0_check = h0
         self.h0 = h0[np.isfinite(h0)].mean()
         self.amplitude = np.atleast_1d(0.)
         self.local_extrema = np.int(0)
+        self.local_extrema_inds = None
         #print 'self.sla', self.sla.shape
         #print 'self.eddy.mask_eff_1d', self.eddy.mask_eff_1d.shape
         self.mask = self.eddy.mask_eff
@@ -159,7 +184,7 @@ class Amplitude (object):
             self._set_local_extrema(-1)
             if (self.local_extrema > 0 and
                 self.local_extrema <= self.MLE):
-                #print '--- h0 %s; slamax %s' % (self.h0, self.sla.max())
+                #print '--- h0 %s; sla.max %s' % (self.h0, self.sla.max())
                 self.amplitude = self.sla.max()
                 self.amplitude -= self.h0
         return self
@@ -191,30 +216,51 @@ class Amplitude (object):
         eroded_background = morphology.binary_erosion(
             background, structure=neighborhood, border_value=1)
         detected_minima -= eroded_background
-        # NOTE: by summing we lose the indices (they could be useful)
+        self.local_extrema_inds = detected_minima
         self.local_extrema = detected_minima.sum()
         return self
         
         
-    def debug_figure(self):
+    def debug_figure(self, grd):
         """
         """
-        plt.figure()
-        if 'Cyclonic' in self.eddy.sign_type:
-            plt.title('Cyclones')
-            sla = self.eddy.slacopy - self.eddy.slacopy.mean()
-        
-        x, y = self.grd.lon(), self.grd.lat()
-        plt.pcolormesh(x, y, sla)
-        plt.clim(-10, 10)
-        plt.scatter(centlon_lmi, centlat_lmi, c='k')
-        plt.scatter(centlon_e, centlat_e, c='w')
-        lmi_j, lmi_i = np.where(self.local_extrema)
-        lmi_i = lmi_i[0] + self.grd.imin
-        lmi_j = lmi_j[0] + self.grd.jmin
-        x_i, y_i = self.grd.lon()[lmi_j, lmi_i], self.grd.lat()[lmi_j, lmi_i]
-        plt.scatter(x_i, y_i, c='gray')
-        plt.show()
+        if self.local_extrema and self.amplitude:
+            
+            plt.figure(587)
+            cmin, cmax = -8, 8
+            ##cmin, cmax = (self.h0_check.min() - 2,
+                          ##self.h0_check.max() + 2)
+            #cmin, cmax = (self.sla.min(), self.sla.max())
+            cm = plt.cm.gist_ncar
+            #cm = plt.cm.hsv
+            
+            plt.title('Local max/min count: %s, Amp: %s' % (
+                             self.local_extrema, self.amplitude))
+            
+            x, y = (grd.lon()[self.jslice, self.islice],
+                    grd.lat()[self.jslice, self.islice])
+            x, y = pcol_2dxy(x, y)
+            pcm = plt.pcolormesh(x, y, self.sla.data, cmap=cm)
+            plt.clim(cmin, cmax)
+            plt.plot(self.contlon, self.contlat)
+            plt.scatter(self.contlon, self.contlat, s=100, c=self.h0_check,
+                        cmap=cm, vmin=cmin, vmax=cmax)
+            #plt.scatter(centlon_lmi, centlat_lmi, c='k')
+            #plt.scatter(centlon_e, centlat_e, c='w')
+            print self.local_extrema
+            print self.local_extrema_inds
+            lmi_j, lmi_i = np.where(self.local_extrema_inds)
+            #lmi_i = lmi_i[0] + self.eddy.imin
+            #lmi_j = lmi_j[0] + self.eddy.jmin
+            #print lmi_i
+            lmi_i = np.array(lmi_i) + self.eddy.imin
+            lmi_j = np.array(lmi_j) + self.eddy.jmin
+            x_i, y_i = grd.lon()[lmi_j, lmi_i], grd.lat()[lmi_j, lmi_i]
+            plt.scatter(x_i, y_i, s=40, c='w')
+            plt.axis('image')
+            plt.colorbar(pcm)
+            plt.show()
+        return
 
         
         

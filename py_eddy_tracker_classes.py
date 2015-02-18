@@ -121,15 +121,14 @@ def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
     M = A_eddy.M
     
     if 'Q' in DIAGNOSTIC_TYPE:
-        pcm = M.imshow(xicopy, cmap=cmap, ax=ax, interpolation='none')
+        pcm = M.pcolormesh(Mx, My, xicopy, cmap=cmap, ax=ax, interpolation='none')
         M.contour(Mx, My, xi, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, qparam, qparameter, ax=ax, colors='g', linewidths=0.25)
         pcm.set_clim(-.5, .5)
         M.contour(Mx, My, qparam, [qparameter[0]], ax=ax, colors='m', linewidths=0.25)
     
     elif 'SLA' in DIAGNOSTIC_TYPE:
-        #pcm = M.pcolormesh(Mx, My, A_eddy.slacopy, cmap=cmap, ax=ax)
-        pcm = M.imshow(A_eddy.slacopy, cmap=cmap, ax=ax, interpolation='none')
+        pcm = M.pcolormesh(Mx, My, A_eddy.slacopy, cmap=cmap, ax=ax)
         M.contour(Mx, My, A_eddy.slacopy, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, A_eddy.slacopy, A_eddy.CONTOUR_PARAMETER, ax=ax, colors='g',
                   linestyles='solid', linewidths=0.15)
@@ -275,12 +274,12 @@ def psi2rho(var_psi):
     Mm = M - 1
     Lm = L - 1
     var_rho = np.zeros((Mp, Lp))
-    var_rho[1:M, 1:L] = quart_interp(var_psi[0:Mm, 0:Lm], var_psi[0:Mm, 1:L],
-                                     var_psi[1:M,  0:Lm], var_psi[1:M,  1:L])
+    var_rho[1:M, 1:L] = quart_interp(var_psi[:Mm, :Lm], var_psi[:Mm, 1:L],
+                                     var_psi[1:M, :Lm], var_psi[1:M, 1:L])
     var_rho[0] = var_rho[1]
     var_rho[M] = var_rho[Mm]
-    var_rho[:,0] = var_rho[:,1]
-    var_rho[:,L] = var_rho[:,Lm]
+    var_rho[:, 0] = var_rho[:, 1]
+    var_rho[:, L] = var_rho[:, Lm]
     return var_rho
 
 
@@ -294,15 +293,15 @@ def pcol_2dxy(x, y):
     M = Mp - 1
     L = Lp - 1
     x_pcol = np.zeros((Mp, Lp))
-    y_pcol = np.zeros((Mp, Lp))
-    x_tmp = half_interp(x[:,:L], x[:,1:Lp])
-    x_pcol[1:Mp,1:Lp] = half_interp(x_tmp[0:M,:], x_tmp[1:Mp,:])
-    x_pcol[0,:] = 2. * x_pcol[1,:] - x_pcol[2,:]
-    x_pcol[:,0] = 2. * x_pcol[:,1] - x_pcol[:,2]
-    y_tmp = half_interp(y[:,0:L], y[:,1:Lp]    )
-    y_pcol[1:Mp,1:Lp] = half_interp(y_tmp[0:M,:], y_tmp[1:Mp,:])
-    y_pcol[0,:] = 2. * y_pcol[1,:] - y_pcol[2,:]
-    y_pcol[:,0] = 2. * y_pcol[:,1] - y_pcol[:,2]
+    y_pcol = np.zeros_like(x_pcol)
+    x_tmp = half_interp(x[:, :L], x[:, 1:Lp])
+    x_pcol[1:Mp, 1:Lp] = half_interp(x_tmp[0:M], x_tmp[1:Mp])
+    x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
+    x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
+    y_tmp = half_interp(y[:, :L], y[:, 1:Lp]    )
+    y_pcol[1:Mp, 1:Lp] = half_interp(y_tmp[:M], y_tmp[1:Mp])
+    y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
+    y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
     return x_pcol, y_pcol
 
 
@@ -419,7 +418,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                            poly_eff.vertices[:, 1].copy()
     
     theseglon, theseglat = eddy_tracker.uniform_resample(
-        theseglon, theseglat, method='akima')
+               theseglon, theseglat)
     
     uavg = Eddy.uspd_coeffs.ev(theseglat[1:], theseglon[1:]).mean()
     
@@ -470,10 +469,13 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                         
                         seglon, seglat = poly_i.vertices[:, 0], poly_i.vertices[:, 1]
                         seglon, seglat = eddy_tracker.uniform_resample(
-                                            seglon, seglat, method='akima')
+                                            seglon, seglat)
                         
                         # Interpolate uspd to seglon, seglat, then get mean
                         uavgseg = Eddy.uspd_coeffs.ev(seglat[1:], seglon[1:]).mean()
+                        
+    
+                        if np.any(np.isinf(uavgseg)): YYYYYYYYYYYYYYYY
                         
                         if save_all_uavg:
                             all_uavg.append(uavgseg)
@@ -659,7 +661,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 # circumferential distribution
                                 contlon_e, contlat_e = \
                                     eddy_tracker.uniform_resample(contlon_e,
-                                                     contlat_e, method='akima')
+                                                     contlat_e)
                                 
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                                     # Note, eddy amplitude == max(abs(vort/f)) within eddy, KCCMC11
@@ -678,6 +680,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                         amp.all_pixels_below_h0()
                                         
                                     else: Exception
+                                    
+                                    #amp.debug_figure(grd)
                                     
                                     if amp.within_amplitude_limits():
                                         properties.amplitude = amp.amplitude
