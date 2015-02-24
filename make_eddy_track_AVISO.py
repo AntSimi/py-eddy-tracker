@@ -504,7 +504,7 @@ class AvisoGrid (PyEddyTracker):
         try: # new AVISO (2014)
             self._lon = self.read_nc(AVISO_FILE, 'lon')
             self._lat = self.read_nc(AVISO_FILE, 'lat')
-            self.fillval = self.read_nc_att(AVISO_FILE, 'sla', '_FillValue')
+            self.FILLVAL = self.read_nc_att(AVISO_FILE, 'sla', '_FillValue')
             base_date = self.read_nc_att(AVISO_FILE, 'time', 'units')
             self.base_date = dt.date2num(
                                 parser.parse(base_date.split(' ')[2:4][0]))
@@ -512,7 +512,7 @@ class AvisoGrid (PyEddyTracker):
         except Exception: # old AVISO
             self._lon = self.read_nc(AVISO_FILE, 'NbLongitudes')
             self._lat = self.read_nc(AVISO_FILE, 'NbLatitudes')
-            self.fillval = self.read_nc_att(AVISO_FILE,
+            self.FILLVAL = self.read_nc_att(AVISO_FILE,
                                            'Grid_0001', '_FillValue')
         
         if LONMIN < 0 and LONMAX <= 0:
@@ -765,13 +765,13 @@ if __name__ == '__main__':
     
     DIAGNOSTIC_TYPE = config['DIAGNOSTIC_TYPE']
     
-    THE_DOMAIN = config['DOMAIN']['THE_DOMAIN']
-    LONMIN = config['DOMAIN']['LONMIN']
-    LONMAX = config['DOMAIN']['LONMAX']
-    LATMIN = config['DOMAIN']['LATMIN']
-    LATMAX = config['DOMAIN']['LATMAX']
-    DATE_STR = config['DOMAIN']['DATE_STR']
-    DATE_END = config['DOMAIN']['DATE_END']
+    config['THE_DOMAIN'] = config['DOMAIN']['THE_DOMAIN']
+    config['LONMIN'] = config['DOMAIN']['LONMIN']
+    config['LONMAX'] = config['DOMAIN']['LONMAX']
+    config['LATMIN'] = config['DOMAIN']['LATMIN']
+    config['LATMAX'] = config['DOMAIN']['LATMAX']
+    DATE_STR = config['DATE_STR'] = config['DOMAIN']['DATE_STR']
+    DATE_END = config['DATE_END'] = config['DOMAIN']['DATE_END']
     
     AVISO_DT14 = config['AVISO']['AVISO_DT14']
     AVISO_FILES = config['AVISO']['AVISO_FILES']
@@ -784,31 +784,35 @@ if __name__ == '__main__':
     else:
         DAYS_BTWN_RECORDS = 7. # old seven day AVISO
         
-    TRACK_DURATION_MIN = config['TRACK_DURATION_MIN']
+    #TRACK_DURATION_MIN = config['TRACK_DURATION_MIN']
    
     if 'SLA' in DIAGNOSTIC_TYPE:
         MAX_SLA = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['MAX_SLA']
         INTERVAL = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['INTERVAL']
-        CONTOUR_PARAMETER = np.arange(-MAX_SLA, MAX_SLA + INTERVAL, INTERVAL)
-        SHAPE_ERROR = config['SHAPE_ERROR'] * np.ones(CONTOUR_PARAMETER.size)
+        config['CONTOUR_PARAMETER'] = np.arange(-MAX_SLA, MAX_SLA + INTERVAL, INTERVAL)
+        config['SHAPE_ERROR'] = np.full(config['CONTOUR_PARAMETER'].size,
+                                        config['SHAPE_ERROR'])
+        
     elif 'Q' in DIAGNOSTIC_TYPE:
         MAX_Q = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['MAX_Q']
         NUM_LEVS = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['NUM_LEVS']
-        CONTOUR_PARAMETER = np.linspace(0, MAX_Q, NUM_LEVS)[::-1]
+        config['CONTOUR_PARAMETER'] = np.linspace(0, MAX_Q, NUM_LEVS)[::-1]
     else: Exception
     
-    JDAY_REFERENCE = config['JDAY_REFERENCE']
+    #JDAY_REFERENCE = config['JDAY_REFERENCE']
 
-    RADMIN = config['RADMIN']
-    RADMAX = config['RADMAX']
+    #RADMIN = config['RADMIN']
+    #RADMAX = config['RADMAX']
     
     if 'SLA' in DIAGNOSTIC_TYPE:
-        AMPMIN = config['AMPMIN']
-        AMPMAX = config['AMPMAX']
+        #AMPMIN = config['AMPMIN']
+        #AMPMAX = config['AMPMAX']
+        pass
     elif 'Q' in DIAGNOSTIC_TYPE:
         AMPMIN = 0.02 # max(abs(xi/f)) within the eddy
         AMPMAX = 100.
-    else: Exception
+    else:
+        Exception
 
     SAVE_FIGURES = config['SAVE_FIGURES']
 
@@ -823,8 +827,6 @@ if __name__ == '__main__':
             SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
         else: Exception
         
-    DIST0 = config['DIST0']
-    AREA0 = np.pi * config['RAD0']**2
     if 'Q' in DIAGNOSTIC_TYPE:
         AMP0 = 0.02 # vort/f
     elif 'SLA' in DIAGNOSTIC_TYPE:
@@ -832,18 +834,15 @@ if __name__ == '__main__':
     TEMP0 = config['TEMP0']
     SALT0 = config['SALT0']
     
-    EVOLVE_AMP_MIN = config['EVOLVE_AMP_MIN']
-    EVOLVE_AMP_MAX = config['EVOLVE_AMP_MAX']
-    EVOLVE_AREA_MIN = config['EVOLVE_AREA_MIN']
-    EVOLVE_AREA_MAX = config['EVOLVE_AREA_MAX']
+    #EVOLVE_AMP_MIN = config['EVOLVE_AMP_MIN']
+    #EVOLVE_AMP_MAX = config['EVOLVE_AMP_MAX']
+    #EVOLVE_AREA_MIN = config['EVOLVE_AREA_MIN']
+    #EVOLVE_AREA_MAX = config['EVOLVE_AREA_MAX']
     
-    SEPARATION_METHOD = config['SEPARATION_METHOD']
     
-    MAX_LOCAL_EXTREMA = config['MAX_LOCAL_EXTREMA']
     
-    TRACK_EXTRA_VARIABLES = config['TRACK_EXTRA_VARIABLES']
+    
 
-    VERBOSE = config['VERBOSE']
 
     CMAP = plt.cm.RdBu
 
@@ -866,23 +865,15 @@ if __name__ == '__main__':
         AVISO_FILES = AVISO_FILES[5:-5:np.int(DAYS_BTWN_RECORDS)]
     
     # Set up a grid object using first AVISO file in the list
-    sla_grd = AvisoGrid(AVISO_FILES[0], LONMIN, LONMAX, LATMIN, LATMAX)
+    sla_grd = AvisoGrid(AVISO_FILES[0], config['LONMIN'], config['LONMAX'],
+                                        config['LATMIN'], config['LATMAX'])
     
-    
-    
-
-
     Mx, My = (sla_grd.Mx[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1],
               sla_grd.My[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1])
-    #pMx, pMy = sla_grd.pcol_2dxy(Mx, My)
-    
-    
-
-    
     
     # Instantiate search ellipse object
-    search_ellipse = eddy_tracker.SearchEllipse(THE_DOMAIN, sla_grd,
-            DAYS_BTWN_RECORDS, RW_PATH)
+    search_ellipse = eddy_tracker.SearchEllipse(config['THE_DOMAIN'],
+                         sla_grd, DAYS_BTWN_RECORDS, RW_PATH)
     
     
     if 'Gaussian' in SMOOTHING_TYPE:
@@ -892,119 +883,41 @@ if __name__ == '__main__':
 
     fig  = plt.figure(1)
 
-    # Initialise two eddy objects to hold data
-    A_eddy = eddy_tracker.TrackList('AVISO', TRACK_DURATION_MIN,
-                                             TRACK_EXTRA_VARIABLES)
-    C_eddy = eddy_tracker.TrackList('AVISO', TRACK_DURATION_MIN,
-                                             TRACK_EXTRA_VARIABLES)
-
     if 'Q' in DIAGNOSTIC_TYPE:
         A_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_anticyclonic.nc'])
-        A_eddy.qparameter = qparameter
-        C_eddy.qparameter = qparameter
         C_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_cyclonic.nc'])
-        A_eddy.SHAPE_ERROR = SHAPE_ERROR
-        C_eddy.SHAPE_ERROR = SHAPE_ERROR
     
     elif 'SLA' in DIAGNOSTIC_TYPE:
         A_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_anticyclonic.nc'])
-        A_eddy.CONTOUR_PARAMETER = CONTOUR_PARAMETER
-        A_eddy.SHAPE_ERROR = SHAPE_ERROR
         C_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_cyclonic.nc'])
-        C_eddy.CONTOUR_PARAMETER = CONTOUR_PARAMETER[::-1]
-        C_eddy.SHAPE_ERROR = SHAPE_ERROR[::-1]
     
-    A_eddy.JDAY_REFERENCE = JDAY_REFERENCE
-    C_eddy.JDAY_REFERENCE = JDAY_REFERENCE
     
-    A_eddy.INTERANNUAL = True
-    C_eddy.INTERANNUAL = True
     
-    A_eddy.DIAGNOSTIC_TYPE = DIAGNOSTIC_TYPE
-    C_eddy.DIAGNOSTIC_TYPE = DIAGNOSTIC_TYPE
-    
-    A_eddy.SMOOTHING = SMOOTHING
-    C_eddy.SMOOTHING = SMOOTHING
-    
-    A_eddy.MAX_LOCAL_EXTREMA = MAX_LOCAL_EXTREMA
-    C_eddy.MAX_LOCAL_EXTREMA = MAX_LOCAL_EXTREMA
-    
-    A_eddy.M = sla_grd.M
-    C_eddy.M = sla_grd.M
-    
-    #A_eddy.rwv = rwv
-    #C_eddy.rwv = rwv
-    
+    # Initialise two eddy objects to hold data
+    #kwargs = config
+    A_eddy = eddy_tracker.TrackList('AVISO', 'Anticyclonic', A_SAVEFILE,
+                            sla_grd, search_ellipse, **config)
+    C_eddy = eddy_tracker.TrackList('AVISO', 'Cyclonic', C_SAVEFILE,
+                            sla_grd, search_ellipse, **config)
+
     A_eddy.search_ellipse = search_ellipse
     C_eddy.search_ellipse = search_ellipse
     
-    
-    A_eddy.SEPARATION_METHOD = SEPARATION_METHOD
-    C_eddy.SEPARATION_METHOD = SEPARATION_METHOD
-    
-    if 'sum_radii' in SEPARATION_METHOD:
+    if 'sum_radii' in config['SEPARATION_METHOD']:
         A_eddy.SEP_DIST_FAC = SEP_DIST_FACTOR
         C_eddy.SEP_DIST_FACTOR = SEP_DIST_FACTOR
     
-    
-    A_eddy.points = np.array([sla_grd.lon().ravel(),
-                              sla_grd.lat().ravel()]).T
-    C_eddy.points = np.array([sla_grd.lon().ravel(),
-                              sla_grd.lat().ravel()]).T
-    
-    A_eddy.EVOLVE_AMP_MIN = np.float64(EVOLVE_AMP_MIN)
-    A_eddy.EVOLVE_AMP_MAX = np.float64(EVOLVE_AMP_MAX)
-    A_eddy.EVOLVE_AREA_MIN = np.float64(EVOLVE_AREA_MIN)
-    A_eddy.EVOLVE_AREA_MAX = np.float64(EVOLVE_AREA_MAX)
-    
-    C_eddy.EVOLVE_AMP_MIN = np.float64(EVOLVE_AMP_MIN)
-    C_eddy.EVOLVE_AMP_MAX = np.float64(EVOLVE_AMP_MAX)
-    C_eddy.EVOLVE_AREA_MIN = np.float64(EVOLVE_AREA_MIN)
-    C_eddy.EVOLVE_AREA_MAX = np.float64(EVOLVE_AREA_MAX)
-
-    A_eddy.i0, A_eddy.i1 = sla_grd.i0, sla_grd.i1
-    A_eddy.j0, A_eddy.j1 = sla_grd.j0, sla_grd.j1
-    C_eddy.i0, C_eddy.i1 = sla_grd.i0, sla_grd.i1
-    C_eddy.j0, C_eddy.j1 = sla_grd.j0, sla_grd.j1
-    
-    A_eddy.LONMIN, A_eddy.LONMAX = np.float64(LONMIN), np.float64(LONMAX)
-    A_eddy.LATMIN, A_eddy.LATMAX = np.float64(LATMIN), np.float64(LATMAX)
-    C_eddy.LONMIN, C_eddy.LONMAX = np.float64(LONMIN), np.float64(LONMAX)
-    C_eddy.LATMIN, C_eddy.LATMAX = np.float64(LATMIN), np.float64(LATMAX)
-    
-    A_eddy.RADMIN = np.float64(RADMIN)
-    A_eddy.RADMAX = np.float64(RADMAX)
-    A_eddy.AMPMIN = np.float64(AMPMIN)
-    A_eddy.AMPMAX = np.float64(AMPMAX)
-    C_eddy.RADMIN = np.float64(RADMIN)
-    C_eddy.RADMAX = np.float64(RADMAX)
-    C_eddy.AMPMIN = np.float64(AMPMIN)
-    C_eddy.AMPMAX = np.float64(AMPMAX)
-    
-    A_eddy.fillval = sla_grd.fillval
-    C_eddy.fillval = sla_grd.fillval
-    A_eddy.VERBOSE = VERBOSE
-    C_eddy.VERBOSE = VERBOSE
-    
-    
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
-    PIXMIN = np.round((np.pi * RADMIN**2) / sla_grd.get_resolution()**2)
-    PIXMAX = np.round((np.pi * RADMAX**2) / sla_grd.get_resolution()**2)
-    print '--- Pixel range = %s-%s' % (np.int(PIXMIN), np.int(PIXMAX))
+    PIXMIN = np.round((np.pi * config['RADMIN']**2) /
+                                  sla_grd.get_resolution()**2)
+    PIXMAX = np.round((np.pi * config['RADMAX']**2) /
+                                  sla_grd.get_resolution()**2)
+    print '--- Pixel range = %s-%s' % (np.int(PIXMIN),
+                                       np.int(PIXMAX))
     
     A_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
     C_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
-    
-    A_eddy.AREA0 = np.float64(AREA0)
-    C_eddy.AREA0 = np.float64(AREA0)
-    A_eddy.AMP0 = np.float64(AMP0)
-    C_eddy.AMP0 = np.float64(AMP0)
-    A_eddy.DIST0 = np.float64(DIST0)
-    C_eddy.DIST0 = np.float64(DIST0)
-    
-    A_eddy.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
-    C_eddy.DAYS_BTWN_RECORDS = DAYS_BTWN_RECORDS
     
     # Create nc files for saving of eddy tracks
     A_eddy.create_netcdf(DATA_DIR, A_SAVEFILE, 'Anticyclonic')
@@ -1064,7 +977,7 @@ if __name__ == '__main__':
                         print '------ applying Gaussian high-pass filter'
                     # Set landpoints to zero
                     np.place(sla, sla_grd.mask == False, 0.)
-                    np.place(sla, sla.data == sla_grd.fillval, 0.)
+                    np.place(sla, sla.data == sla_grd.FILLVAL, 0.)
                     # High pass filter, see
                     # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
                     sla -= ndimage.gaussian_filter(sla, [mres, zres])
@@ -1169,12 +1082,13 @@ if __name__ == '__main__':
                 
             elif 'SLA' in DIAGNOSTIC_TYPE:
                 A_CS = ax.contour(sla_grd.lon(),
-                                  sla_grd.lat(), A_eddy.sla, CONTOUR_PARAMETER)
+                                  sla_grd.lat(),
+                                  A_eddy.sla, A_eddy.CONTOUR_PARAMETER)
                 # Note that CSc is for the cyclonics,
                 #   CONTOUR_PARAMETER in reverse order
                 C_CS = ax.contour(sla_grd.lon(),
                                   sla_grd.lat(),
-                                  C_eddy.sla, CONTOUR_PARAMETER[::-1])
+                                  C_eddy.sla, C_eddy.CONTOUR_PARAMETER)
             
             else:
                 Exception
@@ -1199,8 +1113,10 @@ if __name__ == '__main__':
             C_eddy.swirl = SwirlSpeed(C_CS)
             
             # Now we loop over the CS collection
-            A_eddy.sign_type = 'Anticyclonic'
-            C_eddy.sign_type = 'Cyclonic'
+            A_eddy.SIGN_TYPE = 'Anticyclonic'
+            C_eddy.SIGN_TYPE = 'Cyclonic'
+            
+            qqq
             if 'Q' in DIAGNOSTIC_TYPE:
                 A_eddy, C_eddy = collection_loop(CS, sla_grd, rtime,
                                    A_list_obj=A_eddy, C_list_obj=C_eddy,
@@ -1209,11 +1125,11 @@ if __name__ == '__main__':
             elif 'SLA' in DIAGNOSTIC_TYPE:
                 A_eddy = collection_loop(A_CS, sla_grd, rtime,
                                    A_list_obj=A_eddy, C_list_obj=None,
-                                   sign_type=A_eddy.sign_type, VERBOSE=VERBOSE)
+                                   sign_type=A_eddy.SIGN_TYPE, VERBOSE=A_eddy.VERBOSE)
                 # Note that C_CS is reverse order
                 C_eddy = collection_loop(C_CS, sla_grd, rtime,
                                    A_list_obj=None, C_list_obj=C_eddy,
-                                   sign_type=C_eddy.sign_type, VERBOSE=VERBOSE)
+                                   sign_type=C_eddy.SIGN_TYPE, VERBOSE=C_eddy.VERBOSE)
             
             
             
@@ -1297,7 +1213,7 @@ if __name__ == '__main__':
             # IMPORTANT: this must be done at every time step!!
             #saving_START_TIME = time.time()
             if not first_record:
-                if VERBOSE:
+                if A_eddy.VERBOSE:
                     print '--- saving to nc', A_eddy.SAVE_DIR
                     print '--- saving to nc', C_eddy.SAVE_DIR
                     print '+++'

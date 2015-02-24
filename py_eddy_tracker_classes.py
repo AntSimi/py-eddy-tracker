@@ -41,7 +41,7 @@ import matplotlib.path as path
 import matplotlib.patches as patch
 
 import make_eddy_tracker_list_obj as eddy_tracker
-from py_eddy_tracker_property_classes import Amplitude, EddyProperty
+from py_eddy_tracker_property_classes import Amplitude, EddyProperty, interpolate
 #import haversine_distmat as hav # needs compiling with f2py
 from haversine import haversine # needs compiling with f2py
 
@@ -413,14 +413,25 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
     points = np.array([grd.lon()[jmin:jmax, imin:imax].ravel(),
                        grd.lat()[jmin:jmax, imin:imax].ravel()]).T
     
+    #print points.shape
+    #print Eddy.uspd.ravel().shape
+    
     # First contour is the outer one (effective)
     theseglon, theseglat = poly_eff.vertices[:, 0].copy(), \
                            poly_eff.vertices[:, 1].copy()
     
     theseglon, theseglat = eddy_tracker.uniform_resample(
                theseglon, theseglat)
+    if 'RectBivariate' in Eddy.INTERP_METHOD:
+        uavg = Eddy.uspd_coeffs.ev(theseglat[1:], theseglon[1:]).mean()
     
-    uavg = Eddy.uspd_coeffs.ev(theseglat[1:], theseglon[1:]).mean()
+    elif 'griddata' in Eddy.INTERP_METHOD:
+        uspd1d = Eddy.uspd[jmin:jmax, imin:imax].ravel()
+        uavg = interpolate.griddata(points, uspd1d,
+                   (theseglon[1:], theseglat[1:]), 'linear')
+        uavg = uavg[np.isfinite(uavg)].mean()
+    else:
+        Exception
     
     if save_all_uavg:
         all_uavg = [uavg]
@@ -472,10 +483,19 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                                             seglon, seglat)
                         
                         # Interpolate uspd to seglon, seglat, then get mean
-                        uavgseg = Eddy.uspd_coeffs.ev(seglat[1:], seglon[1:]).mean()
+                        if 'RectBivariate' in Eddy.INTERP_METHOD:
+                            uavgseg = Eddy.uspd_coeffs.ev(seglat[1:], seglon[1:]).mean()
+    
+                        elif 'griddata' in Eddy.INTERP_METHOD:
+                            uavgseg = interpolate.griddata(points, uspd1d,
+                                      (seglon[1:], seglat[1:]), 'linear')
+                            #print 'rrrrrrrrrrrr', uavgseg
+                            uavgseg = uavgseg[np.isfinite(uavgseg)].mean()
+                        else:
+                            Exception
                         
     
-                        if np.any(np.isinf(uavgseg)): YYYYYYYYYYYYYYYY
+                        #if np.any(np.isinf(uavgseg)): YYYYYYYYYYYYYYYY
                         
                         if save_all_uavg:
                             all_uavg.append(uavgseg)
@@ -488,6 +508,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                 
         citer.iternext()
     
+    #print 'ggggggg', uavg
     
     if any_inner_contours: # set speed based contour parameters
         cx, cy = Eddy.M(theseglon, theseglat)
@@ -498,7 +519,6 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
         centlon_s, centlat_s = centlon_e, centlat_e
         eddy_radius_s = eddy_radius_e
         inner_seglon, inner_seglat = theseglon, theseglat
-        
         
     if not save_all_uavg:
         return (uavg, centlon_s, centlat_s, eddy_radius_s,
@@ -607,14 +627,14 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                         
                         if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                             
-                            if xi[centj, centi] != Eddy.fillval:
+                            if xi[centj, centi] != Eddy.FILLVAL:
                                 proceed1 = True
                             else:
                                 proceed1 = False
                         
                         elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
                             
-                            if Eddy.sla[centj, centi] != Eddy.fillval:
+                            if Eddy.sla[centj, centi] != Eddy.FILLVAL:
                                 acyc_not_cyc = (Eddy.sla[centj, centi] >=
                                                          CS.cvalues[collind])
                                 if ('Anticyclonic' in sign_type and
@@ -810,10 +830,10 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
 
                                 # Mask out already found eddies
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
-                                    xi[jmin:jmax, imin:imax].flat[mask_eff] = Eddy.fillval
+                                    xi[jmin:jmax, imin:imax].flat[mask_eff] = Eddy.FILLVAL
                                     
                                 elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
-                                    Eddy.sla[jmin:jmax, imin:imax][Eddy.mask_eff] = Eddy.fillval
+                                    Eddy.sla[jmin:jmax, imin:imax][Eddy.mask_eff] = Eddy.FILLVAL
     
     
     # Leave collection_loop
@@ -1279,7 +1299,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
             Eddy.insert_at_index('new_shape_error', Eddy.index, shape_error)
         
         if Eddy.new_list is True: # initialise a new list
-            print '------ starting a new track list for %ss' %Eddy.sign_type
+            print '------ starting a new track list for %ss' % Eddy.SIGN_TYPE
             Eddy.new_list = False
         
         args = (centlon, centlat, rtime, uavg, teke,

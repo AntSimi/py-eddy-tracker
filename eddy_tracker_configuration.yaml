@@ -118,7 +118,8 @@ SAVE_FIGURES: Yes
 # Useful for working with ARGO data    
 TRACK_EXTRA_VARIABLES: No
     
-    
+# INTERP_METHOD: 'RectBivariate'
+INTERP_METHOD: 'griddata'
     
     
     

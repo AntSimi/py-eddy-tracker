@@ -52,15 +52,20 @@ def pcol_2dxy(x, y):
     y_pcol = np.zeros_like(x_pcol)
     x_tmp = 0.5 * (x[:, :l] + x[:, 1:lp])
     x_pcol[1:mp, 1:lp] = 0.5 * (x_tmp[:m] + x_tmp[1:mp])
-    x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
-    x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
-    y_tmp = 0.5 * (y[:, :l] + y[:, 1:lp]    )
+    x_pcol[0] = 2. * (x_pcol[1] - x_pcol[2])
+    x_pcol[:, 0] = 2. * (x_pcol[:, 1] - x_pcol[:, 2])
+    y_tmp = 0.5 * (y[:, :l] + y[:, 1:lp])
     y_pcol[1:mp, 1:lp] = 0.5 * (y_tmp[:m] + y_tmp[1:mp])
-    y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
-    y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
+    y_pcol[0] = 2. * (y_pcol[1] - y_pcol[2])
+    y_pcol[:, 0] = 2. * (y_pcol[:, 1] - y_pcol[:, 2])
     return x_pcol, y_pcol
 
-    
+
+   
+   
+   
+   
+   
 class EddyProperty (object):
     """
     Class to hold eddy properties *amplitude* and counts of *local maxima/minima*
@@ -135,17 +140,31 @@ class Amplitude (object):
         self.jslice = slice(self.eddy.jmin, self.eddy.jmax)
         self.sla = self.eddy.sla[self.jslice,
                                  self.islice].copy()
-        h0 = grd.sla_coeffs.ev(self.contlat, self.contlon)
+        
+        if 'RectBivariate' in eddy.INTERP_METHOD:
+            h0 = grd.sla_coeffs.ev(self.contlat[1:], self.contlon[1:])
+        
+        elif 'griddata' in eddy.INTERP_METHOD:
+            
+            #plt.figure()
+            #plt.pcolormesh(grd.lon()[self.jslice, self.islice],
+                           #grd.lat()[self.jslice, self.islice], self.sla)
+            #plt.plot(self.contlon[1:], self.contlat[1:],'.-')
+            #plt.show()
+            
+            points = np.array([grd.lon()[self.jslice, self.islice].ravel(),
+                               grd.lat()[self.jslice, self.islice].ravel()]).T
+            h0 = interpolate.griddata(points, self.sla.ravel(), (self.contlon[1:],
+                                      self.contlat[1:]), 'linear')
+        else:
+            Exception
+        
         self.h0_check = h0
         self.h0 = h0[np.isfinite(h0)].mean()
-        self.amplitude = np.atleast_1d(0.)
-        self.local_extrema = np.int(0)
+        self.amplitude = None #np.atleast_1d(0.)
+        self.local_extrema = None #np.int(0)
         self.local_extrema_inds = None
-        #print 'self.sla', self.sla.shape
-        #print 'self.eddy.mask_eff_1d', self.eddy.mask_eff_1d.shape
         self.mask = self.eddy.mask_eff
-        #print 'self.mask', self.mask.shape
-        #self.sla = self.sla[self.mask]
         self.sla = np.ma.masked_where(self.mask == False, self.sla)
     
     
@@ -194,8 +213,8 @@ class Amplitude (object):
         """
         Set count of local SLA maxima/minima within eddy
         """
-        mask = self.mask
-        local_extrema = np.ma.masked_where(mask == False, self.sla)
+        #local_extrema = np.ma.masked_where(self.mask == False, self.sla)
+        local_extrema = self.sla
         local_extrema *= sign
         self._detect_local_minima(local_extrema)
         return self

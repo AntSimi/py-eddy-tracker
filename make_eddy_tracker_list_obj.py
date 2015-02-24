@@ -35,7 +35,6 @@ Version 1.4.2
 from py_eddy_tracker_classes import *
 import scipy.spatial as spatial
 import scipy.interpolate as interpolate
-#import haversine_distmat as hav # needs compiling with f2py
 from haversine import haversine # needs compiling with f2py
 
 
@@ -44,11 +43,11 @@ def haversine_distance_vector(lon1, lat1, lon2, lat2):
     Haversine formula to calculate distance between two points
     Uses mean earth radius in metres (from scalars.h) = 6371315.0
     """
-    lon1 = np.asfortranarray(lon1.copy())
-    lat1 = np.asfortranarray(lat1.copy())
-    lon2 = np.asfortranarray(lon2.copy())
-    lat2 = np.asfortranarray(lat2.copy())
-    dist = np.asfortranarray(np.empty_like(lon1))
+    lon1 = np.asfortranarray(lon1)
+    lat1 = np.asfortranarray(lat1)
+    lon2 = np.asfortranarray(lon2)
+    lat2 = np.asfortranarray(lat2)
+    dist = np.empty_like(lon1, order='F')
     haversine.distance_vector(lon1, lat1, lon2, lat2, dist)
     return np.ascontiguousarray(dist)
 
@@ -100,7 +99,9 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
         num_fac = 2
     
     # Get distances
-    d = np.r_[0, np.cumsum(haversine_distance_vector(x[:-1],y[:-1], x[1:],y[1:]))]
+    d = np.zeros_like(x)
+    d[1:] = np.cumsum(haversine_distance_vector(
+               x[:-1].copy(), y[:-1].copy(), x[1:].copy(), y[1:].copy()))
     # Get uniform distances
     d_uniform = np.linspace(0, d.max(), num=d.size * num_fac, endpoint=True)
     
@@ -273,14 +274,71 @@ class TrackList (object):
         old_lon, old_lat: old lon/lat centroids
         eddy_index:   index of eddy in track_list
     """
-    def __init__(self, DATATYPE, TRACK_DURATION_MIN, TRACK_EXTRA_VARIABLES):
+    #def __init__(self, DATATYPE, TRACK_DURATION_MIN, TRACK_EXTRA_VARIABLES):
+    def __init__(self, DATATYPE, SIGN_TYPE, SAVE_DIR, grd, search_ellipse,
+                       **kwargs):
         """
         Initialise the list 'tracklist'
         """
         self.tracklist = []
         self.DATATYPE = DATATYPE
-        self.TRACK_DURATION_MIN = TRACK_DURATION_MIN
-        self.TRACK_EXTRA_VARIABLES = TRACK_EXTRA_VARIABLES
+        self.SIGN_TYPE = SIGN_TYPE
+        self.SAVE_DIR = SAVE_DIR
+        
+        self.DIAGNOSTIC_TYPE = kwargs.get('DIAGNOSTIC_TYPE', 'SLA')
+        
+        self.THE_DOMAIN = kwargs.get('THE_DOMAIN', 'Global')
+        self.LONMIN = np.float64(kwargs.get('LONMIN', -40))
+        self.LONMAX = np.float64(kwargs.get('LONMAX', -30))
+        self.LATMIN = np.float64(kwargs.get('LATMIN', 20))
+        self.LATMAX = np.float64(kwargs.get('LATMAX', 30))
+        self.DATE_STR = np.float64(kwargs.get('DATE_STR', 20020101))
+        self.DATE_END = np.float64(kwargs.get('DATE_END', 20020630))
+        
+        self.TRACK_DURATION_MIN = kwargs.get('TRACK_DURATION_MIN', 28)
+        self.TRACK_EXTRA_VARIABLES = kwargs.get('TRACK_EXTRA_VARIABLES', False)
+        self.INTERANNUAL = kwargs.get('INTERANNUAL', True)
+        self.SEPARATION_METHOD = kwargs.get('SEPARATION_METHOD', 'ellipse')
+        self.SMOOTHING = kwargs.get('SMOOTHING', True)
+        self.MAX_LOCAL_EXTREMA = kwargs.get('MAX_LOCAL_EXTREMA', 1)
+        
+        self.INTERP_METHOD = kwargs.get('INTERP_METHOD', 'RectBivariate')
+        self.JDAY_REFERENCE = kwargs.get('JDAY_REFERENCE', 2448623.0)
+        self.CONTOUR_PARAMETER = kwargs.get('CONTOUR_PARAMETER',
+                                   np.linspace(-100., 101, 1))
+        if 'Cyclonic' in SIGN_TYPE:
+            self.CONTOUR_PARAMETER = self.CONTOUR_PARAMETER[::-1]
+        self.SHAPE_ERROR = kwargs.get('SHAPE_ERROR',
+                              np.full(self.CONTOUR_PARAMETER.size, 55.))
+        
+        self.DAYS_BTWN_RECORDS = kwargs.get('DAYS_BTWN_RECORDS', 7.)
+        
+        self.RADMIN = np.float64(kwargs.get('RADMIN', 0.4))
+        self.RADMAX = np.float64(kwargs.get('RADMAX', 4.461))
+        self.AMPMIN = np.float64(kwargs.get('AMPMIN', 1.))
+        self.AMPMAX = np.float64(kwargs.get('AMPMAX', 150.))
+        
+        self.EVOLVE_AMP_MIN = np.float64(kwargs.get('EVOLVE_AMP_MIN', 0.0005))
+        self.EVOLVE_AMP_MAX = np.float64(kwargs.get('EVOLVE_AMP_MAX', 500))
+        self.EVOLVE_AREA_MIN = np.float64(kwargs.get('EVOLVE_AREA_MIN', 0.0005))
+        self.EVOLVE_AREA_MAX = np.float64(kwargs.get('EVOLVE_AREA_MAX', 500))
+        
+        
+        self.AREA0 = np.pi * np.float64(kwargs.get('RAD0', 60000.))**2
+        self.AMP0 = np.float64(kwargs.get('AMP0', 2.))
+        self.DIST0 = np.float64(kwargs.get('DIST0', 25000.))
+        
+        self.SAVE_FIGURES = kwargs.get('SAVE_FIGURES', False)
+
+        self.VERBOSE = kwargs.get('VERBOSE', False)
+        
+        self.M = grd.M
+        self.points = np.array([grd.lon().ravel(),
+                                grd.lat().ravel()]).T
+        self.i0, self.i1 = grd.i0, grd.i1
+        self.j0, self.j1 = grd.j0, grd.j1
+        self.FILLVAL = grd.FILLVAL
+        
         self.new_lon    = [] #np.array([])
         self.new_lat    = []
         self.new_radii_s = []
@@ -318,6 +376,7 @@ class TrackList (object):
         self.ch_index = 0 # index for Chelton style nc files
         self.PAD = 2
         self.search_ellipse = None
+        self.PIXEL_THRESHOLD = None
         # Check for a correct configuration
         assert DATATYPE in ('ROMS', 'AVISO'), "".join(('Unknown string ',
                                                  'in *DATATYPE* parameter'))
@@ -518,32 +577,32 @@ class TrackList (object):
         #nc.createDimension('four', 4)
         
         # Create variables     
-        nc.createVariable('track', np.int32, ('Nobs'), fill_value=self.fillval)   
-        nc.createVariable('n', np.int32, ('Nobs'), fill_value=self.fillval)  
+        nc.createVariable('track', np.int32, ('Nobs'), fill_value=self.FILLVAL)   
+        nc.createVariable('n', np.int32, ('Nobs'), fill_value=self.FILLVAL)  
         
         # Use of jday should depend on clim vs interann
         if self.INTERANNUAL: # AVISO or INTERANNUAL ROMS solution
-            nc.createVariable('j1', np.int32, ('Nobs'), fill_value=self.fillval)
+            nc.createVariable('j1', np.int32, ('Nobs'), fill_value=self.FILLVAL)
         
         else: # climatological ROMS solution
-            nc.createVariable('ocean_time', 'f8', ('Nobs'), fill_value=self.fillval)
+            nc.createVariable('ocean_time', 'f8', ('Nobs'), fill_value=self.FILLVAL)
         
-        nc.createVariable('lon', 'f4', ('Nobs'), fill_value=self.fillval)
-        nc.createVariable('lat', 'f4', ('Nobs'), fill_value=self.fillval)
-        nc.createVariable('A', 'f4', ('Nobs'), fill_value=self.fillval)
-        nc.createVariable('L', 'f4', ('Nobs'), fill_value=self.fillval)
-        nc.createVariable('U', 'f4', ('Nobs'), fill_value=self.fillval)
-        nc.createVariable('Teke', 'f4', ('Nobs'), fill_value=self.fillval)
-        nc.createVariable('radius_e', 'f4', ('Nobs'), fill_value=self.fillval)
+        nc.createVariable('lon', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+        nc.createVariable('lat', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+        nc.createVariable('A', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+        nc.createVariable('L', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+        nc.createVariable('U', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+        nc.createVariable('Teke', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+        nc.createVariable('radius_e', 'f4', ('Nobs'), fill_value=self.FILLVAL)
         
         if 'Q' in self.DIAGNOSTIC_TYPE:
-            nc.createVariable('qparameter', 'f4', ('Nobs'), fill_value=self.fillval)
+            nc.createVariable('qparameter', 'f4', ('Nobs'), fill_value=self.FILLVAL)
         
         if 'ROMS' in self.DATATYPE:
-            nc.createVariable('temp', 'f4', ('Nobs'), fill_value=self.fillval)
-            nc.createVariable('salt', 'f4', ('Nobs'), fill_value=self.fillval)
+            nc.createVariable('temp', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+            nc.createVariable('salt', 'f4', ('Nobs'), fill_value=self.FILLVAL)
             
-        #nc.createVariable('eddy_duration', np.int16, ('Nobs'), fill_value=self.fillval)
+        #nc.createVariable('eddy_duration', np.int16, ('Nobs'), fill_value=self.FILLVAL)
         
         # Meta data for variables
         nc.variables['track'].units = 'ordinal'
@@ -630,13 +689,13 @@ class TrackList (object):
             nc.createDimension('uavg_contour_count',
                 np.int(self.slaparameter.size * 0.333))
             nc.createVariable('contour_e', 'f4',
-                ('contour_points','Nobs'), fill_value=self.fillval)
+                ('contour_points','Nobs'), fill_value=self.FILLVAL)
             nc.createVariable('contour_s', 'f4',
-                ('contour_points','Nobs'), fill_value=self.fillval)
+                ('contour_points','Nobs'), fill_value=self.FILLVAL)
             nc.createVariable('uavg_profile', 'f4',
-                ('uavg_contour_count','Nobs'), fill_value=self.fillval)
+                ('uavg_contour_count','Nobs'), fill_value=self.FILLVAL)
             nc.createVariable('shape_error', 'f4',
-                ('Nobs'), fill_value=self.fillval)
+                ('Nobs'), fill_value=self.FILLVAL)
             
             nc.variables['contour_e'].long_name = "".join(('positions of ',
                 'effective contour points'))
@@ -824,17 +883,15 @@ class TrackList (object):
         return self
         
         
-    def get_distances(self, centlon, centlat):
-        """
-        Return all distances between the current centroid *centlon*,
-        *centlat* and arrays *self.old_lon*, *self.old_lat*
-        """
-        clon = self.old_lon.copy()
-        clat = self.old_lat.copy()
-        clon.fill(centlon)
-        clat.fill(centlat)
-        return haversine_distance_vector(clon, clat,
-                                         self.old_lon, self.old_lat)
+    #def get_distances(self, centlon, centlat):
+        #"""
+        #Return all distances between the current centroid *centlon*,
+        #*centlat* and arrays *self.old_lon*, *self.old_lat*
+        #"""
+        #clon = np.full_like(self.old_lon, centlon)
+        #clat = np.full_like(self.old_lon, centlat)
+        #return haversine_distance_vector(clon, clat,
+                                         #self.old_lon, self.old_lat)
 
 
     def insert_at_index(self, xarr, ind, x):
@@ -848,12 +905,6 @@ class TrackList (object):
         except Exception:
             pass
         
-        #tmp = eval('self.' + xarr)
-        #tmp = tmp[:]
-        #if ind < len(tmp):
-            #newsize = len(tmp)
-        #else:
-            #newsize = ind + 1
         val = getattr(self, xarr)
         try:
             val[ind] = x
