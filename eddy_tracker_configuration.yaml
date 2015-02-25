@@ -10,6 +10,7 @@ DIAGNOSTIC_TYPE: 'SLA'
 # Specify the AVISO domain
 DOMAIN:
   THE_DOMAIN: 'Global'
+#   THE_DOMAIN: 'Regional'
   #THE_DOMAIN = 'BlackSea'
   #THE_DOMAIN = 'MedSea' # not yet implemented
   LONMIN: -40.

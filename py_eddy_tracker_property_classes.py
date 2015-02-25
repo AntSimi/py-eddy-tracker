@@ -213,8 +213,8 @@ class Amplitude (object):
         """
         Set count of local SLA maxima/minima within eddy
         """
-        #local_extrema = np.ma.masked_where(self.mask == False, self.sla)
-        local_extrema = self.sla
+        local_extrema = np.ma.masked_where(self.mask == False, self.sla)
+        #local_extrema = self.sla
         local_extrema *= sign
         self._detect_local_minima(local_extrema)
         return self

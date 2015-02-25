@@ -287,7 +287,7 @@ class TrackList (object):
         
         self.DIAGNOSTIC_TYPE = kwargs.get('DIAGNOSTIC_TYPE', 'SLA')
         
-        self.THE_DOMAIN = kwargs.get('THE_DOMAIN', 'Global')
+        self.THE_DOMAIN = kwargs.get('THE_DOMAIN', 'Regional')
         self.LONMIN = np.float64(kwargs.get('LONMIN', -40))
         self.LONMAX = np.float64(kwargs.get('LONMAX', -30))
         self.LATMIN = np.float64(kwargs.get('LATMIN', 20))
@@ -304,10 +304,13 @@ class TrackList (object):
         
         self.INTERP_METHOD = kwargs.get('INTERP_METHOD', 'RectBivariate')
         self.JDAY_REFERENCE = kwargs.get('JDAY_REFERENCE', 2448623.0)
+        
+        # NOTE: '.copy()' suffix is essential here
         self.CONTOUR_PARAMETER = kwargs.get('CONTOUR_PARAMETER',
-                                   np.linspace(-100., 101, 1))
+                                   np.arange(-100., 101, 1)).copy()
         if 'Cyclonic' in SIGN_TYPE:
-            self.CONTOUR_PARAMETER = self.CONTOUR_PARAMETER[::-1]
+            self.CONTOUR_PARAMETER *= -1
+        
         self.SHAPE_ERROR = kwargs.get('SHAPE_ERROR',
                               np.full(self.CONTOUR_PARAMETER.size, 55.))
         
@@ -514,7 +517,7 @@ class TrackList (object):
 
         
 
-    def create_netcdf(self, directory, savedir, title,
+    def create_netcdf(self, directory, savedir,
                       grd=None, Ymin=None, Ymax=None,
                       Mmin=None, Mmax=None, model=None,
                       sigma_lev=None, rho_ntr=None):
@@ -526,7 +529,7 @@ class TrackList (object):
         else:
            self.savedir = savedir.replace('.nc', '_ARGO_enabled.nc')
         nc = Dataset(self.savedir, 'w', format='NETCDF4')
-        nc.title = ''.join((title, ' eddy tracks'))
+        nc.title = ''.join((self.SIGN_TYPE, ' eddy tracks'))
         nc.directory = directory
         nc.DAYS_BTWN_RECORDS = np.float64(self.DAYS_BTWN_RECORDS)
         nc.TRACK_DURATION_MIN = np.float64(self.TRACK_DURATION_MIN)
@@ -1074,7 +1077,7 @@ class RossbyWaveSpeed (object):
         self.ZERO_CROSSING = grd.ZERO_CROSSING
         self.RW_PATH = RW_PATH
         self._tree = None
-        if self.THE_DOMAIN in ('Global', 'ROMS'):
+        if self.THE_DOMAIN in ('Global', 'Regional', 'ROMS'):
             assert self.RW_PATH is not None, \
                 'Must supply a path for the Rossby deformation radius data'
             data = np.loadtxt(RW_PATH)
@@ -1094,6 +1097,7 @@ class RossbyWaveSpeed (object):
     
     def __getstate__(self):
         """
+        Needed for Pickle
         """
         result = self.__dict__.copy()
         result.pop('_tree')
@@ -1102,6 +1106,7 @@ class RossbyWaveSpeed (object):
     
     def __setstate__(self, thedict):
         """
+        Needed for Pickle
         """
         self.__dict__ = thedict
         self._make_kdtree()
@@ -1109,8 +1114,10 @@ class RossbyWaveSpeed (object):
         
     def get_rwdistance(self, xpt, ypt, DAYS_BTWN_RECORDS):
         """
+        Return the distance required by SearchEllipse
+        to construct a search ellipse for eddy tracking.
         """
-        if self.THE_DOMAIN in ('Global', 'ROMS'):
+        if self.THE_DOMAIN in ('Global', 'Regional', 'ROMS'):
 	    #print 'xpt, ypt', xpt, ypt
             self.distance[:] = self._get_rlongwave_spd(xpt, ypt)
             self.distance *= 86400.
@@ -1152,6 +1159,8 @@ class RossbyWaveSpeed (object):
     
     def _make_subset(self):
         """
+        Make a subset of _defrad data over the domain.
+        If 'Global' is defined then widen the domain.
         """
         pad = 1.5 # degrees
         LONMIN, LONMAX, LATMIN, LATMAX = self.limits
@@ -1168,11 +1177,21 @@ class RossbyWaveSpeed (object):
         self._lon = self._lon[lloi]
         self._lat = self._lat[lloi]
         self._defrad = self._defrad[lloi]
+        
+        if 'Global' in self.THE_DOMAIN:
+            lloi = self._lon > 260.
+            self._lon = np.append(self._lon, self._lon[lloi] - 360.)
+            self._lat = np.append(self._lat, self._lat[lloi])
+            self._defrad = np.append(self._defrad, self._defrad[lloi])
+        
         self.x, self.y = self.M(self._lon, self._lat)
         return self
     
     
     def _make_kdtree(self):
+        """
+        Compute KDE tree for nearest indices.
+        """
         points = np.vstack([self.x, self.y]).T
         self._tree = spatial.cKDTree(points)
         return self
@@ -1207,8 +1226,25 @@ class RossbyWaveSpeed (object):
         return self.r_spd_long
     
 
-    
-    
+    def view_grid_subset(self):
+        """
+        Figure to check RossbyWaveSpeed grid after call to
+        self._make_subset()
+        To use, uncomment in SearchEllipse __init__ method
+        """
+        stride = 30
+        plt.figure()
+        ax = plt.subplot()
+        self.M.scatter(self.x, self.y, c='b')
+        self.M.drawcoastlines()
+        self.M.fillcontinents()
+        self.M.drawparallels(np.arange(-90, 90. + stride, stride),
+                             labels=[1, 0, 0, 0], ax=ax)
+        self.M.drawmeridians(np.arange(-360, 360. + stride, stride),
+                             labels=[0, 0, 0, 1], ax=ax)
+        plt.show()
+
+
 class SearchEllipse (object):
     """
     Class to construct a search ellipse/circle around a specified point.
@@ -1238,6 +1274,7 @@ class SearchEllipse (object):
         self.n_s_minor = self.DAYS_BTWN_RECORDS * 15e4 / 7.
         self.semi_n_s_minor = 0.5 * self.n_s_minor
         self.rwv = RossbyWaveSpeed(THE_DOMAIN, grd, RW_PATH=RW_PATH)
+        #self.rwv.view_grid_subset()
         self.rw_c = np.empty(1)
         self.rw_c_mod = np.empty(1)
         self.rw_c_fac = 1.75
@@ -1306,7 +1343,7 @@ class SearchEllipse (object):
         self.xpt = xpt
         self.ypt = ypt
         
-        if self.THE_DOMAIN in ('Global', 'ROMS'):
+        if self.THE_DOMAIN in ('Global', 'Regional', 'ROMS'):
             self.rw_c[:] = self.rwv.get_rwdistance(xpt, ypt,
                                   self.DAYS_BTWN_RECORDS)
             self.rw_c_mod[:] = 1.75

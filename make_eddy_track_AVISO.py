@@ -145,7 +145,9 @@ class PyEddyTracker (object):
         """
         Get indices for desired domain
         """
-        print '--- Setting initial indices to LONMIN, LONMAX, LATMIN, LATMAX'
+        print '--- Setting initial indices to %s domain' % self.THE_DOMAIN
+        print '------ LONMIN = %s, LONMAX = %s, LATMIN = %s, LATMAX = %s' % (
+                                           LONMIN, LONMAX, LATMIN, LATMAX)
         self.i0, junk = self.nearest_point(LONMIN, 
                                            LATMIN + 0.5 * (LATMAX - LATMIN))
         self.i1, junk = self.nearest_point(LONMAX,
@@ -199,7 +201,7 @@ class PyEddyTracker (object):
         around 2d variables.
         Padded matrices are needed only for geostrophic velocity computation.
         """
-        print '--- Setting padding indices with PAD=%s' % pad
+        print '--- Setting padding indices with PAD = %s' % pad
         
         self.pad = pad
         
@@ -489,13 +491,14 @@ class AvisoGrid (PyEddyTracker):
     Class to satisfy the need of the eddy tracker
     to have a grid class
     """
-    def __init__(self, AVISO_FILE, LONMIN, LONMAX, LATMIN, LATMAX,
+    def __init__(self, AVISO_FILE, THE_DOMAIN, LONMIN, LONMAX, LATMIN, LATMAX,
                  with_pad=True):
         """
         Initialise the grid object
         """
         super(AvisoGrid, self).__init__()
         print '\nInitialising the AVISO_grid'
+        self.THE_DOMAIN = THE_DOMAIN
         self.LONMIN = LONMIN
         self.LONMAX = LONMAX
         self.LATMIN = LATMIN
@@ -766,10 +769,21 @@ if __name__ == '__main__':
     DIAGNOSTIC_TYPE = config['DIAGNOSTIC_TYPE']
     
     config['THE_DOMAIN'] = config['DOMAIN']['THE_DOMAIN']
-    config['LONMIN'] = config['DOMAIN']['LONMIN']
-    config['LONMAX'] = config['DOMAIN']['LONMAX']
-    config['LATMIN'] = config['DOMAIN']['LATMIN']
-    config['LATMAX'] = config['DOMAIN']['LATMAX']
+    
+    # It is not recommended to change values given below
+    # for 'Global', 'BlackSea' or 'MedSea'...
+    if 'Global' in config['THE_DOMAIN']:
+        config['LONMIN'] = -100.
+        config['LONMAX'] = 290.
+        config['LATMIN'] = -80.
+        config['LATMAX'] = 80.
+    
+    elif 'Regional' in config['THE_DOMAIN']:
+        config['LONMIN'] = config['DOMAIN']['LONMIN']
+        config['LONMAX'] = config['DOMAIN']['LONMAX']
+        config['LATMIN'] = config['DOMAIN']['LATMIN']
+        config['LATMAX'] = config['DOMAIN']['LATMAX']
+    
     DATE_STR = config['DATE_STR'] = config['DOMAIN']['DATE_STR']
     DATE_END = config['DATE_END'] = config['DOMAIN']['DATE_END']
     
@@ -865,8 +879,9 @@ if __name__ == '__main__':
         AVISO_FILES = AVISO_FILES[5:-5:np.int(DAYS_BTWN_RECORDS)]
     
     # Set up a grid object using first AVISO file in the list
-    sla_grd = AvisoGrid(AVISO_FILES[0], config['LONMIN'], config['LONMAX'],
-                                        config['LATMIN'], config['LATMAX'])
+    sla_grd = AvisoGrid(AVISO_FILES[0], config['THE_DOMAIN'],
+                        config['LONMIN'], config['LONMAX'],
+                        config['LATMIN'], config['LATMAX'])
     
     Mx, My = (sla_grd.Mx[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1],
               sla_grd.My[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1])
@@ -897,9 +912,10 @@ if __name__ == '__main__':
     #kwargs = config
     A_eddy = eddy_tracker.TrackList('AVISO', 'Anticyclonic', A_SAVEFILE,
                             sla_grd, search_ellipse, **config)
+    
     C_eddy = eddy_tracker.TrackList('AVISO', 'Cyclonic', C_SAVEFILE,
                             sla_grd, search_ellipse, **config)
-
+    
     A_eddy.search_ellipse = search_ellipse
     C_eddy.search_ellipse = search_ellipse
     
@@ -920,8 +936,8 @@ if __name__ == '__main__':
     C_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
     
     # Create nc files for saving of eddy tracks
-    A_eddy.create_netcdf(DATA_DIR, A_SAVEFILE, 'Anticyclonic')
-    C_eddy.create_netcdf(DATA_DIR, C_SAVEFILE, 'Cyclonic')
+    A_eddy.create_netcdf(DATA_DIR, A_SAVEFILE)
+    C_eddy.create_netcdf(DATA_DIR, C_SAVEFILE)
 
     
     # Loop through the AVISO files...
@@ -1084,12 +1100,11 @@ if __name__ == '__main__':
                 A_CS = ax.contour(sla_grd.lon(),
                                   sla_grd.lat(),
                                   A_eddy.sla, A_eddy.CONTOUR_PARAMETER)
-                # Note that CSc is for the cyclonics,
-                #   CONTOUR_PARAMETER in reverse order
+                # Note that C_CS is in reverse order
                 C_CS = ax.contour(sla_grd.lon(),
                                   sla_grd.lat(),
                                   C_eddy.sla, C_eddy.CONTOUR_PARAMETER)
-            
+                
             else:
                 Exception
             
@@ -1113,10 +1128,6 @@ if __name__ == '__main__':
             C_eddy.swirl = SwirlSpeed(C_CS)
             
             # Now we loop over the CS collection
-            A_eddy.SIGN_TYPE = 'Anticyclonic'
-            C_eddy.SIGN_TYPE = 'Cyclonic'
-            
-            qqq
             if 'Q' in DIAGNOSTIC_TYPE:
                 A_eddy, C_eddy = collection_loop(CS, sla_grd, rtime,
                                    A_list_obj=A_eddy, C_list_obj=C_eddy,

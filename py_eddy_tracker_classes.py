@@ -421,7 +421,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                            poly_eff.vertices[:, 1].copy()
     
     theseglon, theseglat = eddy_tracker.uniform_resample(
-               theseglon, theseglat)
+               theseglon, theseglat, method='akima')
     if 'RectBivariate' in Eddy.INTERP_METHOD:
         uavg = Eddy.uspd_coeffs.ev(theseglat[1:], theseglon[1:]).mean()
     
@@ -480,7 +480,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                         
                         seglon, seglat = poly_i.vertices[:, 0], poly_i.vertices[:, 1]
                         seglon, seglat = eddy_tracker.uniform_resample(
-                                            seglon, seglat)
+                                            seglon, seglat, method='akima')
                         
                         # Interpolate uspd to seglon, seglat, then get mean
                         if 'RectBivariate' in Eddy.INTERP_METHOD:
@@ -681,7 +681,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 # circumferential distribution
                                 contlon_e, contlat_e = \
                                     eddy_tracker.uniform_resample(contlon_e,
-                                                     contlat_e)
+                                                     contlat_e, method='akima')
                                 
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                                     # Note, eddy amplitude == max(abs(vort/f)) within eddy, KCCMC11
@@ -1299,7 +1299,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
             Eddy.insert_at_index('new_shape_error', Eddy.index, shape_error)
         
         if Eddy.new_list is True: # initialise a new list
-            print '------ starting a new track list for %ss' % Eddy.SIGN_TYPE
+            print ('------ starting a new track list for %s' % 
+                               Eddy.SIGN_TYPE.replace('nic', 'nes'))
             Eddy.new_list = False
         
         args = (centlon, centlat, rtime, uavg, teke,
