@@ -461,7 +461,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
         Eddy.swirl.set_nearest_contour_index(centlon_e, centlat_e)
         theindex = Eddy.swirl.get_index_nearest_path()
         
-        if theindex:
+        if theindex is not False:
             
             poly_i = CS.collections[citer.index].get_paths()[theindex]
             
