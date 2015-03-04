@@ -284,25 +284,25 @@ def psi2rho(var_psi):
 
 
 
-def pcol_2dxy(x, y):
-    """
-    Function to shift x, y for subsequent use with pcolor
-    by Jeroen Molemaker UCLA 2008
-    """
-    Mp, Lp = x.shape
-    M = Mp - 1
-    L = Lp - 1
-    x_pcol = np.zeros((Mp, Lp))
-    y_pcol = np.zeros_like(x_pcol)
-    x_tmp = half_interp(x[:, :L], x[:, 1:Lp])
-    x_pcol[1:Mp, 1:Lp] = half_interp(x_tmp[0:M], x_tmp[1:Mp])
-    x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
-    x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
-    y_tmp = half_interp(y[:, :L], y[:, 1:Lp]    )
-    y_pcol[1:Mp, 1:Lp] = half_interp(y_tmp[:M], y_tmp[1:Mp])
-    y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
-    y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
-    return x_pcol, y_pcol
+#def pcol_2dxy(x, y):
+    #"""
+    #Function to shift x, y for subsequent use with pcolor
+    #by Jeroen Molemaker UCLA 2008
+    #"""
+    #Mp, Lp = x.shape
+    #M = Mp - 1
+    #L = Lp - 1
+    #x_pcol = np.zeros((Mp, Lp))
+    #y_pcol = np.zeros_like(x_pcol)
+    #x_tmp = half_interp(x[:, :L], x[:, 1:Lp])
+    #x_pcol[1:Mp, 1:Lp] = half_interp(x_tmp[0:M], x_tmp[1:Mp])
+    #x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
+    #x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
+    #y_tmp = half_interp(y[:, :L], y[:, 1:Lp]    )
+    #y_pcol[1:Mp, 1:Lp] = half_interp(y_tmp[:M], y_tmp[1:Mp])
+    #y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
+    #y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
+    #return x_pcol, y_pcol
 
 
 
@@ -478,13 +478,15 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                         
                         any_inner_contours = True
                         
-                        seglon, seglat = poly_i.vertices[:, 0], poly_i.vertices[:, 1]
+                        seglon, seglat = (poly_i.vertices[:, 0],
+                                          poly_i.vertices[:, 1])
                         seglon, seglat = eddy_tracker.uniform_resample(
                                             seglon, seglat, method='akima')
                         
                         # Interpolate uspd to seglon, seglat, then get mean
                         if 'RectBivariate' in Eddy.INTERP_METHOD:
-                            uavgseg = Eddy.uspd_coeffs.ev(seglat[1:], seglon[1:]).mean()
+                            uavgseg = Eddy.uspd_coeffs.ev(seglat[1:],
+                                                          seglon[1:]).mean()
     
                         elif 'griddata' in Eddy.INTERP_METHOD:
                             uavgseg = interpolate.griddata(points, uspd1d,
@@ -568,7 +570,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                         
             contlon_e, contlat_e = cont.vertices[:, 0].copy(), \
                                    cont.vertices[:, 1].copy()
-                        
+
             # Filter for closed contours
             if np.alltrue([contlon_e[0] == contlon_e[-1],
                            contlat_e[0] == contlat_e[-1],
@@ -696,10 +698,24 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     if 'Anticyclonic' in sign_type:
                                         amp.all_pixels_above_h0()
                                         
+                                        reset_centroid = amp.all_pixels_above_h0(
+                                                              CS.levels[collind])
+                                        #plt.figure(666)
+                                        #plt.pcolormesh(Eddy.mask_eff)
+                                        #plt.show()
+                                        #amp.debug_figure(grd)
+                                    
                                     elif 'Cyclonic' in sign_type:
-                                        amp.all_pixels_below_h0()
-                                        
-                                    else: Exception
+                                        reset_centroid = amp.all_pixels_below_h0(
+                                                              CS.levels[collind])
+                                    else:
+                                        Exception
+                                    
+                                    if reset_centroid:
+                                        centi = reset_centroid[0]
+                                        centj = reset_centroid[1]
+                                        centlon_e = grd.lon()[centj, centi]
+                                        centlat_e = grd.lat()[centj, centi]
                                     
                                     #amp.debug_figure(grd)
                                     

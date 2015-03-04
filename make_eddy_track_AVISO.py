@@ -145,7 +145,7 @@ class PyEddyTracker (object):
         """
         Get indices for desired domain
         """
-        print '--- Setting initial indices to %s domain' % self.THE_DOMAIN
+        print '--- Setting initial indices to *%s* domain' % self.THE_DOMAIN
         print '------ LONMIN = %s, LONMAX = %s, LATMIN = %s, LATMAX = %s' % (
                                            LONMIN, LONMAX, LATMIN, LATMAX)
         self.i0, junk = self.nearest_point(LONMIN, 
@@ -408,20 +408,18 @@ class PyEddyTracker (object):
         return self
 
 
-    def make_gridmask(self, with_pad=True):
+    def set_basemap(self, with_pad=True):
         """
         Use Basemap to make a landmask
         Format is 1 == ocean, 0 == land
         """
         print '--- Computing Basemap'
         # Create Basemap instance for Mercator projection.
-        self.M = Basemap(projection='merc', llcrnrlon = self.LONMIN - 1,
-                                            urcrnrlon = self.LONMAX + 1,
-                                            llcrnrlat = self.LATMIN - 1,
-                                            urcrnrlat = self.LATMAX + 1,
-                                            lat_ts = 0.5 * (self.LATMIN +
-                                                            self.LATMAX),
-                                            resolution = 'h')
+        self.M = Basemap(projection='merc',
+            llcrnrlon = self.LONMIN - 1, urcrnrlon = self.LONMAX + 1,
+            llcrnrlat = self.LATMIN - 1, urcrnrlat = self.LATMAX + 1,
+            lat_ts = 0.5 * (self.LATMIN + self.LATMAX), resolution = 'h')
+        
         if with_pad:
             x, y = self.M(self.lonpad(), self.latpad())
         else:
@@ -429,6 +427,7 @@ class PyEddyTracker (object):
         self.Mx, self.My = x, y
         return self
 
+        
     
     #@timeit
     def set_geostrophic_velocity(self, zeta):
@@ -532,7 +531,7 @@ class AvisoGrid (PyEddyTracker):
         
         self.set_initial_indices(LONMIN, LONMAX, LATMIN, LATMAX)
         self.set_index_padding()
-        self.make_gridmask(with_pad)
+        self.set_basemap(with_pad=with_pad)
         self.get_AVISO_f_pm_pn()
         self.set_u_v_eke()
         pad2 = 2 * self.pad
@@ -587,10 +586,36 @@ class AvisoGrid (PyEddyTracker):
         """
         if sla.mask.size == 1: # all sea points
             self.mask = np.ones_like(sla.data)
+            
         else:
-            self.mask = sla.mask.astype(np.int) - 1
-            self.mask = np.abs(self.mask)
+            self.mask = np.logical_not(sla.mask).astype(np.int)
+            
+            if 'Global' in self.THE_DOMAIN:
+                
+                # Close Drake Passage
+                minus70 = np.argmin(np.abs(self.lonpad()[0] + 70))
+                self.mask[:125, minus70] = 0
+                # Mask all unwanted regions (Caspian Sea, etc)
+                labels = ndimage.label(self.mask)[0]
+                plus200 = np.argmin(np.abs(self.lonpad()[0] - 200))
+                plus10 = np.argmin(np.abs(self.latpad()[:, 0] - 10))
+                # Set to known sea point
+                good_lab = labels[plus10, plus200]
+                self.mask[labels != good_lab] = 0
+        
         return self
+    
+    
+    
+    def set_global_mask(self):
+        """
+        """
+        if 'Global' in self.THE_DOMAIN:
+            labels = ndimage.label(np.logical_not(self.sla.mask))[0]
+            
+        else:
+            return
+        return
     
     
     def fillmask(self, x, mask):
@@ -992,7 +1017,7 @@ if __name__ == '__main__':
                     if 'first_record' not in locals():
                         print '------ applying Gaussian high-pass filter'
                     # Set landpoints to zero
-                    np.place(sla, sla_grd.mask == False, 0.)
+                    np.place(sla, sla_grd.mask == 0, 0.)
                     np.place(sla, sla.data == sla_grd.FILLVAL, 0.)
                     # High pass filter, see
                     # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
@@ -1000,15 +1025,16 @@ if __name__ == '__main__':
                     
                 elif 'Hanning' in SMOOTHING_TYPE:
                     
-                    print '------ applying %s passes of Hanning filter' \
+                    if 'first_record' not in locals():
+                        print '------ applying %s passes of Hanning filter' \
                                                                % SMOOTH_FAC
                     # Do SMOOTH_FAC passes of 2d Hanning filter
                     sla = func_hann2d_fast(sla, SMOOTH_FAC)
                 
                 else: Exception
             
-            # Expand the landmask
-            sla = np.ma.masked_where(sla_grd.mask == False, sla)
+            # Apply the landmask
+            sla = np.ma.masked_where(sla_grd.mask == 0, sla)
                 
             # Get timing
             try:
@@ -1045,7 +1071,7 @@ if __name__ == '__main__':
                                    sla_grd.iup0:sla_grd.iup1]
                 xi = np.ma.masked_where(sla_grd.mask[
                                         sla_grd.jup0:sla_grd.jup1,
-                                        sla_grd.iup0:sla_grd.iup1] == False,
+                                        sla_grd.iup0:sla_grd.iup1] == 0,
                                    xi / sla_grd.f()[sla_grd.jup0:sla_grd.jup1,
                                                     sla_grd.iup0:sla_grd.iup1])
                 
@@ -1062,7 +1088,7 @@ if __name__ == '__main__':
             uspd = np.sqrt(sla_grd.u**2 + sla_grd.v**2)
             uspd = np.ma.masked_where(
                         sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
-                                     sla_grd.iup0:sla_grd.iup1] == False,
+                                     sla_grd.iup0:sla_grd.iup1] == 0,
                                       uspd)
             A_eddy.uspd = uspd.copy()
             C_eddy.uspd = uspd.copy()
@@ -1144,10 +1170,15 @@ if __name__ == '__main__':
             
             
             
+                
+            ymd_str = ''.join((str(yr), str(mo).zfill(2), str(da).zfill(2)))
             
             
-            ## Test pickling
-            #with open('C_eddy.pkl', 'wb') as save_pickle:
+            # Test pickling
+            #with open("".join((SAVE_DIR, 'A_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
+                #pickle.dump(A_eddy, save_pickle)
+           
+            #with open("".join((SAVE_DIR, 'C_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
                 #pickle.dump(C_eddy, save_pickle)
     
             ## Unpickle
@@ -1213,17 +1244,18 @@ if __name__ == '__main__':
                 
                 if 'Q' in DIAGNOSTIC_TYPE:
                     anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
-                                SAVE_DIR, 'Q-parameter ' + tit, animax, animax_cbar,
+                                SAVE_DIR, 'Q-parameter ' + ymd_str, animax, animax_cbar,
                                 qparam=qparam, qparameter=qparameter, xi=xi, xicopy=xicopy)
                 
                 elif 'SLA' in DIAGNOSTIC_TYPE:
                     anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
-                                SAVE_DIR, 'SLA ' + tit, animax, animax_cbar)
+                                SAVE_DIR, 'SLA ' + ymd_str, animax, animax_cbar)
                 
             # Save inactive eddies to nc file
             # IMPORTANT: this must be done at every time step!!
             #saving_START_TIME = time.time()
             if not first_record:
+                
                 if A_eddy.VERBOSE:
                     print '--- saving to nc', A_eddy.SAVE_DIR
                     print '--- saving to nc', C_eddy.SAVE_DIR

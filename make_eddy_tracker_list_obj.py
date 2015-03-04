@@ -308,6 +308,7 @@ class TrackList (object):
         # NOTE: '.copy()' suffix is essential here
         self.CONTOUR_PARAMETER = kwargs.get('CONTOUR_PARAMETER',
                                    np.arange(-100., 101, 1)).copy()
+        self.INTERVAL = np.diff(self.CONTOUR_PARAMETER)[0]
         if 'Cyclonic' in SIGN_TYPE:
             self.CONTOUR_PARAMETER *= -1
         
@@ -590,6 +591,7 @@ class TrackList (object):
         else: # climatological ROMS solution
             nc.createVariable('ocean_time', 'f8', ('Nobs'), fill_value=self.FILLVAL)
         
+        nc.createVariable('cyc', np.int32, ('Nobs'), fill_value=self.FILLVAL)
         nc.createVariable('lon', 'f4', ('Nobs'), fill_value=self.FILLVAL)
         nc.createVariable('lat', 'f4', ('Nobs'), fill_value=self.FILLVAL)
         nc.createVariable('A', 'f4', ('Nobs'), fill_value=self.FILLVAL)
@@ -630,6 +632,14 @@ class TrackList (object):
         
         else: # climatological ROMS solution
             nc.variables['ocean_time'].units = 'ROMS ocean_time (seconds)'
+        
+        #nc.variables['eddy_duration'].units = 'days'
+        nc.variables['cyc'].units = 'boolean'
+        nc.variables['cyc'].min_val = -1
+        nc.variables['cyc'].max_val = 1
+        nc.variables['cyc'].long_name = 'cyclonic'
+        nc.variables['cyc'].description = 'cyclonic -1; anti-cyclonic +1'
+        
         
         #nc.variables['eddy_duration'].units = 'days'
         nc.variables['lon'].units = 'deg. longitude'
@@ -777,6 +787,10 @@ class TrackList (object):
                             radius_e = np.array([self.tracklist[i].radius_e]) * 1e-3 # to km
                             n = np.arange(tsize, dtype=np.int32)
                             track = np.full(tsize, self.ch_index)
+                            if 'Anticyclonic' in self.SIGN_TYPE:
+                                cyc = np.full(tsize, 1)
+                            elif 'Cyclonic' in self.SIGN_TYPE:
+                                cyc = np.full(tsize, -1)
                             track_max_val = np.array([nc.variables['track'].max_val,
                                                       np.int32(self.ch_index)]).max()
                             #print self.tracklist[i].ocean_time
@@ -784,6 +798,7 @@ class TrackList (object):
                             #eddy_duration = np.array([self.tracklist[i].ocean_time]).ptp()
                             
                             tend = self.ncind + tsize
+                            nc.variables['cyc'][self.ncind:tend] = cyc
                             nc.variables['lon'][self.ncind:tend] = lon
                             nc.variables['lat'][self.ncind:tend] = lat
                             nc.variables['A'][self.ncind:tend] = amp

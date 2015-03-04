@@ -33,8 +33,10 @@ Version 1.4.2
 """
 from scipy import interpolate
 import numpy as np
-import scipy.ndimage.morphology as morphology
-import scipy.ndimage.filters as filters
+import scipy.ndimage as nd
+#import scipy.ndimage.morphology as morphology
+#import scipy.ndimage.filters as filters
+#import scipy.ndimage.label as label
 import matplotlib.pyplot as plt
 
 
@@ -161,11 +163,12 @@ class Amplitude (object):
         
         self.h0_check = h0
         self.h0 = h0[np.isfinite(h0)].mean()
-        self.amplitude = None #np.atleast_1d(0.)
+        self.amplitude = 0 #np.atleast_1d(0.)
         self.local_extrema = None #np.int(0)
         self.local_extrema_inds = None
         self.mask = self.eddy.mask_eff
         self.sla = np.ma.masked_where(self.mask == False, self.sla)
+        self.num_features = np.atleast_1d(0)
     
     
     def within_amplitude_limits(self):
@@ -175,46 +178,95 @@ class Amplitude (object):
                 self.amplitude <= self.eddy.AMPMAX)
     
     
-    def all_pixels_below_h0(self):
+    def _set_cyc_amplitude(self):
+        """
+        """
+        self.amplitude = self.h0
+        self.amplitude -= self.sla.min()
+        
+    
+    def _set_acyc_amplitude(self):
+        """
+        """
+        self.amplitude = self.sla.max()
+        self.amplitude -= self.h0
+    
+    
+    def all_pixels_below_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are below a given SSH threshold for cyclonic eddies.
         """                  
         if np.any(self.sla > self.h0):
-            return self # amplitude == 0
+            return False # i.e., with self.amplitude == 0
+        
         else:
             self._set_local_extrema(1)
+            
             if (self.local_extrema > 0 and
                 self.local_extrema <= self.MLE):
-                self.amplitude = self.h0
-                self.amplitude -= self.sla.min()
-        return self
+                self._set_cyc_amplitude()
+            
+            elif self.local_extrema > self.MLE:
+                lmi_j, lmi_i = np.where(self.local_extrema_inds)
+                levnm2 = level - (2 * self.eddy.INTERVAL)
+                #print 'level, levnm2', level, levnm2
+                slamin = np.atleast_1d(1e5)
+                #print lmi_j, lmi_i
+                for j, i in zip(lmi_j, lmi_i):
+                    if slamin >= self.sla[j, i]:
+                        slamin[:] = self.sla[j, i]
+                        jmin, imin = j, i
+                    if self.sla[j, i] >= levnm2:
+                        self._set_cyc_amplitude()
+                         # Prevent further calls to_set_acyc_amplitude
+                        levnm2 = 1e5
+                jmin += self.eddy.jmin
+                imin += self.eddy.imin
+                return (imin, jmin)
+                
+        return False
     
     
-    def all_pixels_above_h0(self):
+    def all_pixels_above_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are above a given SSH threshold for anticyclonic eddies.
         """              
         if np.any(self.sla < self.h0):
-            #print '--- h0 %s; slamax %s' % (self.h0, self.sla.max())
-            return self # amplitude == 0
+            return False # i.e.,with self.amplitude == 0
+        
         else:
             self._set_local_extrema(-1)
+            
             if (self.local_extrema > 0 and
                 self.local_extrema <= self.MLE):
-                #print '--- h0 %s; sla.max %s' % (self.h0, self.sla.max())
-                self.amplitude = self.sla.max()
-                self.amplitude -= self.h0
-        return self
+                self._set_acyc_amplitude()
+            
+            elif self.local_extrema > self.MLE:
+                lmi_j, lmi_i = np.where(self.local_extrema_inds)
+                levnp2 = level + (2 * self.eddy.INTERVAL)
+                slamax = np.atleast_1d(-1e5)
+                for j, i in zip(lmi_j, lmi_i):
+                    if slamax <= self.sla[j, i]:
+                        slamax[:] = self.sla[j, i]
+                        jmax, imax = j, i
+                    if self.sla[j, i] <= levnp2:
+                        self._set_acyc_amplitude()
+                        levnp2 = -1e5
+                jmax += self.eddy.jmin
+                imax += self.eddy.imin
+                return (imax, jmax)
+                
+        return False
     
     
     def _set_local_extrema(self, sign):
         """
         Set count of local SLA maxima/minima within eddy
         """
-        local_extrema = np.ma.masked_where(self.mask == False, self.sla)
-        #local_extrema = self.sla
+        #local_extrema = np.ma.masked_where(self.mask == False, self.sla)
+        local_extrema = self.sla.copy()
         local_extrema *= sign
         self._detect_local_minima(local_extrema)
         return self
@@ -227,12 +279,12 @@ class Amplitude (object):
         the pixel's value is the neighborhood maximum, 0 otherwise)
         http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
         """
-        neighborhood = morphology.generate_binary_structure(len(arr.shape), 2)
+        neighborhood = nd.morphology.generate_binary_structure(arr.ndim, 2)
         # Get local mimima
-        detected_minima = (filters.minimum_filter(arr,
+        detected_minima = (nd.filters.minimum_filter(arr,
                            footprint=neighborhood) == arr)
         background = (arr == 0)
-        eroded_background = morphology.binary_erosion(
+        eroded_background = nd.morphology.binary_erosion(
             background, structure=neighborhood, border_value=1)
         detected_minima -= eroded_background
         self.local_extrema_inds = detected_minima
@@ -242,6 +294,7 @@ class Amplitude (object):
         
     def debug_figure(self, grd):
         """
+        Uncomment in py-eddy-tracker-classes.py
         """
         if self.local_extrema and self.amplitude:
             
@@ -258,11 +311,11 @@ class Amplitude (object):
             
             x, y = (grd.lon()[self.jslice, self.islice],
                     grd.lat()[self.jslice, self.islice])
-            x, y = pcol_2dxy(x, y)
+            #x, y = pcol_2dxy(x, y)
             pcm = plt.pcolormesh(x, y, self.sla.data, cmap=cm)
             plt.clim(cmin, cmax)
             plt.plot(self.contlon, self.contlat)
-            plt.scatter(self.contlon, self.contlat, s=100, c=self.h0_check,
+            plt.scatter(self.contlon[1:], self.contlat[1:], s=100, c=self.h0_check,
                         cmap=cm, vmin=cmin, vmax=cmax)
             #plt.scatter(centlon_lmi, centlat_lmi, c='k')
             #plt.scatter(centlon_e, centlat_e, c='w')
@@ -304,17 +357,13 @@ class SwirlSpeed(object):
         ci : index to contours
         li : index to levels
         """
-        x = []
-        y = []
-        ci = []
-        li = []
+        x, y, ci, li = [], [], [], []
 
         for lind, cont in enumerate(contour.collections):
             for cind, coll in enumerate(cont.get_paths()):
                 x.append(coll.vertices[:, 0])
                 y.append(coll.vertices[:, 1])
-                thelen = len(coll.vertices[:, 0])
-                ci.append(thelen)
+                ci.append(len(coll.vertices[:, 0]))
             li.append(len(cont.get_paths()))
     
         self.x = np.array([val for sublist in x for val in sublist])
@@ -368,7 +417,7 @@ class SwirlSpeed(object):
             indices_of_first_pts = self.ci[self.level_view_of_contour]
             for i, index_of_first_pt in enumerate(indices_of_first_pts):
                 if ((index_of_first_pt - 
-                        indices_of_first_pts[0]) > self.nearesti):
+                     indices_of_first_pts[0]) > self.nearesti):
                     return i - 1
             return i
         else:
