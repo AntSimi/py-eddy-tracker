@@ -490,14 +490,15 @@ class AvisoGrid (PyEddyTracker):
     Class to satisfy the need of the eddy tracker
     to have a grid class
     """
-    def __init__(self, AVISO_FILE, THE_DOMAIN, LONMIN, LONMAX, LATMIN, LATMAX,
-                 with_pad=True):
+    def __init__(self, AVISO_FILE, THE_DOMAIN, PRODUCT,
+                       LONMIN, LONMAX, LATMIN, LATMAX, with_pad=True):
         """
         Initialise the grid object
         """
         super(AvisoGrid, self).__init__()
         print '\nInitialising the AVISO_grid'
         self.THE_DOMAIN = THE_DOMAIN
+        self.PRODUCT = PRODUCT
         self.LONMIN = LONMIN
         self.LONMAX = LONMAX
         self.LATMIN = LATMIN
@@ -595,14 +596,44 @@ class AvisoGrid (PyEddyTracker):
                 # Close Drake Passage
                 minus70 = np.argmin(np.abs(self.lonpad()[0] + 70))
                 self.mask[:125, minus70] = 0
+                
+                # DT10 mask is open around Panama, so close it...
+                if 'AVISO_DT10' in self.PRODUCT:
+                    
+                    mask = 0
+                    self.mask[348, 92:110] = mask
+                    self.mask[348:356, 92] = mask
+                    self.mask[355, 71:92] = mask
+                    self.mask[355:363, 71] = mask
+                    self.mask[362, 66:71] = mask
+                    self.mask[362:380, 66] = mask
+                    self.mask[380, 47:67] = mask
+                    self.mask[380:389, 47] = mask
+                    self.mask[388, 13:47] = mask
+                    self.mask[388:393, 13] = mask
+                    self.mask[392, :13] = mask
+                    ind = 4 * 360
+                    self.mask[348, 92 + ind:110 + ind] = mask
+                    self.mask[348:356, 92 + ind] = mask
+                    self.mask[355, 71 + ind:92 + ind] = mask
+                    self.mask[355:363, 71 + ind] = mask
+                    self.mask[362, 66 + ind:71 + ind] = mask
+                    self.mask[362:380, 66 + ind] = mask
+                    self.mask[380, 47 + ind:67 + ind] = mask
+                    self.mask[380:389, 47 + ind] = mask
+                    self.mask[388, 13 + ind:47 + ind] = mask
+                    self.mask[388:393, 13 + ind] = mask
+                    self.mask[392,  ind:13 + ind] = mask
+                    
                 # Mask all unwanted regions (Caspian Sea, etc)
                 labels = ndimage.label(self.mask)[0]
-                plus200 = np.argmin(np.abs(self.lonpad()[0] - 200))
-                plus10 = np.argmin(np.abs(self.latpad()[:, 0] - 10))
+                
+                self.labels = labels
                 # Set to known sea point
-                good_lab = labels[plus10, plus200]
-                self.mask[labels != good_lab] = 0
-        
+                plus200 = np.argmin(np.abs(self.lonpad()[0] - 200))
+                plus9 = np.argmin(np.abs(self.latpad()[:, 0] - 9))
+                sea_label = labels[plus9, plus200]
+                np.place(self.mask, labels != sea_label, 0)
         return self
     
     
@@ -815,13 +846,17 @@ if __name__ == '__main__':
     AVISO_DT14 = config['AVISO']['AVISO_DT14']
     AVISO_FILES = config['AVISO']['AVISO_FILES']
     if AVISO_DT14:
+        PRODUCT = 'AVISO_DT14'
         AVISO_DT14_SUBSAMP = config['AVISO']['AVISO_DT14_SUBSAMP']
         if AVISO_DT14_SUBSAMP:
             DAYS_BTWN_RECORDS = config['AVISO']['DAYS_BTWN_RECORDS']
         else:
             DAYS_BTWN_RECORDS = 1.
     else:
+        PRODUCT = 'AVISO_DT10'
         DAYS_BTWN_RECORDS = 7. # old seven day AVISO
+    
+    AVISO_FILES = config['AVISO']['AVISO_FILES']
         
     #TRACK_DURATION_MIN = config['TRACK_DURATION_MIN']
    
@@ -904,7 +939,7 @@ if __name__ == '__main__':
         AVISO_FILES = AVISO_FILES[5:-5:np.int(DAYS_BTWN_RECORDS)]
     
     # Set up a grid object using first AVISO file in the list
-    sla_grd = AvisoGrid(AVISO_FILES[0], config['THE_DOMAIN'],
+    sla_grd = AvisoGrid(AVISO_FILES[0], config['THE_DOMAIN'], PRODUCT,
                         config['LONMIN'], config['LONMAX'],
                         config['LATMIN'], config['LATMAX'])
     
@@ -1009,6 +1044,7 @@ if __name__ == '__main__':
             
             sla = sla_grd.get_AVISO_data(AVISO_FILE)
             sla_grd.set_mask(sla).uvmask()
+            
             
             if SMOOTHING:
                     
@@ -1175,11 +1211,11 @@ if __name__ == '__main__':
             
             
             # Test pickling
-            #with open("".join((SAVE_DIR, 'A_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
-                #pickle.dump(A_eddy, save_pickle)
+            with open("".join((SAVE_DIR, 'A_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
+                pickle.dump(A_eddy, save_pickle)
            
-            #with open("".join((SAVE_DIR, 'C_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
-                #pickle.dump(C_eddy, save_pickle)
+            with open("".join((SAVE_DIR, 'C_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
+                pickle.dump(C_eddy, save_pickle)
     
             ## Unpickle
             #with open('C_eddy.pkl', 'rb') as load_pickle:

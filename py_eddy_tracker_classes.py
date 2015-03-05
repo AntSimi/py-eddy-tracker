@@ -696,8 +696,6 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     amp = Amplitude(contlon_e, contlat_e, Eddy, grd)
                                     
                                     if 'Anticyclonic' in sign_type:
-                                        amp.all_pixels_above_h0()
-                                        
                                         reset_centroid = amp.all_pixels_above_h0(
                                                               CS.levels[collind])
                                         #plt.figure(666)

@@ -342,6 +342,7 @@ class TrackList (object):
         self.i0, self.i1 = grd.i0, grd.i1
         self.j0, self.j1 = grd.j0, grd.j1
         self.FILLVAL = grd.FILLVAL
+        self.PRODUCT = grd.PRODUCT
         
         self.new_lon    = [] #np.array([])
         self.new_lat    = []
@@ -532,6 +533,7 @@ class TrackList (object):
         nc = Dataset(self.savedir, 'w', format='NETCDF4')
         nc.title = ''.join((self.SIGN_TYPE, ' eddy tracks'))
         nc.directory = directory
+        nc.PRODUCT = self.PRODUCT
         nc.DAYS_BTWN_RECORDS = np.float64(self.DAYS_BTWN_RECORDS)
         nc.TRACK_DURATION_MIN = np.float64(self.TRACK_DURATION_MIN)
         

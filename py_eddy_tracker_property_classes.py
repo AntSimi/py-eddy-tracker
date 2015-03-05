@@ -296,7 +296,7 @@ class Amplitude (object):
         """
         Uncomment in py-eddy-tracker-classes.py
         """
-        if self.local_extrema and self.amplitude:
+        if self.local_extrema >= 1 and self.amplitude:
             
             plt.figure(587)
             cmin, cmax = -8, 8
