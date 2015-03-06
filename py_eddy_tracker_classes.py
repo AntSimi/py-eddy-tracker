@@ -880,30 +880,19 @@ def track_eddies(Eddy, first_record):
     
     far_away = 1e9
     
-    # We will need these in m for ellipse method below
+    # We will need these in M for ellipse method below
     old_x, old_y = Eddy.M(np.array(Eddy.old_lon), np.array(Eddy.old_lat))
     new_x, new_y = Eddy.M(np.array(Eddy.new_lon_tmp),
                           np.array(Eddy.new_lat_tmp))
     
-    X_old = np.array([Eddy.old_lon, Eddy.old_lat]).T
-    X_new = np.array([Eddy.new_lon_tmp, Eddy.new_lat_tmp]).T
+    X_old = np.asfortranarray([Eddy.old_lon, Eddy.old_lat]).T
+    X_new = np.asfortranarray([Eddy.new_lon_tmp, Eddy.new_lat_tmp]).T
     
     # Use haversine distance for distance matrix between every old and new eddy
-    #dist_mat = np.empty((X_old.shape[0], X_new.shape[0]))
-    dist_mat = np.ones((X_old.shape[0], X_new.shape[0]), dtype=np.float64)
+    dist_mat = np.empty((X_old.shape[0], X_new.shape[0]), order='F')
     
-    #print 'BEFORE dist_mat', dist_mat.min(), dist_mat.max()
-    #print dist_mat.flags
-    #print '--------------'
-    dist_mat = np.asfortranarray(dist_mat)
-    haversine.distance_matrix(np.asfortranarray(X_old),
-                              np.asfortranarray(X_new),
-                              dist_mat)
+    haversine.distance_matrix(X_old, X_new, dist_mat)
     dist_mat = np.ascontiguousarray(dist_mat)
-    #print '+++++++++++++++'
-    #print 'AFTER dist_mat', dist_mat.min(), dist_mat.max()
-    #print dist_mat.flags
-    #print 'JUNK', dist_mat_junk.min(), dist_mat_junk.max()
     
     dist_mat_copy = dist_mat.copy()
     
@@ -980,28 +969,26 @@ def track_eddies(Eddy, first_record):
         # Loop over separation distances between old and new
         for new_ind, new_dist in enumerate(dist_mat[old_ind]):
                 
-            sep_proceed = False
+            within_range = False
             
             if new_dist < far_away:
                 
                 if 'ellipse' in Eddy.SEPARATION_METHOD:
                     if Eddy.search_ellipse.ellipse_path.contains_point(
                                             (new_x[new_ind], new_y[new_ind])):
-                        sep_proceed = True
-                    #else:
-                        #sep_proceed = False
+                        within_range = True
                 
                 elif 'sum_radii' in Eddy.SEPARATION_METHOD:
                     sep_dist = Eddy.new_radii_tmp_e[new_ind]
                     sep_dist += Eddy.old_radii_e[old_ind]
                     sep_dist *= Eddy.sep_dist_fac
-                    sep_proceed = new_dist <= sep_dist
+                    within_range = new_dist <= sep_dist
                 
                 else:
                     Exception
             
             # Pass only the eddies within ellipse or sep_dist
-            if sep_proceed:
+            if within_range:
                 
                 old_amplitude[:] = Eddy.old_amp[old_ind]
                 new_amplitude[:] = Eddy.new_amp_tmp[new_ind]
@@ -1102,8 +1089,6 @@ def track_eddies(Eddy, first_record):
                     delta_salt = np.r_[delta_salt,
                         np.abs(np.diff([Eddy.old_salt[old_ind], new_st[i]]))]
             
-            #Eddy.search_ellipse.view_search_ellipse(Eddy)
-            #print dist_arr, DIST0
             # This from Penven etal (2005)
             deltaX = np.sqrt((delta_area / AREA0)**2 +
                              (delta_amp / AMP0)**2 +
@@ -1159,18 +1144,8 @@ def track_eddies(Eddy, first_record):
             
             # Use backup_ind to reinsert distances into dist_mat for the unused eddy/eddies
             for bind in backup_ind[dx_unused]:
-                #print dist_mat.shape
-                #print dist_mat[:, bind]
-                #print dist_mat_copy[:, bind]
                 dist_mat[:, bind] = dist_mat_copy[:, bind]
-                #print dist_mat[:, bind]
-                #print '\n'
-                #print 'B new_eddy_inds', new_eddy_inds
                 new_eddy_inds[bind] = True
-                #print 'A new_eddy_inds', new_eddy_inds
-                #print '\n'
-                
-                
                 
             if debug_dist:
                 print 'backup_ind', backup_ind

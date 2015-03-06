@@ -30,8 +30,8 @@ Version 1.4.2
 Scroll down to line ~640 to get started
 ===============================================================================
 """
-#from matplotlib import use as mpl_use
-#mpl_use('Agg')
+from matplotlib import use as mpl_use
+mpl_use('Agg')
 import sys
 import glob as glob
 from py_eddy_tracker_classes import plt, np, dt, Dataset, time, \
@@ -47,7 +47,7 @@ from dateutil import parser
 from mpl_toolkits.basemap import Basemap
 import yaml
 from datetime import datetime
-import pickle
+import cPickle as pickle
 
 
 def timeit(method):
@@ -538,6 +538,21 @@ class AvisoGrid (PyEddyTracker):
         pad2 = 2 * self.pad
         self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
     
+    
+    def __getstate__(self):
+        """
+        Needed for Pickle
+        """
+        print '--- removing unwanted attributes'
+        pops = ('Mx', 'My', '_f', '_angle', '_dx', '_dy', '_gof', '_lon',
+                '_lat', '_pm', '_pn', '_umask', '_vmask', 'eke', 'sla',
+                'mask', 'slacopy', 'sla_coeffs', 'uspd_coeffs')
+        result = self.__dict__.copy()
+        for pop in pops:
+            result.pop(pop)
+        return result
+    
+    
     #@timeit
     def get_AVISO_data(self, AVISO_FILE):
         """
@@ -637,16 +652,6 @@ class AvisoGrid (PyEddyTracker):
         return self
     
     
-    
-    def set_global_mask(self):
-        """
-        """
-        if 'Global' in self.THE_DOMAIN:
-            labels = ndimage.label(np.logical_not(self.sla.mask))[0]
-            
-        else:
-            return
-        return
     
     
     def fillmask(self, x, mask):
@@ -844,7 +849,6 @@ if __name__ == '__main__':
     DATE_END = config['DATE_END'] = config['DOMAIN']['DATE_END']
     
     AVISO_DT14 = config['AVISO']['AVISO_DT14']
-    AVISO_FILES = config['AVISO']['AVISO_FILES']
     if AVISO_DT14:
         PRODUCT = 'AVISO_DT14'
         AVISO_DT14_SUBSAMP = config['AVISO']['AVISO_DT14_SUBSAMP']
@@ -1040,7 +1044,6 @@ if __name__ == '__main__':
             A_eddy.reset_holding_variables()
             C_eddy.reset_holding_variables()
             
-            #grdmask = grd.mask()[j0:j1,i0:i1]
             
             sla = sla_grd.get_AVISO_data(AVISO_FILE)
             sla_grd.set_mask(sla).uvmask()
@@ -1204,18 +1207,16 @@ if __name__ == '__main__':
                                    A_list_obj=None, C_list_obj=C_eddy,
                                    sign_type=C_eddy.SIGN_TYPE, VERBOSE=C_eddy.VERBOSE)
             
-            
-            
                 
             ymd_str = ''.join((str(yr), str(mo).zfill(2), str(da).zfill(2)))
             
             
             # Test pickling
             with open("".join((SAVE_DIR, 'A_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
-                pickle.dump(A_eddy, save_pickle)
+                pickle.dump(A_eddy, save_pickle, 2)
            
             with open("".join((SAVE_DIR, 'C_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
-                pickle.dump(C_eddy, save_pickle)
+                pickle.dump(C_eddy, save_pickle, 2)
     
             ## Unpickle
             #with open('C_eddy.pkl', 'rb') as load_pickle:
@@ -1275,8 +1276,6 @@ if __name__ == '__main__':
             C_eddy = track_eddies(C_eddy, first_record)
             
             if SAVE_FIGURES: # Make figures for animations
-                
-                tit = ''.join((str(yr), str(mo).zfill(2), str(da).zfill(2)))
                 
                 if 'Q' in DIAGNOSTIC_TYPE:
                     anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 

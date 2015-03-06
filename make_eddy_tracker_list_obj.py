@@ -903,15 +903,7 @@ class TrackList (object):
         return self
         
         
-    #def get_distances(self, centlon, centlat):
-        #"""
-        #Return all distances between the current centroid *centlon*,
-        #*centlat* and arrays *self.old_lon*, *self.old_lat*
-        #"""
-        #clon = np.full_like(self.old_lon, centlon)
-        #clat = np.full_like(self.old_lon, centlat)
-        #return haversine_distance_vector(clon, clat,
-                                         #self.old_lon, self.old_lat)
+
 
 
     def insert_at_index(self, xarr, ind, x):
@@ -934,103 +926,7 @@ class TrackList (object):
         setattr(self, xarr, val)
         
         
-        '''
-        if strcompare('new_lon', xarr):
-            try:
-                self.new_lon[ind] = x
-            except:
-                self.new_lon.extend([0] *
-                    (ind - len(self.new_lon) + 1))
-                self.new_lon[ind] = x
-        elif strcompare('new_lat', xarr):
-            try:
-                self.new_lat[ind] = x
-            except:
-                self.new_lat.extend([0] *
-                    (ind - len(self.new_lat) + 1))
-                self.new_lat[ind] = x
-        elif strcompare('new_radii_s', xarr):
-            try:
-                self.new_radii_s[ind] = x
-            except:
-                self.new_radii_s.extend([0] *
-                    (ind - len(self.new_radii_s) + 1))
-                self.new_radii_s[ind] = x
-        elif strcompare('new_radii_e', xarr):
-            try:
-                self.new_radii_e[ind] = x
-            except:
-                self.new_radii_e.extend([0] *
-                    (ind - len(self.new_radii_e) + 1))
-                self.new_radii_e[ind] = x
-        elif strcompare('new_amp', xarr):
-            try:
-                self.new_amp[ind] = x
-            except:
-                self.new_amp.extend([0] *
-                    (ind - len(self.new_amp) + 1))
-                self.new_amp[ind] = x
-        elif strcompare('new_uavg', xarr):
-            try:
-                self.new_uavg[ind] = x
-            except:
-                self.new_uavg.extend([0] *
-                    (ind - len(self.new_uavg) + 1))
-                self.new_uavg[ind] = x
-        elif strcompare('new_teke', xarr):
-            try:
-                self.new_teke[ind] = x
-            except:
-                self.new_teke.extend([0] *
-                    (ind - len(self.new_teke) + 1))
-                self.new_teke[ind] = x
-        elif strcompare('new_temp', xarr):
-            try:
-                self.new_temp[ind] = x
-            except:
-                self.new_temp.extend([0] *
-                    (ind - len(self.new_temp) + 1))
-                self.new_temp[ind] = x
-        elif strcompare('new_salt', xarr):
-            try:
-                self.new_salt[ind] = x
-            except:
-                self.new_salt.extend([0] *
-                    (ind - len(self.new_salt) + 1))
-                self.new_salt[ind] = x
-        elif strcompare('new_shape_error', xarr):
-            try:
-                self.new_shape_error[ind] = x
-            except:
-                self.new_shape_error.extend([0] *
-                    (ind - len(self.new_shape_error) + 1))
-                self.new_shape_error[ind] = x
 
-        elif strcompare('new_contour_e', xarr):
-            try:
-                self.new_contour_e[ind] = x
-            except:
-                self.new_contour_e.append([0] *
-                    (ind - len(self.new_contour_e) + 1))
-                self.new_contour_e[ind] = x
-        elif strcompare('new_contour_s', xarr):
-            try:
-                self.new_contour_s[ind] = x
-            except:
-                self.new_contour_s.append([0] *
-                    (ind - len(self.new_contour_s) + 1))
-                self.new_contour_s[ind] = x
-        elif strcompare('new_uavg_profile', xarr):
-            try:
-                self.new_uavg_profile[ind] = x
-            except:
-                self.new_uavg_profile.append([0] *
-                    (ind - len(self.new_uavg_profile) + 1))
-                self.new_uavg_profile[ind] = x
-        else:
-            raise Exception
-        
-        return self'''
     
 
     
