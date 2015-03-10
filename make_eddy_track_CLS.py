@@ -63,7 +63,7 @@ if __name__ == '__main__':
                 eddy = pickle.load(the_pickle)
                 print '--- loaded %s' % PKL_FILE
             
-            print 'eddy.index', eddy.index
+            #print 'eddy.index', eddy.index
             eddy.savedir = DATA_DIR + eddy.savedir.rpartition('/')[-1]
 
             eddy.TRACK_DURATION_MIN = 10
@@ -79,6 +79,8 @@ if __name__ == '__main__':
                 eddy.tracklist = tracklist.tolist()
                 
                 eddy.index = index
+                eddy.ch_index = ch_index
+                eddy.ncind = ncind
                 
                 eddy.old_lon = old_lon
                 eddy.old_lat = old_lat
@@ -103,7 +105,6 @@ if __name__ == '__main__':
                 eddy = track_eddies(eddy, first_record)
                 tracklist = np.copy(eddy.tracklist)
             
-            index = eddy.index
             
             print 'eddy.index', eddy.index
             print len(eddy.tracklist)
@@ -112,6 +113,10 @@ if __name__ == '__main__':
             if not first_record:
                 print eddy.new_time_tmp[0]
                 eddy.write2netcdf(eddy.new_time_tmp[0])
+            
+            index = eddy.index
+            ch_index = eddy.ch_index
+            ncind = eddy.ncind
             
             old_lon = eddy.old_lon
             old_lat = eddy.old_lat

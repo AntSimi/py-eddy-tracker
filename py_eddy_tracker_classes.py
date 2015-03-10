@@ -1037,7 +1037,7 @@ def track_eddies(Eddy, first_record):
                                             Eddy.new_lon_tmp[new_ind])] = False
                     #print 'aa', new_eddy_inds
                     dist_mat[:, new_ind] = far_away # km
-                    print '*********************************************'
+                    #print '*********************************************'
         
         
         if Eddy.TRACK_EXTRA_VARIABLES:

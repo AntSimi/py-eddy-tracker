@@ -378,7 +378,7 @@ class TrackList (object):
             self.old_contour_s = []
             self.old_uavg_profile = []
             self.old_shape_error = []
-        self.new_list   = True # flag indicating new list
+        self.new_list = True # flag indicating new list
         self.index = 0 # counter
         self.ncind = 0 # index to write to nc files, will increase and increase
         self.ch_index = 0 # index for Chelton style nc files
