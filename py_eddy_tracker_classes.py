@@ -1037,6 +1037,7 @@ def track_eddies(Eddy, first_record):
                                             Eddy.new_lon_tmp[new_ind])] = False
                     #print 'aa', new_eddy_inds
                     dist_mat[:, new_ind] = far_away # km
+                    print '*********************************************'
         
         
         if Eddy.TRACK_EXTRA_VARIABLES:
@@ -1170,7 +1171,7 @@ def track_eddies(Eddy, first_record):
     # Now we need to add new eddies defined by new_eddy_inds
     if np.any(new_eddy_inds):
         
-        if False:
+        if True:
             print '------adding %s new eddies' %new_eddy_inds.sum()
             
         for neind, a_new_eddy in enumerate(new_eddy_inds):

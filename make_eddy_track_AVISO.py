@@ -545,8 +545,8 @@ class AvisoGrid (PyEddyTracker):
         """
         print '--- removing unwanted attributes'
         pops = ('Mx', 'My', '_f', '_angle', '_dx', '_dy', '_gof', '_lon',
-                '_lat', '_pm', '_pn', '_umask', '_vmask', 'eke', 'sla',
-                'mask', 'slacopy', 'sla_coeffs', 'uspd_coeffs')
+                '_lat', '_pm', '_pn', '_umask', '_vmask', 'eke', 'u', 'v',
+                'mask')
         result = self.__dict__.copy()
         for pop in pops:
             result.pop(pop)

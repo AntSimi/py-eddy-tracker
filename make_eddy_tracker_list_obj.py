@@ -344,6 +344,9 @@ class TrackList (object):
         self.FILLVAL = grd.FILLVAL
         self.PRODUCT = grd.PRODUCT
         
+        self.sla = None
+        self.slacopy = None
+        
         self.new_lon    = [] #np.array([])
         self.new_lat    = []
         self.new_radii_s = []
@@ -387,7 +390,17 @@ class TrackList (object):
                                                  'in *DATATYPE* parameter'))
     
 
-    
+    def __getstate__(self):
+        """
+        Needed for Pickle
+        """
+        print '--- removing unwanted attributes'
+        pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
+                'circlon', 'circlat', 'sla', 'slacopy')
+        result = self.__dict__.copy()
+        for pop in pops:
+            result.pop(pop)
+        return result
     
     def add_new_track(self, lon, lat, time, uavg, teke,
             radius_s, radius_e, amplitude, temp=None, salt=None,
