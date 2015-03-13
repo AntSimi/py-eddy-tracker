@@ -55,7 +55,7 @@ def haversine_distance_vector(lon1, lat1, lon2, lat2):
 #def newPosition(lonin, latin, angle, distance):
     #"""
     #Given the inputs (base lon, base lat, angle, distance) return
-     #the lon, lat of the new position...
+    #the lon, lat of the new position...
     #"""
     #lonin = np.asfortranarray(lonin.copy())
     #latin = np.asfortranarray(latin.copy())
@@ -92,19 +92,19 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
         method = kwargs['method']
     else:
         method = 'interp1d'
-    
+
     if kwargs.has_key('num_fac'):
         num_fac = kwargs['num_fac']
     else:
         num_fac = 2
-    
+
     # Get distances
     d = np.zeros_like(x)
     d[1:] = np.cumsum(haversine_distance_vector(
                x[:-1].copy(), y[:-1].copy(), x[1:].copy(), y[1:].copy()))
     # Get uniform distances
     d_uniform = np.linspace(0, d.max(), num=d.size * num_fac, endpoint=True)
-    
+
     # Do 1d interpolations
     if strcompare('interp1d', method):
         if kwargs.has_key('kind'):
@@ -113,18 +113,18 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
             kind = 'linear'
         xfunc = interpolate.interp1d(d, x, kind=kind)
         yfunc = interpolate.interp1d(d, y, kind=kind)
-    
+
     elif strcompare('akima', method):
         xfunc = interpolate.Akima1DInterpolator(d, x)
         yfunc = interpolate.Akima1DInterpolator(d, y)
-    
+
     else:
         Exception
-    
+
     xnew = xfunc(d_uniform)
     ynew = yfunc(d_uniform)
     return xnew, ynew
-    
+
 
 def strcompare(str1, str2):
     return str1 in str2 and str2 in str1
@@ -138,7 +138,7 @@ def strcompare(str1, str2):
 
     #Call signature::
 
-      #segmin = find_nearest_contour(contcoll, x, y)
+    #segmin = find_nearest_contour(contcoll, x, y)
 
     #"""
     #dmin = 1e10
@@ -162,10 +162,6 @@ def strcompare(str1, str2):
     #return (segmin, linepathmin)
 
 
-
-
-
-
 class Track (object):
     """
     Class that holds eddy tracks and related info
@@ -185,10 +181,11 @@ class Track (object):
         saved2nc - Becomes True once saved to netcdf file
         dayzero - True at first appearance of eddy
     """
+
     def __init__(self, eddy_index, DATATYPE, lon, lat, time, uavg, teke,
-                       radius_s, radius_e, amplitude, temp=None, salt=None, 
-                       save_extras=False, contour_e=None, contour_s=None,
-                       uavg_profile=None, shape_error=None):
+                 radius_s, radius_e, amplitude, temp=None, salt=None,
+                 save_extras=False, contour_e=None, contour_s=None,
+                 uavg_profile=None, shape_error=None):
 
         self.eddy_index = eddy_index
         self.DATATYPE   = DATATYPE
@@ -214,9 +211,7 @@ class Track (object):
             self.contour_s = [contour_s]
             self.uavg_profile = [uavg_profile]
             self.shape_error = [shape_error]
-        
-    
-    
+
     def append_pos(self, lon, lat, time, uavg, teke, radius_s, radius_e,
                    amplitude, temp=None, salt=None, contour_e=None,
                    contour_s=None, uavg_profile=None, shape_error=None):
@@ -243,8 +238,6 @@ class Track (object):
             self.shape_error = np.r_[self.shape_error, shape_error]
         return self
 
-
-
     def _is_alive(self, rtime):
         """
         Query if eddy is still active
@@ -252,18 +245,17 @@ class Track (object):
         If not active, kill it
         """
         # The eddy...
-        if self.alive is False: # is already dead
+        if self.alive is False:  # is already dead
             return self.alive
-        elif self.dayzero: # has just been initiated
+        elif self.dayzero:  # has just been initiated
             self.dayzero = False
             return self.alive
-        elif self.ocean_time[-1] == rtime: # is still alive
+        elif self.ocean_time[-1] == rtime:  # is still alive
             return self.alive
         else:
-            self.alive = False # is now dead
+            self.alive = False  # is now dead
             return self.alive
-        
-        
+
 
 class TrackList (object):
     """
@@ -276,7 +268,7 @@ class TrackList (object):
     """
     #def __init__(self, DATATYPE, TRACK_DURATION_MIN, TRACK_EXTRA_VARIABLES):
     def __init__(self, DATATYPE, SIGN_TYPE, SAVE_DIR, grd, search_ellipse,
-                       **kwargs):
+                 **kwargs):
         """
         Initialise the list 'tracklist'
         """
@@ -284,9 +276,9 @@ class TrackList (object):
         self.DATATYPE = DATATYPE
         self.SIGN_TYPE = SIGN_TYPE
         self.SAVE_DIR = SAVE_DIR
-        
+
         self.DIAGNOSTIC_TYPE = kwargs.get('DIAGNOSTIC_TYPE', 'SLA')
-        
+
         self.THE_DOMAIN = kwargs.get('THE_DOMAIN', 'Regional')
         self.LONMIN = np.float64(kwargs.get('LONMIN', -40))
         self.LONMAX = np.float64(kwargs.get('LONMAX', -30))
@@ -294,48 +286,48 @@ class TrackList (object):
         self.LATMAX = np.float64(kwargs.get('LATMAX', 30))
         self.DATE_STR = np.float64(kwargs.get('DATE_STR', 20020101))
         self.DATE_END = np.float64(kwargs.get('DATE_END', 20020630))
-        
+
         self.TRACK_DURATION_MIN = kwargs.get('TRACK_DURATION_MIN', 28)
         self.TRACK_EXTRA_VARIABLES = kwargs.get('TRACK_EXTRA_VARIABLES', False)
         self.INTERANNUAL = kwargs.get('INTERANNUAL', True)
         self.SEPARATION_METHOD = kwargs.get('SEPARATION_METHOD', 'ellipse')
         self.SMOOTHING = kwargs.get('SMOOTHING', True)
         self.MAX_LOCAL_EXTREMA = kwargs.get('MAX_LOCAL_EXTREMA', 1)
-        
+
         self.INTERP_METHOD = kwargs.get('INTERP_METHOD', 'RectBivariate')
         self.JDAY_REFERENCE = kwargs.get('JDAY_REFERENCE', 2448623.0)
-        
+
         # NOTE: '.copy()' suffix is essential here
         self.CONTOUR_PARAMETER = kwargs.get('CONTOUR_PARAMETER',
                                    np.arange(-100., 101, 1)).copy()
         self.INTERVAL = np.diff(self.CONTOUR_PARAMETER)[0]
         if 'Cyclonic' in SIGN_TYPE:
             self.CONTOUR_PARAMETER *= -1
-        
+
         self.SHAPE_ERROR = kwargs.get('SHAPE_ERROR',
                               np.full(self.CONTOUR_PARAMETER.size, 55.))
-        
+
         self.DAYS_BTWN_RECORDS = kwargs.get('DAYS_BTWN_RECORDS', 7.)
-        
+
         self.RADMIN = np.float64(kwargs.get('RADMIN', 0.4))
         self.RADMAX = np.float64(kwargs.get('RADMAX', 4.461))
         self.AMPMIN = np.float64(kwargs.get('AMPMIN', 1.))
         self.AMPMAX = np.float64(kwargs.get('AMPMAX', 150.))
-        
+
         self.EVOLVE_AMP_MIN = np.float64(kwargs.get('EVOLVE_AMP_MIN', 0.0005))
         self.EVOLVE_AMP_MAX = np.float64(kwargs.get('EVOLVE_AMP_MAX', 500))
         self.EVOLVE_AREA_MIN = np.float64(kwargs.get('EVOLVE_AREA_MIN', 0.0005))
         self.EVOLVE_AREA_MAX = np.float64(kwargs.get('EVOLVE_AREA_MAX', 500))
-        
-        
+
+
         self.AREA0 = np.pi * np.float64(kwargs.get('RAD0', 60000.))**2
         self.AMP0 = np.float64(kwargs.get('AMP0', 2.))
         self.DIST0 = np.float64(kwargs.get('DIST0', 25000.))
-        
+
         self.SAVE_FIGURES = kwargs.get('SAVE_FIGURES', False)
 
         self.VERBOSE = kwargs.get('VERBOSE', False)
-        
+
         self.M = grd.M
         self.points = np.array([grd.lon().ravel(),
                                 grd.lat().ravel()]).T
@@ -343,10 +335,10 @@ class TrackList (object):
         self.j0, self.j1 = grd.j0, grd.j1
         self.FILLVAL = grd.FILLVAL
         self.PRODUCT = grd.PRODUCT
-        
+
         self.sla = None
         self.slacopy = None
-        
+
         self.new_lon    = [] #np.array([])
         self.new_lat    = []
         self.new_radii_s = []
@@ -386,9 +378,9 @@ class TrackList (object):
         self.search_ellipse = None
         self.PIXEL_THRESHOLD = None
         # Check for a correct configuration
-        assert DATATYPE in ('ROMS', 'AVISO'), "".join(('Unknown string ',
-                                                 'in *DATATYPE* parameter'))
-    
+        assert DATATYPE in ('ROMS',
+                            'AVISO'), "".join(('Unknown string ',
+                                               'in *DATATYPE* parameter'))
 
     def __getstate__(self):
         """
@@ -401,11 +393,11 @@ class TrackList (object):
         for pop in pops:
             result.pop(pop)
         return result
-    
+
     def add_new_track(self, lon, lat, time, uavg, teke,
-            radius_s, radius_e, amplitude, temp=None, salt=None,
-            contour_e=None, contour_s=None, uavg_profile=None,
-            shape_error=None):
+                      radius_s, radius_e, amplitude, temp=None, salt=None,
+                      contour_e=None, contour_s=None, uavg_profile=None,
+                      shape_error=None):
         """
         Append a new 'track' object to the list
         """
@@ -416,21 +408,20 @@ class TrackList (object):
                                     contour_e, contour_s, uavg_profile,
                                     shape_error))
 
-
     def update_track(self, index, lon, lat, time, uavg, teke,
-             radius_s, radius_e, amplitude, temp=None, salt=None,
-             contour_e=None, contour_s=None, uavg_profile=None,
-             shape_error=None):
+                     radius_s, radius_e, amplitude, temp=None, salt=None,
+                     contour_e=None, contour_s=None, uavg_profile=None,
+                     shape_error=None):
         """
         Update a track at index
         """
-        self.tracklist[index].append_pos(lon, lat, time, uavg, teke,
-                         radius_s, radius_e, amplitude, temp=temp,
-                         salt=salt, contour_e=contour_e,
-                         contour_s=contour_s, uavg_profile=uavg_profile,
-                         shape_error=shape_error)
-    
-    
+        self.tracklist[index].append_pos(
+            lon, lat, time, uavg, teke,
+            radius_s, radius_e, amplitude, temp=temp,
+            salt=salt, contour_e=contour_e,
+            contour_s=contour_s, uavg_profile=uavg_profile,
+            shape_error=shape_error)
+
     def update_eddy_properties(self, properties):
         """
         Append new variable values to track arrays
@@ -457,8 +448,6 @@ class TrackList (object):
                                              properties.shape_error]
         return self
 
-
-
     def reset_holding_variables(self):
         """
         Reset temporary holding variables to empty arrays
@@ -481,7 +470,6 @@ class TrackList (object):
             self.new_shape_error_tmp = np.atleast_1d([])
         return
 
-
     def set_old_variables(self):
         """
         Pass all values at time k+1 to k
@@ -501,7 +489,6 @@ class TrackList (object):
             self.old_uavg_profile = list(self.new_uavg_profile_tmp)
             self.old_shape_error = np.atleast_1d([])
 
-
     def get_active_tracks(self, rtime):
         """
         Return list of indices to active tracks.
@@ -516,7 +503,6 @@ class TrackList (object):
                 active_tracks.append(i)
         return active_tracks
 
-
     def get_inactive_tracks(self, rtime):
         """
         Return list of indices to inactive tracks.
@@ -529,9 +515,6 @@ class TrackList (object):
                 inactive_tracks.append(i)
         return inactive_tracks
 
-
-        
-
     def create_netcdf(self, directory, savedir,
                       grd=None, Ymin=None, Ymax=None,
                       Mmin=None, Mmax=None, model=None,
@@ -542,37 +525,37 @@ class TrackList (object):
         if not self.TRACK_EXTRA_VARIABLES:
             self.savedir = savedir
         else:
-           self.savedir = savedir.replace('.nc', '_ARGO_enabled.nc')
+            self.savedir = savedir.replace('.nc', '_ARGO_enabled.nc')
         nc = Dataset(self.savedir, 'w', format='NETCDF4')
         nc.title = ''.join((self.SIGN_TYPE, ' eddy tracks'))
         nc.directory = directory
         nc.PRODUCT = self.PRODUCT
         nc.DAYS_BTWN_RECORDS = np.float64(self.DAYS_BTWN_RECORDS)
         nc.TRACK_DURATION_MIN = np.float64(self.TRACK_DURATION_MIN)
-        
+
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.Q_parameter_contours = self.qparameter
         elif 'SLA' in self.DIAGNOSTIC_TYPE:
             nc.CONTOUR_PARAMETER = self.CONTOUR_PARAMETER
             nc.SHAPE_ERROR = self.SHAPE_ERROR[0]
             nc.PIXEL_THRESHOLD = self.PIXEL_THRESHOLD
-        
+
         if self.SMOOTHING in locals():
             nc.SMOOTHING = np.str(self.SMOOTHING)
             nc.SMOOTH_FAC = np.float64(self.SMOOTH_FAC)
         else:
             nc.SMOOTHING = 'None'
-        
+
         nc.i0 = np.int32(self.i0)
         nc.i1 = np.int32(self.i1)
         nc.j0 = np.int32(self.j0)
         nc.j1 = np.int32(self.j1)
-        
+
         #nc.LONMIN = grd.LONMIN
         #nc.LONMAX = grd.LONMAX
         #nc.LATMIN = grd.LATMIN
         #nc.LATMAX = grd.LATMAX
-        
+
         if 'ROMS' in self.DATATYPE:
             nc.ROMS_grid = grd.grdfile
             nc.model = model
@@ -581,31 +564,31 @@ class TrackList (object):
             nc.Mmin = np.int32(Mmin)
             nc.Mmax = np.int32(Mmax)
             nc.sigma_lev_index = np.int32(sigma_lev)
-            
+
             if 'ip_roms' in model:
                 nc.rho_ntr = rho_ntr
-        
+
         nc.EVOLVE_AMP_MIN = self.EVOLVE_AMP_MIN
         nc.EVOLVE_AMP_MAX = self.EVOLVE_AMP_MAX
         nc.EVOLVE_AREA_MIN = self.EVOLVE_AREA_MIN
         nc.EVOLVE_AREA_MAX = self.EVOLVE_AREA_MAX
-        
-        # Create dimensions     
+
+        # Create dimensions
         nc.createDimension('Nobs', None)#len(Eddy.tracklist))
         #nc.createDimension('time', None) #len(maxlen(ocean_time)))
         #nc.createDimension('four', 4)
-        
-        # Create variables     
+
+        # Create variables
         nc.createVariable('track', np.int32, ('Nobs'), fill_value=self.FILLVAL)   
         nc.createVariable('n', np.int32, ('Nobs'), fill_value=self.FILLVAL)  
-        
+
         # Use of jday should depend on clim vs interann
         if self.INTERANNUAL: # AVISO or INTERANNUAL ROMS solution
             nc.createVariable('j1', np.int32, ('Nobs'), fill_value=self.FILLVAL)
-        
+
         else: # climatological ROMS solution
             nc.createVariable('ocean_time', 'f8', ('Nobs'), fill_value=self.FILLVAL)
-        
+
         nc.createVariable('cyc', np.int32, ('Nobs'), fill_value=self.FILLVAL)
         nc.createVariable('lon', 'f4', ('Nobs'), fill_value=self.FILLVAL)
         nc.createVariable('lat', 'f4', ('Nobs'), fill_value=self.FILLVAL)
@@ -614,28 +597,28 @@ class TrackList (object):
         nc.createVariable('U', 'f4', ('Nobs'), fill_value=self.FILLVAL)
         nc.createVariable('Teke', 'f4', ('Nobs'), fill_value=self.FILLVAL)
         nc.createVariable('radius_e', 'f4', ('Nobs'), fill_value=self.FILLVAL)
-        
+
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.createVariable('qparameter', 'f4', ('Nobs'), fill_value=self.FILLVAL)
-        
+
         if 'ROMS' in self.DATATYPE:
             nc.createVariable('temp', 'f4', ('Nobs'), fill_value=self.FILLVAL)
             nc.createVariable('salt', 'f4', ('Nobs'), fill_value=self.FILLVAL)
-            
+
         #nc.createVariable('eddy_duration', np.int16, ('Nobs'), fill_value=self.FILLVAL)
-        
+
         # Meta data for variables
         nc.variables['track'].units = 'ordinal'
         nc.variables['track'].min_val = np.int32(0)
         nc.variables['track'].max_val = np.int32(0)
         nc.variables['track'].long_name = 'track number'
         nc.variables['track'].description = 'eddy identification number'
-        
+
         nc.variables['n'].units = 'ordinal'
         nc.variables['n'].long_name = 'observation number'
         # Add option here to set length of intervals.....
         nc.variables['n'].description = 'observation sequence number (XX day intervals)'
-        
+
         ## Use of jday should depend on clim vs interann
         if self.INTERANNUAL: # AVISO or INTERANNUAL ROMS solution
             nc.variables['j1'].units = 'days'
@@ -644,18 +627,18 @@ class TrackList (object):
             nc.variables['j1'].reference = self.JDAY_REFERENCE
             nc.variables['j1'].reference_description = "".join(('Julian '
                 'date on Jan 1, 1992'))
-        
+
         else: # climatological ROMS solution
             nc.variables['ocean_time'].units = 'ROMS ocean_time (seconds)'
-        
+
         #nc.variables['eddy_duration'].units = 'days'
         nc.variables['cyc'].units = 'boolean'
         nc.variables['cyc'].min_val = -1
         nc.variables['cyc'].max_val = 1
         nc.variables['cyc'].long_name = 'cyclonic'
         nc.variables['cyc'].description = 'cyclonic -1; anti-cyclonic +1'
-        
-        
+
+
         #nc.variables['eddy_duration'].units = 'days'
         nc.variables['lon'].units = 'deg. longitude'
         nc.variables['lon'].min_val = self.LONMIN
@@ -666,10 +649,10 @@ class TrackList (object):
 
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.variables['A'].units = 'None, normalised vorticity (abs(xi)/f)'
-        
+
         elif 'SLA' in self.DIAGNOSTIC_TYPE:
             nc.variables['A'].units = 'cm'
-        
+
         nc.variables['A'].min_val = self.AMPMIN
         nc.variables['A'].max_val = self.AMPMAX
         nc.variables['A'].long_name = 'amplitude'
@@ -683,7 +666,7 @@ class TrackList (object):
         nc.variables['L'].description = "".join(('radius of a circle whose ',
             'area is equal to that enclosed by the contour of maximum ',
             'circum-average speed'))
-        
+
         nc.variables['U'].units = 'cm/sec'
         #nc.variables['U'].min = 0.
         #nc.variables['U'].max = 376.6
@@ -696,23 +679,23 @@ class TrackList (object):
         nc.variables['Teke'].long_name = 'sum EKE within contour Ceff'
         nc.variables['Teke'].description = "".join(('sum of eddy kinetic ',
             'energy within contour defining the effective radius'))
-        
+
         nc.variables['radius_e'].units = 'km'
         nc.variables['radius_e'].min_val = self.RADMIN / 1000.
         nc.variables['radius_e'].max_val = self.RADMAX / 1000.
         nc.variables['radius_e'].long_name = 'effective radius scale'
         nc.variables['radius_e'].description = 'effective eddy radius'
-        
-        
+
+
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.variables['qparameter'].units = 's^{-2}'
 
         if 'ROMS' in self.DATATYPE:
             nc.variables['temp'].units = 'deg. C'
             nc.variables['salt'].units = 'psu'
-        
+
         if self.TRACK_EXTRA_VARIABLES:
-            
+
             nc.createDimension('contour_points', None)
             nc.createDimension('uavg_contour_count',
                 np.int(self.slaparameter.size * 0.333))
@@ -724,7 +707,7 @@ class TrackList (object):
                 ('uavg_contour_count','Nobs'), fill_value=self.FILLVAL)
             nc.createVariable('shape_error', 'f4',
                 ('Nobs'), fill_value=self.FILLVAL)
-            
+
             nc.variables['contour_e'].long_name = "".join(('positions of ',
                 'effective contour points'))
             nc.variables['contour_e'].description = "".join(('lons/lats of ',
@@ -740,10 +723,8 @@ class TrackList (object):
                 'values from effective contour inwards to ',
                 'smallest inner contour (pixel == 1)'))
             nc.variables['shape_error'].units = '%'
-        
-        nc.close()
-        
 
+        nc.close()
 
     def _reduce_inactive_tracks(self):
         """
@@ -768,30 +749,29 @@ class TrackList (object):
                     track.uavg_profile = []
                     track.shape_error = []
         return
-    
-    
+
     def write2netcdf(self, rtime):
         """
         Write inactive tracks to netcdf file.
-        'ncind' is important because prevents writing of 
+        'ncind' is important because prevents writing of
         already written tracks.
         Each inactive track is 'emptied' after saving
         """
         tracks2save = np.array([self.get_inactive_tracks(rtime)])
         DBR = self.DAYS_BTWN_RECORDS
-        
+
         if np.any(tracks2save): # Note, this could break if all eddies become inactive at same time
-            
+
             with Dataset(self.savedir, 'a') as nc:
-                
+
                 for i in np.nditer(tracks2save):
 
                     # saved2nc is a flag indicating if track[i] has been saved
                     if (not self.tracklist[i].saved2nc) and \
                        (np.all(self.tracklist[i].ocean_time)):
-     
+
                         tsize = len(self.tracklist[i].lon)
-                        
+
                         if (tsize >= self.TRACK_DURATION_MIN / DBR) and tsize > 1.:
                             lon = np.array([self.tracklist[i].lon])
                             lat = np.array([self.tracklist[i].lat])
@@ -811,7 +791,7 @@ class TrackList (object):
                             #print self.tracklist[i].ocean_time
                             #exit()
                             #eddy_duration = np.array([self.tracklist[i].ocean_time]).ptp()
-                            
+
                             tend = self.ncind + tsize
                             nc.variables['cyc'][self.ncind:tend] = cyc
                             nc.variables['lon'][self.ncind:tend] = lon
@@ -825,28 +805,28 @@ class TrackList (object):
                             nc.variables['track'][self.ncind:tend] = track
                             nc.variables['track'].max_val = track_max_val
                             #nc.variables['eddy_duration'][self.ncind:tend] = eddy_duration
-                            
+
                             if 'ROMS' in self.DATATYPE:
                                 temp = np.array([self.tracklist[i].temp])
                                 salt = np.array([self.tracklist[i].salt])
-                                
+
                                 nc.variables['temp'][self.ncind:tend] = temp
                                 nc.variables['salt'][self.ncind:tend] = salt
-                                
+
                             if self.INTERANNUAL:
                                 # We add 1 because 'j1' is an integer in ncsavefile; julian day midnight has .5
                                 # i.e., dt.julian2num(2448909.5) -> 727485.0
                                 j1 = dt.num2julian(np.array([self.tracklist[i].ocean_time])) + 1
                                 nc.variables['j1'][self.ncind:tend] = j1
-                            
+
                             else:
                                 ocean_time = np.array([self.tracklist[i].ocean_time])
                                 nc.variables['ocean_time'][self.ncind:tend] = ocean_time
-                            
+
                             if self.TRACK_EXTRA_VARIABLES:
                                 shape_error = np.array([self.tracklist[i].shape_error])
                                 nc.variables['shape_error'][self.ncind:tend] = shape_error
-                                
+
                                 for j in np.arange(tend - self.ncind):
                                     jj = j + self.ncind
                                     contour_e_arr = np.array([self.tracklist[i].contour_e[j]]).ravel()
@@ -855,28 +835,28 @@ class TrackList (object):
                                     nc.variables['contour_e'][:contour_e_arr.size, jj] = contour_e_arr
                                     nc.variables['contour_s'][:contour_s_arr.size, jj] = contour_s_arr
                                     nc.variables['uavg_profile'][:uavg_profile_arr.size, jj] = uavg_profile_arr
-                        
+
                             # Flag indicating track[i] is now saved
                             self.tracklist[i].saved2nc = True
                             self.ncind += tsize
                             self.ch_index += 1
                             nc.sync()
-        
+
         # Get index to first currently active track
         try:
             lasti = self.get_active_tracks(rtime)[0]
-        
+
         except Exception:
             lasti = None
-        
+
         # Clip the tracklist,
         # removes all dead tracks preceding first currently active track
         self.tracklist = self.tracklist[lasti:]
         self.index = len(self.tracklist) # adjust index accordingly
-        
+
         # Remove inactive tracks
         self._reduce_inactive_tracks()
-        
+
         # Update old_lon and old_lat...
         self.old_lon = self.new_lon[lasti:]
         self.old_lat = self.new_lat[lasti:]
@@ -885,7 +865,7 @@ class TrackList (object):
         self.old_amp = self.new_amp[lasti:]
         self.old_uavg = self.new_uavg[lasti:]
         self.old_teke = self.new_teke[lasti:]
-        
+
         self.new_lon = []
         self.new_lat = []
         self.new_radii_s = []
@@ -894,30 +874,26 @@ class TrackList (object):
         self.new_uavg = []
         self.new_teke = []
         self.new_time = []
-        
+
         if 'ROMS' in self.DATATYPE:
             self.old_temp = self.new_temp[lasti:]
             self.old_salt = self.new_salt[lasti:]
-            
+
             self.new_temp = []
             self.new_salt = []
-        
+
         if self.TRACK_EXTRA_VARIABLES:
             self.old_contour_e = list(self.new_contour_e[lasti:])
             self.old_contour_s = list(self.new_contour_s[lasti:])
             self.old_uavg_profile = list(self.new_uavg_profile[lasti:])
             self.old_shape_error = self.new_shape_error[lasti:]
-            
+
             self.new_contour_e = []
             self.new_contour_s = []
             self.new_uavg_profile = []
             self.new_shape_error = []
-            
+
         return self
-        
-        
-
-
 
     def insert_at_index(self, xarr, ind, x):
         """
@@ -929,7 +905,7 @@ class TrackList (object):
             x = x[0]
         except Exception:
             pass
-        
+
         val = getattr(self, xarr)
         try:
             val[ind] = x
@@ -937,12 +913,7 @@ class TrackList (object):
             val.extend([0] * (ind - len(val) + 1))
             val[ind] = x
         setattr(self, xarr, val)
-        
-        
 
-    
-
-    
     def set_bounds(self, contlon, contlat, grd):
         """
         Get indices to a bounding box around the eddy
@@ -954,20 +925,19 @@ class TrackList (object):
         tl_i, tl_j = nearest(lonmin, latmax, grd.lon(), grd.lat(), grd.shape)
         br_i, br_j = nearest(lonmax, latmin, grd.lon(), grd.lat(), grd.shape)
         tr_i, tr_j = nearest(lonmax, latmax, grd.lon(), grd.lat(), grd.shape)
-        
+
         iarr = np.array([bl_i, tl_i, br_i, tr_i])
         jarr = np.array([bl_j, tl_j, br_j, tr_j])
         self.imin, self.imax = iarr.min(), iarr.max()
         self.jmin, self.jmax = jarr.min(), jarr.max()
-        
+
         # For indexing the mins must not be less than zero
         self.imin = np.maximum(self.imin - self.PAD, 0)
         self.jmin = np.maximum(self.jmin - self.PAD, 0)
         self.imax += self.PAD + 1
         self.jmax += self.PAD + 1
         return self
-    
-    
+
     def set_mask_eff(self, contour, grd):
         """
         Set points within bounding box around eddy and calculate
@@ -981,18 +951,16 @@ class TrackList (object):
         self.mask_eff_1d = contour.contains_points(self.points)
         self.mask_eff_sum = self.mask_eff_1d.sum()
         return self
-    
-    
+
     def reshape_mask_eff(self, grd):
         """
         """
         shape = grd.lon()[self.jmin:self.jmax, self.imin:self.imax].shape
         self.mask_eff = self.mask_eff_1d.reshape(shape)
 
-        
-        
+
 class RossbyWaveSpeed (object):
-  
+
     def __init__(self, THE_DOMAIN, grd, RW_PATH=None):
         """
         Instantiate the RossbyWaveSpeed object
@@ -1019,8 +987,7 @@ class RossbyWaveSpeed (object):
         self.beta = np.empty(1)
         self.r_spd_long = np.empty(1)
         self.start = True
-    
-    
+
     def __getstate__(self):
         """
         Needed for Pickle
@@ -1029,36 +996,34 @@ class RossbyWaveSpeed (object):
         result.pop('_tree')
         return result
 
-    
     def __setstate__(self, thedict):
         """
         Needed for Pickle
         """
         self.__dict__ = thedict
         self._make_kdtree()
-        
-        
+
     def get_rwdistance(self, xpt, ypt, DAYS_BTWN_RECORDS):
         """
         Return the distance required by SearchEllipse
         to construct a search ellipse for eddy tracking.
         """
         if self.THE_DOMAIN in ('Global', 'Regional', 'ROMS'):
-	    #print 'xpt, ypt', xpt, ypt
+            #print 'xpt, ypt', xpt, ypt
             self.distance[:] = self._get_rlongwave_spd(xpt, ypt)
             self.distance *= 86400.
             #if self.THE_DOMAIN in 'ROMS':
                 #self.distance *= 1.5
-        
+
         elif 'BlackSea' in self.THE_DOMAIN:
-            self.distance[:] = 15000. # e.g., Blokhina & Afanasyev, 2003
-        
+            self.distance[:] = 15000.  # e.g., Blokhina & Afanasyev, 2003
+
         elif 'MedSea' in self.THE_DOMAIN:
             self.distance[:] = 20000.
-        
+
         else:
-            Exception # Unknown THE_DOMAIN
-        
+            Exception  # Unknown THE_DOMAIN
+
         if self.start:
             lon, lat = self.M.projtran(xpt, ypt, inverse=True)
             lon, lat = np.round(lon, 2), np.round(lat, 2)
@@ -1070,7 +1035,7 @@ class RossbyWaveSpeed (object):
                 lat = "".join((str(lat), 'S'))
             elif lat >= 0:
                 lat = "".join((str(lat), 'N'))
-            
+
             print "".join(('--------- setting ellipse for first tracked ',
                            'eddy at %s, %s in the %s domain'
                             % (lon, lat, self.THE_DOMAIN)))
@@ -1078,23 +1043,22 @@ class RossbyWaveSpeed (object):
             print "".join(('--------- with extratropical long baroclinic ',
                            'Rossby wave phase speed of %s m/s' % c))
             self.start = False
-        
+
         self.distance = np.abs(self.distance)
         return self.distance * DAYS_BTWN_RECORDS
-    
-    
+
     def _make_subset(self):
         """
         Make a subset of _defrad data over the domain.
         If 'Global' is defined then widen the domain.
         """
-        pad = 1.5 # degrees
+        pad = 1.5  # degrees
         LONMIN, LONMAX, LATMIN, LATMAX = self.limits
         if self.ZERO_CROSSING:
-             ieast, iwest = (((self._lon + 360.) <= LONMAX + pad),
-                                      (self._lon > LONMIN + pad))
-             self._lon[ieast] += 360.
-             lloi = iwest + ieast
+            ieast, iwest = (((self._lon + 360.) <= LONMAX + pad),
+                            (self._lon > LONMIN + pad))
+            self._lon[ieast] += 360.
+            lloi = iwest + ieast
         else:
             lloi = np.logical_and(self._lon >= LONMIN - pad,
                                   self._lon <= LONMAX + pad)
@@ -1103,17 +1067,16 @@ class RossbyWaveSpeed (object):
         self._lon = self._lon[lloi]
         self._lat = self._lat[lloi]
         self._defrad = self._defrad[lloi]
-        
+
         if 'Global' in self.THE_DOMAIN:
             lloi = self._lon > 260.
             self._lon = np.append(self._lon, self._lon[lloi] - 360.)
             self._lat = np.append(self._lat, self._lat[lloi])
             self._defrad = np.append(self._defrad, self._defrad[lloi])
-        
+
         self.x, self.y = self.M(self._lon, self._lat)
         return self
-    
-    
+
     def _make_kdtree(self):
         """
         Compute KDE tree for nearest indices.
@@ -1121,8 +1084,7 @@ class RossbyWaveSpeed (object):
         points = np.vstack([self.x, self.y]).T
         self._tree = spatial.cKDTree(points)
         return self
-    
-    
+
     def _get_defrad(self, xpt, ypt):
         """
         Get a point average of the deformation radius
@@ -1133,24 +1095,22 @@ class RossbyWaveSpeed (object):
         self._weights = weights
         self.i = i
         return np.average(self._defrad[i], weights=weights)
-    
-    
+
     def _get_rlongwave_spd(self, xpt, ypt):
         """
         Get the longwave phase speed, see Chelton etal (1998) pg 446:
           c = -beta * defrad**2 (this only for extratropical waves...)
         """
         self.r_spd_long[:] = self._get_defrad(xpt, ypt)
-        self.r_spd_long *= 1000. # km to m
+        self.r_spd_long *= 1000.  # km to m
         self.r_spd_long **= 2
         self.beta[:] = np.average(self._lat[self.i],
-                                  weights=self._weights) # lat
+                                  weights=self._weights)  # lat
         self.beta[:] = np.cos(np.deg2rad(self.beta))
-        self.beta *= 1458e-7 # 1458e-7 ~ (2 * 7.29*10**-5)
+        self.beta *= 1458e-7  # 1458e-7 ~ (2 * 7.29*10**-5)
         self.beta /= self.EARTH_RADIUS
         self.r_spd_long *= -self.beta
         return self.r_spd_long
-    
 
     def view_grid_subset(self):
         """
@@ -1180,17 +1140,17 @@ class SearchEllipse (object):
         """
         Set the constant dimensions of the search ellipse.
         Instantiate a RossbyWaveSpeed object
-        
+
         Arguments:
-          
+
           *THE_DOMAIN*: string
             Refers to THE_DOMAIN specified in yaml configuration file
-          
+
           *grd*: An AvisoGrid or RomsGrid object.
-          
+
           *DAYS_BTWN_RECORDS*: integer
             Constant defined in yaml configuration file.
-          
+
           *RW_PATH*: string
             Path to rossrad.dat file, specified in yaml configuration file.
         """
@@ -1204,28 +1164,25 @@ class SearchEllipse (object):
         self.rw_c = np.empty(1)
         self.rw_c_mod = np.empty(1)
         self.rw_c_fac = 1.75
-    
-    
+
     def _set_east_ellipse(self):
         """
         The *east_ellipse* is a full ellipse, but only its eastern
         part is used to build the search ellipse.
         """
         self.east_ellipse = patch.Ellipse((self.xpt, self.ypt),
-                                           self.e_w_major, self.n_s_minor)
+                                          self.e_w_major, self.n_s_minor)
         return self
-    
-    
+
     def _set_west_ellipse(self):
         """
         The *west_ellipse* is a full ellipse, but only its western
         part is used to build the search ellipse.
         """
         self.west_ellipse = patch.Ellipse((self.xpt, self.ypt),
-                                           self.rw_c_mod, self.n_s_minor)
+                                          self.rw_c_mod, self.n_s_minor)
         return self
-    
-    
+
     def _set_global_ellipse(self):
         """
         Set a Path object *ellipse_path* built from the eastern vertices of
@@ -1241,8 +1198,7 @@ class SearchEllipse (object):
         ew_x = np.hstack((e_verts[e_size:, 0], w_verts[:w_size, 0]))
         ew_y = np.hstack((e_verts[e_size:, 1], w_verts[:w_size, 1]))
         self.ellipse_path = path.Path(np.array([ew_x, ew_y]).T)
-    
-    
+
     def _set_black_sea_ellipse(self):
         """
         Set *ellipse_path* for the *black_sea_ellipse*.
@@ -1253,22 +1209,21 @@ class SearchEllipse (object):
         self.ellipse_path = path.Path(np.array([verts[:, 0],
                                                 verts[:, 1]]).T)
         return self
-    
-    
+
     def set_search_ellipse(self, xpt, ypt):
         """
         Set the search ellipse around a point.
-        
+
         args:
 
             *xpt*: lon coordinate (Basemap projection)
-            
+
             *ypt*: lat coordinate (Basemap projection)
 
         """
         self.xpt = xpt
         self.ypt = ypt
-        
+
         if self.THE_DOMAIN in ('Global', 'Regional', 'ROMS'):
             self.rw_c[:] = self.rwv.get_rwdistance(xpt, ypt,
                                   self.DAYS_BTWN_RECORDS)
@@ -1278,20 +1233,19 @@ class SearchEllipse (object):
                                          self.semi_n_s_minor]).max()
             self.rw_c_mod *= 2.
             self._set_global_ellipse()
-        
+
         elif 'BlackSea' in self.THE_DOMAIN:
             self.rw_c_mod[:] = 1.75
             self.rw_c[:] = self.rwv.get_rwdistance(x, y,
                                    self.DAYS_BTWN_RECORDS)
             self.rw_c_mod *= self.rw_c
             self._set_black_sea_ellipse()
-        
+
         else:
             Exception
-        
+
         return self
-    
-    
+
     def view_search_ellipse(self, Eddy):
         """
         Input A_eddy or C_eddy
@@ -1309,9 +1263,7 @@ class SearchEllipse (object):
         Eddy.M.drawmeridians(np.arange(-360, 360. + stride, stride),
                              labels=[0, 0, 0, 1], ax=ax)
         plt.show()
-    
-    
-    
+
 """
 def pickle_track(track_list, file):
     file = open(file, 'wb')
@@ -1334,40 +1286,29 @@ if __name__ == '__main__':
     lat_ini = 25.
     time_ini = 247893
     index = 0
-    
+
     trackA = track_list(index, lon_ini, lat_ini, time_ini, 0, 0)
     print 'trackA lon:', trackA.tracklist[0].lon
-    
+
     # update track 0
     trackA.update_track(0, -22, 34, 333344, 0, 0)
     trackA.update_track(0, -87, 37, 443344, 0, 0)
     trackA.update_track(0, -57, 57, 543344, 0, 0)
     print 'trackA lon:', trackA.tracklist[0].lon
-    
+
     # start a new track
     trackA.append_list(-33, 45, 57435, 0, 0)
     print '\ntrackA lat:', trackA.tracklist[1].lat
-    
+
     trackA.update_track(1, -32, 32, 4453344, 0, 0)
     print 'trackA lat:', trackA.tracklist[1].lat
-    
-    
+
     # Pickle
     output = open('data.pkl', 'wb')
     pickle.dump(trackA, output)
     output.close()
-    
+
     # Unpickle
     pkl_file = open('data.pkl', 'rb')
     data1 = pickle.load(pkl_file)
     pkl_file.close()
-
-
-
-
-
-
-
-
-
-

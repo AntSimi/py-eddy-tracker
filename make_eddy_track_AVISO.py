@@ -66,11 +66,11 @@ def timeit(method):
 class PyEddyTracker (object):
     """
     Base object
-    
+
     Methods defined here are grouped into categories based on input data
     source, i.e., AVISO, ROMS, etc.  To introduce a new data source new methods
     can be introduced here.
-    
+
     METHODS:
       Common: read_nc
               read_nc_att
@@ -80,12 +80,12 @@ class PyEddyTracker (object):
               half_interp
       AVISO:  get_AVISO_f_pm_pn
       ROMS:   get_ROMS_f_pm_pn
-    
+
     """
     def __init__(self):
         """
         Set some constants
-          
+
           *ZERO_CROSSING*:
             Boolean, *True* if THE_DOMAIN crosses 0 degree meridian
         """
@@ -115,7 +115,6 @@ class PyEddyTracker (object):
         self._umask = None
         self._vmask = None
 
-    
     def read_nc(self, varfile, varname, indices="[:]"):
         """
         Read data from nectdf file
@@ -130,7 +129,6 @@ class PyEddyTracker (object):
             else:
                 return var
 
-
     def read_nc_att(self, varfile, varname, att):
         """
         Read data attribute from nectdf file
@@ -140,7 +138,6 @@ class PyEddyTracker (object):
         with Dataset(varfile) as nc:
             return eval(''.join(("nc.variables[varname].", att)))
 
-
     def set_initial_indices(self, LONMIN, LONMAX, LATMIN, LATMAX):
         """
         Get indices for desired domain
@@ -148,14 +145,14 @@ class PyEddyTracker (object):
         print '--- Setting initial indices to *%s* domain' % self.THE_DOMAIN
         print '------ LONMIN = %s, LONMAX = %s, LATMIN = %s, LATMAX = %s' % (
                                            LONMIN, LONMAX, LATMIN, LATMAX)
-        self.i0, junk = self.nearest_point(LONMIN, 
-                                           LATMIN + 0.5 * (LATMAX - LATMIN))
-        self.i1, junk = self.nearest_point(LONMAX,
-                                           LATMIN + 0.5 * (LATMAX - LATMIN))
-        junk, self.j0 = self.nearest_point(LONMIN + 0.5 * (LONMAX - LONMIN),
-                                                                     LATMIN)
-        junk, self.j1 = self.nearest_point(LONMIN + 0.5 * (LONMAX - LONMIN),
-                                                                     LATMAX)
+        self.i0, _ = self.nearest_point(LONMIN, 
+                                        LATMIN + 0.5 * (LATMAX - LATMIN))
+        self.i1, _ = self.nearest_point(LONMAX,
+                                        LATMIN + 0.5 * (LATMAX - LATMIN))
+        _, self.j0 = self.nearest_point(LONMIN + 0.5 * (LONMAX - LONMIN),
+                                        LATMIN)
+        _, self.j1 = self.nearest_point(LONMIN + 0.5 * (LONMAX - LONMIN),
+                                        LATMAX)
 
         def kdt(lon, lat, limits, k=4):
             ppoints = np.array([lon.ravel(), lat.ravel()]).T
@@ -169,7 +166,7 @@ class PyEddyTracker (object):
             return iind, jind
 
         if 'AvisoGrid' in self.__class__.__name__:
-            
+
             if self.ZERO_CROSSING is True:
                 """
                 Used for a zero crossing, e.g., across Agulhas region
@@ -191,9 +188,8 @@ class PyEddyTracker (object):
                 limits = half_limits(lon, lat)
                 iind, jind = kdt(self._lon, self._lat, limits)
                 self.i0 = iind.max()
-        
-        return self
 
+        return self
 
     def set_index_padding(self, pad=2):
         """
@@ -202,9 +198,9 @@ class PyEddyTracker (object):
         Padded matrices are needed only for geostrophic velocity computation.
         """
         print '--- Setting padding indices with PAD = %s' % pad
-        
+
         self.pad = pad
-        
+
         def get_str(thestr, pad):
             """
             Get start indices for pad
@@ -219,7 +215,7 @@ class PyEddyTracker (object):
             else:
                 unpad_str = np.array([0, np.diff([pad_str, thestr])]).min()
                 return pad_str, -1 * unpad_str
-    
+
         def get_end(theend, shape, pad):
             """
             Get end indices for pad
@@ -244,7 +240,7 @@ class PyEddyTracker (object):
                 return pad_end, unpad_end
             else:
                 return pad_end, -1 * unpad_end
-        
+
         self.jp0, self.jup0 = get_str(self.j0, pad)
         self.jp1, self.jup1 = get_end(self.j1, self._lon.shape[0], pad)
         if self.ZERO_CROSSING:
@@ -252,8 +248,6 @@ class PyEddyTracker (object):
         self.ip0, self.iup0 = get_str(self.i0, pad)
         self.ip1, self.iup1 = get_end(self.i1, self._lon.shape[1], pad)
         return self
-
-
 
     def haversine_dist(self, lon1, lat1, lon2, lat2):
         """
@@ -276,19 +270,16 @@ class PyEddyTracker (object):
         a *= np.cos(lat1) * np.cos(lat2)
         a += (np.sin(0.5 * dlat))**2
         c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-        return 6371315.0 * c # Return the distance
-
-
+        return 6371315.0 * c  # Return the distance
 
     def nearest_point(self, lon, lat):
         """
         Get indices to a point (lon, lat) in the grid
         """
         i, j = eddy_tracker.nearest(lon, lat, self._lon, self._lat,
-                                                    self._lon.shape)
+                                    self._lon.shape)
         return i, j
-    
-    
+
     def half_interp(self, h_one, h_two):
         """
         Speed up frequent operations of type 0.5 * (arr[:-1] + arr[1:])
@@ -297,11 +288,10 @@ class PyEddyTracker (object):
         h_one *= 0.5
         return h_one
 
-
     def get_AVISO_f_pm_pn(self):
         """
         Padded matrices are used here because Coriolis (f), pm and pn
-        are needed for the geostrophic velocity computation in 
+        are needed for the geostrophic velocity computation in
         method getSurfGeostrVel()
         NOTE: this should serve for ROMS too
         """
@@ -313,7 +303,7 @@ class PyEddyTracker (object):
         self._gof /= 86400.
         self._f = self._gof.copy()
         self._gof = self.GRAVITY / self._gof
-        
+
         lonu = self.half_interp(self.lonpad()[:, :-1], self.lonpad()[:, 1:])
         latu = self.half_interp(self.latpad()[:, :-1], self.latpad()[:, 1:])
         lonv = self.half_interp(self.lonpad()[:-1], self.lonpad()[1:])
@@ -322,12 +312,12 @@ class PyEddyTracker (object):
         # Get pm and pn
         pm = np.zeros_like(self.lonpad())
         pm[:, 1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
-                                         lonu[:, 1:],  latu[:, 1:])
+                                          lonu[:, 1:],  latu[:, 1:])
         pm[:, 0] = pm[:, 1]
         pm[:, -1] = pm[:, -2]
         self._dx = pm
         self._pm = np.reciprocal(pm)
-                
+
         pn = np.zeros_like(self.lonpad())
         pn[1:-1] = self.haversine_dist(lonv[:-1], latv[:-1],
                                        lonv[1:],  latv[1:])
@@ -337,14 +327,13 @@ class PyEddyTracker (object):
         self._pn = np.reciprocal(pn)
         return self
 
-
     def u2rho_2d(self, uu_in):
         """
         Convert a 2D field at u points to a field at rho points
         """
         def uu2ur(uu_in, mp, lp):
             l = lp - 1
-            lm = l  - 1
+            lm = l - 1
             u_out = np.zeros((mp, lp))
             u_out[:, 1:l] = self.half_interp(uu_in[:, 0:lm], uu_in[:, 1:l])
             u_out[:, 0] = u_out[:, 1]
@@ -353,12 +342,11 @@ class PyEddyTracker (object):
         mshp, lshp = uu_in.shape
         return uu2ur(uu_in, mshp, lshp + 1)
 
-
     def v2rho_2d(self, vv_in):
         # Convert a 2D field at v points to a field at rho points
         def vv2vr(vv_in, mp, lp):
             m = mp - 1
-            mm = m  - 1
+            mm = m - 1
             v_out = np.zeros((mp, lp))
             v_out[1:m] = self.half_interp(vv_in[:mm], vv_in[1:m])
             v_out[0] = v_out[1]
@@ -366,7 +354,6 @@ class PyEddyTracker (object):
             return (v_out.squeeze())
         mshp, lshp = vv_in.shape
         return vv2vr(vv_in, mshp + 1, lshp)
-
 
     def rho2u_2d(self, rho_in):
         """
@@ -381,7 +368,6 @@ class PyEddyTracker (object):
         mshp, lshp = rho_in.shape
         return _r2u(rho_in, rho_in.shape[1])
 
-
     def rho2v_2d(self, rho_in):
         """
         Convert a 2D field at rho points to a field at v points
@@ -393,7 +379,6 @@ class PyEddyTracker (object):
             return v_out.squeeze()
         assert rho_in.ndim == 2, 'rho_in must be 2d'
         return _r2v(rho_in, rho_in.shape[0])
-
 
     def uvmask(self):
         """
@@ -407,7 +392,6 @@ class PyEddyTracker (object):
         self._vmask = self.mask[:m] * self.mask[1:mp]
         return self
 
-
     def set_basemap(self, with_pad=True):
         """
         Use Basemap to make a landmask
@@ -415,11 +399,12 @@ class PyEddyTracker (object):
         """
         print '--- Computing Basemap'
         # Create Basemap instance for Mercator projection.
-        self.M = Basemap(projection='merc',
-            llcrnrlon = self.LONMIN - 1, urcrnrlon = self.LONMAX + 1,
-            llcrnrlat = self.LATMIN - 1, urcrnrlat = self.LATMAX + 1,
-            lat_ts = 0.5 * (self.LATMIN + self.LATMAX), resolution = 'h')
-        
+        self.M = Basemap(
+            projection='merc',
+            llcrnrlon=self.LONMIN - 1, urcrnrlon=self.LONMAX + 1,
+            llcrnrlat=self.LATMIN - 1, urcrnrlat=self.LATMAX + 1,
+            lat_ts=0.5 * (self.LATMIN + self.LATMAX), resolution='h')
+
         if with_pad:
             x, y = self.M(self.lonpad(), self.latpad())
         else:
@@ -427,8 +412,6 @@ class PyEddyTracker (object):
         self.Mx, self.My = x, y
         return self
 
-        
-    
     #@timeit
     def set_geostrophic_velocity(self, zeta):
         """
@@ -437,23 +420,22 @@ class PyEddyTracker (object):
         Note: output at rho points
         """
         gof = self.gof().view()
-        
+
         vmask = self.vmask().view()
         zeta1, zeta2 = zeta.data[1:].view(), zeta.data[:-1].view()
         pn1, pn2 = self.pn()[1:].view(), self.pn()[:-1].view()
         self.upad[:] = self.v2rho_2d(vmask * (zeta1 - zeta2) *
-                                                0.5 * (pn1 + pn2))
+                                     0.5 * (pn1 + pn2))
         self.upad *= -gof
-        
+
         umask = self.umask().view()
         zeta1, zeta2 = zeta.data[:, 1:].view(), zeta.data[:, :-1].view()
         pm1, pm2 = self.pm()[:, 1:].view(), self.pm()[:, :-1].view()
         self.vpad[:] = self.u2rho_2d(umask * (zeta1 - zeta2) *
-                                                0.5 * (pm1 + pm2))
+                                     0.5 * (pm1 + pm2))
         self.vpad *= gof
         return self
 
-        
     #@timeit
     def set_u_v_eke(self, pad=2):
         """
@@ -471,8 +453,7 @@ class PyEddyTracker (object):
         self.u = np.empty_like(self.eke)
         self.v = np.empty_like(self.eke)
         return self
-    
-    
+
     def getEKE(self):
         """
         Set EKE; also sets u/v from upad/vpad
@@ -484,14 +465,13 @@ class PyEddyTracker (object):
         return self
 
 
-
 class AvisoGrid (PyEddyTracker):
     """
     Class to satisfy the need of the eddy tracker
     to have a grid class
     """
     def __init__(self, AVISO_FILE, THE_DOMAIN, PRODUCT,
-                       LONMIN, LONMAX, LATMIN, LATMAX, with_pad=True):
+                 LONMIN, LONMAX, LATMIN, LATMAX, with_pad=True):
         """
         Initialise the grid object
         """
@@ -503,21 +483,21 @@ class AvisoGrid (PyEddyTracker):
         self.LONMAX = LONMAX
         self.LATMIN = LATMIN
         self.LATMAX = LATMAX
-        
-        try: # new AVISO (2014)
+
+        try:  # new AVISO (2014)
             self._lon = self.read_nc(AVISO_FILE, 'lon')
             self._lat = self.read_nc(AVISO_FILE, 'lat')
             self.FILLVAL = self.read_nc_att(AVISO_FILE, 'sla', '_FillValue')
             base_date = self.read_nc_att(AVISO_FILE, 'time', 'units')
             self.base_date = dt.date2num(
-                                parser.parse(base_date.split(' ')[2:4][0]))
-        
-        except Exception: # old AVISO
+                parser.parse(base_date.split(' ')[2:4][0]))
+
+        except Exception:  # old AVISO
             self._lon = self.read_nc(AVISO_FILE, 'NbLongitudes')
             self._lat = self.read_nc(AVISO_FILE, 'NbLatitudes')
             self.FILLVAL = self.read_nc_att(AVISO_FILE,
-                                           'Grid_0001', '_FillValue')
-        
+                                            'Grid_0001', '_FillValue')
+
         if LONMIN < 0 and LONMAX <= 0:
             self._lon -= 360.
         self._lon, self._lat = np.meshgrid(self._lon, self._lat)
@@ -526,10 +506,10 @@ class AvisoGrid (PyEddyTracker):
         # crosses zero degree meridian
         if LONMIN < 0 and LONMAX >= 0:
             self.ZERO_CROSSING = True
-        
+
         self.sla_coeffs = None
         self.uspd_coeffs = None
-        
+
         self.set_initial_indices(LONMIN, LONMAX, LATMIN, LATMAX)
         self.set_index_padding()
         self.set_basemap(with_pad=with_pad)
@@ -537,8 +517,7 @@ class AvisoGrid (PyEddyTracker):
         self.set_u_v_eke()
         pad2 = 2 * self.pad
         self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
-    
-    
+
     def __getstate__(self):
         """
         Needed for Pickle
@@ -551,70 +530,72 @@ class AvisoGrid (PyEddyTracker):
         for pop in pops:
             result.pop(pop)
         return result
-    
-    
+
     #@timeit
     def get_AVISO_data(self, AVISO_FILE):
         """
         Read nc data from AVISO file
         """
         if self.ZERO_CROSSING:
-            
-            try: # new AVISO (2014)
-                ssh1 = self.read_nc(AVISO_FILE, 'sla',
-                       indices='[:, self.jp0:self.jp1, :self.ip0]')
-                ssh0 = self.read_nc(AVISO_FILE, 'sla',
-                       indices='[:, self.jp0:self.jp1, self.ip1:]')
-                ssh0, ssh1 = ssh0.squeeze(), ssh1.squeeze()
-                ssh0 *= 100. # m to cm
-                ssh1 *= 100. # m to cm
-            
-            except Exception: # old AVISO
-                ssh1 = self.read_nc(AVISO_FILE, 'Grid_0001',
-                       indices='[:self.ip0, self.jp0:self.jp1]').T
-                ssh0 = self.read_nc(AVISO_FILE, 'Grid_0001',
-                       indices='[self.ip1:, self.jp0:self.jp1]').T
-            
-            zeta = np.ma.concatenate((ssh0, ssh1), axis=1)
-        
-        else:
-            
-            try: # new AVISO (2014)
-                zeta = self.read_nc(AVISO_FILE, 'sla',
-                       indices='[:, self.jp0:self.jp1, self.ip0:self.ip1]')
-                zeta = zeta.squeeze()
-                zeta *= 100. # m to cm
-            
-            except Exception: # old AVISO
-                zeta = self.read_nc(AVISO_FILE, 'Grid_0001',
-                       indices='[self.ip0:self.ip1, self.jp0:self.jp1]').T
 
-        try: # Extrapolate over land points with fillmask
+            try:  # new AVISO (2014)
+                ssh1 = self.read_nc(
+                    AVISO_FILE, 'sla',
+                    indices='[:, self.jp0:self.jp1, :self.ip0]')
+                ssh0 = self.read_nc(
+                    AVISO_FILE, 'sla',
+                    indices='[:, self.jp0:self.jp1, self.ip1:]')
+                ssh0, ssh1 = ssh0.squeeze(), ssh1.squeeze()
+                ssh0 *= 100.  # m to cm
+                ssh1 *= 100.  # m to cm
+
+            except Exception:  # old AVISO
+                ssh1 = self.read_nc(AVISO_FILE, 'Grid_0001',
+                                    indices='[:self.ip0, self.jp0:self.jp1]').T
+                ssh0 = self.read_nc(AVISO_FILE, 'Grid_0001',
+                                    indices='[self.ip1:, self.jp0:self.jp1]').T
+
+            zeta = np.ma.concatenate((ssh0, ssh1), axis=1)
+
+        else:
+
+            try:  # new AVISO (2014)
+                zeta = self.read_nc(
+                    AVISO_FILE, 'sla',
+                    indices='[:, self.jp0:self.jp1, self.ip0:self.ip1]')
+                zeta = zeta.squeeze()
+                zeta *= 100.  # m to cm
+
+            except Exception:  # old AVISO
+                zeta = self.read_nc(
+                    AVISO_FILE, 'Grid_0001',
+                    indices='[self.ip0:self.ip1, self.jp0:self.jp1]').T
+
+        try:  # Extrapolate over land points with fillmask
             zeta = fillmask(zeta, self.mask == 1)
             #zeta = fillmask(zeta, 1 + (-1 * zeta.mask))
-        except Exception: # In case no landpoints
+        except Exception:  # In case no landpoints
             zeta = np.ma.masked_array(zeta)
         return zeta.astype(np.float64)
-
 
     def set_mask(self, sla):
         """
         """
-        if sla.mask.size == 1: # all sea points
+        if sla.mask.size == 1:  # all sea points
             self.mask = np.ones_like(sla.data)
-            
+
         else:
             self.mask = np.logical_not(sla.mask).astype(np.int)
-            
+
             if 'Global' in self.THE_DOMAIN:
-                
+
                 # Close Drake Passage
                 minus70 = np.argmin(np.abs(self.lonpad()[0] + 70))
                 self.mask[:125, minus70] = 0
-                
+
                 # DT10 mask is open around Panama, so close it...
                 if 'AVISO_DT10' in self.PRODUCT:
-                    
+
                     mask = 0
                     self.mask[348, 92:110] = mask
                     self.mask[348:356, 92] = mask
@@ -639,10 +620,10 @@ class AvisoGrid (PyEddyTracker):
                     self.mask[388, 13 + ind:47 + ind] = mask
                     self.mask[388:393, 13 + ind] = mask
                     self.mask[392,  ind:13 + ind] = mask
-                    
+
                 # Mask all unwanted regions (Caspian Sea, etc)
                 labels = ndimage.label(self.mask)[0]
-                
+
                 self.labels = labels
                 # Set to known sea point
                 plus200 = np.argmin(np.abs(self.lonpad()[0] - 200))
@@ -650,24 +631,21 @@ class AvisoGrid (PyEddyTracker):
                 sea_label = labels[plus9, plus200]
                 np.place(self.mask, labels != sea_label, 0)
         return self
-    
-    
-    
-    
+
     def fillmask(self, x, mask):
         """
-        Fill missing values in an array with an average of nearest  
+        Fill missing values in an array with an average of nearest
         neighbours
         From http://permalink.gmane.org/gmane.comp.python.scientific.user/19610
         """
         assert x.ndim == 2, 'x must be a 2D array.'
         fill_value = 9999.99
         x[mask == 0] = fill_value
-    
+
         # Create (i, j) point arrays for good and bad data.
         # Bad data are marked by the fill_value, good data elsewhere.
         igood = np.vstack(np.where(x != fill_value)).T
-        ibad  = np.vstack(np.where(x == fill_value)).T
+        ibad = np.vstack(np.where(x == fill_value)).T
 
         # Create a tree for the bad points, the points to be filled
         tree = spatial.cKDTree(igood)
@@ -691,7 +669,6 @@ class AvisoGrid (PyEddyTracker):
         x[ibad[:, 0], ibad[:, 1]] = xfill
         return x
 
-
     def lon(self):
         if self.ZERO_CROSSING:
             # TO DO: These concatenations are possibly expensive, they
@@ -701,13 +678,13 @@ class AvisoGrid (PyEddyTracker):
             return np.concatenate((lon0 - 360., lon1), axis=1)
         else:
             return self._lon[self.j0:self.j1, self.i0:self.i1]
-    
+
     def lat(self):
         if self.ZERO_CROSSING:
             lat0 = self._lat[self.j0:self.j1, self.i1:]
             lat1 = self._lat[self.j0:self.j1, :self.i0]
             return np.concatenate((lat0, lat1), axis=1)
-        else:            
+        else:
             return self._lat[self.j0:self.j1, self.i0:self.i1]
 
     def lonpad(self):
@@ -717,48 +694,45 @@ class AvisoGrid (PyEddyTracker):
             return np.concatenate((lon0 - 360., lon1), axis=1)
         else:
             return self._lon[self.jp0:self.jp1, self.ip0:self.ip1]
-    
+
     def latpad(self):
         if self.ZERO_CROSSING:
             lat0 = self._lat[self.jp0:self.jp1, self.ip1:]
             lat1 = self._lat[self.jp0:self.jp1, :self.ip0]
             return np.concatenate((lat0, lat1), axis=1)
-        else:            
+        else:
             return self._lat[self.jp0:self.jp1, self.ip0:self.ip1]
 
     def angle(self):
         return self._angle[self.j0:self.j1, self.i0:self.i1]
-    
-    
-    def umask(self): # Mask at U points
+
+    def umask(self):  # Mask at U points
         return self._umask
-    
-    def vmask(self): # Mask at V points
+
+    def vmask(self):  # Mask at V points
         return self._vmask
-    
-    def f(self): #  Coriolis
+
+    def f(self):  # Coriolis
         return self._f
-      
-    def gof(self): # Gravity / Coriolis
+
+    def gof(self):  # Gravity / Coriolis
         return self._gof
 
-    def dx(self): # Grid spacing along X direction
+    def dx(self):  # Grid spacing along X direction
         return self._dx
-    
-    def dy(self): # Grid spacing along Y direction
-        return self._dy
-        
-    def pm(self): # Reciprocal of dx
-        return self._pm
-    
-    def pn(self): # Reciprocal of dy
-        return self._pn
 
+    def dy(self):  # Grid spacing along Y direction
+        return self._dy
+
+    def pm(self):  # Reciprocal of dx
+        return self._pm
+
+    def pn(self):  # Reciprocal of dy
+        return self._pn
 
     def get_resolution(self):
         return np.sqrt(np.diff(self.lon()[1:], axis=1) *
                        np.diff(self.lat()[:, 1:], axis=0)).mean()
-
 
     def boundary(self):
         """
@@ -774,7 +748,6 @@ class AvisoGrid (PyEddyTracker):
                      self.lat()[::-1, -1], self.lat()[0, ::-1])]
         return lon, lat
 
-
     def brypath(self, imin=0, imax=-1, jmin=0, jmax=-1):
         """
         Return Path object of perimeter around a ROMS grid
@@ -784,8 +757,6 @@ class AvisoGrid (PyEddyTracker):
         brypath = np.array([lon, lat]).T
         return path.Path(brypath)
 
-
-        
     def set_interp_coeffs(self, sla, uspd):
         """
         Won't work for rotated grid
@@ -796,41 +767,40 @@ class AvisoGrid (PyEddyTracker):
             self.lat()[:, 0], self.lon()[0], uspd, kx=1, ky=1)
         return self
 
-
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 if __name__ == '__main__':
-    
+
     # Run using:
     # python make_eddy_track_AVISO.py eddy_tracker_configuration.yaml
     try:
         YAML_FILE = sys.argv[1]
     except Exception:
         print "To run use 'python make_eddy_track_AVISO.py eddy_tracker_configuration.yaml'"
-        
+
     print "\nLaunching with yaml file: %s" % YAML_FILE
     # Choose a yaml configuration file
     #YAML_FILE = 'eddy_tracker_configuration.yaml'
     #YAML_FILE = 'BlackSea.yaml'
-   
-   #--------------------------------------------------------------------------
-    
+
+    # --------------------------------------------------------------------------
+
     plt.close('all')
-    
+
     # Read yaml configuration file
     with open(YAML_FILE, 'r') as stream:
         config = yaml.load(stream)
-    
+
     # Setup configuration
     DATA_DIR = config['PATHS']['DATA_DIR']
     SAVE_DIR = config['PATHS']['SAVE_DIR']
     print '\nOutputs saved to', SAVE_DIR
     RW_PATH = config['PATHS']['RW_PATH']
-    
+
     DIAGNOSTIC_TYPE = config['DIAGNOSTIC_TYPE']
-    
+
     config['THE_DOMAIN'] = config['DOMAIN']['THE_DOMAIN']
-    
+
     # It is not recommended to change values given below
     # for 'Global', 'BlackSea' or 'MedSea'...
     if 'Global' in config['THE_DOMAIN']:
@@ -838,16 +808,16 @@ if __name__ == '__main__':
         config['LONMAX'] = 290.
         config['LATMIN'] = -80.
         config['LATMAX'] = 80.
-    
+
     elif 'Regional' in config['THE_DOMAIN']:
         config['LONMIN'] = config['DOMAIN']['LONMIN']
         config['LONMAX'] = config['DOMAIN']['LONMAX']
         config['LATMIN'] = config['DOMAIN']['LATMIN']
         config['LATMAX'] = config['DOMAIN']['LATMAX']
-    
+
     DATE_STR = config['DATE_STR'] = config['DOMAIN']['DATE_STR']
     DATE_END = config['DATE_END'] = config['DOMAIN']['DATE_END']
-    
+
     AVISO_DT14 = config['AVISO']['AVISO_DT14']
     if AVISO_DT14:
         PRODUCT = 'AVISO_DT14'
@@ -858,36 +828,38 @@ if __name__ == '__main__':
             DAYS_BTWN_RECORDS = 1.
     else:
         PRODUCT = 'AVISO_DT10'
-        DAYS_BTWN_RECORDS = 7. # old seven day AVISO
-    
+        DAYS_BTWN_RECORDS = 7.  # old seven day AVISO
+
     AVISO_FILES = config['AVISO']['AVISO_FILES']
-        
+
     #TRACK_DURATION_MIN = config['TRACK_DURATION_MIN']
-   
+
     if 'SLA' in DIAGNOSTIC_TYPE:
         MAX_SLA = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['MAX_SLA']
         INTERVAL = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['INTERVAL']
-        config['CONTOUR_PARAMETER'] = np.arange(-MAX_SLA, MAX_SLA + INTERVAL, INTERVAL)
+        config['CONTOUR_PARAMETER'] = np.arange(-MAX_SLA, MAX_SLA + INTERVAL,
+                                                INTERVAL)
         config['SHAPE_ERROR'] = np.full(config['CONTOUR_PARAMETER'].size,
                                         config['SHAPE_ERROR'])
-        
+
     elif 'Q' in DIAGNOSTIC_TYPE:
         MAX_Q = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['MAX_Q']
         NUM_LEVS = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['NUM_LEVS']
         config['CONTOUR_PARAMETER'] = np.linspace(0, MAX_Q, NUM_LEVS)[::-1]
-    else: Exception
-    
+    else:
+        Exception
+
     #JDAY_REFERENCE = config['JDAY_REFERENCE']
 
     #RADMIN = config['RADMIN']
     #RADMAX = config['RADMAX']
-    
+
     if 'SLA' in DIAGNOSTIC_TYPE:
         #AMPMIN = config['AMPMIN']
         #AMPMAX = config['AMPMAX']
         pass
     elif 'Q' in DIAGNOSTIC_TYPE:
-        AMPMIN = 0.02 # max(abs(xi/f)) within the eddy
+        AMPMIN = 0.02  # max(abs(xi/f)) within the eddy
         AMPMAX = 100.
     else:
         Exception
@@ -903,118 +875,110 @@ if __name__ == '__main__':
         elif 'Q' in DIAGNOSTIC_TYPE:
             SMOOTH_FAC = config['SMOOTHING_Q']['SMOOTH_FAC']
             SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
-        else: Exception
-        
+        else:
+            Exception
+
     if 'Q' in DIAGNOSTIC_TYPE:
-        AMP0 = 0.02 # vort/f
+        AMP0 = 0.02  # vort/f
     elif 'SLA' in DIAGNOSTIC_TYPE:
         AMP0 = config['AMP0']
     TEMP0 = config['TEMP0']
     SALT0 = config['SALT0']
-    
+
     #EVOLVE_AMP_MIN = config['EVOLVE_AMP_MIN']
     #EVOLVE_AMP_MAX = config['EVOLVE_AMP_MAX']
     #EVOLVE_AREA_MIN = config['EVOLVE_AREA_MIN']
     #EVOLVE_AREA_MAX = config['EVOLVE_AREA_MAX']
-    
-    
-    
-    
-
 
     CMAP = plt.cm.RdBu
 
-
     # End user configuration setup options
-    #--------------------------------------------------------------------------
-    
+    # --------------------------------------------------------------------------
+
     assert DATE_STR < DATE_END, 'DATE_END must be larger than DATE_STR'
     assert DIAGNOSTIC_TYPE in ('Q', 'SLA'), 'Undefined DIAGNOSTIC_TYPE'
-    
+
     thestartdate = dt.date2num(datestr2datetime(str(DATE_STR)))
     theenddate = dt.date2num(datestr2datetime(str(DATE_END)))
-    
+
     # Get complete AVISO file list
     AVISO_FILES = sorted(glob.glob(DATA_DIR + AVISO_FILES))
-    
+
     # For subsampling to get identical list as old_AVISO use:
     # AVISO_FILES = AVISO_FILES[5:-5:7]
     if AVISO_DT14 and AVISO_DT14_SUBSAMP:
         AVISO_FILES = AVISO_FILES[5:-5:np.int(DAYS_BTWN_RECORDS)]
-    
+
     # Set up a grid object using first AVISO file in the list
     sla_grd = AvisoGrid(AVISO_FILES[0], config['THE_DOMAIN'], PRODUCT,
                         config['LONMIN'], config['LONMAX'],
                         config['LATMIN'], config['LATMAX'])
-    
+
     Mx, My = (sla_grd.Mx[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1],
               sla_grd.My[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1])
-    
+
     # Instantiate search ellipse object
     search_ellipse = eddy_tracker.SearchEllipse(config['THE_DOMAIN'],
-                         sla_grd, DAYS_BTWN_RECORDS, RW_PATH)
-    
-    
+                                                sla_grd, DAYS_BTWN_RECORDS,
+                                                RW_PATH)
+
     if 'Gaussian' in SMOOTHING_TYPE:
         # Get parameters for ndimage.gaussian_filter
         zres, mres = gaussian_resolution(sla_grd.get_resolution(),
-                         ZWL, MWL)
+                                         ZWL, MWL)
 
-    fig  = plt.figure(1)
+    fig = plt.figure(1)
 
     if 'Q' in DIAGNOSTIC_TYPE:
         A_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_anticyclonic.nc'])
         C_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_Q_AVISO_cyclonic.nc'])
-    
+
     elif 'SLA' in DIAGNOSTIC_TYPE:
         A_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_anticyclonic.nc'])
         C_SAVEFILE = "".join([SAVE_DIR, 'eddy_tracks_SLA_AVISO_cyclonic.nc'])
-    
-    
-    
+
     # Initialise two eddy objects to hold data
     #kwargs = config
     A_eddy = eddy_tracker.TrackList('AVISO', 'Anticyclonic', A_SAVEFILE,
-                            sla_grd, search_ellipse, **config)
-    
+                                    sla_grd, search_ellipse, **config)
+
     C_eddy = eddy_tracker.TrackList('AVISO', 'Cyclonic', C_SAVEFILE,
-                            sla_grd, search_ellipse, **config)
-    
+                                    sla_grd, search_ellipse, **config)
+
     A_eddy.search_ellipse = search_ellipse
     C_eddy.search_ellipse = search_ellipse
-    
+
     if 'sum_radii' in config['SEPARATION_METHOD']:
         A_eddy.SEP_DIST_FAC = SEP_DIST_FACTOR
         C_eddy.SEP_DIST_FACTOR = SEP_DIST_FACTOR
-    
+
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
     PIXMIN = np.round((np.pi * config['RADMIN']**2) /
-                                  sla_grd.get_resolution()**2)
+                      sla_grd.get_resolution()**2)
     PIXMAX = np.round((np.pi * config['RADMAX']**2) /
-                                  sla_grd.get_resolution()**2)
+                      sla_grd.get_resolution()**2)
     print '--- Pixel range = %s-%s' % (np.int(PIXMIN),
                                        np.int(PIXMAX))
-    
+
     A_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
     C_eddy.PIXEL_THRESHOLD = [PIXMIN, PIXMAX]
-    
+
     # Create nc files for saving of eddy tracks
     A_eddy.create_netcdf(DATA_DIR, A_SAVEFILE)
     C_eddy.create_netcdf(DATA_DIR, C_SAVEFILE)
 
-    
     # Loop through the AVISO files...
     START = True
-    
+
     START_TIME = time.time()
-    
+
     print '\nStart tracking'
-    
+
     for AVISO_FILE in AVISO_FILES:
-        
+
         with Dataset(AVISO_FILE) as nc:
-    
+
             try:
                 thedate = nc.OriginalName
                 if 'qd_' in thedate:
@@ -1026,33 +990,30 @@ if __name__ == '__main__':
             except Exception:
                 thedate = nc.variables['time'][:]
                 thedate += sla_grd.base_date
-        
+
         rtime = thedate
-        
+
         if thedate >= thestartdate and thedate <= theenddate:
             active = True
         else:
             active = False
-        
-        
+
         if active:
-            
+
             #rec_START_TIME = time.time()
             print '--- AVISO_FILE:', AVISO_FILE
-            
+
             # Holding variables
             A_eddy.reset_holding_variables()
             C_eddy.reset_holding_variables()
-            
-            
+
             sla = sla_grd.get_AVISO_data(AVISO_FILE)
             sla_grd.set_mask(sla).uvmask()
-            
-            
+
             if SMOOTHING:
-                    
+
                 if 'Gaussian' in SMOOTHING_TYPE:
-                    
+
                     if 'first_record' not in locals():
                         print '------ applying Gaussian high-pass filter'
                     # Set landpoints to zero
@@ -1061,20 +1022,21 @@ if __name__ == '__main__':
                     # High pass filter, see
                     # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
                     sla -= ndimage.gaussian_filter(sla, [mres, zres])
-                    
+
                 elif 'Hanning' in SMOOTHING_TYPE:
-                    
+
                     if 'first_record' not in locals():
                         print '------ applying %s passes of Hanning filter' \
                                                                % SMOOTH_FAC
                     # Do SMOOTH_FAC passes of 2d Hanning filter
                     sla = func_hann2d_fast(sla, SMOOTH_FAC)
-                
-                else: Exception
-            
+
+                else:
+                    Exception
+
             # Apply the landmask
             sla = np.ma.masked_where(sla_grd.mask == 0, sla)
-                
+
             # Get timing
             try:
                 thedate = dt.num2date(rtime)[0]
@@ -1083,25 +1045,24 @@ if __name__ == '__main__':
             yr = thedate.year
             mo = thedate.month
             da = thedate.day
-                
+
             # Multiply by 0.01 for m
             sla_grd.set_geostrophic_velocity(sla * 0.01)
-                
+
             # Remove padded boundary
             sla = sla[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1]
-                
+
             # Calculate EKE
             sla_grd.getEKE()
-            
-            
+
             if 'Q' in DIAGNOSTIC_TYPE:
 
                 okubo, xi = okubo_weiss(sla_grd)
-            
-                qparam = np.ma.multiply(-0.25, okubo) # see Kurian etal 2011
-                
+
+                qparam = np.ma.multiply(-0.25, okubo)  # see Kurian etal 2011
+
                 qparam = func_hann2d_fast(qparam, hanning_passes)
-                    
+
                 # Set Q over land to zero
                 qparam *= sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
                                        sla_grd.iup0:sla_grd.iup1]
@@ -1113,54 +1074,54 @@ if __name__ == '__main__':
                                         sla_grd.iup0:sla_grd.iup1] == 0,
                                    xi / sla_grd.f()[sla_grd.jup0:sla_grd.jup1,
                                                     sla_grd.iup0:sla_grd.iup1])
-                
+
                 xicopy = np.ma.copy(xi)
-            
+
             elif 'SLA' in DIAGNOSTIC_TYPE:
-            
+
                 A_eddy.sla = sla.copy()
                 C_eddy.sla = sla.copy()
                 A_eddy.slacopy = sla.copy()
                 C_eddy.slacopy = sla.copy()
-            
+
             # Get scalar speed
             uspd = np.sqrt(sla_grd.u**2 + sla_grd.v**2)
             uspd = np.ma.masked_where(
-                        sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
-                                     sla_grd.iup0:sla_grd.iup1] == 0,
-                                      uspd)
+                sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
+                             sla_grd.iup0:sla_grd.iup1] == 0,
+                uspd)
             A_eddy.uspd = uspd.copy()
             C_eddy.uspd = uspd.copy()
-            
+
             # Set interpolation coefficients
             sla_grd.set_interp_coeffs(sla, uspd)
             A_eddy.sla_coeffs = sla_grd.sla_coeffs
             A_eddy.uspd_coeffs = sla_grd.uspd_coeffs
             C_eddy.sla_coeffs = sla_grd.sla_coeffs
             C_eddy.uspd_coeffs = sla_grd.uspd_coeffs
-            
+
             # Get contours of Q/sla parameter
             if 'first_record' not in locals():
-                
+
                 print '------ processing SLA contours for eddies'
                 contfig = plt.figure(99)
                 ax = contfig.add_subplot(111)
-                
+
                 if SAVE_FIGURES:
-                    
+
                     animfig = plt.figure(999)
                     animax = animfig.add_subplot(111)
                     # Colorbar axis
                     animax_cbar = get_cax(animax, dx=0.03,
                                           width=.05, position='b')
-                   
+
             if 'Q' in DIAGNOSTIC_TYPE:
                 CS = ax.contour(sla_grd.lon(),
                                 sla_grd.lat(), qparam, CONTOUR_PARAMETER)
                 # Get xi contour field at zero
                 CSxi = ax.contour(sla_grd.lon(),
                                   sla_grd.lat(), xi, [0.])
-                
+
             elif 'SLA' in DIAGNOSTIC_TYPE:
                 A_CS = ax.contour(sla_grd.lon(),
                                   sla_grd.lat(),
@@ -1169,13 +1130,13 @@ if __name__ == '__main__':
                 C_CS = ax.contour(sla_grd.lon(),
                                   sla_grd.lat(),
                                   C_eddy.sla, C_eddy.CONTOUR_PARAMETER)
-                
+
             else:
                 Exception
-            
-            if True: # clear the current axis
+
+            if True:  # clear the current axis
                 ax.cla()
-            else: # draw debug figure
+            else:  # draw debug figure
                 if 'Q' in DIAGNOSTIC_TYPE:
                     ax.set_title('qparameter and xi')
                     ax.clabel(CS, np.array([CONTOUR_PARAMETER.min(),
@@ -1186,61 +1147,61 @@ if __name__ == '__main__':
                                               CONTOUR_PARAMETER.max()]))
                 plt.axis('image')
                 plt.show()
-            
+
             # Set contour coordinates and indices for calculation of
             # speed-based radius
             A_eddy.swirl = SwirlSpeed(A_CS)
             C_eddy.swirl = SwirlSpeed(C_CS)
-            
+
             # Now we loop over the CS collection
             if 'Q' in DIAGNOSTIC_TYPE:
                 A_eddy, C_eddy = collection_loop(CS, sla_grd, rtime,
-                                   A_list_obj=A_eddy, C_list_obj=C_eddy,
-                                   xi=xi, CSxi=CSxi, VERBOSE=VERBOSE)
-            
+                                                 A_list_obj=A_eddy,
+                                                 C_list_obj=C_eddy,
+                                                 xi=xi, CSxi=CSxi,
+                                                 VERBOSE=VERBOSE)
+
             elif 'SLA' in DIAGNOSTIC_TYPE:
                 A_eddy = collection_loop(A_CS, sla_grd, rtime,
-                                   A_list_obj=A_eddy, C_list_obj=None,
-                                   sign_type=A_eddy.SIGN_TYPE, VERBOSE=A_eddy.VERBOSE)
+                                         A_list_obj=A_eddy, C_list_obj=None,
+                                         sign_type=A_eddy.SIGN_TYPE,
+                                         VERBOSE=A_eddy.VERBOSE)
                 # Note that C_CS is reverse order
                 C_eddy = collection_loop(C_CS, sla_grd, rtime,
-                                   A_list_obj=None, C_list_obj=C_eddy,
-                                   sign_type=C_eddy.SIGN_TYPE, VERBOSE=C_eddy.VERBOSE)
-            
-                
+                                         A_list_obj=None, C_list_obj=C_eddy,
+                                         sign_type=C_eddy.SIGN_TYPE,
+                                         VERBOSE=C_eddy.VERBOSE)
+
             ymd_str = ''.join((str(yr), str(mo).zfill(2), str(da).zfill(2)))
-            
-            
+
             # Test pickling
             with open("".join((SAVE_DIR, 'A_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
                 pickle.dump(A_eddy, save_pickle, 2)
-           
+
             with open("".join((SAVE_DIR, 'C_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
                 pickle.dump(C_eddy, save_pickle, 2)
-    
+
             ## Unpickle
             #with open('C_eddy.pkl', 'rb') as load_pickle:
                 #C_eddy = pickle.load(load_pickle)
-            
-            
-            
+
             # Debug
             if 'fig250' in locals():
-                
+
                 plt.figure(250)
                 tit = 'Y' + str(yr) + 'M' + str(mo).zfill(2) + \
                                       'D' + str(da).zfill(2)
-                
+
                 if 'Q' in DIAGNOSTIC_TYPE:
                     plt.title('Q ' + tit)
                     sla_grd.M.pcolormesh(Mx, My, xi, CMAP=CMAP)
                     sla_grd.M.contour(Mx, My, xi, [0.],
-                                      colors='k',linewidths=0.5)
+                                      colors='k', linewidths=0.5)
                     sla_grd.M.contour(Mx, My, qparam, qparameter,
                                       colors='w', linewidths=0.3)
                     sla_grd.M.contour(Mx, My, qparam, [qparameter[0]],
                                       colors='m', linewidths=0.25)
-                
+
                 elif 'SLA' in DIAGNOSTIC_TYPE:
                     plt.title('sla ' + tit)
                     sla_grd.M.pcolormesh(Mx, My, sla, CMAP=CMAP)
@@ -1250,7 +1211,7 @@ if __name__ == '__main__':
                                       colors='w', linewidths=0.3)
                     sla_grd.M.contour(Mx, My, sla, [CONTOUR_PARAMETER[0]],
                                       colors='m', linewidths=0.25)
-                
+
                 plt.colorbar(orientation='horizontal')
                 plt.clim(-.5, .5)
                 sla_grd.M.fillcontinents()
@@ -1258,7 +1219,6 @@ if __name__ == '__main__':
                 plt.show()
                 #plt.clf()
                 plt.close(250)
-
 
             if START:
                 first_record = True
@@ -1269,40 +1229,42 @@ if __name__ == '__main__':
                 print '------ tracking eddies'
             else:
                 first_record = False
-            
-            
+
             # Track the eddies
             A_eddy = track_eddies(A_eddy, first_record)
             C_eddy = track_eddies(C_eddy, first_record)
-            
-            if SAVE_FIGURES: # Make figures for animations
-                
+
+            if SAVE_FIGURES:  # Make figures for animations
+
                 if 'Q' in DIAGNOSTIC_TYPE:
-                    anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
-                                SAVE_DIR, 'Q-parameter ' + ymd_str, animax, animax_cbar,
-                                qparam=qparam, qparameter=qparameter, xi=xi, xicopy=xicopy)
-                
+                    anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime,
+                                DIAGNOSTIC_TYPE, SAVE_DIR,
+                                'Q-parameter ' + ymd_str, animax, animax_cbar,
+                                qparam=qparam, qparameter=qparameter,
+                                xi=xi, xicopy=xicopy)
+
                 elif 'SLA' in DIAGNOSTIC_TYPE:
-                    anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime, DIAGNOSTIC_TYPE, 
-                                SAVE_DIR, 'SLA ' + ymd_str, animax, animax_cbar)
-                
+                    anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime,
+                                DIAGNOSTIC_TYPE, SAVE_DIR, 'SLA ' + ymd_str,
+                                animax, animax_cbar)
+
             # Save inactive eddies to nc file
             # IMPORTANT: this must be done at every time step!!
             #saving_START_TIME = time.time()
             if not first_record:
-                
+
                 if A_eddy.VERBOSE:
                     print '--- saving to nc', A_eddy.SAVE_DIR
                     print '--- saving to nc', C_eddy.SAVE_DIR
                     print '+++'
-                
+
                 A_eddy.write2netcdf(rtime)
                 C_eddy.write2netcdf(rtime)
-        
+
         if str(DATE_END) in AVISO_FILE:
             active = False
-    
-    # Total running time    
+
+    # Total running time
     print 'Duration', str((time.time() - START_TIME) / 3600.), 'hours!'
 
     print '\nOutputs saved to', SAVE_DIR
