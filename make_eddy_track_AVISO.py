@@ -30,8 +30,8 @@ Version 1.4.2
 Scroll down to line ~640 to get started
 ===============================================================================
 """
-from matplotlib import use as mpl_use
-mpl_use('Agg')
+#from matplotlib import use as mpl_use
+#mpl_use('Agg')
 import sys
 import glob as glob
 from py_eddy_tracker_classes import plt, np, dt, Dataset, time, \
@@ -520,9 +520,10 @@ class AvisoGrid (PyEddyTracker):
 
     def __getstate__(self):
         """
-        Needed for Pickle
+        Remove refernces to unwanted attributes in self.
+        This reduces the size of saved cPickle objects.
         """
-        print '--- removing unwanted attributes'
+        #print '--- removing unwanted attributes'
         pops = ('Mx', 'My', '_f', '_angle', '_dx', '_dy', '_gof', '_lon',
                 '_lat', '_pm', '_pn', '_umask', '_vmask', 'eke', 'u', 'v',
                 'mask')
@@ -1232,7 +1233,7 @@ if __name__ == '__main__':
 
             # Track the eddies
             A_eddy = track_eddies(A_eddy, first_record)
-            C_eddy = track_eddies(C_eddy, first_record)
+            #C_eddy = track_eddies(C_eddy, first_record)
 
             if SAVE_FIGURES:  # Make figures for animations
 
@@ -1259,7 +1260,9 @@ if __name__ == '__main__':
                     print '+++'
 
                 A_eddy.write2netcdf(rtime)
-                C_eddy.write2netcdf(rtime)
+                #print '______________________eddy.index', A_eddy.index
+                #print '______________________eddy.ncind', A_eddy.ncind
+                #C_eddy.write2netcdf(rtime)
 
         if str(DATE_END) in AVISO_FILE:
             active = False

@@ -24,6 +24,7 @@ DOMAIN:
 AVISO:
   AVISO_DT14: Yes # Use new AVISO DT14 data (e.g., Capet et al, 2014)
   AVISO_FILES: 'dt_global_twosat_msla_h_????????_20140106.nc'
+  #AVISO_FILES: 'dt_ref_global_merged_msla_h_qd_????????_????????_????????.nc'
   AVISO_DT14_SUBSAMP: No # subsample the daily AVISO DT14
   DAYS_BTWN_RECORDS: 7  # sampling rate (days)
 
@@ -76,7 +77,7 @@ SMOOTHING_Q:
   SMOOTH_FAC: 5 # number of passes
 
 # Min and max permitted eddy radii [degrees] and amplitudes (cm)
-RADMIN: 0.35 # CSS11 recommend ~50 km minimum
+RADMIN: 0.35 # 0.4 for DT10, 0.35 for DT14
 RADMAX: 4.461
 AMPMIN: 1.
 AMPMAX: 150.
@@ -108,7 +109,7 @@ EVOLVE_AREA_MAX: 500 # max change in area
 
 
 # Make figures for animations
-SAVE_FIGURES: Yes
+SAVE_FIGURES: No
 
 
 # Define track_extra_variables to track and save:
@@ -118,9 +119,10 @@ SAVE_FIGURES: Yes
 # - profiles of swirl velocity from effective contour inwards
 # Useful for working with ARGO data    
 TRACK_EXTRA_VARIABLES: No
-    
-# INTERP_METHOD: 'RectBivariate'
-INTERP_METHOD: 'griddata'
+
+# 'RectBivariate' is faster
+INTERP_METHOD: 'RectBivariate'
+#INTERP_METHOD: 'griddata'
     
     
     

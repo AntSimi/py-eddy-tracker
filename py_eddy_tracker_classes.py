@@ -877,7 +877,9 @@ def track_eddies(Eddy, first_record):
 
     haversine.distance_matrix(X_old, X_new, dist_mat)
     dist_mat = np.ascontiguousarray(dist_mat)
-
+    
+    #print '+++++++++++++ X_old.mean()', X_old.mean()
+    
     dist_mat_copy = dist_mat.copy()
 
     # *new_eddy_inds* contains indices to every newly identified eddy
@@ -1148,7 +1150,7 @@ def track_eddies(Eddy, first_record):
     # Now we need to add new eddies defined by new_eddy_inds
     if np.any(new_eddy_inds):
 
-        if True:
+        if False:
             print '------adding %s new eddies' % new_eddy_inds.sum()
 
         for neind, a_new_eddy in enumerate(new_eddy_inds):

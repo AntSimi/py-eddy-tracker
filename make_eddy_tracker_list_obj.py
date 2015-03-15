@@ -182,14 +182,13 @@ class Track (object):
         dayzero - True at first appearance of eddy
     """
 
-    def __init__(self, eddy_index, DATATYPE, lon, lat, time, uavg, teke,
+    def __init__(self, DATATYPE, lon, lat, time, uavg, teke,
                  radius_s, radius_e, amplitude, temp=None, salt=None,
                  save_extras=False, contour_e=None, contour_s=None,
                  uavg_profile=None, shape_error=None):
 
-        self.eddy_index = eddy_index
+        #self.eddy_index = eddy_index
         self.DATATYPE   = DATATYPE
-        #self.lon        = np.atleast_1d(lon)
         self.lon        = [lon]
         self.lat        = [lat]
         self.ocean_time = [time]
@@ -264,7 +263,7 @@ class TrackList (object):
         qparameter: Q parameter range used for contours
         new_lon, new_lat: new lon/lat centroids
         old_lon, old_lat: old lon/lat centroids
-        eddy_index:   index of eddy in track_list
+        index:   index of eddy in track_list
     """
     #def __init__(self, DATATYPE, TRACK_DURATION_MIN, TRACK_EXTRA_VARIABLES):
     def __init__(self, DATATYPE, SIGN_TYPE, SAVE_DIR, grd, search_ellipse,
@@ -339,28 +338,29 @@ class TrackList (object):
         self.sla = None
         self.slacopy = None
 
-        self.new_lon    = [] #np.array([])
-        self.new_lat    = []
+        self.new_lon = []
+        self.new_lat = []
         self.new_radii_s = []
         self.new_radii_e = []
-        self.new_amp    = []
-        self.new_uavg   = []
-        self.new_teke   = []
+        self.new_amp = []
+        self.new_uavg = []
+        self.new_teke = []
         if 'ROMS' in self.DATATYPE:
             self.new_temp = []
             self.new_salt = []
-        self.new_time   = []
-        self.old_lon    = []
-        self.old_lat    = []
-        self.old_radii_s  = []
-        self.old_radii_e  = []
-        self.old_amp    = []
-        self.old_uavg   = []
-        self.old_teke   = []
+        # NOTE check if new_time and old_time are necessary... 
+        self.new_time = []
+        self.old_lon = []
+        self.old_lat = []
+        self.old_radii_s = []
+        self.old_radii_e = []
+        self.old_amp = []
+        self.old_uavg = []
+        self.old_teke = []
         if 'ROMS' in self.DATATYPE:
             self.old_temp = []
             self.old_salt = []
-        self.old_time   = []
+        self.old_time = []
         if self.TRACK_EXTRA_VARIABLES:
             self.new_contour_e = []
             self.new_contour_s = []
@@ -386,7 +386,7 @@ class TrackList (object):
         """
         Needed for Pickle
         """
-        print '--- removing unwanted attributes'
+        #print '--- removing unwanted attributes'
         pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
                 'circlon', 'circlat', 'sla', 'slacopy')
         result = self.__dict__.copy()
@@ -401,7 +401,7 @@ class TrackList (object):
         """
         Append a new 'track' object to the list
         """
-        self.tracklist.append(Track(self.index, self.DATATYPE,
+        self.tracklist.append(Track(self.DATATYPE,
                                     lon, lat, time, uavg, teke,
                                     radius_s, radius_e, amplitude,
                                     temp, salt, self.TRACK_EXTRA_VARIABLES,
@@ -841,11 +841,14 @@ class TrackList (object):
                             self.ncind += tsize
                             self.ch_index += 1
                             nc.sync()
-
+        
+        #print 'eddy.ncind', self.ncind
+        
         # Get index to first currently active track
         try:
             lasti = self.get_active_tracks(rtime)[0]
-
+            #print '__________________lasti', lasti
+            #print '__________________rtime', rtime
         except Exception:
             lasti = None
 
@@ -859,6 +862,7 @@ class TrackList (object):
 
         # Update old_lon and old_lat...
         self.old_lon = self.new_lon[lasti:]
+        #print '______________________self.old_lon', self.old_lon
         self.old_lat = self.new_lat[lasti:]
         self.old_radii_s = self.new_radii_s[lasti:]
         self.old_radii_e = self.new_radii_e[lasti:]

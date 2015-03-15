@@ -41,83 +41,94 @@ from make_eddy_track_AVISO import track_eddies, AvisoGrid
 
 if __name__ == '__main__':
 
-    DATA_DIR = '/data/OCE_ETU/MSA/emason/Global_DT10/'
+    TRACK_DURATION_MIN = 28
+    
+    #DATA_DIR = '/data/OCE_ETU/MSA/emason/Global_DT10/'
+    DATA_DIR = '/Users/emason/mercurial_projects/py-eddy-tracker-cls/py-eddy-tracker-cls/outputs/'
 
     A_PKL_FILES = 'A_eddy_????????.pkl'
-    C_PKL_FILES = 'C_eddy_????????.pkl'
+    #C_PKL_FILES = 'C_eddy_????????.pkl'
 
-    A_PKL_FILES = sorted(glob.glob(DATA_DIR + A_PKL_FILES))
-    C_PKL_FILES = sorted(glob.glob(DATA_DIR + C_PKL_FILES))
+    PKL_FILES = glob.glob(DATA_DIR + A_PKL_FILES)
+    PKL_FILES.sort()
+    #C_PKL_FILES = glob.glob(DATA_DIR + C_PKL_FILES)
 
-    for PKL_FILES in (A_PKL_FILES, C_PKL_FILES):
+    for active, PKL_FILE in enumerate(PKL_FILES):
 
-        for active, PKL_FILE in enumerate(PKL_FILES):
+        print PKL_FILE
+        
+        try: del eddy
+        except: pass
+        
+        # Unpickle
+        with open(PKL_FILE, 'rb') as the_pickle:
+            eddy = pickle.load(the_pickle)
+            print '--- loaded %s' % PKL_FILE
 
-            print PKL_FILE
+        #print 'eddy.index', eddy.index
+        eddy.savedir = DATA_DIR + eddy.savedir.rpartition('/')[-1]
 
-            # Unpickle
-            with open(PKL_FILE, 'rb') as the_pickle:
-                eddy = pickle.load(the_pickle)
-                print '--- loaded %s' % PKL_FILE
+        eddy.TRACK_DURATION_MIN = TRACK_DURATION_MIN
 
-            #print 'eddy.index', eddy.index
-            eddy.savedir = DATA_DIR + eddy.savedir.rpartition('/')[-1]
+        if active:
 
-            eddy.TRACK_DURATION_MIN = 10
+            eddy.new_list = False
+            eddy.tracklist = tracklist#.tolist()
 
-            if active:
-
-                first_record = False
-
-                eddy.new_list = False
-                eddy.tracklist = tracklist.tolist()
-
+            try:
                 eddy.index = index
                 eddy.ch_index = ch_index
+                #eddy.ncind = ncind
+            except:
+                pass
+            eddy.old_lon = old_lon
+            eddy.old_lat = old_lat
+            eddy.old_amp = old_amp
+            eddy.old_uavg = old_uavg
+            eddy.old_radii_s = old_radii_s
+            eddy.old_radii_e = old_radii_e
+            eddy.old_teke = old_teke
+
+            eddy = track_eddies(eddy, first_record)
+            
+            try:
                 eddy.ncind = ncind
+            except:
+                pass
 
-                eddy.old_lon = old_lon
-                eddy.old_lat = old_lat
-                eddy.old_amp = old_amp
-                eddy.old_uavg = old_uavg
-                eddy.old_radii_s = old_radii_s
-                eddy.old_radii_e = old_radii_e
-                eddy.old_teke = old_teke
-                #eddy.old_temp = old_temp
-                #eddy.old_salt = old_salt
+        else:
+            
+            eddy.create_netcdf(DATA_DIR, eddy.savedir)
+            eddy.set_old_variables()
+            first_record = True
+            eddy = track_eddies(eddy, first_record)
+            first_record = False
+            tracklist = eddy.tracklist
+        
+        if not first_record:
+            
+            #print eddy.new_time_tmp[0]
+            
+            eddy.write2netcdf(eddy.new_time_tmp[0])
+            # tracklist is modified by write2netcdf, so
+            # place update just after
+            tracklist = eddy.tracklist
+            ncind = np.copy(eddy.ncind)
+            ch_index = np.copy(eddy.ch_index)
+            index = np.copy(eddy.index)
 
-                eddy = track_eddies(eddy, first_record)
-                tracklist = np.copy(eddy.tracklist)
+        #print '______________________eddy.index', eddy.index
+        #print '______________________eddy.ncind', eddy.ncind
 
-            else:
+        old_lon = eddy.old_lon
+        #print '______________________eddy.old_lon', eddy.old_lon
+        old_lat = eddy.old_lat
+        old_amp = eddy.old_amp
+        old_uavg = eddy.old_uavg
+        old_radii_s = eddy.old_radii_s
+        old_radii_e = eddy.old_radii_e
+        old_teke = eddy.old_teke
+        #old_temp = eddy.old_temp
+        #old_salt = eddy.old_salt
 
-                first_record = True
-
-                eddy.create_netcdf(DATA_DIR, eddy.savedir)
-                eddy.set_old_variables()
-
-                eddy = track_eddies(eddy, first_record)
-                tracklist = np.copy(eddy.tracklist)
-
-            print 'eddy.index', eddy.index
-            print len(eddy.tracklist)
-
-            if not first_record:
-                print eddy.new_time_tmp[0]
-                eddy.write2netcdf(eddy.new_time_tmp[0])
-
-            index = eddy.index
-            ch_index = eddy.ch_index
-            ncind = eddy.ncind
-
-            old_lon = eddy.old_lon
-            old_lat = eddy.old_lat
-            old_amp = eddy.old_amp
-            old_uavg = eddy.old_uavg
-            old_radii_s = eddy.old_radii_s
-            old_radii_e = eddy.old_radii_e
-            old_teke = eddy.old_teke
-            #old_temp = eddy.old_temp
-            #old_salt = eddy.old_salt
-
-            #eddy.reset_holding_variables()
+        eddy.reset_holding_variables()
