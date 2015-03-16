@@ -1233,7 +1233,7 @@ if __name__ == '__main__':
 
             # Track the eddies
             A_eddy = track_eddies(A_eddy, first_record)
-            #C_eddy = track_eddies(C_eddy, first_record)
+            C_eddy = track_eddies(C_eddy, first_record)
 
             if SAVE_FIGURES:  # Make figures for animations
 
@@ -1260,9 +1260,7 @@ if __name__ == '__main__':
                     print '+++'
 
                 A_eddy.write2netcdf(rtime)
-                #print '______________________eddy.index', A_eddy.index
-                #print '______________________eddy.ncind', A_eddy.ncind
-                #C_eddy.write2netcdf(rtime)
+                C_eddy.write2netcdf(rtime)
 
         if str(DATE_END) in AVISO_FILE:
             active = False

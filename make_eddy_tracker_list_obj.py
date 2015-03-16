@@ -130,38 +130,6 @@ def strcompare(str1, str2):
     return str1 in str2 and str2 in str1
 
 
-#def find_nearest_contour(contcoll, x, y):
-    #"""
-    #Finds contour that is closest to a point.
-
-    #Returns a tuple containing the contour & segment.
-
-    #Call signature::
-
-    #segmin = find_nearest_contour(contcoll, x, y)
-
-    #"""
-    #dmin = 1e10
-    #segmin = None
-    #linepathmin = None
-
-    #paths = contcoll.get_paths()
-    #for segNum, linepath in enumerate(paths):
-        #lc = linepath.vertices
-        #ds = lc[:,0] - x
-        #ds **= 2
-        #dss = lc[:,1] - y
-        #dss **= 2
-        #ds += dss
-        ##print 'ds', ds
-        #d = ds.min()
-        #if d < dmin:
-            #dmin = d
-            #segmin = segNum
-            #linepathmin = linepath
-    #return (segmin, linepathmin)
-
-
 class Track (object):
     """
     Class that holds eddy tracks and related info
@@ -265,7 +233,6 @@ class TrackList (object):
         old_lon, old_lat: old lon/lat centroids
         index:   index of eddy in track_list
     """
-    #def __init__(self, DATATYPE, TRACK_DURATION_MIN, TRACK_EXTRA_VARIABLES):
     def __init__(self, DATATYPE, SIGN_TYPE, SAVE_DIR, grd, search_ellipse,
                  **kwargs):
         """
@@ -318,7 +285,6 @@ class TrackList (object):
         self.EVOLVE_AREA_MIN = np.float64(kwargs.get('EVOLVE_AREA_MIN', 0.0005))
         self.EVOLVE_AREA_MAX = np.float64(kwargs.get('EVOLVE_AREA_MAX', 500))
 
-
         self.AREA0 = np.pi * np.float64(kwargs.get('RAD0', 60000.))**2
         self.AMP0 = np.float64(kwargs.get('AMP0', 2.))
         self.DIST0 = np.float64(kwargs.get('DIST0', 25000.))
@@ -370,10 +336,10 @@ class TrackList (object):
             self.old_contour_s = []
             self.old_uavg_profile = []
             self.old_shape_error = []
-        self.new_list = True # flag indicating new list
-        self.index = 0 # counter
-        self.ncind = 0 # index to write to nc files, will increase and increase
-        self.ch_index = 0 # index for Chelton style nc files
+        self.new_list = True  # flag indicating new list
+        self.index = 0  # counter
+        self.ncind = 0  # index to write to nc files, will increase and increase
+        self.ch_index = 0  # index for Chelton style nc files
         self.PAD = 2
         self.search_ellipse = None
         self.PIXEL_THRESHOLD = None
@@ -638,7 +604,6 @@ class TrackList (object):
         nc.variables['cyc'].long_name = 'cyclonic'
         nc.variables['cyc'].description = 'cyclonic -1; anti-cyclonic +1'
 
-
         #nc.variables['eddy_duration'].units = 'days'
         nc.variables['lon'].units = 'deg. longitude'
         nc.variables['lon'].min_val = self.LONMIN
@@ -685,7 +650,6 @@ class TrackList (object):
         nc.variables['radius_e'].max_val = self.RADMAX / 1000.
         nc.variables['radius_e'].long_name = 'effective radius scale'
         nc.variables['radius_e'].description = 'effective eddy radius'
-
 
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.variables['qparameter'].units = 's^{-2}'
@@ -842,13 +806,9 @@ class TrackList (object):
                             self.ch_index += 1
                             nc.sync()
         
-        #print 'eddy.ncind', self.ncind
-        
         # Get index to first currently active track
         try:
             lasti = self.get_active_tracks(rtime)[0]
-            #print '__________________lasti', lasti
-            #print '__________________rtime', rtime
         except Exception:
             lasti = None
 
@@ -862,7 +822,6 @@ class TrackList (object):
 
         # Update old_lon and old_lat...
         self.old_lon = self.new_lon[lasti:]
-        #print '______________________self.old_lon', self.old_lon
         self.old_lat = self.new_lat[lasti:]
         self.old_radii_s = self.new_radii_s[lasti:]
         self.old_radii_e = self.new_radii_e[lasti:]

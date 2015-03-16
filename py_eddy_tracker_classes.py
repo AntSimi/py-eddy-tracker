@@ -45,7 +45,6 @@ from py_eddy_tracker_property_classes import Amplitude, EddyProperty, interpolat
 #import haversine_distmat as hav # needs compiling with f2py
 from haversine import haversine # needs compiling with f2py
 
-
 def datestr2datetime(datestr):
     """
     Take strings with format YYYYMMDD and convert to datetime instance
@@ -484,14 +483,10 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                         elif 'griddata' in Eddy.INTERP_METHOD:
                             uavgseg = interpolate.griddata(points, uspd1d,
                                       (seglon[1:], seglat[1:]), 'linear')
-                            #print 'rrrrrrrrrrrr', uavgseg
                             uavgseg = uavgseg[np.isfinite(uavgseg)].mean()
                         else:
                             Exception
-
-
-                        #if np.any(np.isinf(uavgseg)): YYYYYYYYYYYYYYYY
-
+                        
                         if save_all_uavg:
                             all_uavg.append(uavgseg)
 
@@ -502,8 +497,6 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                         inner_seglon, inner_seglat = seglon.copy(), seglat.copy()
 
         citer.iternext()
-
-    #print 'ggggggg', uavg
 
     if any_inner_contours:  # set speed based contour parameters
         cx, cy = Eddy.M(theseglon, theseglat)
@@ -878,8 +871,6 @@ def track_eddies(Eddy, first_record):
     haversine.distance_matrix(X_old, X_new, dist_mat)
     dist_mat = np.ascontiguousarray(dist_mat)
     
-    #print '+++++++++++++ X_old.mean()', X_old.mean()
-    
     dist_mat_copy = dist_mat.copy()
 
     # *new_eddy_inds* contains indices to every newly identified eddy
@@ -927,6 +918,7 @@ def track_eddies(Eddy, first_record):
         dist_mat[old_ind][non_unique_inds] = far_away  # km
 
         if debug_dist:
+            
             debug_distmax = 5e6
             debug_cmap = plt.cm.Set3
 
@@ -1018,9 +1010,8 @@ def track_eddies(Eddy, first_record):
                     # corresponding new_eddy_inds set to False
                     new_eddy_inds[np.nonzero(Eddy.new_lon_tmp ==
                                              Eddy.new_lon_tmp[new_ind])] = False
-                    #print 'aa', new_eddy_inds
+
                     dist_mat[:, new_ind] = far_away # km
-                    #print '*********************************************'
 
         if Eddy.TRACK_EXTRA_VARIABLES:
             kwargs = {'contour_e': new_cntr_e, 'contour_s': new_cntr_s,

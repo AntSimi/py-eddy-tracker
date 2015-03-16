@@ -147,13 +147,6 @@ class Amplitude (object):
             h0 = grd.sla_coeffs.ev(self.contlat[1:], self.contlon[1:])
         
         elif 'griddata' in eddy.INTERP_METHOD:
-            
-            #plt.figure()
-            #plt.pcolormesh(grd.lon()[self.jslice, self.islice],
-                           #grd.lat()[self.jslice, self.islice], self.sla)
-            #plt.plot(self.contlon[1:], self.contlat[1:],'.-')
-            #plt.show()
-            
             points = np.array([grd.lon()[self.jslice, self.islice].ravel(),
                                grd.lat()[self.jslice, self.islice].ravel()]).T
             h0 = interpolate.griddata(points, self.sla.ravel(), (self.contlon[1:],
