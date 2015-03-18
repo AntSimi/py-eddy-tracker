@@ -44,15 +44,16 @@ if __name__ == '__main__':
     TRACK_DURATION_MIN = 28
     
     #DATA_DIR = '/data/OCE_ETU/MSA/emason/Global_DT10/'
-    DATA_DIR = '/Users/emason/mercurial_projects/py-eddy-tracker-cls/py-eddy-tracker-cls/outputs/'
+    #DATA_DIR = '/Users/emason/mercurial_projects/py-eddy-tracker-cls/py-eddy-tracker-cls/outputs/'
+    DATA_DIR = '/home/emason/Downloads/'
 
-    A_PKL_FILES = 'A_eddy_????????.pkl'
-    #C_PKL_FILES = 'C_eddy_????????.pkl'
+    #A_PKL_FILES = 'A_eddy_????????.pkl'
+    C_PKL_FILES = 'C_eddy_????????.pkl'
 
-    PKL_FILES = glob.glob(DATA_DIR + A_PKL_FILES)
+    #PKL_FILES = glob.glob(DATA_DIR + A_PKL_FILES)
+    PKL_FILES = glob.glob(DATA_DIR + C_PKL_FILES)
+
     PKL_FILES.sort()
-    #C_PKL_FILES = glob.glob(DATA_DIR + C_PKL_FILES)
-
     for active, PKL_FILE in enumerate(PKL_FILES):
 
         print PKL_FILE
@@ -65,7 +66,6 @@ if __name__ == '__main__':
             eddy = pickle.load(the_pickle)
             print '--- loaded %s' % PKL_FILE
 
-        #print 'eddy.index', eddy.index
         eddy.savedir = DATA_DIR + eddy.savedir.rpartition('/')[-1]
 
         eddy.TRACK_DURATION_MIN = TRACK_DURATION_MIN
@@ -107,8 +107,6 @@ if __name__ == '__main__':
         
         if not first_record:
             
-            #print eddy.new_time_tmp[0]
-            
             eddy.write2netcdf(eddy.new_time_tmp[0])
             # tracklist is modified by write2netcdf, so
             # place update just after
@@ -117,11 +115,8 @@ if __name__ == '__main__':
             ch_index = np.copy(eddy.ch_index)
             index = np.copy(eddy.index)
 
-        #print '______________________eddy.index', eddy.index
-        #print '______________________eddy.ncind', eddy.ncind
 
         old_lon = eddy.old_lon
-        #print '______________________eddy.old_lon', eddy.old_lon
         old_lat = eddy.old_lat
         old_amp = eddy.old_amp
         old_uavg = eddy.old_uavg

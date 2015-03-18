@@ -30,8 +30,8 @@ Version 1.4.2
 Scroll down to line ~640 to get started
 ===============================================================================
 """
-#from matplotlib import use as mpl_use
-#mpl_use('Agg')
+from matplotlib import use as mpl_use
+mpl_use('Agg')
 import sys
 import glob as glob
 from py_eddy_tracker_classes import plt, np, dt, Dataset, time, \
@@ -526,7 +526,7 @@ class AvisoGrid (PyEddyTracker):
         #print '--- removing unwanted attributes'
         pops = ('Mx', 'My', '_f', '_angle', '_dx', '_dy', '_gof', '_lon',
                 '_lat', '_pm', '_pn', '_umask', '_vmask', 'eke', 'u', 'v',
-                'mask')
+                'mask', 'pad', 'vpad', 'upad')
         result = self.__dict__.copy()
         for pop in pops:
             result.pop(pop)
@@ -1181,7 +1181,9 @@ if __name__ == '__main__':
 
             with open("".join((SAVE_DIR, 'C_eddy_%s.pkl' % ymd_str)), 'wb') as save_pickle:
                 pickle.dump(C_eddy, save_pickle, 2)
-
+            
+            print 'EXIT here'
+            exit()
             ## Unpickle
             #with open('C_eddy.pkl', 'rb') as load_pickle:
                 #C_eddy = pickle.load(load_pickle)

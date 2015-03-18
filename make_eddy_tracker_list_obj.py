@@ -354,7 +354,8 @@ class TrackList (object):
         """
         #print '--- removing unwanted attributes'
         pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
-                'circlon', 'circlat', 'sla', 'slacopy')
+                'circlon', 'circlat', 'sla', 'slacopy', 'swirl',
+                'mask_eff', 'mask_eff_sum', 'mask_eff_1d')
         result = self.__dict__.copy()
         for pop in pops:
             result.pop(pop)
