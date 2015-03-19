@@ -37,7 +37,7 @@ import netCDF4 as netcdf
 import numpy as np
 import matplotlib.path as Path
 from make_eddy_track_AVISO import PyEddyTracker
-
+from mpl_toolkits.basemap import Basemap
 
 
 def root(): ## Define just one root path here
@@ -58,8 +58,8 @@ def getcoast(coastfile):
     return data[:,0],data[:,1]
 
 
-def read_nc(grdfile, var):
-    nc = netcdf.Dataset(grdfile,'r')
+def read_nc(GRDFILE, var):
+    nc = netcdf.Dataset(GRDFILE,'r')
     var = nc.variables[var][:]
     nc.close()
     return var
@@ -77,31 +77,36 @@ class RomsGrid (PyEddyTracker):
     Initialises with:
       obcs : [0,0,0,1] where 1 is open [S,E,N,W]
     '''
-    def __init__(self, grdfile, lonmin, lonmax, latmin, latmax, pad):
-        super(RomsGrid, self).__init__()
+    def __init__(self, GRDFILE, THE_DOMAIN, PRODUCT,
+                 LONMIN, LONMAX, LATMIN, LATMAX, FILLVAL,
+                 with_pad=True):
+        """
         # Initialise the grid object
-        print '\nInitialising the RomsGrid'
-        self.i0, self.j0 = 0, 0
-        self.i1, self.j1 = None, None
-        self.lonmin = lonmin
-        self.lonmax = lonmax
-        self.latmin = latmin
-        self.latmax = latmax
-        self.grdfile = grdfile
+        """
+        super(RomsGrid, self).__init__()
+        print '\nInitialising the *RomsGrid*'
+        self.THE_DOMAIN = THE_DOMAIN
+        self.PRODUCT = PRODUCT
+        self.LONMIN = LONMIN
+        self.LONMAX = LONMAX
+        self.LATMIN = LATMIN
+        self.LATMAX = LATMAX
+        self.FILLVAL = FILLVAL
+        self.GRDFILE = GRDFILE
         
         try:
-            with netcdf.Dataset(self.grdfile) as nc:
+            with netcdf.Dataset(self.GRDFILE) as nc:
                 pass
         except Exception:
             try:
-                with netcdf.Dataset(root() + self.grdfile) as nc:
-                    self.grdfile = root() + self.grdfile
+                with netcdf.Dataset(root() + self.GRDFILE) as nc:
+                    self.GRDFILE = root() + self.GRDFILE
             except Exception:
-                print 'No file at: ', self.grdfile
-                print 'or at ', root() + self.grdfile
+                print 'No file at: ', self.GRDFILE
+                print 'or at ', root() + self.GRDFILE
                 raise Exception # no grid file found
 
-        with netcdf.Dataset(self.grdfile) as nc:
+        with netcdf.Dataset(self.GRDFILE) as nc:
             self._lon = nc.variables['lon_rho'][:]
             self._lat = nc.variables['lat_rho'][:]
             self._pm = nc.variables['pm'][:]
@@ -109,56 +114,60 @@ class RomsGrid (PyEddyTracker):
             self._f = nc.variables['f'][:]
             self._angle = nc.variables['angle'][:]
             self._mask = nc.variables['mask_rho'][:]
-            self._gof = self.gravity / self._f
+            self._gof = self.GRAVITY / self._f
 
-        self.set_initial_indices(lonmin, lonmax, latmin, latmax)
+        self.set_initial_indices()
         self.set_index_padding()
+        self.set_basemap(with_pad=with_pad)
         self.uvpmask()
         self.set_u_v_eke()
+        self.shape = self.lon().shape
+        #pad2 = 2 * self.pad
+        #self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
         
         # Parameters for different grid files; modify accordingly
-        if self.grdfile.split('/')[-1] in 'roms_grd_NA2009_7pt5km.nc':
+        if self.GRDFILE.split('/')[-1] in 'roms_grd_NA2009_7pt5km.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0, 0.0, 120.0, 32.0, 2, [[1,'S'],[1,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'gc_2009_1km_grd_smooth.nc':
+        elif self.GRDFILE.split('/')[-1] in 'gc_2009_1km_grd_smooth.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   60.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'cb_2009_3km_grd_smooth.nc':
+        elif self.GRDFILE.split('/')[-1] in 'cb_2009_3km_grd_smooth.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'roms_grd_CanBas_smooth_bnd.nc':
+        elif self.GRDFILE.split('/')[-1] in 'roms_grd_CanBas_smooth_bnd.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          0.0,          120.0,   32.0,   1,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'grd_Med14km_2010.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_Med14km_2010.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   50.0,   2,           [[0,'S'],[0,'E'],[0,'N'],[1,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'grd_MedWest4pt75km_2010_smooth.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_MedWest4pt75km_2010_smooth.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   50.0,   2,           [[0,'S'],[0,'E'],[0,'N'],[1,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'grd_ATL_15km.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_ATL_15km.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             10.0,          2.0,          400.0,   40.0,   2,           [[1,'S'],[1,'E'],[1,'N'],[0,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'grd_NA2011_7pt5km.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_NA2011_7pt5km.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[1,'S'],[1,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.grdfile.split('/')[-1] in 'grd_MedSea15.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_MedSea15.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[0,'S'],[0,'E'],[1,'N'],[1,'W']]
-        elif self.grdfile.split('/')[-1] in 'grd_MedSea5.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_MedSea5.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[0,'S'],[0,'E'],[1,'N'],[1,'W']]
-        elif self.grdfile.split('/')[-1] in 'grd_canbas2.5.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_canbas2.5.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
-        elif self.grdfile.split('/')[-1] in 'grd_canwake4km.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_canwake4km.nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          0.0,          200.0,   42.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         else: 

@@ -212,7 +212,7 @@ class Amplitude (object):
                         jmin, imin = j, i
                     if self.sla[j, i] >= levnm2:
                         self._set_cyc_amplitude()
-                         # Prevent further calls to_set_acyc_amplitude
+                         # Prevent further calls to_set_cyc_amplitude
                         levnm2 = 1e5
                 jmin += self.eddy.jmin
                 imin += self.eddy.imin
@@ -246,6 +246,7 @@ class Amplitude (object):
                         jmax, imax = j, i
                     if self.sla[j, i] <= levnp2:
                         self._set_acyc_amplitude()
+                        # Prevent further calls to_set_acyc_amplitude
                         levnp2 = -1e5
                 jmax += self.eddy.jmin
                 imax += self.eddy.imin

@@ -527,13 +527,13 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
     if C_list_obj is not None:
         Eddy = C_list_obj
 
-    if 'ROMS' in Eddy.DATATYPE:
+    if 'ROMS' in Eddy.PRODUCT:
         #has_ts = True
         has_ts = False
-    elif 'AVISO' in Eddy.DATATYPE:
+    elif 'AVISO' in Eddy.PRODUCT:
         has_ts = False
     else:
-        Exception  # unknown DATATYPE
+        Exception  # unknown PRODUCT
 
     # Unpack indices for convenience
     istr, iend, jstr, jend = Eddy.i0, Eddy.i1, Eddy.j0, Eddy.j1
@@ -739,11 +739,11 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                                                       inner_contlat)
 
                                 # Define T and S if needed
-                                if has_ts:
-                                    # Temperature at centroid
-                                    cent_temp = temp[centj, centi]
-                                    # Salinity at centroid
-                                    cent_salt = salt[centj, centi]
+                                #if has_ts:
+                                    ## Temperature at centroid
+                                    #cent_temp = temp[centj, centi]
+                                    ## Salinity at centroid
+                                    #cent_salt = salt[centj, centi]
 
                                 properties.eddy_radius_s = eddy_radius_s
                                 properties.uavg = uavg
@@ -787,18 +787,19 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     properties.centlon, properties.centlat = centlon_s.copy(), centlat_s.copy()
 
                                     if has_ts: # for ocean model
-                                        if 'Anticyclonic' in sign_type:
-                                            A_list_obj.update_eddy_properties(centlon, centlat,
-                                                                              eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, uavg, teke, rtime,
-                                                                              cent_temp=cent_temp,
-                                                                              cent_salt=cent_salt)
-                                        elif 'Cyclonic' in sign_type:
-                                            C_list_obj.update_eddy_properties(centlon, centlat,
-                                                                              eddy_radius_s, eddy_radius_e,
-                                                                              amplitude, uavg, teke, rtime,
-                                                                              cent_temp=cent_temp,
-                                                                              cent_salt=cent_salt)
+                                        pass
+                                        #if 'Anticyclonic' in sign_type:
+                                            #A_list_obj.update_eddy_properties(centlon, centlat,
+                                                                              #eddy_radius_s, eddy_radius_e,
+                                                                              #amplitude, uavg, teke, rtime,
+                                                                              #cent_temp=cent_temp,
+                                                                              #cent_salt=cent_salt)
+                                        #elif 'Cyclonic' in sign_type:
+                                            #C_list_obj.update_eddy_properties(centlon, centlat,
+                                                                              #eddy_radius_s, eddy_radius_e,
+                                                                              #amplitude, uavg, teke, rtime,
+                                                                              #cent_temp=cent_temp,
+                                                                              #cent_salt=cent_salt)
                                     else:  # for AVISO
 
                                         if 'Anticyclonic' in sign_type:
@@ -945,8 +946,8 @@ def track_eddies(Eddy, first_record):
         for new_ind, new_dist in enumerate(dist_mat[old_ind]):
 
             within_range = False
-
-            if new_dist < far_away:
+            #print far_away, Eddy.search_ellipse.rw_c_mod
+            if new_dist < Eddy.search_ellipse.rw_c_mod:#far_away:
 
                 if 'ellipse' in Eddy.SEPARATION_METHOD:
                     if Eddy.search_ellipse.ellipse_path.contains_point(
@@ -991,7 +992,7 @@ def track_eddies(Eddy, first_record):
                     new_ek.append(Eddy.new_teke_tmp[new_ind])
                     new_tm.append(Eddy.new_time_tmp[new_ind])
 
-                    if 'ROMS' in Eddy.DATATYPE:
+                    if 'ROMS' in Eddy.PRODUCT:
                         #new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
                         #new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
                         pass
@@ -1027,10 +1028,11 @@ def track_eddies(Eddy, first_record):
                     new_rd_e[0], new_am[0], new_Ua[0], new_ek[0], new_tm[0],
                     new_eddy, first_record)
 
-            if 'ROMS' in Eddy.DATATYPE:
-                new_tp = new_st = 99; print 'correct me'
-                kwargs['cent_temp'] = new_tp[0]
-                kwargs['cent_salt'] = new_st[0]
+            if 'ROMS' in Eddy.PRODUCT:
+                pass
+                #new_tp = new_st = 99; print 'correct me'
+                #kwargs['cent_temp'] = new_tp[0]
+                #kwargs['cent_salt'] = new_st[0]
 
             # NOTE accounting should be part of Eddy (or some other) object...
             Eddy = accounting(*args, **kwargs)
@@ -1055,13 +1057,14 @@ def track_eddies(Eddy, first_record):
                 delta_area = np.r_[delta_area, delta_area_tmp]
                 delta_amp = np.r_[delta_amp, delta_amp_tmp]
 
-                if 'ROMS' in Eddy.DATATYPE:
+                if 'ROMS' in Eddy.PRODUCT:
                     #delta_temp_tmp = 
                     #delta_salt_tmp = 
-                    delta_temp = np.r_[delta_temp,
-                        np.abs(np.diff([Eddy.old_temp[old_ind], new_tp[i]]))]
-                    delta_salt = np.r_[delta_salt,
-                        np.abs(np.diff([Eddy.old_salt[old_ind], new_st[i]]))]
+                    pass
+                    #delta_temp = np.r_[delta_temp,
+                        #np.abs(np.diff([Eddy.old_temp[old_ind], new_tp[i]]))]
+                    #delta_salt = np.r_[delta_salt,
+                        #np.abs(np.diff([Eddy.old_salt[old_ind], new_st[i]]))]
 
             # This from Penven etal (2005)
             deltaX = np.sqrt((delta_area / AREA0)**2 +
@@ -1096,8 +1099,9 @@ def track_eddies(Eddy, first_record):
             kwargs = {'contour_e': new_cntr_e, 'contour_s': new_cntr_s,
                       'uavg_profile': new_uavg_prf, 'shape_error': new_shp_err}
 
-            if 'ROMS' in Eddy.DATATYPE:
-                print 'fix me for temp and salt'
+            if 'ROMS' in Eddy.PRODUCT:
+                pass
+                #print 'fix me for temp and salt'
 
             Eddy = accounting(*args, **kwargs)
 
@@ -1169,14 +1173,18 @@ def track_eddies(Eddy, first_record):
                           'uavg_profile': new_uavg_profile_tmp,
                           'shape_error': new_shape_error_tmp}
 
-                if 'ROMS' in Eddy.DATATYPE:
+                if 'ROMS' in Eddy.PRODUCT:
 
-                    kwargs['cent_temp'] = Eddy.new_temp_tmp[neind]
-                    kwargs['cent_salt'] = Eddy.new_salt_tmp[neind]
-
-                Eddy = accounting(*args, **kwargs)
-
+                    #kwargs['cent_temp'] = Eddy.new_temp_tmp[neind]
+                    pass
+                    #kwargs['cent_salt'] = Eddy.new_salt_tmp[neind]
+                
+                Eddy = accounting(*args, **kwargs)  
+    
     return Eddy
+
+
+
 
 
 def accounting(Eddy, old_ind, centlon, centlat,
@@ -1220,9 +1228,10 @@ def accounting(Eddy, old_ind, centlon, centlat,
         Eddy.insert_at_index('new_uavg', old_ind, uavg)
         Eddy.insert_at_index('new_teke', old_ind, teke)
 
-        if 'ROMS' in Eddy.DATATYPE:
-            Eddy.insert_at_index('new_temp', old_ind, cent_temp)
-            Eddy.insert_at_index('new_salt', old_ind, cent_salt)
+        if 'ROMS' in Eddy.PRODUCT:
+            pass
+            #Eddy.insert_at_index('new_temp', old_ind, cent_temp)
+            #Eddy.insert_at_index('new_salt', old_ind, cent_salt)
 
         if Eddy.TRACK_EXTRA_VARIABLES:
             Eddy.insert_at_index('new_contour_e', old_ind, contour_e)
@@ -1246,9 +1255,10 @@ def accounting(Eddy, old_ind, centlon, centlat,
         Eddy.insert_at_index('new_uavg', Eddy.index, uavg)
         Eddy.insert_at_index('new_teke', Eddy.index, teke)
 
-        if 'ROMS' in Eddy.DATATYPE:
-            Eddy.insert_at_index('new_temp', Eddy.index, cent_temp)
-            Eddy.insert_at_index('new_salt', Eddy.index, cent_salt)
+        if 'ROMS' in Eddy.PRODUCT:
+            pass
+            #Eddy.insert_at_index('new_temp', Eddy.index, cent_temp)
+            #Eddy.insert_at_index('new_salt', Eddy.index, cent_salt)
 
         if Eddy.TRACK_EXTRA_VARIABLES:
             Eddy.insert_at_index('new_contour_e', Eddy.index, contour_e)

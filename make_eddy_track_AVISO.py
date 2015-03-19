@@ -138,23 +138,27 @@ class PyEddyTracker (object):
         with Dataset(varfile) as nc:
             return eval(''.join(("nc.variables[varname].", att)))
 
-    def set_initial_indices(self, LONMIN, LONMAX, LATMIN, LATMAX):
+    def set_initial_indices(self):
         """
-        Get indices for desired domain
+        Set indices for desired domain
         """
+        LONMIN, LONMAX = self.LONMIN, self.LONMAX
+        LATMIN, LATMAX = self.LATMIN, self.LATMAX
+        
         print '--- Setting initial indices to *%s* domain' % self.THE_DOMAIN
         print '------ LONMIN = %s, LONMAX = %s, LATMIN = %s, LATMAX = %s' % (
                                            LONMIN, LONMAX, LATMIN, LATMAX)
-        self.i0, _ = self.nearest_point(LONMIN, 
-                                        LATMIN + 0.5 * (LATMAX - LATMIN))
-        self.i1, _ = self.nearest_point(LONMAX,
-                                        LATMIN + 0.5 * (LATMAX - LATMIN))
-        _, self.j0 = self.nearest_point(LONMIN + 0.5 * (LONMAX - LONMIN),
-                                        LATMIN)
-        _, self.j1 = self.nearest_point(LONMIN + 0.5 * (LONMAX - LONMIN),
-                                        LATMAX)
+        LATMIN_OFFSET = LATMIN + (0.5 * (LATMAX - LATMIN))
+        self.i0, _ = self.nearest_point(LONMIN, LATMIN_OFFSET)
+        self.i1, _ = self.nearest_point(LONMAX, LATMIN_OFFSET)
+        LONMIN_OFFSET = LONMIN + (0.5 * (LONMAX - LONMIN))
+        _, self.j0 = self.nearest_point(LONMIN_OFFSET, LATMIN)
+        _, self.j1 = self.nearest_point(LONMIN_OFFSET, LATMAX)
 
         def kdt(lon, lat, limits, k=4):
+            """
+            Make kde tree for indices if domain crosses zero meridian
+            """
             ppoints = np.array([lon.ravel(), lat.ravel()]).T
             ptree = spatial.cKDTree(ppoints)
             pindices = ptree.query(limits, k=k)[1]
@@ -463,6 +467,23 @@ class PyEddyTracker (object):
         self.eke[:] = self.u**2 + self.v**2
         self.eke *= 0.5
         return self
+    
+    def set_interp_coeffs(self, sla, uspd):
+        """
+        Won't work for rotated grid
+        """
+        if 'AVISO' in self.PRODUCT:
+            self.sla_coeffs = interpolate.RectBivariateSpline(
+                self.lat()[:, 0], self.lon()[0], sla, kx=1, ky=1)
+            self.uspd_coeffs = interpolate.RectBivariateSpline(
+                self.lat()[:, 0], self.lon()[0], uspd, kx=1, ky=1)
+        elif 'ROMS' in self.PRODUCT:
+            points = np.array([self.lon().ravel(), self.lat().ravel()]).T
+            self.sla_coeffs = interpolate.CloughTocher2DInterpolator(
+                points, sla.ravel())
+            self.uspd_coeffs = interpolate.CloughTocher2DInterpolator(
+                points, uspd.ravel())
+        return self
 
 
 class AvisoGrid (PyEddyTracker):
@@ -476,7 +497,7 @@ class AvisoGrid (PyEddyTracker):
         Initialise the grid object
         """
         super(AvisoGrid, self).__init__()
-        print '\nInitialising the AVISO_grid'
+        print '\nInitialising the *AVISO_grid*'
         self.THE_DOMAIN = THE_DOMAIN
         self.PRODUCT = PRODUCT
         self.LONMIN = LONMIN
@@ -515,8 +536,9 @@ class AvisoGrid (PyEddyTracker):
         self.set_basemap(with_pad=with_pad)
         self.get_AVISO_f_pm_pn()
         self.set_u_v_eke()
-        pad2 = 2 * self.pad
-        self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
+        self.shape = self.lon().shape
+        #pad2 = 2 * self.pad
+        #self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
 
     def __getstate__(self):
         """
@@ -758,16 +780,6 @@ class AvisoGrid (PyEddyTracker):
         brypath = np.array([lon, lat]).T
         return path.Path(brypath)
 
-    def set_interp_coeffs(self, sla, uspd):
-        """
-        Won't work for rotated grid
-        """
-        self.sla_coeffs = interpolate.RectBivariateSpline(
-            self.lat()[:, 0], self.lon()[0], sla, kx=1, ky=1)
-        self.uspd_coeffs = interpolate.RectBivariateSpline(
-            self.lat()[:, 0], self.lon()[0], uspd, kx=1, ky=1)
-        return self
-
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 if __name__ == '__main__':
@@ -872,13 +884,12 @@ if __name__ == '__main__':
         if 'SLA' in DIAGNOSTIC_TYPE:
             ZWL = np.atleast_1d(config['SMOOTHING_SLA']['ZWL'])
             MWL = np.atleast_1d(config['SMOOTHING_SLA']['MWL'])
-            SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
         elif 'Q' in DIAGNOSTIC_TYPE:
             SMOOTH_FAC = config['SMOOTHING_Q']['SMOOTH_FAC']
-            SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
         else:
             Exception
-
+        SMOOTHING_TYPE = config['SMOOTHING_SLA']['TYPE']
+    
     if 'Q' in DIAGNOSTIC_TYPE:
         AMP0 = 0.02  # vort/f
     elif 'SLA' in DIAGNOSTIC_TYPE:
@@ -925,7 +936,7 @@ if __name__ == '__main__':
 
     if 'Gaussian' in SMOOTHING_TYPE:
         # Get parameters for ndimage.gaussian_filter
-        zres, mres = gaussian_resolution(sla_grd.get_resolution(),
+        ZRES, MRES = gaussian_resolution(sla_grd.get_resolution(),
                                          ZWL, MWL)
 
     fig = plt.figure(1)
@@ -940,10 +951,10 @@ if __name__ == '__main__':
 
     # Initialise two eddy objects to hold data
     #kwargs = config
-    A_eddy = eddy_tracker.TrackList('AVISO', 'Anticyclonic', A_SAVEFILE,
+    A_eddy = eddy_tracker.TrackList('Anticyclonic', A_SAVEFILE,
                                     sla_grd, search_ellipse, **config)
 
-    C_eddy = eddy_tracker.TrackList('AVISO', 'Cyclonic', C_SAVEFILE,
+    C_eddy = eddy_tracker.TrackList('Cyclonic', C_SAVEFILE,
                                     sla_grd, search_ellipse, **config)
 
     A_eddy.search_ellipse = search_ellipse
@@ -1022,7 +1033,7 @@ if __name__ == '__main__':
                     np.place(sla, sla.data == sla_grd.FILLVAL, 0.)
                     # High pass filter, see
                     # http://stackoverflow.com/questions/6094957/high-pass-filter-for-image-processing-in-python-by-using-scipy-numpy
-                    sla -= ndimage.gaussian_filter(sla, [mres, zres])
+                    sla -= ndimage.gaussian_filter(sla, [MRES, ZRES])
 
                 elif 'Hanning' in SMOOTHING_TYPE:
 
@@ -1252,8 +1263,6 @@ if __name__ == '__main__':
                                 animax, animax_cbar)
 
             # Save inactive eddies to nc file
-            # IMPORTANT: this must be done at every time step!!
-            #saving_START_TIME = time.time()
             if not first_record:
 
                 if A_eddy.VERBOSE:

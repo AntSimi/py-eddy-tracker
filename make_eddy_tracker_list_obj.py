@@ -87,12 +87,18 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
        method  : currently only 'interp1d' or 'Akima'
                  (Akima is slightly slower, but may be more accurate)
        kind    : type of interpolation (interp1d only)
+       extrapolate : IS NOT RELIABLE (sometimes nans occur)
     """
     if kwargs.has_key('method'):
         method = kwargs['method']
     else:
         method = 'interp1d'
 
+    if kwargs.has_key('extrapolate'):
+        extrapolate = kwargs['extrapolate']
+    else:
+        extrapolate = None
+        
     if kwargs.has_key('num_fac'):
         num_fac = kwargs['num_fac']
     else:
@@ -113,16 +119,18 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
             kind = 'linear'
         xfunc = interpolate.interp1d(d, x, kind=kind)
         yfunc = interpolate.interp1d(d, y, kind=kind)
+        xnew = xfunc(d_uniform)
+        ynew = yfunc(d_uniform)
 
     elif strcompare('akima', method):
         xfunc = interpolate.Akima1DInterpolator(d, x)
         yfunc = interpolate.Akima1DInterpolator(d, y)
+        xnew = xfunc(d_uniform, extrapolate=extrapolate)
+        ynew = yfunc(d_uniform, extrapolate=extrapolate)
 
     else:
         Exception
 
-    xnew = xfunc(d_uniform)
-    ynew = yfunc(d_uniform)
     return xnew, ynew
 
 
@@ -150,13 +158,13 @@ class Track (object):
         dayzero - True at first appearance of eddy
     """
 
-    def __init__(self, DATATYPE, lon, lat, time, uavg, teke,
+    def __init__(self, PRODUCT, lon, lat, time, uavg, teke,
                  radius_s, radius_e, amplitude, temp=None, salt=None,
                  save_extras=False, contour_e=None, contour_s=None,
                  uavg_profile=None, shape_error=None):
 
         #self.eddy_index = eddy_index
-        self.DATATYPE   = DATATYPE
+        self.PRODUCT   = PRODUCT
         self.lon        = [lon]
         self.lat        = [lat]
         self.ocean_time = [time]
@@ -165,9 +173,10 @@ class Track (object):
         self.radius_s   = [radius_s] # speed-based eddy radius
         self.radius_e   = [radius_e] # effective eddy radius
         self.amplitude  = [amplitude]
-        if 'ROMS' in self.DATATYPE:
-            self.temp   = [temp]
-            self.salt   = [salt]
+        if 'ROMS' in self.PRODUCT:
+            #self.temp   = [temp]
+            pass
+            #self.salt   = [salt]
         #self.bounds     = np.atleast_2d(bounds)
         self.alive      = True
         self.dayzero    = True
@@ -195,9 +204,10 @@ class Track (object):
         self.radius_s.append(radius_s)
         self.radius_e.append(radius_e)
         self.amplitude.append(amplitude)
-        if 'ROMS' in self.DATATYPE:
-            self.temp = np.r_[self.temp, temp]
-            self.salt = np.r_[self.salt, salt]
+        if 'ROMS' in self.PRODUCT:
+            #self.temp = np.r_[self.temp, temp]
+            pass
+            #self.salt = np.r_[self.salt, salt]
         if self.save_extras:
             self.contour_e.append(contour_e)
             self.contour_s.append(contour_s)
@@ -233,13 +243,13 @@ class TrackList (object):
         old_lon, old_lat: old lon/lat centroids
         index:   index of eddy in track_list
     """
-    def __init__(self, DATATYPE, SIGN_TYPE, SAVE_DIR, grd, search_ellipse,
+    def __init__(self, SIGN_TYPE, SAVE_DIR, grd, search_ellipse,
                  **kwargs):
         """
         Initialise the list 'tracklist'
         """
         self.tracklist = []
-        self.DATATYPE = DATATYPE
+        self.PRODUCT = grd.PRODUCT
         self.SIGN_TYPE = SIGN_TYPE
         self.SAVE_DIR = SAVE_DIR
 
@@ -311,7 +321,7 @@ class TrackList (object):
         self.new_amp = []
         self.new_uavg = []
         self.new_teke = []
-        if 'ROMS' in self.DATATYPE:
+        if 'ROMS' in self.PRODUCT:
             self.new_temp = []
             self.new_salt = []
         # NOTE check if new_time and old_time are necessary... 
@@ -323,9 +333,10 @@ class TrackList (object):
         self.old_amp = []
         self.old_uavg = []
         self.old_teke = []
-        if 'ROMS' in self.DATATYPE:
-            self.old_temp = []
-            self.old_salt = []
+        if 'ROMS' in self.PRODUCT:
+            #self.old_temp = []
+            pass
+            #self.old_salt = []
         self.old_time = []
         if self.TRACK_EXTRA_VARIABLES:
             self.new_contour_e = []
@@ -344,9 +355,9 @@ class TrackList (object):
         self.search_ellipse = None
         self.PIXEL_THRESHOLD = None
         # Check for a correct configuration
-        assert DATATYPE in ('ROMS',
-                            'AVISO'), "".join(('Unknown string ',
-                                               'in *DATATYPE* parameter'))
+        assert self.PRODUCT in ('ROMS',
+                                'AVISO'), "".join(('Unknown string ',
+                                              'in *PRODUCT* parameter'))
 
     def __getstate__(self):
         """
@@ -368,7 +379,7 @@ class TrackList (object):
         """
         Append a new 'track' object to the list
         """
-        self.tracklist.append(Track(self.DATATYPE,
+        self.tracklist.append(Track(self.PRODUCT,
                                     lon, lat, time, uavg, teke,
                                     radius_s, radius_e, amplitude,
                                     temp, salt, self.TRACK_EXTRA_VARIABLES,
@@ -401,12 +412,12 @@ class TrackList (object):
         self.new_uavg_tmp.append(properties.uavg)
         self.new_teke_tmp.append(properties.teke)
         self.new_time_tmp.append(properties.rtime)
-        #print self.new_time_tmp
-        #print self.new_lon_tmp
-        if 'ROMS' in self.DATATYPE:
-            #self.new_temp_tmp = np.r_[self.new_temp_tmp, cent_temp]
-            #self.new_salt_tmp = np.r_[self.new_salt_tmp, cent_salt]
+
+        if 'ROMS' in self.PRODUCT:
+            #self.new_temp_tmp = np.r_[self.new_temp_tmp, properties.cent_temp]
+            #self.new_salt_tmp = np.r_[self.new_salt_tmp, properties.cent_salt]
             pass
+        
         if self.TRACK_EXTRA_VARIABLES:
             self.new_contour_e_tmp.append(properties.contour_e)
             self.new_contour_s_tmp.append(properties.contour_s)
@@ -483,9 +494,9 @@ class TrackList (object):
         return inactive_tracks
 
     def create_netcdf(self, directory, savedir,
-                      grd=None, Ymin=None, Ymax=None,
-                      Mmin=None, Mmax=None, model=None,
-                      sigma_lev=None, rho_ntr=None):
+                      grd=None, YMIN=None, YMAX=None,
+                      MMIN=None, MMAX=None, MODEL=None,
+                      SIGMA_LEV=None, rho_ntr=None):
         """
         Create netcdf file same style as Chelton etal (2011)
         """
@@ -523,16 +534,16 @@ class TrackList (object):
         #nc.LATMIN = grd.LATMIN
         #nc.LATMAX = grd.LATMAX
 
-        if 'ROMS' in self.DATATYPE:
-            nc.ROMS_grid = grd.grdfile
-            nc.model = model
-            nc.Ymin = np.int32(Ymin)
-            nc.Ymax = np.int32(Ymax)
-            nc.Mmin = np.int32(Mmin)
-            nc.Mmax = np.int32(Mmax)
-            nc.sigma_lev_index = np.int32(sigma_lev)
+        if 'ROMS' in self.PRODUCT:
+            nc.ROMS_GRID = grd.GRDFILE
+            nc.MODEL = MODEL
+            nc.YMIN = np.int32(YMIN)
+            nc.YMAX = np.int32(YMAX)
+            nc.MMIN = np.int32(MMIN)
+            nc.MMAX = np.int32(MMAX)
+            nc.SIGMA_LEV_index = np.int32(SIGMA_LEV)
 
-            if 'ip_roms' in model:
+            if 'ip_roms' in MODEL:
                 nc.rho_ntr = rho_ntr
 
         nc.EVOLVE_AMP_MIN = self.EVOLVE_AMP_MIN
@@ -568,10 +579,10 @@ class TrackList (object):
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.createVariable('qparameter', 'f4', ('Nobs'), fill_value=self.FILLVAL)
 
-        if 'ROMS' in self.DATATYPE:
-            nc.createVariable('temp', 'f4', ('Nobs'), fill_value=self.FILLVAL)
-            nc.createVariable('salt', 'f4', ('Nobs'), fill_value=self.FILLVAL)
-
+        if 'ROMS' in self.PRODUCT:
+            #nc.createVariable('temp', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+            #nc.createVariable('salt', 'f4', ('Nobs'), fill_value=self.FILLVAL)
+            pass
         #nc.createVariable('eddy_duration', np.int16, ('Nobs'), fill_value=self.FILLVAL)
 
         # Meta data for variables
@@ -655,9 +666,10 @@ class TrackList (object):
         if 'Q' in self.DIAGNOSTIC_TYPE:
             nc.variables['qparameter'].units = 's^{-2}'
 
-        if 'ROMS' in self.DATATYPE:
-            nc.variables['temp'].units = 'deg. C'
-            nc.variables['salt'].units = 'psu'
+        if 'ROMS' in self.PRODUCT:
+            #nc.variables['temp'].units = 'deg. C'
+            #nc.variables['salt'].units = 'psu'
+            pass
 
         if self.TRACK_EXTRA_VARIABLES:
 
@@ -771,12 +783,12 @@ class TrackList (object):
                             nc.variables['track'].max_val = track_max_val
                             #nc.variables['eddy_duration'][self.ncind:tend] = eddy_duration
 
-                            if 'ROMS' in self.DATATYPE:
-                                temp = np.array([self.tracklist[i].temp])
-                                salt = np.array([self.tracklist[i].salt])
-
-                                nc.variables['temp'][self.ncind:tend] = temp
-                                nc.variables['salt'][self.ncind:tend] = salt
+                            if 'ROMS' in self.PRODUCT:
+                                #temp = np.array([self.tracklist[i].temp])
+                                #salt = np.array([self.tracklist[i].salt])
+                                pass
+                                #nc.variables['temp'][self.ncind:tend] = temp
+                                #nc.variables['salt'][self.ncind:tend] = salt
 
                             if self.INTERANNUAL:
                                 # We add 1 because 'j1' is an integer in ncsavefile; julian day midnight has .5
@@ -839,12 +851,12 @@ class TrackList (object):
         self.new_teke = []
         self.new_time = []
 
-        if 'ROMS' in self.DATATYPE:
-            self.old_temp = self.new_temp[lasti:]
-            self.old_salt = self.new_salt[lasti:]
-
-            self.new_temp = []
-            self.new_salt = []
+        if 'ROMS' in self.PRODUCT:
+            #self.old_temp = self.new_temp[lasti:]
+            #self.old_salt = self.new_salt[lasti:]
+            pass
+            #self.new_temp = []
+            #self.new_salt = []
 
         if self.TRACK_EXTRA_VARIABLES:
             self.old_contour_e = list(self.new_contour_e[lasti:])
@@ -939,10 +951,12 @@ class RossbyWaveSpeed (object):
             assert self.RW_PATH is not None, \
                 'Must supply a path for the Rossby deformation radius data'
             data = np.loadtxt(RW_PATH)
-            self._lon = data[:, 1] - 360.
+            self._lon = data[:, 1] 
             self._lat = data[:, 0]
             self._defrad = data[:, 3]
             self.limits = [grd.LONMIN, grd.LONMAX, grd.LATMIN, grd.LATMAX]
+            if grd.LONMIN < 0:
+                self._lon -= 360.
             self._make_subset()._make_kdtree()
             self.vartype = 'variable'
         else:
