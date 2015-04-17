@@ -62,8 +62,7 @@ if __name__ == '__main__':
     #SAVE_DIR = DIRECTORY
     SAVE_DIR = '/marula/emason/runs2009/na_2009_7pt5km/eddy_tracking_exps/sla_1/'
 
-    # True to save outputs in same style as CSS11
-    chelton_style_nc = True
+
     
     print 'SAVE_DIR', SAVE_DIR
     

@@ -499,7 +499,10 @@ class AvisoGrid (PyEddyTracker):
         super(AvisoGrid, self).__init__()
         print '\nInitialising the *AVISO_grid*'
         self.THE_DOMAIN = THE_DOMAIN
-        self.PRODUCT = PRODUCT
+        if 'AVISO' in PRODUCT:
+            self.PRODUCT = 'AVISO'
+        else:
+            self.PRODUCT = PRODUCT
         self.LONMIN = LONMIN
         self.LONMAX = LONMAX
         self.LATMIN = LATMIN
@@ -531,7 +534,7 @@ class AvisoGrid (PyEddyTracker):
         self.sla_coeffs = None
         self.uspd_coeffs = None
 
-        self.set_initial_indices(LONMIN, LONMAX, LATMIN, LATMAX)
+        self.set_initial_indices()
         self.set_index_padding()
         self.set_basemap(with_pad=with_pad)
         self.get_AVISO_f_pm_pn()

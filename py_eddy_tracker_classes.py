@@ -39,11 +39,11 @@ import time
 import matplotlib.dates as dt
 import matplotlib.path as path
 import matplotlib.patches as patch
-
+import mpl_toolkits.basemap.pyproj as pyproj
 import make_eddy_tracker_list_obj as eddy_tracker
 from py_eddy_tracker_property_classes import Amplitude, EddyProperty, interpolate
-#import haversine_distmat as hav # needs compiling with f2py
 from haversine import haversine # needs compiling with f2py
+
 
 def datestr2datetime(datestr):
     """
@@ -414,6 +414,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
 
     theseglon, theseglat = eddy_tracker.uniform_resample(
         theseglon, theseglat, method='akima')
+    
     if 'RectBivariate' in Eddy.INTERP_METHOD:
         uavg = Eddy.uspd_coeffs.ev(theseglat[1:], theseglon[1:]).mean()
 
@@ -499,9 +500,14 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
         citer.iternext()
 
     if any_inner_contours:  # set speed based contour parameters
-        cx, cy = Eddy.M(theseglon, theseglat)
+        proj = pyproj.Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
+                           % (theseglat.mean(), theseglon.mean()))
+        cx, cy = proj(theseglon, theseglat)
+        #cx, cy = Eddy.M(theseglon, theseglat)
         centx_s, centy_s, eddy_radius_s, junk = fit_circle(cx, cy)
-        centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
+        centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
+        #print 'fffffffffff', centlon_s, centlat_s
+        #centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
 
     else:  # use the effective contour
         centlon_s, centlat_s = centlon_e, centlat_e
@@ -565,18 +571,35 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                 properties = EddyProperty()
 
                 # Prepare for shape test and get eddy_radius_e
-                cx, cy = Eddy.M(contlon_e, contlat_e)
+                #cx, cy = Eddy.M(contlon_e, contlat_e)
+                
+                ##################0
+                #proj = pyproj.Proj(proj='aeqd', lat_0=contlat_e.mean(), lon_0=contlon_e.mean())#, width=5.e2, height=5.e2)
+                # http://www.geo.hunter.cuny.edu/~jochen/gtech201/lectures/lec6concepts/map%20coordinate%20systems/how%20to%20choose%20a%20projection.htm
+                proj = pyproj.Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
+                                   % (contlat_e.mean(), contlon_e.mean()))
+                cx, cy = proj(contlon_e, contlat_e)
                 centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(cx, cy)
-
+                #print centlon_e, centlat_e, eddy_radius_e, aerr
+                #print cxx, cyy
+                ##################0
+                
+                #centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(cx, cy)
+                #print centlon_e, centlat_e, eddy_radius_e, aerr
+                #print cx, cy
+                #print '-----------------------------------------------------'
+                #aaaaaaaaaaaaaaaaa
+                
                 aerr = np.atleast_1d(aerr)
 
                 # Filter for shape: >35% (>55%) is not an eddy for Q (SLA)
                 if aerr >= 0. and aerr <= Eddy.SHAPE_ERROR[collind]:
 
                     # Get centroid in lon lat
-                    centlon_e, centlat_e = Eddy.M.projtran(centlon_e,
-                                                           centlat_e,
-                                                           inverse=True)
+                    centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
+                    #centlon_e, centlat_e = Eddy.M.projtran(centlon_e,
+                                                           #centlat_e,
+                                                           #inverse=True)
 
                     # For some reason centlat_e is transformed
                     # by projtran to 'float'...
@@ -648,8 +671,10 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             centx, centy = Eddy.M(centlon_e, centlat_e)
                             circlon, circlat = get_circle(centx, centy,
                                                           eddy_radius_e, 180)
-                            circlon[:], circlat[:] = Eddy.M.projtran(
-                                circlon, circlat, inverse=True)
+                            #circlon[:], circlat[:] = Eddy.M.projtran(
+                                #circlon, circlat, inverse=True)
+                            circlon[:], circlat[:] = proj(circlon, circlat,
+                                                          inverse=True)
                             Eddy.circlon, Eddy.circlat = circlon, circlat
 
                             # Set masked points within bounding box around eddy
