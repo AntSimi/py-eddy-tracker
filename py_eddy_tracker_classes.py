@@ -95,8 +95,8 @@ def do_basemap(M, ax):
                     labels=[1, 0, 0, 0], linewidth=0.25, size=8, ax=ax)
     M.drawmeridians(np.arange(-360, 360 + stride, stride),
                     labels=[0, 0, 0, 1], linewidth=0.25, size=8, ax=ax)
-    M.fillcontinents('k', ax=ax)
-    M.drawcoastlines(linewidth=0.5, ax=ax)
+    M.fillcontinents('k', ax=ax, zorder=20)
+    M.drawcoastlines(linewidth=0.5, ax=ax, zorder=20)
     return
 
 
@@ -474,7 +474,7 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
                         seglon, seglat = (poly_i.vertices[:, 0],
                                           poly_i.vertices[:, 1])
                         seglon, seglat = eddy_tracker.uniform_resample(
-                            seglon, seglat, method='akima')
+                            seglon, seglat, method='interp1d')
 
                         # Interpolate uspd to seglon, seglat, then get mean
                         if 'RectBivariate' in Eddy.INTERP_METHOD:
@@ -573,23 +573,13 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                 # Prepare for shape test and get eddy_radius_e
                 #cx, cy = Eddy.M(contlon_e, contlat_e)
                 
-                ##################0
                 #proj = pyproj.Proj(proj='aeqd', lat_0=contlat_e.mean(), lon_0=contlon_e.mean())#, width=5.e2, height=5.e2)
                 # http://www.geo.hunter.cuny.edu/~jochen/gtech201/lectures/lec6concepts/map%20coordinate%20systems/how%20to%20choose%20a%20projection.htm
                 proj = pyproj.Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
                                    % (contlat_e.mean(), contlon_e.mean()))
                 cx, cy = proj(contlon_e, contlat_e)
                 centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(cx, cy)
-                #print centlon_e, centlat_e, eddy_radius_e, aerr
-                #print cxx, cyy
-                ##################0
-                
-                #centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(cx, cy)
-                #print centlon_e, centlat_e, eddy_radius_e, aerr
-                #print cx, cy
-                #print '-----------------------------------------------------'
-                #aaaaaaaaaaaaaaaaa
-                
+
                 aerr = np.atleast_1d(aerr)
 
                 # Filter for shape: >35% (>55%) is not an eddy for Q (SLA)
@@ -668,13 +658,15 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                                       Eddy.jmin, Eddy.jmax)
 
                             # Get eddy circumference using eddy_radius_e
-                            centx, centy = Eddy.M(centlon_e, centlat_e)
-                            circlon, circlat = get_circle(centx, centy,
+                            #centx, centy = Eddy.M(centlon_e, centlat_e)
+                            #circlon, circlat = get_circle(centx, centy,
+                                                          #eddy_radius_e, 180)
+                            circlon, circlat = get_circle(centlon_e, centlat_e,
                                                           eddy_radius_e, 180)
                             #circlon[:], circlat[:] = Eddy.M.projtran(
                                 #circlon, circlat, inverse=True)
-                            circlon[:], circlat[:] = proj(circlon, circlat,
-                                                          inverse=True)
+                            #circlon[:], circlat[:] = proj(circlon, circlat,
+                                                          #inverse=True)
                             Eddy.circlon, Eddy.circlat = circlon, circlat
 
                             # Set masked points within bounding box around eddy
@@ -690,7 +682,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 # circumferential distribution
                                 contlon_e, contlat_e = \
                                     eddy_tracker.uniform_resample(
-                                        contlon_e, contlat_e, method='akima')
+                                        contlon_e, contlat_e)
 
                                 if 'Q' in Eddy.DIAGNOSTIC_TYPE:
                                     # Note, eddy amplitude == max(abs(vort/f)) within eddy, KCCMC11
@@ -963,6 +955,7 @@ def track_eddies(Eddy, first_record):
         # Make an ellipse at current old_eddy location
         # (See CSS11 sec. B4, pg. 208)
         if 'ellipse' in Eddy.SEPARATION_METHOD:
+            
             Eddy.search_ellipse.set_search_ellipse(old_x[old_ind],
                                                    old_y[old_ind])
             #Eddy.search_ellipse.view_search_ellipse(Eddy)
@@ -1388,30 +1381,51 @@ def func_hann2d_fast(var, numpasses):
     return var
 
 
-def get_circle(x0, y0, r, npts):
-    """
-    Return points on a circle, with specified (x0, y0) center and radius
-                    (and optional number of points too).
+#def get_circle_OLD(x0, y0, r, npts):
+    #"""
+    #Return points on a circle, with specified (x0, y0) center and radius
+                    #(and optional number of points too).
 
-    Input     : 1  - x0, scalar, center X of circle
-                2  - y0, scalar, center Y of circle
-                3  - r,  scalar, radius
-                4  - npts, scalar, number of points (optional)
+    #Input     : 1  - x0, scalar, center X of circle
+                #2  - y0, scalar, center Y of circle
+                #3  - r,  scalar, radius
+                #4  - npts, scalar, number of points (optional)
 
-    Output    : 1  - cx, circle x-points
-                2  - cy, circle y-points
+    #Output    : 1  - cx, circle x-points
+                #2  - cy, circle y-points
 
-    Example   :  [cx cy] = func_get_circle (5, 5, 3, 256)
-                plot (cx, cy, '-')
+    #Example   :  [cx cy] = func_get_circle (5, 5, 3, 256)
+                #plot (cx, cy, '-')
 
-    Written By : UCLA ROMS Team (jaison@atmos.ucla.edu)
-    Written On : June/05/2008
-    Tool       : Eddy Tracker
-    """
-    theta = np.arange(npts)  # NOTE npts is a constant, so
-    # *cos(theta)* and *sin(theta)* can be predefined
+    #Written By : UCLA ROMS Team (jaison@atmos.ucla.edu)
+    #Written On : June/05/2008
+    #Tool       : Eddy Tracker
+    #"""
+    #theta = np.arange(np.float64(npts))  # NOTE npts is a constant, so
+    ## *cos(theta)* and *sin(theta)* can be predefined
+    ## SHOULD BE PART OF CONTOUR OBJECT
+    #theta[:] = theta * 2. * (4. * np.arctan(1.)) / npts
+    #cx = x0 + r * np.cos(theta)
+    #cy = y0 + r * np.sin(theta)
+    #return cx, cy
+
+
+def get_circle(lon, lat, distance, npts):
+    '''
+    Given the inputs (base lon, base lat, angle [deg], distance [m]) return
+    the lon, lat of the new position...
     # SHOULD BE PART OF CONTOUR OBJECT
-    theta[:] = theta * 2. * (4. * np.arctan(1.)) / npts
-    cx = x0 + r * np.cos(theta)
-    cy = y0 + r * np.sin(theta)
-    return cx, cy
+    Could be speeded up with f2py
+    '''
+    pio180 = np.pi / 180.
+    lon *= pio180
+    lat *= pio180
+    angle = np.arange(np.float64(npts))
+    angle[:] = angle * 2. * (4. * np.arctan(1.)) / npts
+    distance /= 6371315.0 # angular distance
+    lat1 = (np.arcsin(np.sin(lat) * np.cos(distance) + np.cos(lat) *
+                      np.sin(distance) * np.cos(angle)))
+    lon1 = (lon + np.arctan2(np.sin(angle) * np.sin(distance) * np.cos(lat),
+                             np.cos(distance) - np.sin(lat) * np.sin(lat1)))
+    return lon1 / pio180, lat1 / pio180
+
