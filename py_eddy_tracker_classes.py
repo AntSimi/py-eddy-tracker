@@ -656,7 +656,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             # Unpack indices for convenience
                             imin, imax, jmin, jmax = (Eddy.imin, Eddy.imax,
                                                       Eddy.jmin, Eddy.jmax)
-
+                            '''
                             # Get eddy circumference using eddy_radius_e
                             #centx, centy = Eddy.M(centlon_e, centlat_e)
                             #circlon, circlat = get_circle(centx, centy,
@@ -668,7 +668,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             #circlon[:], circlat[:] = proj(circlon, circlat,
                                                           #inverse=True)
                             Eddy.circlon, Eddy.circlat = circlon, circlat
-
+                            '''
                             # Set masked points within bounding box around eddy
                             Eddy.set_mask_eff(cont, grd)
 
