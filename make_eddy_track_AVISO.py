@@ -49,6 +49,8 @@ import yaml
 from datetime import datetime
 import cPickle as pickle
 
+import global_tracking as gbtk
+
 
 def timeit(method):
     """
@@ -1197,7 +1199,13 @@ if __name__ == '__main__':
                 pickle.dump(C_eddy, save_pickle, 2)
             
             print 'EXIT here'
-            exit()
+            
+            print '' 
+            save2nc = gbtk.save_netcdf(A_eddy, ymd_str)
+            save2nc.create_netcdf()
+            save2nc.write_tracks()
+            
+            #exit()
             ## Unpickle
             #with open('C_eddy.pkl', 'rb') as load_pickle:
                 #C_eddy = pickle.load(load_pickle)

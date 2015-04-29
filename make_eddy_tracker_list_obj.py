@@ -367,7 +367,7 @@ class TrackList (object):
         """pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
                 'circlon', 'circlat', 'sla', 'slacopy', 'swirl',
                 'mask_eff', 'mask_eff_sum', 'mask_eff_1d')"""
-	    pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
+        pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
                 'sla', 'slacopy', 'swirl',
                 'mask_eff', 'mask_eff_sum', 'mask_eff_1d')
         result = self.__dict__.copy()
