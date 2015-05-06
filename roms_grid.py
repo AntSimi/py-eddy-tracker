@@ -17,13 +17,13 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014 by Evan Mason
+Copyright (c) 2014-2015 by Evan Mason
 Email: emason@imedea.uib-csic.es 
 ===========================================================================
 
 roms_grid.py
 
-Version 1.4.2
+Version 2.0.0
 
 ===========================================================================
 
@@ -261,7 +261,7 @@ class RomsGrid (PyEddyTracker):
 
 
     def VertCoordType(self):
-        nc = netcdf.Dataset(self.grdfile,'r')
+        nc = netcdf.Dataset(self.GRDFILE,'r')
         var = nc.VertCoordType
         nc.close()
         return var
@@ -282,7 +282,7 @@ class RomsGrid (PyEddyTracker):
 
 
     def title(self):
-        nc = netcdf.Dataset(self.grdfile,'r')
+        nc = netcdf.Dataset(self.GRDFILE,'r')
         var = nc.title
         nc.close()
         return var

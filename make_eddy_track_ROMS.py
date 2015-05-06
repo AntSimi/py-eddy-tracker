@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# %run make_eddy_track.py
+# %run make_eddy_track_ROMS.py
 
 """
 ===========================================================================
@@ -18,13 +18,13 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014 by Evan Mason
+Copyright (c) 2014-2015 by Evan Mason
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
 make_eddy_track_ROMS.py
 
-Version 1.4.1
+Version 2.0.0
 
 
 

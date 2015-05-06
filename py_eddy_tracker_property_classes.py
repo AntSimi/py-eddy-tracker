@@ -18,14 +18,14 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2015 by Evan Mason
+Copyright (c) 2014-2015 by Evan Mason
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
 
 py_eddy_tracker_amplitude.py
 
-Version 1.4.2
+Version 2.0.0
 
 
 ===========================================================================
@@ -203,9 +203,7 @@ class Amplitude (object):
             elif self.local_extrema > self.MLE:
                 lmi_j, lmi_i = np.where(self.local_extrema_inds)
                 levnm2 = level - (2 * self.eddy.INTERVAL)
-                #print 'level, levnm2', level, levnm2
                 slamin = np.atleast_1d(1e5)
-                #print lmi_j, lmi_i
                 for j, i in zip(lmi_j, lmi_i):
                     if slamin >= self.sla[j, i]:
                         slamin[:] = self.sla[j, i]

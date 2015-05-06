@@ -18,14 +18,14 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014 by Evan Mason
+Copyright (c) 2014-2015 by Evan Mason
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
 
 make_eddy_tracker_list_obj.py
 
-Version 1.4.2
+Version 2.0.0
 
 
 ===========================================================================
@@ -164,23 +164,22 @@ class Track (object):
                  uavg_profile=None, shape_error=None):
 
         #self.eddy_index = eddy_index
-        self.PRODUCT   = PRODUCT
-        self.lon        = [lon]
-        self.lat        = [lat]
+        self.PRODUCT = PRODUCT
+        self.lon = [lon]
+        self.lat = [lat]
         self.ocean_time = [time]
-        self.uavg       = [uavg]
-        self.teke       = [teke]
-        self.radius_s   = [radius_s] # speed-based eddy radius
-        self.radius_e   = [radius_e] # effective eddy radius
-        self.amplitude  = [amplitude]
+        self.uavg = [uavg]
+        self.teke = [teke]
+        self.radius_s = [radius_s] # speed-based eddy radius
+        self.radius_e = [radius_e] # effective eddy radius
+        self.amplitude = [amplitude]
         if 'ROMS' in self.PRODUCT:
-            #self.temp   = [temp]
+            #self.temp = [temp]
+            #self.salt = [salt]
             pass
-            #self.salt   = [salt]
-        #self.bounds     = np.atleast_2d(bounds)
-        self.alive      = True
-        self.dayzero    = True
-        self.saved2nc   = False
+        self.alive = True
+        self.dayzero = True
+        self.saved2nc = False
         self.save_extras = save_extras
         if self.save_extras:
             self.contour_e = [contour_e]
@@ -222,7 +221,9 @@ class Track (object):
         If not active, kill it
         """
         # The eddy...
-        if self.alive is False:  # is already dead
+        #print not self.alive, self.dayzero, self.ocean_time[-1] == rtime
+        if not self.alive:  # is already dead
+            #print '--AAA'
             return self.alive
         elif self.dayzero:  # has just been initiated
             self.dayzero = False
@@ -367,7 +368,7 @@ class TrackList (object):
         """pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
                 'circlon', 'circlat', 'sla', 'slacopy', 'swirl',
                 'mask_eff', 'mask_eff_sum', 'mask_eff_1d')"""
-        pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
+	    pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
                 'sla', 'slacopy', 'swirl',
                 'mask_eff', 'mask_eff_sum', 'mask_eff_1d')
         result = self.__dict__.copy()
@@ -479,8 +480,8 @@ class TrackList (object):
         inactive tracks.
         """
         active_tracks = []
-        for i, item in enumerate(self.tracklist):
-            if item._is_alive(rtime):
+        for i, track in enumerate(self.tracklist):
+            if track._is_alive(rtime):
                 active_tracks.append(i)
         return active_tracks
 
@@ -491,8 +492,8 @@ class TrackList (object):
         inactive tracks
         """
         inactive_tracks = []
-        for i, item in enumerate(self.tracklist):
-            if not item._is_alive(rtime):
+        for i, track in enumerate(self.tracklist):
+            if not track._is_alive(rtime):
                 inactive_tracks.append(i)
         return inactive_tracks
 
@@ -715,13 +716,11 @@ class TrackList (object):
             if not track.alive:
                 track.lon = []
                 track.lat = []
-                track.qparameter = []
                 track.amplitude = []
                 track.uavg = []
                 track.teke = []
                 track.radius_s = []
                 track.radius_e = []
-                #track.bounds = []
                 track.ocean_time = []
                 if self.TRACK_EXTRA_VARIABLES:
                     track.contour_e = []
@@ -729,6 +728,21 @@ class TrackList (object):
                     track.uavg_profile = []
                     track.shape_error = []
         return
+
+    def _remove_inactive_tracks(self):
+        """
+        Remove dead tracks from self.tracklist and
+        return indices to active tracks.
+        """
+        new_tracklist = []
+        for track in self.tracklist:
+            new_tracklist.append(track.alive)
+        #print new_tracklist
+        alive_inds = np.nonzero(new_tracklist)[0]
+        #print alive_inds.shape
+        tracklist = np.array(self.tracklist)[alive_inds]
+        self.tracklist = tracklist.tolist()
+        return alive_inds
 
     def write2netcdf(self, rtime):
         """
@@ -823,27 +837,29 @@ class TrackList (object):
                             nc.sync()
         
         # Get index to first currently active track
-        try:
-            lasti = self.get_active_tracks(rtime)[0]
-        except Exception:
-            lasti = None
-
-        # Clip the tracklist,
-        # removes all dead tracks preceding first currently active track
-        self.tracklist = self.tracklist[lasti:]
-        self.index = len(self.tracklist) # adjust index accordingly
+        #try:
+            #lasti = self.get_active_tracks(rtime)[0]
+        #except Exception:
+            #lasti = None
 
         # Remove inactive tracks
-        self._reduce_inactive_tracks()
+        # NOTE: line below used to be below clipping lines below
+        #self._reduce_inactive_tracks()
+        alive_i = self._remove_inactive_tracks()
+        # Clip the tracklist,
+        # removes all dead tracks preceding first currently active track
+        #self.tracklist = self.tracklist[alive_i:]
+        self.index = len(self.tracklist) # adjust index accordingly
+
 
         # Update old_lon and old_lat...
-        self.old_lon = self.new_lon[lasti:]
-        self.old_lat = self.new_lat[lasti:]
-        self.old_radii_s = self.new_radii_s[lasti:]
-        self.old_radii_e = self.new_radii_e[lasti:]
-        self.old_amp = self.new_amp[lasti:]
-        self.old_uavg = self.new_uavg[lasti:]
-        self.old_teke = self.new_teke[lasti:]
+        self.old_lon = np.array(self.new_lon)[alive_i].tolist()
+        self.old_lat = np.array(self.new_lat)[alive_i].tolist()
+        self.old_radii_s = np.array(self.new_radii_s)[alive_i].tolist()
+        self.old_radii_e = np.array(self.new_radii_e)[alive_i].tolist()
+        self.old_amp = np.array(self.new_amp)[alive_i].tolist()
+        self.old_uavg = np.array(self.new_uavg)[alive_i].tolist()
+        self.old_teke = np.array(self.new_teke)[alive_i].tolist()
 
         self.new_lon = []
         self.new_lat = []
@@ -855,17 +871,17 @@ class TrackList (object):
         self.new_time = []
 
         if 'ROMS' in self.PRODUCT:
-            #self.old_temp = self.new_temp[lasti:]
-            #self.old_salt = self.new_salt[lasti:]
+            #self.old_temp = self.new_temp[alive_i:]
+            #self.old_salt = self.new_salt[alive_i:]
             pass
             #self.new_temp = []
             #self.new_salt = []
 
         if self.TRACK_EXTRA_VARIABLES:
-            self.old_contour_e = list(self.new_contour_e[lasti:])
-            self.old_contour_s = list(self.new_contour_s[lasti:])
-            self.old_uavg_profile = list(self.new_uavg_profile[lasti:])
-            self.old_shape_error = self.new_shape_error[lasti:]
+            self.old_contour_e = list(self.new_contour_e[alive_i])
+            self.old_contour_s = list(self.new_contour_s[alive_i])
+            self.old_uavg_profile = list(self.new_uavg_profile[alive_i])
+            self.old_shape_error = self.new_shape_error[alive_i]
 
             self.new_contour_e = []
             self.new_contour_s = []
@@ -968,6 +984,7 @@ class RossbyWaveSpeed (object):
         self.beta = np.empty(1)
         self.r_spd_long = np.empty(1)
         self.start = True
+        self.pio180 = np.pi / 180.
 
     def __getstate__(self):
         """
@@ -1087,7 +1104,7 @@ class RossbyWaveSpeed (object):
         self.r_spd_long **= 2
         self.beta[:] = np.average(self._lat[self.i],
                                   weights=self._weights)  # lat
-        self.beta[:] = np.cos(np.deg2rad(self.beta))
+        self.beta[:] = np.cos(self.pio180 * self.beta)
         self.beta *= 1458e-7  # 1458e-7 ~ (2 * 7.29*10**-5)
         self.beta /= self.EARTH_RADIUS
         self.r_spd_long *= -self.beta

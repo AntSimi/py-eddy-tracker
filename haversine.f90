@@ -16,7 +16,7 @@ module haversine
 !     You should have received a copy of the GNU General Public License
 !     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 ! 
-! Copyright (c) 2014 by Evan Mason
+! Copyright (c) 2014-2015 by Evan Mason
 ! Email: emason@imedea.uib-csic.es
 !
 ! ===========================================================================
@@ -27,7 +27,7 @@ module haversine
 !
 !    If you have ifort on your system, change 'gfortran' to 'intelem'!
 !
-!   Version 1.4.2
+!   Version 2.0.0
 !
 !===========================================================================
 implicit none

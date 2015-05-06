@@ -18,13 +18,13 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014 by Evan Mason
+Copyright (c) 2014-2015 by Evan Mason
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
 py_eddy_tracker_classes.py
 
-Version 1.4.2
+Version 2.0.0
 ===========================================================================
 
 
@@ -43,6 +43,7 @@ import mpl_toolkits.basemap.pyproj as pyproj
 import make_eddy_tracker_list_obj as eddy_tracker
 from py_eddy_tracker_property_classes import Amplitude, EddyProperty, interpolate
 from haversine import haversine # needs compiling with f2py
+import scipy.sparse as sparse
 
 
 def datestr2datetime(datestr):
@@ -111,9 +112,9 @@ def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
             if len(Eddy.tracklist[i].lon) > track_length:
                 aex, aey = Eddy.M(np.asarray(Eddy.tracklist[i].lon),
                                   np.asarray(Eddy.tracklist[i].lat))
-                M.plot(aex, aey, col, lw=0.5, ax=ax, zorder=5)
+                M.plot(aex, aey, col, lw=0.5, ax=ax, zorder=6)
                 M.scatter(aex[-1], aey[-1], s=7, c=col, edgecolor='w',
-                          ax=ax, zorder=6)
+                          ax=ax, zorder=5)
         return
 
     track_length = 0  # for filtering below
@@ -891,10 +892,23 @@ def track_eddies(Eddy, first_record):
     
     dist_mat_copy = dist_mat.copy()
 
+
+    # Prepare distance matrix for sparse operation
+    # NOTE: need to find optimal (+dynamic) choice of filter here
+    dist_mat[dist_mat > 35000.] = 0
+    
+
+    # Use a coordinate format (COO) sparse matrix
+    # https://scipy-lectures.github.io/advanced/scipy_sparse/coo_matrix.html
+    sparse_mat = sparse.coo_matrix((dist_mat))
+    old_sparse_inds = sparse_mat.row
+    new_sparse_inds = sparse_mat.col
+
+
     # *new_eddy_inds* contains indices to every newly identified eddy
     # that are initially set to True on the assumption that it is a new
     # eddy, i.e, it has just been born.
-    # Later some will be set to False, indicating it is a contination
+    # Later some will be set to False, indicating the continuation
     # of an existing eddy.
     new_eddy_inds = np.ones_like(new_x, dtype=bool)
     new_eddy = False
@@ -905,36 +919,31 @@ def track_eddies(Eddy, first_record):
     new_amplitude = np.empty_like(old_area)
 
     # Loop over the old eddies looking for active eddies
-    for old_ind in np.arange(dist_mat.shape[0]):
+    #for old_ind in np.arange(dist_mat.shape[0]):
+    for old_ind in old_sparse_inds:
 
         dist_arr = np.array([])
-        new_ln = []
-        new_lt = []
-        new_rd_s = []
-        new_rd_e = []
-        new_am = []
-        new_Ua = []
-        new_ek = []
-        new_tm = []  # new time
-        new_tp = []  # new temp
-        new_st = []  # new salt
-        #if Eddy.TRACK_EXTRA_VARIABLES:
-        new_cntr_e = []
-        new_cntr_s = []
-        new_uavg_prf = []
-        new_shp_err = np.array([])
-        #new_bnds = np.array([], dtype=np.int16)
-        new_inds = np.array([], dtype=np.int16)
-        backup_ind = np.array([], dtype=np.int16)
-        backup_dist = np.array([])
+        new_ln, new_lt, new_rd_s, new_rd_e, new_am, \
+            new_Ua, new_ek, new_tm, new_tp, new_st = \
+                [], [], [], [], [], [], [], [], [], []
 
+        #if Eddy.TRACK_EXTRA_VARIABLES:
+        new_cntr_e, new_cntr_s, new_uavg_prf = [], [], []
+        new_shp_err = np.array([])
+
+        new_inds, backup_ind, backup_dist = np.array([], dtype=np.int16), \
+                                            np.array([], dtype=np.int16), \
+                                            np.array([])
+
+        '''
         # See http://stackoverflow.com/questions/11528078/determining-duplicate-values-in-an-array
         non_unique_inds = np.setdiff1d(np.arange(len(dist_mat[old_ind])),
                                            np.unique(dist_mat[old_ind],
                                                     return_index=True)[1])
         # Move non_unique_inds far away
         dist_mat[old_ind][non_unique_inds] = far_away  # km
-
+        '''
+        
         if debug_dist:
             
             debug_distmax = 5e6
@@ -961,10 +970,13 @@ def track_eddies(Eddy, first_record):
             #Eddy.search_ellipse.view_search_ellipse(Eddy)
 
         # Loop over separation distances between old and new
-        for new_ind, new_dist in enumerate(dist_mat[old_ind]):
-
+        #for new_ind, new_dist in enumerate(dist_mat[old_ind]):
+        for new_ind in new_sparse_inds:
+            
+            new_dist = dist_mat[old_ind, new_ind]
+            
             within_range = False
-            #print far_away, Eddy.search_ellipse.rw_c_mod
+            #print far_away, Eddy.search_ellipse.rw_c_mod, new_dist
             if new_dist < Eddy.search_ellipse.rw_c_mod:#far_away:
 
                 if 'ellipse' in Eddy.SEPARATION_METHOD:
@@ -996,9 +1008,9 @@ def track_eddies(Eddy, first_record):
                 # Pass only the eddies within min and max times old amplitude
                 # and area (KCCMC11 and CSS11 use 0.25 and 2.5, respectively)
                 if (new_amplitude >= (Eddy.EVOLVE_AMP_MIN * old_amplitude) and
-                  new_amplitude <= (Eddy.EVOLVE_AMP_MAX * old_amplitude)) and \
+                    new_amplitude <= (Eddy.EVOLVE_AMP_MAX * old_amplitude)) and \
                    (new_area >= (Eddy.EVOLVE_AREA_MIN * old_area) and
-                  new_area <= (Eddy.EVOLVE_AREA_MAX * old_area)):
+                    new_area <= (Eddy.EVOLVE_AREA_MAX * old_area)):
 
                     dist_arr = np.r_[dist_arr, new_dist]
                     new_ln.append(Eddy.new_lon_tmp[new_ind])
@@ -1192,7 +1204,6 @@ def track_eddies(Eddy, first_record):
                           'shape_error': new_shape_error_tmp}
 
                 if 'ROMS' in Eddy.PRODUCT:
-
                     #kwargs['cent_temp'] = Eddy.new_temp_tmp[neind]
                     pass
                     #kwargs['cent_salt'] = Eddy.new_salt_tmp[neind]
@@ -1284,7 +1295,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
             Eddy.insert_at_index('new_uavg_profile', Eddy.index, uavg_profile)
             Eddy.insert_at_index('new_shape_error', Eddy.index, shape_error)
 
-        if Eddy.new_list is True:  # initialise a new list
+        if Eddy.new_list:  # initialise a new list
             print ('------ starting a new track list for %s' %
                    Eddy.SIGN_TYPE.replace('nic', 'nes'))
             Eddy.new_list = False
