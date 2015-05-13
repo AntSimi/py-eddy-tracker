@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_amplitude.py
 
-Version 2.0.0
+Version 2.0.1
 
 
 ===========================================================================

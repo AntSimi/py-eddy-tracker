@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 2.0.0
+Version 2.0.1
 ===========================================================================
 
 
@@ -101,7 +101,7 @@ def do_basemap(M, ax):
     return
 
 
-def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
+def anim_figure(A_eddy, C_eddy, Mx, My, MMx, MMy, cmap, rtime, DIAGNOSTIC_TYPE,
                 savedir, tit, ax, ax_cbar, qparam=None, qparameter=None,
                 xi=None, xicopy=None):
     """
@@ -121,7 +121,7 @@ def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
     M = A_eddy.M
 
     if 'Q' in DIAGNOSTIC_TYPE:
-        pcm = M.pcolormesh(Mx, My, xicopy, cmap=cmap, ax=ax,
+        pcm = M.pcolormesh(MMx, MMy, xicopy, cmap=cmap, ax=ax,
                            interpolation='none')
         M.contour(Mx, My, xi, [0.], ax=ax, colors='k', linewidths=0.5)
         M.contour(Mx, My, qparam, qparameter, ax=ax, colors='g',
@@ -131,7 +131,7 @@ def anim_figure(A_eddy, C_eddy, Mx, My, cmap, rtime, DIAGNOSTIC_TYPE,
                   linewidths=0.25)
 
     elif 'SLA' in DIAGNOSTIC_TYPE:
-        pcm = M.pcolormesh(Mx, My, A_eddy.slacopy, cmap=cmap, ax=ax)
+        pcm = M.pcolormesh(MMx, MMy, A_eddy.slacopy, cmap=cmap, ax=ax)
         M.contour(Mx, My, A_eddy.slacopy, [0.], ax=ax, colors='k',
                   linewidths=0.5)
         M.contour(Mx, My, A_eddy.slacopy, A_eddy.CONTOUR_PARAMETER, ax=ax,
@@ -203,7 +203,9 @@ def half_interp(h1, h2):
     """
     Speed up for frequent operations
     """
-    return ne.evaluate('0.5 * (h1 + h2)')
+    h1 += h2
+    h1 *= 0.5
+    return h1
 
 
 def quart_interp(h1, h2, h3, h4):
@@ -286,25 +288,25 @@ def psi2rho(var_psi):
     var_rho[:, L] = var_rho[:, Lm]
     return var_rho
 
-#def pcol_2dxy(x, y):
-    #"""
-    #Function to shift x, y for subsequent use with pcolor
-    #by Jeroen Molemaker UCLA 2008
-    #"""
-    #Mp, Lp = x.shape
-    #M = Mp - 1
-    #L = Lp - 1
-    #x_pcol = np.zeros((Mp, Lp))
-    #y_pcol = np.zeros_like(x_pcol)
-    #x_tmp = half_interp(x[:, :L], x[:, 1:Lp])
-    #x_pcol[1:Mp, 1:Lp] = half_interp(x_tmp[0:M], x_tmp[1:Mp])
-    #x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
-    #x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
-    #y_tmp = half_interp(y[:, :L], y[:, 1:Lp]    )
-    #y_pcol[1:Mp, 1:Lp] = half_interp(y_tmp[:M], y_tmp[1:Mp])
-    #y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
-    #y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
-    #return x_pcol, y_pcol
+def pcol_2dxy(x, y):
+    """
+    Function to shift x, y for subsequent use with pcolor
+    by Jeroen Molemaker UCLA 2008
+    """
+    Mp, Lp = x.shape
+    M = Mp - 1
+    L = Lp - 1
+    x_pcol = np.zeros((Mp, Lp))
+    y_pcol = np.zeros_like(x_pcol)
+    x_tmp = half_interp(x[:, :L], x[:, 1:Lp])
+    x_pcol[1:Mp, 1:Lp] = half_interp(x_tmp[0:M], x_tmp[1:Mp])
+    x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
+    x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
+    y_tmp = half_interp(y[:, :L], y[:, 1:Lp]    )
+    y_pcol[1:Mp, 1:Lp] = half_interp(y_tmp[:M], y_tmp[1:Mp])
+    y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
+    y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
+    return x_pcol, y_pcol
 
 
 def fit_circle(xvec, yvec):
@@ -500,28 +502,41 @@ def get_uavg(Eddy, CS, collind, centlon_e, centlat_e, poly_eff,
 
         citer.iternext()
 
-    if any_inner_contours:  # set speed based contour parameters
-        proj = pyproj.Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
-                           % (theseglat.mean(), theseglon.mean()))
-        cx, cy = proj(theseglon, theseglat)
-        #cx, cy = Eddy.M(theseglon, theseglat)
-        centx_s, centy_s, eddy_radius_s, junk = fit_circle(cx, cy)
-        centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
-        #print 'fffffffffff', centlon_s, centlat_s
-        #centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
-
-    else:  # use the effective contour
+    if not any_inner_contours:  # set speed based contour parameters
+        #proj = pyproj.Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
+                           #% (theseglat.mean(), theseglon.mean()))
+        #cx, cy = proj(theseglon, theseglat)
+        ##cx, cy = Eddy.M(theseglon, theseglat)
+        #centx_s, centy_s, eddy_radius_s, junk = fit_circle(cx, cy)
+        #centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
+        ##print 'fffffffffff', centlon_s, centlat_s
+        ##centlon_s, centlat_s = Eddy.M.projtran(centx_s, centy_s, inverse=True)
+        
+        
+        
+        #'''
+        ## Debug
+        #plt.figure()
+        #plt.contour(Eddy.grd.lon(), Eddy.grd.lat(), Eddy.slacopy, Eddy.CONTOUR_PARAMETER,
+                    #colors='k', linestyles='solid', linewidths=0.25)
+        #plt.scatter(centlon_s, centlat_s, c='k', edgecolors='none', s=100)
+        #plt.plot(theseglon, theseglat, 'r')
+        #plt.axis('image')
+        #plt.show()
+        #'''
+        
+    #else:  # use the effective contour
         centlon_s, centlat_s = centlon_e, centlat_e
-        eddy_radius_s = eddy_radius_e
+        #eddy_radius_s = eddy_radius_e
         inner_seglon, inner_seglat = theseglon, theseglat
 
     if not save_all_uavg:
-        return (uavg, centlon_s, centlat_s, eddy_radius_s,
-                theseglon, theseglat, inner_seglon, inner_seglat)
+        #return (uavg, centlon_s, centlat_s, eddy_radius_s,
+                #theseglon, theseglat, inner_seglon, inner_seglat)
+        return (uavg, theseglon, theseglat, inner_seglon, inner_seglat)
 
     else:
-        return (uavg, centlon_s, centlat_s, eddy_radius_s,
-                theseglon, theseglat, inner_seglon, inner_seglat, all_uavg)
+        return (uavg, theseglon, theseglat, inner_seglon, inner_seglat, all_uavg)
 
 
 def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
@@ -657,19 +672,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                             # Unpack indices for convenience
                             imin, imax, jmin, jmax = (Eddy.imin, Eddy.imax,
                                                       Eddy.jmin, Eddy.jmax)
-                            '''
-                            # Get eddy circumference using eddy_radius_e
-                            #centx, centy = Eddy.M(centlon_e, centlat_e)
-                            #circlon, circlat = get_circle(centx, centy,
-                                                          #eddy_radius_e, 180)
-                            circlon, circlat = get_circle(centlon_e, centlat_e,
-                                                          eddy_radius_e, 180)
-                            #circlon[:], circlat[:] = Eddy.M.projtran(
-                                #circlon, circlat, inverse=True)
-                            #circlon[:], circlat[:] = proj(circlon, circlat,
-                                                          #inverse=True)
-                            Eddy.circlon, Eddy.circlat = circlon, circlat
-                            '''
+
                             # Set masked points within bounding box around eddy
                             Eddy.set_mask_eff(cont, grd)
 
@@ -743,18 +746,37 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                             cont, grd, eddy_radius_e)
 
                                     if not Eddy.TRACK_EXTRA_VARIABLES:
-                                        (uavg, centlon_s, centlat_s,
-                                         eddy_radius_s, contlon_s, contlat_s,
+                                        #(uavg, centlon_s, centlat_s,
+                                         #eddy_radius_s, contlon_s, contlat_s,
+                                         #inner_contlon, inner_contlat) = get_uavg(*args)
+                                        (uavg, contlon_s, contlat_s,
                                          inner_contlon, inner_contlat) = get_uavg(*args)
                                     else:
-                                        (uavg, centlon_s, centlat_s,
-                                         eddy_radius_s, contlon_s, contlat_s,
+                                        #(uavg, centlon_s, centlat_s,
+                                         #eddy_radius_s, contlon_s, contlat_s,
+                                         #inner_contlon, inner_contlat,
+                                         #uavg_profile) = get_uavg(*args, save_all_uavg=True)
+                                        (uavg, contlon_s, contlat_s,
                                          inner_contlon, inner_contlat,
                                          uavg_profile) = get_uavg(*args, save_all_uavg=True)
 
-
-                                    centlon_lmi, centlat_lmi, junk, junk = fit_circle(inner_contlon,
-                                                                                      inner_contlat)
+                                    # Use azimuth equal projection for radius
+                                    proj = pyproj.Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
+                                                       % (inner_contlat.mean(),
+                                                          inner_contlon.mean()))
+                                    
+                                    # First, get position based on innermost contour
+                                    cx, cy = proj(inner_contlon, inner_contlat)
+                                    centx_s, centy_s, _, _ = fit_circle(cx, cy)
+                                    centlon_s, centlat_s = proj(centx_s, centy_s,
+                                                                inverse=True)
+                                    # Second, get speed-based radius based on
+                                    # contour of max uavg
+                                    # (perhaps we should make a new proj here based on
+                                    #  contlon_s, contlat_s but I'm not sure it's
+                                    #  that important ... Antoine?)
+                                    cx, cy = proj(contlon_s, contlat_s)
+                                    _, _, eddy_radius_s, _ = fit_circle(cx, cy)
 
                                 # Define T and S if needed
                                 #if has_ts:
@@ -800,9 +822,10 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                 elif 'SLA' in Eddy.DIAGNOSTIC_TYPE:
 
                                     # See CSS11 section B4
-                                    centlon_s, centlat_s = centlon_lmi.copy(), centlat_lmi.copy()
+                                    #centlon_s, centlat_s = centlon_lmi.copy(), centlat_lmi.copy()
 
-                                    properties.centlon, properties.centlat = centlon_s.copy(), centlat_s.copy()
+                                    #properties.centlon, properties.centlat = centlon_s.copy(), centlat_s.copy()
+                                    properties.centlon, properties.centlat = np.copy(centlon_s), np.copy(centlat_s)
 
                                     if has_ts: # for ocean model
                                         pass

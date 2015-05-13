@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 2.0.0
+Version 2.0.1
 
 
 Scroll down to line ~640 to get started
@@ -37,7 +37,7 @@ import glob as glob
 from py_eddy_tracker_classes import plt, np, dt, Dataset, time, \
                                     datestr2datetime, gaussian_resolution, \
                                     get_cax, collection_loop, track_eddies, \
-                                    anim_figure
+                                    anim_figure, pcol_2dxy
 from py_eddy_tracker_property_classes import SwirlSpeed
 import make_eddy_tracker_list_obj as eddy_tracker
 import scipy.ndimage as ndimage
@@ -547,7 +547,7 @@ class AvisoGrid (PyEddyTracker):
 
     def __getstate__(self):
         """
-        Remove refernces to unwanted attributes in self.
+        Remove references to unwanted attributes in self.
         This reduces the size of saved cPickle objects.
         """
         #print '--- removing unwanted attributes'
@@ -930,9 +930,10 @@ if __name__ == '__main__':
     sla_grd = AvisoGrid(AVISO_FILES[0], config['THE_DOMAIN'], PRODUCT,
                         config['LONMIN'], config['LONMAX'],
                         config['LATMIN'], config['LATMAX'])
-
-    Mx, My = (sla_grd.Mx[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1],
-              sla_grd.My[sla_grd.jup0:sla_grd.jup1, sla_grd.iup0:sla_grd.iup1])
+    
+    # Set coordinates for figures
+    Mx, My = sla_grd.M(sla_grd.lon(), sla_grd.lat())
+    MMx, MMy = pcol_2dxy(Mx, My)
 
     # Instantiate search ellipse object
     search_ellipse = eddy_tracker.SearchEllipse(config['THE_DOMAIN'],
@@ -1269,7 +1270,7 @@ if __name__ == '__main__':
                                 xi=xi, xicopy=xicopy)
 
                 elif 'SLA' in DIAGNOSTIC_TYPE:
-                    anim_figure(A_eddy, C_eddy, Mx, My, plt.cm.RdBu_r, rtime,
+                    anim_figure(A_eddy, C_eddy, Mx, My, MMx, MMy, plt.cm.RdBu_r, rtime,
                                 DIAGNOSTIC_TYPE, SAVE_DIR, 'SLA ' + ymd_str,
                                 animax, animax_cbar)
 

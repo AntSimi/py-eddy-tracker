@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 2.0.0
+Version 2.0.1
 
 
 ===========================================================================
@@ -193,8 +193,6 @@ class Track (object):
         """
         Append track updates
         """
-        #self.lon = np.r_[self.lon, lon]
-        #print 'ccccccccccccccccccccccc', type(lon)
         self.lon.append(lon)
         self.lat.append(lat)
         self.ocean_time.append(time)
@@ -205,8 +203,8 @@ class Track (object):
         self.amplitude.append(amplitude)
         if 'ROMS' in self.PRODUCT:
             #self.temp = np.r_[self.temp, temp]
-            pass
             #self.salt = np.r_[self.salt, salt]
+            pass
         if self.save_extras:
             self.contour_e.append(contour_e)
             self.contour_s.append(contour_s)
@@ -368,7 +366,7 @@ class TrackList (object):
         """pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
                 'circlon', 'circlat', 'sla', 'slacopy', 'swirl',
                 'mask_eff', 'mask_eff_sum', 'mask_eff_1d')"""
-	    pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
+        pops = ('uspd', 'uspd_coeffs', 'sla_coeffs', 'points',
                 'sla', 'slacopy', 'swirl',
                 'mask_eff', 'mask_eff_sum', 'mask_eff_1d')
         result = self.__dict__.copy()
@@ -679,7 +677,7 @@ class TrackList (object):
 
             nc.createDimension('contour_points', None)
             nc.createDimension('uavg_contour_count',
-                np.int(self.slaparameter.size * 0.333))
+                np.int(self.CONTOUR_PARAMETER.size * 0.333))
             nc.createVariable('contour_e', 'f4',
                 ('contour_points','Nobs'), fill_value=self.FILLVAL)
             nc.createVariable('contour_s', 'f4',
@@ -766,7 +764,7 @@ class TrackList (object):
 
                         tsize = len(self.tracklist[i].lon)
 
-                        if (tsize >= self.TRACK_DURATION_MIN / DBR) and tsize > 1.:
+                        if (tsize >= self.TRACK_DURATION_MIN / DBR) and tsize >= 1.:
                             lon = np.array([self.tracklist[i].lon])
                             lat = np.array([self.tracklist[i].lat])
                             amp = np.array([self.tracklist[i].amplitude])
@@ -1006,6 +1004,22 @@ class RossbyWaveSpeed (object):
         Return the distance required by SearchEllipse
         to construct a search ellipse for eddy tracking.
         """
+        def get_lon_lat(xpt, ypt):
+            """
+            
+            """
+            lon, lat = self.M.projtran(xpt, ypt, inverse=True)
+            lon, lat = np.round(lon, 2), np.round(lat, 2)
+            if lon < 0.:
+                lon = "".join((str(lon), 'W'))
+            elif lon >= 0:
+                lon = "".join((str(lon), 'E'))
+            if lat < 0:
+                lat = "".join((str(lat), 'S'))
+            elif lat >= 0:
+                lat = "".join((str(lat), 'N'))
+            return lon, lat
+            
         if self.THE_DOMAIN in ('Global', 'Regional', 'ROMS'):
             #print 'xpt, ypt', xpt, ypt
             self.distance[:] = self._get_rlongwave_spd(xpt, ypt)
@@ -1023,23 +1037,21 @@ class RossbyWaveSpeed (object):
             Exception  # Unknown THE_DOMAIN
 
         if self.start:
-            lon, lat = self.M.projtran(xpt, ypt, inverse=True)
-            lon, lat = np.round(lon, 2), np.round(lat, 2)
-            if lon < 0.:
-                lon = "".join((str(lon), 'W'))
-            elif lon >= 0:
-                lon = "".join((str(lon), 'E'))
-            if lat < 0:
-                lat = "".join((str(lat), 'S'))
-            elif lat >= 0:
-                lat = "".join((str(lat), 'N'))
-
-            print "".join(('--------- setting ellipse for first tracked ',
-                           'eddy at %s, %s in the %s domain'
-                            % (lon, lat, self.THE_DOMAIN)))
-            c = np.abs(self._get_rlongwave_spd(xpt, ypt))[0]
-            print "".join(('--------- with extratropical long baroclinic ',
-                           'Rossby wave phase speed of %s m/s' % c))
+            lon, lat = get_lon_lat(xpt, ypt)
+            if 'Global' in self.THE_DOMAIN:
+                print "".join(('--------- setting ellipse for first tracked ',
+                            'eddy at %s, %s in the %s domain'
+                                % (lon, lat, self.THE_DOMAIN)))
+                c = np.abs(self._get_rlongwave_spd(xpt, ypt))[0]
+                print "".join(('--------- with extratropical long baroclinic ',
+                            'Rossby wave phase speed of %s m/s' % c))
+            elif self.THE_DOMAIN in ('BlackSea', 'MedSea'):
+                print "".join(('--------- setting search radius of %s m for '
+                                % self.distance[0],
+                            'first tracked eddy at %s, %s in the %s domain'
+                                % (lon, lat, self.THE_DOMAIN)))
+            else:
+                Exception
             self.start = False
 
         self.distance = np.abs(self.distance)
@@ -1052,6 +1064,7 @@ class RossbyWaveSpeed (object):
         """
         pad = 1.5  # degrees
         LONMIN, LONMAX, LATMIN, LATMAX = self.limits
+
         if self.ZERO_CROSSING:
             ieast, iwest = (((self._lon + 360.) <= LONMAX + pad),
                             (self._lon > LONMIN + pad))
@@ -1158,7 +1171,7 @@ class SearchEllipse (object):
         self.n_s_minor = self.DAYS_BTWN_RECORDS * 15e4 / 7.
         self.semi_n_s_minor = 0.5 * self.n_s_minor
         self.rwv = RossbyWaveSpeed(THE_DOMAIN, grd, RW_PATH=RW_PATH)
-        #self.rwv.view_grid_subset()
+        #self.rwv.view_grid_subset() # debug; not relevant for MedSea / BlackSea
         self.rw_c = np.empty(1)
         self.rw_c_mod = np.empty(1)
         self.rw_c_fac = 1.75
@@ -1201,7 +1214,7 @@ class SearchEllipse (object):
         """
         Set *ellipse_path* for the *black_sea_ellipse*.
         """
-        self.black_sea_ellipse = patch.Ellipse((self.x, self.y),
+        self.black_sea_ellipse = patch.Ellipse((self.xpt, self.ypt),
                                2. * self.rw_c_mod, 2. * self.rw_c_mod)
         verts = self.black_sea_ellipse.get_verts()
         self.ellipse_path = path.Path(np.array([verts[:, 0],
@@ -1221,20 +1234,19 @@ class SearchEllipse (object):
         """
         self.xpt = xpt
         self.ypt = ypt
+        self.rw_c_mod[:] = 1.75
 
         if self.THE_DOMAIN in ('Global', 'Regional', 'ROMS'):
             self.rw_c[:] = self.rwv.get_rwdistance(xpt, ypt,
                                   self.DAYS_BTWN_RECORDS)
-            self.rw_c_mod[:] = 1.75
             self.rw_c_mod *= self.rw_c
             self.rw_c_mod[:] = np.array([self.rw_c_mod,
                                          self.semi_n_s_minor]).max()
             self.rw_c_mod *= 2.
             self._set_global_ellipse()
 
-        elif 'BlackSea' in self.THE_DOMAIN:
-            self.rw_c_mod[:] = 1.75
-            self.rw_c[:] = self.rwv.get_rwdistance(x, y,
+        elif self.THE_DOMAIN in ('BlackSea', 'MedSea'):
+            self.rw_c[:] = self.rwv.get_rwdistance(xpt, ypt,
                                    self.DAYS_BTWN_RECORDS)
             self.rw_c_mod *= self.rw_c
             self._set_black_sea_ellipse()
