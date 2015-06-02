@@ -27,7 +27,7 @@ module haversine
 !
 !    If you have ifort on your system, change 'gfortran' to 'intelem'!
 !
-!   Version 2.0.1
+!   Version 2.0.3
 !
 !===========================================================================
 implicit none

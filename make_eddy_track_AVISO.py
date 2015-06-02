@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_track_AVISO.py
 
-Version 2.0.1
+Version 2.0.3
 
 
 Scroll down to line ~640 to get started
@@ -87,7 +87,6 @@ class PyEddyTracker (object):
     def __init__(self):
         """
         Set some constants
-
           *ZERO_CROSSING*:
             Boolean, *True* if THE_DOMAIN crosses 0 degree meridian
         """
@@ -318,7 +317,7 @@ class PyEddyTracker (object):
         # Get pm and pn
         pm = np.zeros_like(self.lonpad())
         pm[:, 1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
-                                          lonu[:, 1:],  latu[:, 1:])
+                                          lonu[:, 1:], latu[:, 1:])
         pm[:, 0] = pm[:, 1]
         pm[:, -1] = pm[:, -2]
         self._dx = pm
@@ -326,7 +325,7 @@ class PyEddyTracker (object):
 
         pn = np.zeros_like(self.lonpad())
         pn[1:-1] = self.haversine_dist(lonv[:-1], latv[:-1],
-                                       lonv[1:],  latv[1:])
+                                       lonv[1:], latv[1:])
         pn[0] = pn[1]
         pn[-1] = pn[-2]
         self._dy = pn
@@ -499,7 +498,7 @@ class AvisoGrid (PyEddyTracker):
         Initialise the grid object
         """
         super(AvisoGrid, self).__init__()
-        print '\nInitialising the *AVISO_grid*'
+        print('\nInitialising the *AVISO_grid*')
         self.THE_DOMAIN = THE_DOMAIN
         if 'AVISO' in PRODUCT:
             self.PRODUCT = 'AVISO'
@@ -601,7 +600,6 @@ class AvisoGrid (PyEddyTracker):
 
         try:  # Extrapolate over land points with fillmask
             zeta = fillmask(zeta, self.mask == 1)
-            #zeta = fillmask(zeta, 1 + (-1 * zeta.mask))
         except Exception:  # In case no landpoints
             zeta = np.ma.masked_array(zeta)
         return zeta.astype(np.float64)
@@ -847,7 +845,7 @@ if __name__ == '__main__':
     else:
         PRODUCT = 'AVISO_DT10'
         DAYS_BTWN_RECORDS = 7.  # old seven day AVISO
-
+    config['DAYS_BTWN_RECORDS'] = DAYS_BTWN_RECORDS
     AVISO_FILES = config['AVISO']['AVISO_FILES']
 
     #TRACK_DURATION_MIN = config['TRACK_DURATION_MIN']
@@ -972,10 +970,10 @@ if __name__ == '__main__':
 
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
-    PIXMIN = np.round((np.pi * config['RADMIN']**2) /
-                      sla_grd.get_resolution()**2)
-    PIXMAX = np.round((np.pi * config['RADMAX']**2) /
-                      sla_grd.get_resolution()**2)
+    PIXMIN = np.round((np.pi * config['RADMIN'] ** 2) /
+                      sla_grd.get_resolution() ** 2)
+    PIXMAX = np.round((np.pi * config['RADMAX'] ** 2) /
+                      sla_grd.get_resolution() ** 2)
     print '--- Pixel range = %s-%s' % (np.int(PIXMIN),
                                        np.int(PIXMAX))
 
@@ -1093,7 +1091,7 @@ if __name__ == '__main__':
                                    xi / sla_grd.f()[sla_grd.jup0:sla_grd.jup1,
                                                     sla_grd.iup0:sla_grd.iup1])
 
-                xicopy = np.ma.copy(xi)
+                xicopy = xi.copy()
 
             elif 'SLA' in DIAGNOSTIC_TYPE:
 
@@ -1103,11 +1101,11 @@ if __name__ == '__main__':
                 C_eddy.slacopy = sla.copy()
 
             # Get scalar speed
-            uspd = np.sqrt(sla_grd.u**2 + sla_grd.v**2)
+            uspd = np.sqrt(sla_grd.u ** 2 + sla_grd.v ** 2)
             uspd = np.ma.masked_where(
                 sla_grd.mask[sla_grd.jup0:sla_grd.jup1,
                              sla_grd.iup0:sla_grd.iup1] == 0,
-                uspd)
+                             uspd)
             A_eddy.uspd = uspd.copy()
             C_eddy.uspd = uspd.copy()
 
@@ -1121,7 +1119,7 @@ if __name__ == '__main__':
             # Get contours of Q/sla parameter
             if 'first_record' not in locals():
 
-                print '------ processing SLA contours for eddies'
+                print('------ processing SLA contours for eddies')
                 contfig = plt.figure(99)
                 ax = contfig.add_subplot(111)
 
@@ -1252,7 +1250,7 @@ if __name__ == '__main__':
                 A_eddy.set_old_variables()
                 C_eddy.set_old_variables()
                 START = False
-                print '------ tracking eddies'
+                print('------ tracking eddies')
             else:
                 first_record = False
 
@@ -1278,9 +1276,9 @@ if __name__ == '__main__':
             if not first_record:
 
                 if A_eddy.VERBOSE:
-                    print '--- saving to nc', A_eddy.SAVE_DIR
-                    print '--- saving to nc', C_eddy.SAVE_DIR
-                    print '+++'
+                    print('--- saving to nc', A_eddy.SAVE_DIR)
+                    print('--- saving to nc', C_eddy.SAVE_DIR)
+                    print('+++')
 
                 A_eddy.write2netcdf(rtime)
                 C_eddy.write2netcdf(rtime)

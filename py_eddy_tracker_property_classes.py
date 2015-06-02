@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_amplitude.py
 
-Version 2.0.1
+Version 2.0.3
 
 
 ===========================================================================
@@ -297,6 +297,8 @@ class Amplitude (object):
             #cmin, cmax = (self.sla.min(), self.sla.max())
             cm = plt.cm.gist_ncar
             #cm = plt.cm.hsv
+            print self.h0_check.shape
+            print self.contlon.shape
             
             plt.title('Local max/min count: %s, Amp: %s' % (
                              self.local_extrema, self.amplitude))

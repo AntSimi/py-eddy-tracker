@@ -25,7 +25,7 @@ Email: emason@imedea.uib-csic.es
 
 make_eddy_tracker_list_obj.py
 
-Version 2.0.1
+Version 2.0.3
 
 
 ===========================================================================
@@ -483,7 +483,7 @@ class TrackList (object):
                 active_tracks.append(i)
         return active_tracks
 
-    def get_inactive_tracks(self, rtime):
+    def get_inactive_tracks(self, rtime, stopper=0):
         """
         Return list of indices to inactive tracks.
         This call also identifies and removes
@@ -494,6 +494,15 @@ class TrackList (object):
             if not track._is_alive(rtime):
                 inactive_tracks.append(i)
         return inactive_tracks
+
+    def kill_all_tracks(self):
+        """
+        Mark all tracks as not alive
+        """
+        for track in self.tracklist:
+            track.alive = False
+        print('------ all %s tracks killed for final saving'
+               % self.SIGN_TYPE.replace('one', 'onic').lower())
 
     def create_netcdf(self, directory, savedir,
                       grd=None, YMIN=None, YMAX=None,
@@ -742,13 +751,17 @@ class TrackList (object):
         self.tracklist = tracklist.tolist()
         return alive_inds
 
-    def write2netcdf(self, rtime):
+    def write2netcdf(self, rtime, stopper=0):
         """
         Write inactive tracks to netcdf file.
         'ncind' is important because prevents writing of
         already written tracks.
         Each inactive track is 'emptied' after saving
+        
+        rtime - current timestamp
+        stopper - dummy value (either 0 or 1)
         """
+        rtime += stopper
         tracks2save = np.array([self.get_inactive_tracks(rtime)])
         DBR = self.DAYS_BTWN_RECORDS
 
@@ -833,7 +846,12 @@ class TrackList (object):
                             self.ncind += tsize
                             self.ch_index += 1
                             nc.sync()
-        
+
+        # Print final message and return
+        if stopper:
+            print('All %ss saved' % self.SIGN_TYPE.replace('one', 'onic').lower())
+            return
+
         # Get index to first currently active track
         #try:
             #lasti = self.get_active_tracks(rtime)[0]

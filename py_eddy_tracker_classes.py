@@ -24,7 +24,7 @@ Email: emason@imedea.uib-csic.es
 
 py_eddy_tracker_classes.py
 
-Version 2.0.1
+Version 2.0.3
 ===========================================================================
 
 
@@ -376,7 +376,7 @@ def fit_circle(xvec, yvec):
 
     # Indices of polygon points outside circle
     # p_inon_? : polygon x or y points inside & on the circle
-    pout_id = np.nonzero(dist_poly > r)
+    pout_id = (dist_poly > r).nonzero()
 
     p_inon_x = xvec  # init
     p_inon_y = yvec  # init
@@ -954,9 +954,10 @@ def track_eddies(Eddy, first_record):
         new_cntr_e, new_cntr_s, new_uavg_prf = [], [], []
         new_shp_err = np.array([])
 
-        new_inds, backup_ind, backup_dist = np.array([], dtype=np.int16), \
-                                            np.array([], dtype=np.int16), \
-                                            np.array([])
+        #new_inds, backup_ind, backup_dist = np.array([], dtype=np.int16), \
+                                            #np.array([], dtype=np.int16), \
+                                            #np.array([])
+        backup_ind = np.array([], dtype=np.int16)
 
         '''
         # See http://stackoverflow.com/questions/11528078/determining-duplicate-values-in-an-array
@@ -983,6 +984,7 @@ def track_eddies(Eddy, first_record):
             plt.xlabel('new')
             plt.ylabel('old')
             plt.title('original')
+            plt.show()
 
         # Make an ellipse at current old_eddy location
         # (See CSS11 sec. B4, pg. 208)
@@ -997,7 +999,7 @@ def track_eddies(Eddy, first_record):
         for new_ind in new_sparse_inds:
             
             new_dist = dist_mat[old_ind, new_ind]
-            
+
             within_range = False
             #print far_away, Eddy.search_ellipse.rw_c_mod, new_dist
             if new_dist < Eddy.search_ellipse.rw_c_mod:#far_away:
@@ -1018,54 +1020,38 @@ def track_eddies(Eddy, first_record):
 
             # Pass only the eddies within ellipse or sep_dist
             if within_range:
+                
+                dist_arr = np.r_[dist_arr, new_dist]
+                new_ln.append(Eddy.new_lon_tmp[new_ind])
+                new_lt.append(Eddy.new_lat_tmp[new_ind])
+                new_rd_s.append(Eddy.new_radii_tmp_s[new_ind])
+                new_rd_e.append(Eddy.new_radii_tmp_e[new_ind])
+                new_am.append(Eddy.new_amp_tmp[new_ind])
+                new_Ua.append(Eddy.new_uavg_tmp[new_ind])
+                new_ek.append(Eddy.new_teke_tmp[new_ind])
+                new_tm.append(Eddy.new_time_tmp[new_ind])
 
-                old_amplitude[:] = Eddy.old_amp[old_ind]
-                new_amplitude[:] = Eddy.new_amp_tmp[new_ind]
 
-                # Following CSS11, we use effective radius rather than speed based...
-                old_area[:] = Eddy.old_radii_s[old_ind]**2
-                old_area *= np.pi
-                new_area[:] = Eddy.new_radii_tmp_s[new_ind]**2
-                new_area *= np.pi
+                if 'ROMS' in Eddy.PRODUCT:
+                    #new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
+                    #new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
+                    pass
 
-                # Pass only the eddies within min and max times old amplitude
-                # and area (KCCMC11 and CSS11 use 0.25 and 2.5, respectively)
-                if (new_amplitude >= (Eddy.EVOLVE_AMP_MIN * old_amplitude) and
-                    new_amplitude <= (Eddy.EVOLVE_AMP_MAX * old_amplitude)) and \
-                   (new_area >= (Eddy.EVOLVE_AREA_MIN * old_area) and
-                    new_area <= (Eddy.EVOLVE_AREA_MAX * old_area)):
+                if Eddy.TRACK_EXTRA_VARIABLES:
+                    new_cntr_e.append(Eddy.new_contour_e_tmp[new_ind])
+                    new_cntr_s.append(Eddy.new_contour_s_tmp[new_ind])
+                    new_uavg_prf.append(Eddy.new_uavg_profile_tmp[new_ind])
+                    new_shp_err = np.r_[new_shp_err,
+                                        Eddy.new_shape_error_tmp[new_ind]]
 
-                    dist_arr = np.r_[dist_arr, new_dist]
-                    new_ln.append(Eddy.new_lon_tmp[new_ind])
-                    new_lt.append(Eddy.new_lat_tmp[new_ind])
-                    new_rd_s.append(Eddy.new_radii_tmp_s[new_ind])
-                    new_rd_e.append(Eddy.new_radii_tmp_e[new_ind])
-                    new_am.append(Eddy.new_amp_tmp[new_ind])
-                    new_Ua.append(Eddy.new_uavg_tmp[new_ind])
-                    new_ek.append(Eddy.new_teke_tmp[new_ind])
-                    new_tm.append(Eddy.new_time_tmp[new_ind])
+                backup_ind = np.r_[backup_ind, new_ind]
 
-                    if 'ROMS' in Eddy.PRODUCT:
-                        #new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
-                        #new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
-                        pass
+                # An old (active) eddy has been detected, so
+                # corresponding new_eddy_inds set to False
+                new_eddy_inds[np.nonzero(Eddy.new_lon_tmp ==
+                                            Eddy.new_lon_tmp[new_ind])] = False
 
-                    if Eddy.TRACK_EXTRA_VARIABLES:
-                        new_cntr_e.append(Eddy.new_contour_e_tmp[new_ind])
-                        new_cntr_s.append(Eddy.new_contour_s_tmp[new_ind])
-                        new_uavg_prf.append(Eddy.new_uavg_profile_tmp[new_ind])
-                        new_shp_err = np.r_[new_shp_err,
-                                            Eddy.new_shape_error_tmp[new_ind]]
-
-                    new_inds = np.r_[new_inds, new_ind]
-                    backup_ind = np.r_[backup_ind, new_ind]
-
-                    # An old (active) eddy has been detected, so
-                    # corresponding new_eddy_inds set to False
-                    new_eddy_inds[np.nonzero(Eddy.new_lon_tmp ==
-                                             Eddy.new_lon_tmp[new_ind])] = False
-
-                    dist_mat[:, new_ind] = far_away # km
+                dist_mat[:, new_ind] = far_away # km
 
         if Eddy.TRACK_EXTRA_VARIABLES:
             kwargs = {'contour_e': new_cntr_e, 'contour_s': new_cntr_s,
@@ -1075,7 +1061,6 @@ def track_eddies(Eddy, first_record):
 
         # Only one eddy within range
         if dist_arr.size == 1:  # then update the eddy track only
-
             # Use index 0 here because type is list and we want the scalar
             args = (Eddy, old_ind, new_ln[0], new_lt[0], new_rd_s[0],
                     new_rd_e[0], new_am[0], new_Ua[0], new_ek[0], new_tm[0],
@@ -1103,8 +1088,8 @@ def track_eddies(Eddy, first_record):
 
                 # Choice of using effective or speed-based...
                 delta_area_tmp = np.array([np.pi *
-                                           (Eddy.old_radii_e[old_ind]**2),
-                                           np.pi * (new_rd_e[i]**2)]).ptp()
+                                           (Eddy.old_radii_e[old_ind] ** 2),
+                                           np.pi * (new_rd_e[i] ** 2)]).ptp()
                 delta_amp_tmp = np.array([Eddy.old_amp[old_ind],
                                           new_am[i]]).ptp()
                 delta_area = np.r_[delta_area, delta_area_tmp]
@@ -1120,9 +1105,9 @@ def track_eddies(Eddy, first_record):
                         #np.abs(np.diff([Eddy.old_salt[old_ind], new_st[i]]))]
 
             # This from Penven etal (2005)
-            deltaX = np.sqrt((delta_area / AREA0)**2 +
-                             (delta_amp / AMP0)**2 +
-                             (dist_arr / DIST0)**2)
+            deltaX = np.sqrt((delta_area / AREA0) ** 2 +
+                             (delta_amp / AMP0) ** 2 +
+                             (dist_arr / DIST0) ** 2)
 
             dx = deltaX.argsort()
             dx0 = dx[0]  # index to the nearest eddy
