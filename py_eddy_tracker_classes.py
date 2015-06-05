@@ -32,17 +32,17 @@ Version 2.0.3
 # External modules
 #import matplotlib
 #matplotlib.use('Agg')
+import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
 import time
 import matplotlib.dates as dt
-import matplotlib.path as path
-import matplotlib.patches as patch
 import mpl_toolkits.basemap.pyproj as pyproj
 import make_eddy_tracker_list_obj as eddy_tracker
-from py_eddy_tracker_property_classes import Amplitude, EddyProperty, interpolate
-from haversine import haversine # needs compiling with f2py
+from py_eddy_tracker_property_classes import Amplitude, EddyProperty, \
+    interpolate
+from haversine import haversine  # needs compiling with f2py
 import scipy.sparse as sparse
 
 
@@ -567,9 +567,8 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
     # Loop over each collection
     for collind, coll in enumerate(CS.collections):
 
-        if VERBOSE:
-            message = '------ doing collection %s, contour value %s'
-            print message % (collind, CS.cvalues[collind])
+        logging.debug('doing collection %s, contour value %s',
+                      collind, CS.cvalues[collind])
 
         # Loop over individual CS contours (i.e., every eddy in field)
         for cont in coll.get_paths():
@@ -764,7 +763,7 @@ def collection_loop(CS, grd, rtime, A_list_obj, C_list_obj,
                                     proj = pyproj.Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
                                                        % (inner_contlat.mean(),
                                                           inner_contlon.mean()))
-                                    
+
                                     # First, get position based on innermost contour
                                     cx, cy = proj(inner_contlon, inner_contlat)
                                     centx_s, centy_s, _, _ = fit_circle(cx, cy)
@@ -912,21 +911,18 @@ def track_eddies(Eddy, first_record):
 
     haversine.distance_matrix(X_old, X_new, dist_mat)
     dist_mat = np.ascontiguousarray(dist_mat)
-    
-    dist_mat_copy = dist_mat.copy()
 
+    dist_mat_copy = dist_mat.copy()
 
     # Prepare distance matrix for sparse operation
     # NOTE: need to find optimal (+dynamic) choice of filter here
     dist_mat[dist_mat > 35000.] = 0
-    
 
     # Use a coordinate format (COO) sparse matrix
     # https://scipy-lectures.github.io/advanced/scipy_sparse/coo_matrix.html
     sparse_mat = sparse.coo_matrix((dist_mat))
     old_sparse_inds = sparse_mat.row
     new_sparse_inds = sparse_mat.col
-
 
     # *new_eddy_inds* contains indices to every newly identified eddy
     # that are initially set to True on the assumption that it is a new
@@ -967,9 +963,9 @@ def track_eddies(Eddy, first_record):
         # Move non_unique_inds far away
         dist_mat[old_ind][non_unique_inds] = far_away  # km
         '''
-        
+
         if debug_dist:
-            
+
             debug_distmax = 5e6
             debug_cmap = plt.cm.Set3
 
@@ -989,24 +985,23 @@ def track_eddies(Eddy, first_record):
         # Make an ellipse at current old_eddy location
         # (See CSS11 sec. B4, pg. 208)
         if 'ellipse' in Eddy.SEPARATION_METHOD:
-            
             Eddy.search_ellipse.set_search_ellipse(old_x[old_ind],
                                                    old_y[old_ind])
-            #Eddy.search_ellipse.view_search_ellipse(Eddy)
+            # Eddy.search_ellipse.view_search_ellipse(Eddy)
 
         # Loop over separation distances between old and new
-        #for new_ind, new_dist in enumerate(dist_mat[old_ind]):
+        # for new_ind, new_dist in enumerate(dist_mat[old_ind]):
         for new_ind in new_sparse_inds:
-            
+
             new_dist = dist_mat[old_ind, new_ind]
 
             within_range = False
-            #print far_away, Eddy.search_ellipse.rw_c_mod, new_dist
-            if new_dist < Eddy.search_ellipse.rw_c_mod:#far_away:
+            # print far_away, Eddy.search_ellipse.rw_c_mod, new_dist
+            if new_dist < Eddy.search_ellipse.rw_c_mod:  # far_away:
 
                 if 'ellipse' in Eddy.SEPARATION_METHOD:
                     if Eddy.search_ellipse.ellipse_path.contains_point(
-                                            (new_x[new_ind], new_y[new_ind])):
+                            (new_x[new_ind], new_y[new_ind])):
                         within_range = True
 
                 elif 'sum_radii' in Eddy.SEPARATION_METHOD:
@@ -1020,7 +1015,6 @@ def track_eddies(Eddy, first_record):
 
             # Pass only the eddies within ellipse or sep_dist
             if within_range:
-                
                 dist_arr = np.r_[dist_arr, new_dist]
                 new_ln.append(Eddy.new_lon_tmp[new_ind])
                 new_lt.append(Eddy.new_lat_tmp[new_ind])
@@ -1031,10 +1025,9 @@ def track_eddies(Eddy, first_record):
                 new_ek.append(Eddy.new_teke_tmp[new_ind])
                 new_tm.append(Eddy.new_time_tmp[new_ind])
 
-
                 if 'ROMS' in Eddy.PRODUCT:
-                    #new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
-                    #new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
+                    # new_tp = np.r_[new_tp, Eddy.new_temp_tmp[new_ind]]
+                    # new_st = np.r_[new_st, Eddy.new_salt_tmp[new_ind]]
                     pass
 
                 if Eddy.TRACK_EXTRA_VARIABLES:
@@ -1048,10 +1041,11 @@ def track_eddies(Eddy, first_record):
 
                 # An old (active) eddy has been detected, so
                 # corresponding new_eddy_inds set to False
-                new_eddy_inds[np.nonzero(Eddy.new_lon_tmp ==
-                                            Eddy.new_lon_tmp[new_ind])] = False
+                new_eddy_inds[
+                    np.nonzero(Eddy.new_lon_tmp ==
+                               Eddy.new_lon_tmp[new_ind])] = False
 
-                dist_mat[:, new_ind] = far_away # km
+                dist_mat[:, new_ind] = far_away  # km
 
         if Eddy.TRACK_EXTRA_VARIABLES:
             kwargs = {'contour_e': new_cntr_e, 'contour_s': new_cntr_s,
@@ -1068,9 +1062,9 @@ def track_eddies(Eddy, first_record):
 
             if 'ROMS' in Eddy.PRODUCT:
                 pass
-                #new_tp = new_st = 99; print 'correct me'
-                #kwargs['cent_temp'] = new_tp[0]
-                #kwargs['cent_salt'] = new_st[0]
+                # new_tp = new_st = 99; print 'correct me'
+                # kwargs['cent_temp'] = new_tp[0]
+                # kwargs['cent_salt'] = new_st[0]
 
             # NOTE accounting should be part of Eddy (or some other) object...
             Eddy = accounting(*args, **kwargs)
@@ -1113,13 +1107,12 @@ def track_eddies(Eddy, first_record):
             dx0 = dx[0]  # index to the nearest eddy
             dx_unused = dx[1:]  # index/indices to the unused eddy/eddies
 
-            if debug_dist:
-                print 'delta_area', delta_area
-                print 'delta_amp', delta_amp
-                print 'dist_arr', dist_arr
-                print 'dx', dx
-                print 'dx0', dx0
-                print 'dx_unused', dx_unused
+            logging.debug('delta_area %s', delta_area)
+            logging.debug('delta_amp %s', delta_amp)
+            logging.debug('dist_arr %s', dist_arr)
+            logging.debug('dx %s', dx)
+            logging.debug('dx0 %s', dx0)
+            logging.debug('dx_unused %s', dx_unused)
 
             # Update eddy track dx0
             if not Eddy.TRACK_EXTRA_VARIABLES:
@@ -1139,7 +1132,7 @@ def track_eddies(Eddy, first_record):
 
             if 'ROMS' in Eddy.PRODUCT:
                 pass
-                #print 'fix me for temp and salt'
+                # print 'fix me for temp and salt'
 
             Eddy = accounting(*args, **kwargs)
 
@@ -1155,15 +1148,18 @@ def track_eddies(Eddy, first_record):
                 plt.ylabel('old')
                 plt.title('before')
 
-            # Use backup_ind to reinsert distances into dist_mat for the unused eddy/eddies
+            # Use backup_ind to reinsert distances into dist_mat for the unused
+            # eddy/eddies
             for bind in backup_ind[dx_unused]:
                 dist_mat[:, bind] = dist_mat_copy[:, bind]
                 new_eddy_inds[bind] = True
 
             if debug_dist:
-                print 'backup_ind', backup_ind
-                print 'backup_ind[dx_unused]', backup_ind[dx_unused]
-                print 'backup_ind[dx_unused].shape', backup_ind[dx_unused].shape
+                logging.debug('backup_ind %s', backup_ind)
+                logging.debug('backup_ind[dx_unused] %s',
+                              backup_ind[dx_unused])
+                logging.debug('backup_ind[dx_unused].shape %s',
+                              backup_ind[dx_unused].shape)
                 debug_ax = fig.add_subplot(133)
                 im = plt.imshow(dist_mat, interpolation='none',
                                 origin='lower', cmap=debug_cmap)
@@ -1184,7 +1180,7 @@ def track_eddies(Eddy, first_record):
     if np.any(new_eddy_inds):
 
         if False:
-            print '------adding %s new eddies' % new_eddy_inds.sum()
+            logging.info('adding %s new eddies', new_eddy_inds.sum())
 
         for neind, a_new_eddy in enumerate(new_eddy_inds):
 
@@ -1212,16 +1208,13 @@ def track_eddies(Eddy, first_record):
                           'shape_error': new_shape_error_tmp}
 
                 if 'ROMS' in Eddy.PRODUCT:
-                    #kwargs['cent_temp'] = Eddy.new_temp_tmp[neind]
+                    # kwargs['cent_temp'] = Eddy.new_temp_tmp[neind]
                     pass
-                    #kwargs['cent_salt'] = Eddy.new_salt_tmp[neind]
-                
-                Eddy = accounting(*args, **kwargs)  
-    
+                    # kwargs['cent_salt'] = Eddy.new_salt_tmp[neind]
+
+                Eddy = accounting(*args, **kwargs)
+
     return Eddy
-
-
-
 
 
 def accounting(Eddy, old_ind, centlon, centlat,
@@ -1248,8 +1241,7 @@ def accounting(Eddy, old_ind, centlon, centlat,
     """
     if first_record:  # is True then all eddies are new
         new_eddy = True
-        if Eddy.VERBOSE:
-            print '------ writing first record'
+        logging.debug('writing first record')
 
     kwargs = {'temp': cent_temp, 'salt': cent_salt,
               'contour_e': contour_e, 'contour_s': contour_s,
@@ -1267,8 +1259,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
 
         if 'ROMS' in Eddy.PRODUCT:
             pass
-            #Eddy.insert_at_index('new_temp', old_ind, cent_temp)
-            #Eddy.insert_at_index('new_salt', old_ind, cent_salt)
+            # Eddy.insert_at_index('new_temp', old_ind, cent_temp)
+            # Eddy.insert_at_index('new_salt', old_ind, cent_salt)
 
         if Eddy.TRACK_EXTRA_VARIABLES:
             Eddy.insert_at_index('new_contour_e', old_ind, contour_e)
@@ -1294,8 +1286,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
 
         if 'ROMS' in Eddy.PRODUCT:
             pass
-            #Eddy.insert_at_index('new_temp', Eddy.index, cent_temp)
-            #Eddy.insert_at_index('new_salt', Eddy.index, cent_salt)
+            # Eddy.insert_at_index('new_temp', Eddy.index, cent_temp)
+            # Eddy.insert_at_index('new_salt', Eddy.index, cent_salt)
 
         if Eddy.TRACK_EXTRA_VARIABLES:
             Eddy.insert_at_index('new_contour_e', Eddy.index, contour_e)
@@ -1304,8 +1296,8 @@ def accounting(Eddy, old_ind, centlon, centlat,
             Eddy.insert_at_index('new_shape_error', Eddy.index, shape_error)
 
         if Eddy.new_list:  # initialise a new list
-            print ('------ starting a new track list for %s' %
-                   Eddy.SIGN_TYPE.replace('nic', 'nes'))
+            logging.info('starting a new track list for %s',
+                         Eddy.SIGN_TYPE.replace('nic', 'nes'))
             Eddy.new_list = False
 
         args = (centlon, centlat, rtime, uavg, teke,
@@ -1358,7 +1350,7 @@ def func_hann2d_fast(var, numpasses):
     ni = isz + 2
 
     def hann2d_fast(var, ni, nj):
-        #print 'jsz, isz',jsz, isz
+        # print 'jsz, isz',jsz, isz
         var_ext = np.ma.zeros((nj, ni))  # add 1-more line parallell to
         var_ext[1:-1, 1:-1] = var        # each of 4-sides
         var_ext[1:-1, 0] = var[:, 0]   # duplicate W-side
@@ -1441,10 +1433,9 @@ def get_circle(lon, lat, distance, npts):
     lat *= pio180
     angle = np.arange(np.float64(npts))
     angle[:] = angle * 2. * (4. * np.arctan(1.)) / npts
-    distance /= 6371315.0 # angular distance
+    distance /= 6371315.0  # angular distance
     lat1 = (np.arcsin(np.sin(lat) * np.cos(distance) + np.cos(lat) *
                       np.sin(distance) * np.cos(angle)))
     lon1 = (lon + np.arctan2(np.sin(angle) * np.sin(distance) * np.cos(lat),
                              np.cos(distance) - np.sin(lat) * np.sin(lat1)))
     return lon1 / pio180, lat1 / pio180
-

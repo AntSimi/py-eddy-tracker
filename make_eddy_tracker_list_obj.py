@@ -32,9 +32,12 @@ Version 2.0.3
 
 
 """
+import logging
 from py_eddy_tracker_classes import *
+import matplotlib.path as path
+import matplotlib.patches as patch
 import scipy.spatial as spatial
-import scipy.interpolate as interpolate
+import scipy.interpolate as sc_interpolate
 from haversine import haversine # needs compiling with f2py
 
 
@@ -89,42 +92,28 @@ def uniform_resample(x, y, **kwargs):#, method='interp1d', kind='linear'):
        kind    : type of interpolation (interp1d only)
        extrapolate : IS NOT RELIABLE (sometimes nans occur)
     """
-    if kwargs.has_key('method'):
-        method = kwargs['method']
-    else:
-        method = 'interp1d'
-
-    if kwargs.has_key('extrapolate'):
-        extrapolate = kwargs['extrapolate']
-    else:
-        extrapolate = None
-        
-    if kwargs.has_key('num_fac'):
-        num_fac = kwargs['num_fac']
-    else:
-        num_fac = 2
+    method = kwargs.get('method', 'interp1d')
+    extrapolate = kwargs.get('extrapolate', None)
+    num_fac = kwargs.get('num_fac', 2)
 
     # Get distances
     d = np.zeros_like(x)
     d[1:] = np.cumsum(haversine_distance_vector(
-               x[:-1].copy(), y[:-1].copy(), x[1:].copy(), y[1:].copy()))
+        x[:-1].copy(), y[:-1].copy(), x[1:].copy(), y[1:].copy()))
     # Get uniform distances
     d_uniform = np.linspace(0, d.max(), num=d.size * num_fac, endpoint=True)
 
     # Do 1d interpolations
     if strcompare('interp1d', method):
-        if kwargs.has_key('kind'):
-            kind = kwargs['kind']
-        else:
-            kind = 'linear'
-        xfunc = interpolate.interp1d(d, x, kind=kind)
-        yfunc = interpolate.interp1d(d, y, kind=kind)
+        kind = kwargs.get('kind', 'linear')
+        xfunc = sc_interpolate.interp1d(d, x, kind=kind)
+        yfunc = sc_interpolate.interp1d(d, y, kind=kind)
         xnew = xfunc(d_uniform)
         ynew = yfunc(d_uniform)
 
     elif strcompare('akima', method):
-        xfunc = interpolate.Akima1DInterpolator(d, x)
-        yfunc = interpolate.Akima1DInterpolator(d, y)
+        xfunc = sc_interpolate.Akima1DInterpolator(d, x)
+        yfunc = sc_interpolate.Akima1DInterpolator(d, y)
         xnew = xfunc(d_uniform, extrapolate=extrapolate)
         ynew = yfunc(d_uniform, extrapolate=extrapolate)
 
@@ -501,8 +490,8 @@ class TrackList (object):
         """
         for track in self.tracklist:
             track.alive = False
-        print('------ all %s tracks killed for final saving'
-               % self.SIGN_TYPE.replace('one', 'onic').lower())
+        logging.info('all %s tracks killed for final saving',
+            self.SIGN_TYPE.replace('one', 'onic').lower())
 
     def create_netcdf(self, directory, savedir,
                       grd=None, YMIN=None, YMAX=None,
@@ -849,7 +838,8 @@ class TrackList (object):
 
         # Print final message and return
         if stopper:
-            print('All %ss saved' % self.SIGN_TYPE.replace('one', 'onic').lower())
+            logging.info('All %ss saved',
+                         self.SIGN_TYPE.replace('one', 'onic').lower())
             return
 
         # Get index to first currently active track
@@ -1057,17 +1047,17 @@ class RossbyWaveSpeed (object):
         if self.start:
             lon, lat = get_lon_lat(xpt, ypt)
             if 'Global' in self.THE_DOMAIN:
-                print "".join(('--------- setting ellipse for first tracked ',
-                            'eddy at %s, %s in the %s domain'
-                                % (lon, lat, self.THE_DOMAIN)))
+                logging.info('--------- setting ellipse for first tracked '
+                             'eddy at %s, %s in the %s domain',
+                             lon, lat, self.THE_DOMAIN)
                 c = np.abs(self._get_rlongwave_spd(xpt, ypt))[0]
-                print "".join(('--------- with extratropical long baroclinic ',
-                            'Rossby wave phase speed of %s m/s' % c))
+                logging.info('with extratropical long baroclinic '
+                             'Rossby wave phase speed of %s m/s',
+                             c)
             elif self.THE_DOMAIN in ('BlackSea', 'MedSea'):
-                print "".join(('--------- setting search radius of %s m for '
-                                % self.distance[0],
-                            'first tracked eddy at %s, %s in the %s domain'
-                                % (lon, lat, self.THE_DOMAIN)))
+                logging.info('setting search radius of %s m for '
+                             'first tracked eddy at %s, %s in the %s domain',
+                             self.distance[0], lon, lat, self.THE_DOMAIN)
             else:
                 Exception
             self.start = False
