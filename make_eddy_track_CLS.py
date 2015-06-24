@@ -33,7 +33,7 @@ import glob as glob
 import cPickle as pickle
 import numpy as np
 from make_eddy_track_AVISO import track_eddies
-
+import logging
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -54,8 +54,6 @@ if __name__ == '__main__':
     PKL_FILES.sort()
     for active, PKL_FILE in enumerate(PKL_FILES):
 
-        print PKL_FILE
-
         try:
             del eddy
         except:
@@ -64,7 +62,7 @@ if __name__ == '__main__':
         # Unpickle
         with open(PKL_FILE, 'rb') as the_pickle:
             eddy = pickle.load(the_pickle)
-            print '--- loaded %s' % PKL_FILE
+            logging.info('\tloaded %s', PKL_FILE)
 
         eddy.savedir = DATA_DIR + eddy.savedir.rpartition('/')[-1]
 

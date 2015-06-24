@@ -87,10 +87,10 @@ class RomsGrid (PyEddyTracker):
         print '\nInitialising the *RomsGrid*'
         self.THE_DOMAIN = THE_DOMAIN
         self.PRODUCT = PRODUCT
-        self.LONMIN = LONMIN
-        self.LONMAX = LONMAX
-        self.LATMIN = LATMIN
-        self.LATMAX = LATMAX
+        self.lonmin = LONMIN
+        self.lonmax = LONMAX
+        self.latmin = LATMIN
+        self.latmax = LATMAX
         self.FILLVAL = FILLVAL
         self.GRDFILE = GRDFILE
         

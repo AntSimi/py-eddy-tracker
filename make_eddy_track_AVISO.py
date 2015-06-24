@@ -53,19 +53,6 @@ import global_tracking as gbtk
 import logging
 
 
-def timeit(method):
-    """
-    Decorator to time a function
-    """
-    def timed(*args, **kw):
-        ts = datetime.now()
-        result = method(*args, **kw)
-        te = datetime.now()
-        logging.info('%s : %s sec', method.__name__, te - ts)
-        return result
-    return timed
-
-
 class PyEddyTracker (object):
     """
     Base object
@@ -85,15 +72,17 @@ class PyEddyTracker (object):
       ROMS:   get_ROMS_f_pm_pn
 
     """
+
+    GRAVITY = 9.81
+    EARTH_RADIUS = 6371315.0
+
     def __init__(self):
         """
         Set some constants
-          *ZERO_CROSSING*:
+          *zero_crossing*:
             Boolean, *True* if THE_DOMAIN crosses 0 degree meridian
         """
-        self.GRAVITY = 9.81
-        self.EARTH_RADIUS = 6371315.0
-        self.ZERO_CROSSING = False
+        self.zero_crossing = False
         self.i0, self.i1 = 0, None
         self.j0, self.j1 = 0, None
         self.ip0, self.ip1 = 0, None
@@ -123,8 +112,8 @@ class PyEddyTracker (object):
           varname : variable ('temp', 'mask_rho', etc) to read
           indices : string of index ranges, eg. '[0,:,0]'
         """
-        with Dataset(varfile) as nc:
-            return nc.variables[varname][indices]
+        with Dataset(varfile) as h_nc:
+            return h_nc.variables[varname][indices]
 
     def read_nc_att(self, varfile, varname, att):
         """
@@ -132,27 +121,27 @@ class PyEddyTracker (object):
           varname : variable ('temp', 'mask_rho', etc) to read
           att : string of attribute, eg. 'valid_range'
         """
-        with Dataset(varfile) as nc:
-            return getattr(nc.variables[varname], att)
+        with Dataset(varfile) as h_nc:
+            return getattr(h_nc.variables[varname], att)
 
     def set_initial_indices(self):
         """
         Set indices for desired domain
         """
-        # print self.ZERO_CROSSING
+        # print self.zero_crossing
         # print 'wwwwwwww', self._lon.min(), self._lon.max()
-        LONMIN, LONMAX = self.LONMIN, self.LONMAX
-        LATMIN, LATMAX = self.LATMIN, self.LATMAX
+        lonmin, lonmax = self.lonmin, self.lonmax
+        latmin, latmax = self.latmin, self.latmax
 
         logging.info('Setting initial indices to *%s* domain', self.THE_DOMAIN)
-        logging.info('LONMIN = %s, LONMAX = %s, LATMIN = %s, LATMAX = %s',
-                     LONMIN, LONMAX, LATMIN, LATMAX)
-        LATMIN_OFFSET = LATMIN + (0.5 * (LATMAX - LATMIN))
-        self.i0, _ = self.nearest_point(LONMIN, LATMIN_OFFSET)
-        self.i1, _ = self.nearest_point(LONMAX, LATMIN_OFFSET)
-        LONMIN_OFFSET = LONMIN + (0.5 * (LONMAX - LONMIN))
-        _, self.j0 = self.nearest_point(LONMIN_OFFSET, LATMIN)
-        _, self.j1 = self.nearest_point(LONMIN_OFFSET, LATMAX)
+        logging.info('lonmin = %s, lonmax = %s, latmin = %s, latmax = %s',
+                     lonmin, lonmax, latmin, latmax)
+        latmin_offset = latmin + (0.5 * (latmax - latmin))
+        self.i0, _ = self.nearest_point(lonmin, latmin_offset)
+        self.i1, _ = self.nearest_point(lonmax, latmin_offset)
+        lonmin_offset = lonmin + (0.5 * (lonmax - lonmin))
+        _, self.j0 = self.nearest_point(lonmin_offset, latmin)
+        _, self.j1 = self.nearest_point(lonmin_offset, latmax)
 
         def kdt(lon, lat, limits, k=4):
             """
@@ -170,24 +159,26 @@ class PyEddyTracker (object):
 
         if 'AvisoGrid' in self.__class__.__name__:
 
-            if self.ZERO_CROSSING is True:
+            if self.zero_crossing is True:
                 """
                 Used for a zero crossing, e.g., across Agulhas region
                 """
                 def half_limits(lon, lat):
-                    return np.array([np.array([lon.min(), lon.max(),
-                                               lon.max(), lon.min()]),
-                                     np.array([lat.min(), lat.min(),
-                                               lat.max(), lat.max()])]).T
+                    return np.array([[lon.min(), lon.max(),
+                                      lon.max(), lon.min()],
+                                     [lat.min(), lat.min(),
+                                      lat.max(), lat.max()]]).T
                 # Get bounds for right part of grid
-                lat = self._lat[self._lon >= 360 + LONMIN - 0.5]
-                lon = self._lon[self._lon >= 360 + LONMIN - 0.5]
+                lat = self._lat[self._lon >= 360 + lonmin - 0.5]
+                lon = self._lon[self._lon >= 360 + lonmin - 0.5]
+                print half_limits(lon, lat)
                 limits = half_limits(lon, lat)
                 iind, jind = kdt(self._lon, self._lat, limits)
                 self.i1 = iind.min()
                 # Get bounds for left part of grid
-                lat = self._lat[self._lon <= LONMAX + 0.5]
-                lon = self._lon[self._lon <= LONMAX + 0.5]
+                lat = self._lat[self._lon <= lonmax + 0.5]
+                lon = self._lon[self._lon <= lonmax + 0.5]
+                print half_limits(lon, lat)
                 limits = half_limits(lon, lat)
                 iind, jind = kdt(self._lon, self._lat, limits)
                 self.i0 = iind.max()
@@ -200,7 +191,7 @@ class PyEddyTracker (object):
         around 2d variables.
         Padded matrices are needed only for geostrophic velocity computation.
         """
-        logging.info('--- Setting padding indices with PAD = %s', pad)
+        logging.info('\tSetting padding indices with PAD = %s', pad)
 
         self.pad = pad
 
@@ -246,7 +237,7 @@ class PyEddyTracker (object):
 
         self.jp0, self.jup0 = get_str(self.j0, pad)
         self.jp1, self.jup1 = get_end(self.j1, self._lon.shape[0], pad)
-        if self.ZERO_CROSSING:
+        if self.zero_crossing:
             pad = -pad
         self.ip0, self.iup0 = get_str(self.i0, pad)
         self.ip1, self.iup1 = get_end(self.i1, self._lon.shape[1], pad)
@@ -262,7 +253,7 @@ class PyEddyTracker (object):
         Return:
           distance (m)
         """
-        # print 'ssssssssssssssss'
+
         lon1, lat1, lon2, lat2 = (lon1.copy(), lat1.copy(),
                                   lon2.copy(), lat2.copy())
         dlat = np.deg2rad(lat2 - lat1)
@@ -404,9 +395,9 @@ class PyEddyTracker (object):
         # Create Basemap instance for Mercator projection.
         self.M = Basemap(
             projection='merc',
-            llcrnrlon=self.LONMIN - 1, urcrnrlon=self.LONMAX + 1,
-            llcrnrlat=self.LATMIN - 1, urcrnrlat=self.LATMAX + 1,
-            lat_ts=0.5 * (self.LATMIN + self.LATMAX), resolution='h')
+            llcrnrlon=self.lonmin - 1, urcrnrlon=self.lonmax + 1,
+            llcrnrlat=self.latmin - 1, urcrnrlat=self.latmax + 1,
+            lat_ts=0.5 * (self.latmin + self.latmax), resolution='c')
 
         if with_pad:
             x, y = self.M(self.lonpad(), self.latpad())
@@ -444,7 +435,7 @@ class PyEddyTracker (object):
         """
         Set empty arrays for u, v, upad, vpad
         """
-        if self.ZERO_CROSSING:
+        if self.zero_crossing:
             u1 = np.empty((self.jp1 - self.jp0, self.ip0))
             u0 = np.empty((self.jp1 - self.jp0, self._lon.shape[1] - self.ip1))
             self.upad = np.ma.concatenate((u0, u1), axis=1)
@@ -502,10 +493,10 @@ class AvisoGrid (PyEddyTracker):
             self.PRODUCT = 'AVISO'
         else:
             self.PRODUCT = PRODUCT
-        self.LONMIN = LONMIN
-        self.LONMAX = LONMAX
-        self.LATMIN = LATMIN
-        self.LATMAX = LATMAX
+        self.lonmin = LONMIN
+        self.lonmax = LONMAX
+        self.latmin = LATMIN
+        self.latmax = LATMAX
 
         try:  # new AVISO (2014)
             self._lon = self.read_nc(AVISO_FILE, 'lon')
@@ -530,10 +521,10 @@ class AvisoGrid (PyEddyTracker):
             self._lon -= 360.
             # print 'vvvvvvvv', self._lon.min(), self._lon.max()
 
-        # ZERO_CROSSING, used for handling a longitude range that
+        # zero_crossing, used for handling a longitude range that
         # crosses zero degree meridian
         if LONMIN < 0 and LONMAX >= 0 and 'MedSea' not in self.THE_DOMAIN:
-            self.ZERO_CROSSING = True
+            self.zero_crossing = True
 
         self.sla_coeffs = None
         self.uspd_coeffs = None
@@ -566,7 +557,7 @@ class AvisoGrid (PyEddyTracker):
         """
         Read nc data from AVISO file
         """
-        if self.ZERO_CROSSING:
+        if self.zero_crossing:
 
             try:  # new AVISO (2014)
                 ssh1 = self.read_nc(
@@ -728,7 +719,7 @@ class AvisoGrid (PyEddyTracker):
         return x
 
     def lon(self):
-        if self.ZERO_CROSSING:
+        if self.zero_crossing:
             # TO DO: These concatenations are possibly expensive, they
             # shouldn't need to happen with every call to self.lon()
             lon0 = self._lon[self.j0:self.j1, self.i1:]
@@ -738,7 +729,7 @@ class AvisoGrid (PyEddyTracker):
             return self._lon[self.j0:self.j1, self.i0:self.i1]
 
     def lat(self):
-        if self.ZERO_CROSSING:
+        if self.zero_crossing:
             lat0 = self._lat[self.j0:self.j1, self.i1:]
             lat1 = self._lat[self.j0:self.j1, :self.i0]
             return np.concatenate((lat0, lat1), axis=1)
@@ -746,7 +737,7 @@ class AvisoGrid (PyEddyTracker):
             return self._lat[self.j0:self.j1, self.i0:self.i1]
 
     def lonpad(self):
-        if self.ZERO_CROSSING:
+        if self.zero_crossing:
             lon0 = self._lon[self.jp0:self.jp1, self.ip1:]
             lon1 = self._lon[self.jp0:self.jp1, :self.ip0]
             return np.concatenate((lon0 - 360., lon1), axis=1)
@@ -754,7 +745,7 @@ class AvisoGrid (PyEddyTracker):
             return self._lon[self.jp0:self.jp1, self.ip0:self.ip1]
 
     def latpad(self):
-        if self.ZERO_CROSSING:
+        if self.zero_crossing:
             lat0 = self._lat[self.jp0:self.jp1, self.ip1:]
             lat1 = self._lat[self.jp0:self.jp1, :self.ip0]
             return np.concatenate((lat0, lat1), axis=1)
@@ -838,11 +829,10 @@ class ColoredFormatter(logging.Formatter):
         record.levelname = model % record.levelname
         return super(ColoredFormatter, self).format(record)
 
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 if __name__ == '__main__':
     format_log = "%(levelname)-8s %(asctime)s %(module)s." \
-                 "%(funcName)s : %(message)s"
+                 "%(funcName)s :\n\t\t\t\t\t%(message)s"
     # set up logging to console
     console = logging.StreamHandler()
     console.setFormatter(ColoredFormatter(format_log))
@@ -863,6 +853,7 @@ if __name__ == '__main__':
         config = yaml.load(stream)
 
     logging.getLogger().setLevel(getattr(logging, config['VERBOSE'].upper()))
+    VERBOSE = 'No' if config['VERBOSE'].upper() != 'DEBUG' else 'Yes'
 
     logging.info('Launching with yaml file: %s', YAML_FILE)
 
@@ -879,16 +870,16 @@ if __name__ == '__main__':
     # It is not recommended to change values given below
     # for 'Global', 'BlackSea' or 'MedSea'...
     if 'Global' in config['THE_DOMAIN']:
-        config['LONMIN'] = -100.
-        config['LONMAX'] = 290.
-        config['LATMIN'] = -80.
-        config['LATMAX'] = 80.
+        config['lonmin'] = -100.
+        config['lonmax'] = 290.
+        config['latmin'] = -80.
+        config['latmax'] = 80.
 
     elif config['THE_DOMAIN'] in ('Regional', 'MedSea'):
-        config['LONMIN'] = config['DOMAIN']['LONMIN']
-        config['LONMAX'] = config['DOMAIN']['LONMAX']
-        config['LATMIN'] = config['DOMAIN']['LATMIN']
-        config['LATMAX'] = config['DOMAIN']['LATMAX']
+        config['lonmin'] = config['DOMAIN']['LONMIN']
+        config['lonmax'] = config['DOMAIN']['LONMAX']
+        config['latmin'] = config['DOMAIN']['LATMIN']
+        config['latmax'] = config['DOMAIN']['LATMAX']
 
     DATE_STR = config['DATE_STR'] = config['DOMAIN']['DATE_STR']
     DATE_END = config['DATE_END'] = config['DOMAIN']['DATE_END']
@@ -910,8 +901,10 @@ if __name__ == '__main__':
     # TRACK_DURATION_MIN = config['TRACK_DURATION_MIN']
 
     if 'SLA' in DIAGNOSTIC_TYPE:
-        MAX_SLA = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['MAX_SLA']
-        INTERVAL = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_SLA']['INTERVAL']
+        MAX_SLA = config['CONTOUR_PARAMETER'
+                         ]['CONTOUR_PARAMETER_SLA']['MAX_SLA']
+        INTERVAL = config['CONTOUR_PARAMETER'
+                          ]['CONTOUR_PARAMETER_SLA']['INTERVAL']
         config['CONTOUR_PARAMETER'] = np.arange(-MAX_SLA, MAX_SLA + INTERVAL,
                                                 INTERVAL)
         config['SHAPE_ERROR'] = np.full(config['CONTOUR_PARAMETER'].size,
@@ -919,7 +912,8 @@ if __name__ == '__main__':
 
     elif 'Q' in DIAGNOSTIC_TYPE:
         MAX_Q = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['MAX_Q']
-        NUM_LEVS = config['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['NUM_LEVS']
+        NUM_LEVS = config['CONTOUR_PARAMETER'
+                          ]['CONTOUR_PARAMETER_Q']['NUM_LEVS']
         config['CONTOUR_PARAMETER'] = np.linspace(0, MAX_Q, NUM_LEVS)[::-1]
     else:
         Exception
@@ -988,8 +982,8 @@ if __name__ == '__main__':
 
     # Set up a grid object using first AVISO file in the list
     sla_grd = AvisoGrid(AVISO_FILES[0], config['THE_DOMAIN'], PRODUCT,
-                        config['LONMIN'], config['LONMAX'],
-                        config['LATMIN'], config['LATMAX'])
+                        config['lonmin'], config['lonmax'],
+                        config['latmin'], config['latmax'])
 
     # Set coordinates for figures
     Mx, My = sla_grd.M(sla_grd.lon(), sla_grd.lat())
@@ -1111,7 +1105,6 @@ if __name__ == '__main__':
             sla = np.ma.masked_where(sla_grd.mask == 0, sla)
 
             # Get timing
-            print rtime
             try:
                 thedate = dt.num2date(rtime)[0]
             except:
@@ -1255,18 +1248,15 @@ if __name__ == '__main__':
             ymd_str = ''.join((str(yr), str(mo).zfill(2), str(da).zfill(2)))
 
             # Test pickling
-            with open(SAVE_DIR + 'A_eddy_%s.pkl' % ymd_str,
-                      'wb') as save_pickle:
-                pickle.dump(A_eddy, save_pickle, 2)
-
-            with open(SAVE_DIR + 'C_eddy_%s.pkl' % ymd_str,
-                      'wb') as save_pickle:
-                pickle.dump(C_eddy, save_pickle, 2)
 
             save2nc = gbtk.GlobalTracking(A_eddy, ymd_str)
             save2nc.create_netcdf()
             save2nc.write_tracks()
+            save2nc = gbtk.GlobalTracking(C_eddy, ymd_str)
+            save2nc.create_netcdf()
+            save2nc.write_tracks()
 
+            continue
             # exit()
 
             if START:
@@ -1279,6 +1269,7 @@ if __name__ == '__main__':
             else:
                 first_record = False
 
+            continue
             # Track the eddies
             A_eddy = track_eddies(A_eddy, first_record)
             C_eddy = track_eddies(C_eddy, first_record)

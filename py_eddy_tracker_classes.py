@@ -33,6 +33,7 @@ Version 2.0.3
 #import matplotlib
 #matplotlib.use('Agg')
 import logging
+import numexpr as ne
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
@@ -253,8 +254,6 @@ def okubo_weiss(grd):
     von = 2. * v / (pn[:M] + pn[1:Mp])
     vom = 2. * v / (pm[:M] + pm[1:Mp])
     mn = pm * pn
-    mn_p = quart_interp(mn[:M, :L], mn[:M, 1:Lp],
-                        mn[1:Mp, 1:Lp], mn[1:Mp, :L])
     # Sigma_T
     ST = mn * psi2rho(von[:, 1:Lp] - von[:, :L] + uom[1:Mp, :] - uom[:M, :])
     # Sigma_N
@@ -288,6 +287,7 @@ def psi2rho(var_psi):
     var_rho[:, L] = var_rho[:, Lm]
     return var_rho
 
+
 def pcol_2dxy(x, y):
     """
     Function to shift x, y for subsequent use with pcolor
@@ -302,7 +302,7 @@ def pcol_2dxy(x, y):
     x_pcol[1:Mp, 1:Lp] = half_interp(x_tmp[0:M], x_tmp[1:Mp])
     x_pcol[0] = 2. * x_pcol[1] - x_pcol[2]
     x_pcol[:, 0] = 2. * x_pcol[:, 1] - x_pcol[:, 2]
-    y_tmp = half_interp(y[:, :L], y[:, 1:Lp]    )
+    y_tmp = half_interp(y[:, :L], y[:, 1:Lp])
     y_pcol[1:Mp, 1:Lp] = half_interp(y_tmp[:M], y_tmp[1:Mp])
     y_pcol[0] = 2. * y_pcol[1] - y_pcol[2]
     y_pcol[:, 0] = 2. * y_pcol[:, 1] - y_pcol[:, 2]
@@ -890,8 +890,8 @@ def track_eddies(Eddy, first_record):
     DIST0 = Eddy.DIST0
     AMP0 = Eddy.AMP0
     AREA0 = Eddy.AREA0
-    #TEMP0 = 20.
-    #SALT0 = 35.
+    # TEMP0 = 20.
+    # SALT0 = 35.
 
     # True to debug
     debug_dist = False
@@ -1370,18 +1370,16 @@ def func_hann2d_fast(var, numpasses):
         var_ext[np.isnan(var_ext)] = 0.
 
         # Initialize count and sum variables
-        cc = np.ma.zeros((var.shape))
-        varS = np.ma.zeros((var.shape))
+        cc = npts[1:nj-1, 1:ni-1] * (
+            npts[0:nj-2, 1:ni-1] + npts[2:nj, 1:ni-1] +
+            npts[1:nj-1, 0:ni-2] + npts[1:nj-1, 2:ni])
 
-        cc = npts[1:nj-1, 1:ni-1] * (npts[0:nj-2, 1:ni-1] + npts[2:nj, 1:ni-1] +
-                                     npts[1:nj-1, 0:ni-2] + npts[1:nj-1, 2:ni])
-
-        varS = (var_ext[0:nj-2, 1:ni-1] + var_ext[2:nj,   1:ni-1] + 
+        varS = (var_ext[0:nj-2, 1:ni-1] + var_ext[2:nj,   1:ni-1] +
                 var_ext[1:nj-1, 0:ni-2] + var_ext[1:nj-1, 2:ni])
 
         cc[cc == 0] = np.nan  # bring back nans in original data.
         weight = 8. - cc  # This is the weight for values on each grid point,
-                                        # based on number of valid neighbours 
+                                        # based on number of valid neighbours
         # Final smoothed version of var
         hsm = 0.125 * (varS + weight * var_ext[1:jsz+1, 1:isz+1])
         return hsm
