@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# %run py_eddy_tracker_property_classes.py
 
 """
 ===========================================================================
@@ -27,38 +26,16 @@ py_eddy_tracker_amplitude.py
 
 Version 2.0.3
 
-
 ===========================================================================
 
 """
-from scipy import interpolate
+from scipy.interpolate import griddata
+from scipy.ndimage import generate_binary_structure, binary_erosion
+from scipy.ndimage import minimum_filter
 import numpy as np
-import scipy.ndimage as nd
-# import scipy.ndimage.morphology as morphology
-# import scipy.ndimage.filters as filters
-# import scipy.ndimage.label as label
 import matplotlib.pyplot as plt
-
-
-def pcol_2dxy(x, y):
-    """
-    Function to shift x, y for subsequent use with pcolor
-    by Jeroen Molemaker UCLA 2008
-    """
-    mp, lp = x.shape
-    m = mp - 1
-    l = lp - 1
-    x_pcol = np.zeros((mp, lp))
-    y_pcol = np.zeros_like(x_pcol)
-    x_tmp = 0.5 * (x[:, :l] + x[:, 1:lp])
-    x_pcol[1:mp, 1:lp] = 0.5 * (x_tmp[:m] + x_tmp[1:mp])
-    x_pcol[0] = 2. * (x_pcol[1] - x_pcol[2])
-    x_pcol[:, 0] = 2. * (x_pcol[:, 1] - x_pcol[:, 2])
-    y_tmp = 0.5 * (y[:, :l] + y[:, 1:lp])
-    y_pcol[1:mp, 1:lp] = 0.5 * (y_tmp[:m] + y_tmp[1:mp])
-    y_pcol[0] = 2. * (y_pcol[1] - y_pcol[2])
-    y_pcol[:, 0] = 2. * (y_pcol[:, 1] - y_pcol[:, 2])
-    return x_pcol, y_pcol
+from .tools import index_from_nearest_path
+import logging
 
 
 class EddyProperty (object):
@@ -129,26 +106,26 @@ class Amplitude (object):
         self.contlat = contlat.copy()
         eddy.grd = grd  # temporary fix
         self.eddy = eddy
-        self.MLE = self.eddy.MAX_LOCAL_EXTREMA
+        self.mle = self.eddy.MAX_LOCAL_EXTREMA
         self.islice = slice(self.eddy.imin, self.eddy.imax)
         self.jslice = slice(self.eddy.jmin, self.eddy.jmax)
         self.sla = self.eddy.sla[self.jslice,
                                  self.islice].copy()
 
         if 'RectBivariate' in eddy.INTERP_METHOD:
-            h0 = grd.sla_coeffs.ev(self.contlat[1:], self.contlon[1:])
+            h_0 = grd.sla_coeffs.ev(self.contlat[1:], self.contlon[1:])
 
         elif 'griddata' in eddy.INTERP_METHOD:
             points = np.array([grd.lon()[self.jslice, self.islice].ravel(),
                                grd.lat()[self.jslice, self.islice].ravel()]).T
-            h0 = interpolate.griddata(points, self.sla.ravel(),
-                                      (self.contlon[1:], self.contlat[1:]),
-                                      'linear')
+            h_0 = griddata(points, self.sla.ravel(),
+                           (self.contlon[1:], self.contlat[1:]),
+                           'linear')
         else:
             Exception
 
-        self.h0_check = h0
-        self.h0 = h0[np.isfinite(h0)].mean()
+        self.h0_check = h_0
+        self.h_0 = h_0[np.isfinite(h_0)].mean()
         self.amplitude = 0  # np.atleast_1d(0.)
         self.local_extrema = None  # np.int(0)
         self.local_extrema_inds = None
@@ -165,29 +142,29 @@ class Amplitude (object):
     def _set_cyc_amplitude(self):
         """
         """
-        self.amplitude = self.h0
+        self.amplitude = self.h_0
         self.amplitude -= self.sla.min()
 
     def _set_acyc_amplitude(self):
         """
         """
         self.amplitude = self.sla.max()
-        self.amplitude -= self.h0
+        self.amplitude -= self.h_0
 
     def all_pixels_below_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are below a given SSH threshold for cyclonic eddies.
         """
-        if np.any(self.sla > self.h0):
+        if np.any(self.sla > self.h_0):
             return False  # i.e., with self.amplitude == 0
         else:
             self._set_local_extrema(1)
             if (self.local_extrema > 0 and
-                    self.local_extrema <= self.MLE):
+                    self.local_extrema <= self.mle):
                 self._set_cyc_amplitude()
 
-            elif self.local_extrema > self.MLE:
+            elif self.local_extrema > self.mle:
                 lmi_j, lmi_i = np.where(self.local_extrema_inds)
                 levnm2 = level - (2 * self.eddy.INTERVAL)
                 slamin = np.atleast_1d(1e5)
@@ -209,17 +186,17 @@ class Amplitude (object):
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are above a given SSH threshold for anticyclonic eddies.
         """
-        if np.any(self.sla < self.h0):
+        if np.any(self.sla < self.h_0):
             return False  # i.e.,with self.amplitude == 0
 
         else:
             self._set_local_extrema(-1)
 
             if (self.local_extrema > 0 and
-                    self.local_extrema <= self.MLE):
+                    self.local_extrema <= self.mle):
                 self._set_acyc_amplitude()
 
-            elif self.local_extrema > self.MLE:
+            elif self.local_extrema > self.mle:
                 lmi_j, lmi_i = np.where(self.local_extrema_inds)
                 levnp2 = level + (2 * self.eddy.INTERVAL)
                 slamax = np.atleast_1d(-1e5)
@@ -253,12 +230,12 @@ class Amplitude (object):
         the pixel's value is the neighborhood maximum, 0 otherwise)
         http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
         """
-        neighborhood = nd.morphology.generate_binary_structure(arr.ndim, 2)
+        neighborhood = generate_binary_structure(arr.ndim, 2)
         # Get local mimima
-        detected_minima = (nd.filters.minimum_filter(arr,
+        detected_minima = (minimum_filter(arr,
                            footprint=neighborhood) == arr)
         background = (arr == 0)
-        eroded_background = nd.morphology.binary_erosion(
+        eroded_background = binary_erosion(
             background, structure=neighborhood, border_value=1)
         detected_minima -= eroded_background
         self.local_extrema_inds = detected_minima
@@ -272,28 +249,24 @@ class Amplitude (object):
         if self.local_extrema >= 1 and self.amplitude:
             plt.figure(587)
             cmin, cmax = -8, 8
-            ##cmin, cmax = (self.h0_check.min() - 2,
-                          ##self.h0_check.max() + 2)
-            # cmin, cmax = (self.sla.min(), self.sla.max())
-            cm = plt.cm.gist_ncar
-            # cm = plt.cm.hsv
-            print self.h0_check.shape
-            print self.contlon.shape
+#             cmin, cmax = (self.h0_check.min() - 2,
+#                         self.h0_check.max() + 2)
+#             cmin, cmax = (self.sla.min(), self.sla.max())
+
             plt.title('Local max/min count: %s, Amp: %s' % (
                 self.local_extrema, self.amplitude))
 
-            x, y = (grd.lon()[self.jslice, self.islice],
-                    grd.lat()[self.jslice, self.islice])
-            # x, y = pcol_2dxy(x, y)
-            pcm = plt.pcolormesh(x, y, self.sla.data, cmap=cm)
+            pcm = plt.pcolormesh(
+                grd.lon[self.jslice, self.islice],
+                grd.lat[self.jslice, self.islice],
+                self.sla.data, cmap='gist_ncar')
             plt.clim(cmin, cmax)
             plt.plot(self.contlon, self.contlat)
-            plt.scatter(self.contlon[1:], self.contlat[1:], s=100, c=self.h0_check,
-                        cmap=cm, vmin=cmin, vmax=cmax)
+            plt.scatter(self.contlon[1:], self.contlat[1:], s=100,
+                        c=self.h0_check, cmap='gist_ncar', vmin=cmin,
+                        vmax=cmax)
             # plt.scatter(centlon_lmi, centlat_lmi, c='k')
             # plt.scatter(centlon_e, centlat_e, c='w')
-            print self.local_extrema
-            print self.local_extrema_inds
             lmi_j, lmi_i = np.where(self.local_extrema_inds)
             # lmi_i = lmi_i[0] + self.eddy.imin
             # lmi_j = lmi_j[0] + self.eddy.jmin
@@ -326,69 +299,38 @@ class SwirlSpeed(object):
     """
     def __init__(self, contour):
         """
-        ci : index to contours
-        li : index to levels
+        c_i : index to contours
+        l_i : index to levels
         """
-        x, y, ci, li = [], [], [], []
+        x_list, y_list, ci_list, li_list = [], [], [], []
 
-        for lind, cont in enumerate(contour.collections):
-            for cind, coll in enumerate(cont.get_paths()):
-                x.append(coll.vertices[:, 0])
-                y.append(coll.vertices[:, 1])
-                ci.append(len(coll.vertices[:, 0]))
-            li.append(len(cont.get_paths()))
+        for cont in contour.collections:
+            for coll in cont.get_paths():
+                x_list.append(coll.vertices[:, 0])
+                y_list.append(coll.vertices[:, 1])
+                ci_list.append(len(coll.vertices[:, 0]))
+            li_list.append(len(cont.get_paths()))
 
-        self.x = np.array([val for sublist in x for val in sublist])
-        self.y = np.array([val for sublist in y for val in sublist])
-        self.nb_pt_per_c = np.array(ci)
-        self.ci = self.nb_pt_per_c.cumsum() - self.nb_pt_per_c
-        self.nb_c_per_l = np.array(li)
-        self.li = self.nb_c_per_l.cumsum() - self.nb_c_per_l
-        self.level_slice = None
-        self.nearesti = None  # index to nearest contour
+        self.x_value = np.array([val for sublist in x_list for val in sublist])
+        self.y_value = np.array([val for sublist in y_list for val in sublist])
+        self.nb_pt_per_c = np.array(ci_list, dtype='u4')
+        self.c_i = np.array(self.nb_pt_per_c.cumsum() - self.nb_pt_per_c,
+                            dtype='u4')
+        self.nb_c_per_l = np.array(li_list, dtype='u4')
+        self.l_i = np.array(self.nb_c_per_l.cumsum() - self.nb_c_per_l,
+                            dtype='u4')
 
-    def _set_level_slice(self, thelevel):
-        """
-        Set slices
-        """
-        if self.nb_c_per_l[thelevel] == 0:
-            self.level_slice = None
-        else:
-            self.level_view_of_contour = slice(
-                self.li[thelevel],
-                self.li[thelevel] + self.nb_c_per_l[thelevel])
-            nb_pts = self.nb_pt_per_c[self.level_view_of_contour].sum()
-            self.level_slice = slice(
-                self.ci[self.li[thelevel]],
-                self.ci[self.li[thelevel]] + nb_pts)
-        return self
-
-    def set_dist_array_size(self, thelevel):
+    def get_index_nearest_path(self, level, xpt, ypt):
         """
         """
-        self._set_level_slice(thelevel)
-        return self
-
-    def set_nearest_contour_index(self, xpt, ypt):
-        """
-        """
-        self.dist = (self.x[self.level_slice] - xpt)**2
-        self.dist += (self.y[self.level_slice] - ypt)**2
-        try:
-            self.nearesti = self.dist.argmin()
-        except:
-            self.nearesti = None
-        return self
-
-    def get_index_nearest_path(self):
-        """
-        """
-        if self.nearesti is not None:
-            indices_of_first_pts = self.ci[self.level_view_of_contour]
-            for i, index_of_first_pt in enumerate(indices_of_first_pts):
-                if ((index_of_first_pt -
-                     indices_of_first_pts[0]) > self.nearesti):
-                    return i - 1
-            return i
-        else:
-            return False
+        return index_from_nearest_path(
+            level,
+            self.l_i,
+            self.nb_c_per_l,
+            self.nb_pt_per_c,
+            self.c_i,
+            self.x_value,
+            self.y_value,
+            xpt,
+            ypt
+            )

@@ -59,9 +59,9 @@ def getcoast(coastfile):
 
 
 def read_nc(GRDFILE, var):
-    nc = netcdf.Dataset(GRDFILE,'r')
-    var = nc.variables[var][:]
-    nc.close()
+    h_nc = netcdf.Dataset(GRDFILE,'r')
+    var = h_nc.variables[var][:]
+    h_nc.close()
     return var
 
 
@@ -85,36 +85,36 @@ class RomsGrid (PyEddyTracker):
         """
         super(RomsGrid, self).__init__()
         print '\nInitialising the *RomsGrid*'
-        self.THE_DOMAIN = THE_DOMAIN
-        self.PRODUCT = PRODUCT
+        self.the_domain = THE_DOMAIN
+        self.product = PRODUCT
         self.lonmin = LONMIN
         self.lonmax = LONMAX
         self.latmin = LATMIN
         self.latmax = LATMAX
-        self.FILLVAL = FILLVAL
+        self.fillval = FILLVAL
         self.GRDFILE = GRDFILE
         
         try:
-            with netcdf.Dataset(self.GRDFILE) as nc:
+            with netcdf.Dataset(self.GRDFILE) as h_nc:
                 pass
         except Exception:
             try:
-                with netcdf.Dataset(root() + self.GRDFILE) as nc:
+                with netcdf.Dataset(root() + self.GRDFILE) as h_nc:
                     self.GRDFILE = root() + self.GRDFILE
             except Exception:
                 print 'No file at: ', self.GRDFILE
                 print 'or at ', root() + self.GRDFILE
                 raise Exception # no grid file found
 
-        with netcdf.Dataset(self.GRDFILE) as nc:
-            self._lon = nc.variables['lon_rho'][:]
-            self._lat = nc.variables['lat_rho'][:]
-            self._pm = nc.variables['pm'][:]
-            self._pn = nc.variables['pn'][:]
-            self._f = nc.variables['f'][:]
-            self._angle = nc.variables['angle'][:]
-            self._mask = nc.variables['mask_rho'][:]
-            self._gof = self.GRAVITY / self._f
+        with netcdf.Dataset(self.GRDFILE) as h_nc:
+            self._lon = h_nc.variables['lon_rho'][:]
+            self._lat = h_nc.variables['lat_rho'][:]
+            self._pm = h_nc.variables['p_m'][:]
+            self._pn = h_nc.variables['p_n'][:]
+            self._f_val = h_nc.variables['f_coriolis'][:]
+            self._angle = h_nc.variables['angle'][:]
+            self._mask = h_nc.variables['mask_rho'][:]
+            self._gof = self.GRAVITY / self._f_val
 
         self.set_initial_indices()
         self.set_index_padding()
@@ -123,51 +123,51 @@ class RomsGrid (PyEddyTracker):
         self.set_u_v_eke()
         self.shape = self.lon().shape
         #pad2 = 2 * self.pad
-        #self.shape = (self.f().shape[0] - pad2, self.f().shape[1] - pad2)
+        #self.shape = (self.f_coriolis().shape[0] - pad2, self.f_coriolis().shape[1] - pad2)
         
         # Parameters for different grid files; modify accordingly
-        if self.GRDFILE.split('/')[-1] in 'roms_grd_NA2009_7pt5km.nc':
+        if self.GRDFILE.split('/')[-1] in 'roms_grd_NA2009_7pt5km.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0, 0.0, 120.0, 32.0, 2, [[1,'S'],[1,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'gc_2009_1km_grd_smooth.nc':
+        elif self.GRDFILE.split('/')[-1] in 'gc_2009_1km_grd_smooth.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   60.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'cb_2009_3km_grd_smooth.nc':
+        elif self.GRDFILE.split('/')[-1] in 'cb_2009_3km_grd_smooth.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'roms_grd_CanBas_smooth_bnd.nc':
+        elif self.GRDFILE.split('/')[-1] in 'roms_grd_CanBas_smooth_bnd.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          0.0,          120.0,   32.0,   1,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'grd_Med14km_2010.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_Med14km_2010.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   50.0,   2,           [[0,'S'],[0,'E'],[0,'N'],[1,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'grd_MedWest4pt75km_2010_smooth.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_MedWest4pt75km_2010_smooth.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   50.0,   2,           [[0,'S'],[0,'E'],[0,'N'],[1,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'grd_ATL_15km.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_ATL_15km.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             10.0,          2.0,          400.0,   40.0,   2,           [[1,'S'],[1,'E'],[1,'N'],[0,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'grd_NA2011_7pt5km.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_NA2011_7pt5km.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[1,'S'],[1,'E'],[1,'N'],[1,'W']]
         ####
-        elif self.GRDFILE.split('/')[-1] in 'grd_MedSea15.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_MedSea15.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[0,'S'],[0,'E'],[1,'N'],[1,'W']]
-        elif self.GRDFILE.split('/')[-1] in 'grd_MedSea5.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_MedSea5.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[0,'S'],[0,'E'],[1,'N'],[1,'W']]
-        elif self.GRDFILE.split('/')[-1] in 'grd_canbas2.5.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_canbas2.5.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          2.0,          120.0,   42.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
-        elif self.GRDFILE.split('/')[-1] in 'grd_canwake4km.nc':
+        elif self.GRDFILE.split('/')[-1] in 'grd_canwake4km.h_nc':
             self.theta_s, self.theta_b, self.hc, self.N, self.scoord, self.obcs = \
             6.0,          0.0,          200.0,   42.0,   2,           [[1,'S'],[0,'E'],[1,'N'],[1,'W']]
         else: 
@@ -178,10 +178,10 @@ class RomsGrid (PyEddyTracker):
 
 
     def lon(self):
-        return self._lon[self.j0:self.j1, self.i0:self.i1]
+        return self._lon[self.j_0:self.j_1, self.i_0:self.i_1]
 
     def lat(self):
-        return self._lat[self.j0:self.j1, self.i0:self.i1]
+        return self._lat[self.j_0:self.j_1, self.i_0:self.i_1]
     
     def lonpad(self):
         return self._lon[self.jp0:self.jp1, self.ip0:self.ip1]
@@ -189,10 +189,10 @@ class RomsGrid (PyEddyTracker):
     def latpad(self):
         return self._lat[self.jp0:self.jp1, self.ip0:self.ip1]
     
-    def pm(self):
+    def p_m(self):
         return self._pm[self.jp0:self.jp1, self.ip0:self.ip1]
 
-    def pn(self):
+    def p_n(self):
         return self._pn[self.jp0:self.jp1, self.ip0:self.ip1]
 
     def mask(self):
@@ -207,8 +207,8 @@ class RomsGrid (PyEddyTracker):
     def hraw(self):
         return self._hraw[self.jp0:self.jp1, self.ip0:self.ip1]
 
-    def f(self):
-        return self._f[self.jp0:self.jp1, self.ip0:self.ip1]
+    def f_coriolis(self):
+        return self._f_val[self.jp0:self.jp1, self.ip0:self.ip1]
       
     def gof(self):
         return self._gof[self.jp0:self.jp1, self.ip0:self.ip1]
@@ -261,12 +261,12 @@ class RomsGrid (PyEddyTracker):
 
 
     def VertCoordType(self):
-        nc = netcdf.Dataset(self.GRDFILE,'r')
-        var = nc.VertCoordType
-        nc.close()
+        h_nc = netcdf.Dataset(self.GRDFILE,'r')
+        var = h_nc.VertCoordType
+        h_nc.close()
         return var
     
-    def get_resolution(self, meters=False):
+    def resolution(self, meters=False):
         '''
         Get mean grid resolution in degrees or meters
         If meters defined, return degrees
@@ -276,15 +276,15 @@ class RomsGrid (PyEddyTracker):
             res = np.copy(meters)
             res *= np.pi * mean_earth_radius / 180.0
         else: # Meters to degrees
-            res = np.mean(np.sqrt((1. / self.pm()) * (1. / self.pn())))
+            res = np.mean(np.sqrt((1. / self.p_m()) * (1. / self.p_n())))
             res /= np.pi * mean_earth_radius / 180.
         return res
 
 
     def title(self):
-        nc = netcdf.Dataset(self.GRDFILE,'r')
-        var = nc.title
-        nc.close()
+        h_nc = netcdf.Dataset(self.GRDFILE,'r')
+        var = h_nc.title
+        h_nc.close()
         return var
 
 
@@ -323,19 +323,19 @@ class RomsGrid (PyEddyTracker):
         return zres, mres
     
 
-    def transect(self, ln1, lt1, ln2, lt2, dx):
+    def transect(self, ln1, lt1, ln2, lt2, d_x):
         '''
         Return lon/lat arrays for a transect between
-        two points with resolution dx
+        two points with resolution d_x
         TO DO: check points are within domain
         Input:   1. lon/lat points  (ln1,lt1,ln2,lt2)
-                 2. dx [km]
+                 2. d_x [km]
         Returns: 1. the two arrays
                  2. the distance [m]
                  2. the angle [degrees]
         '''
         dist    = et.distLonLat(ln1,lt1,ln2,lt2)
-        num_stn = np.round(dist[0] / (dx * 1000.))
+        num_stn = np.round(dist[0] / (d_x * 1000.))
         tr_ln   = np.linspace(ln1,ln2,num=num_stn)
         tr_lt   = np.linspace(lt1,lt2,num=num_stn)
         return tr_ln,tr_lt,dist[0],dist[1]

@@ -1,0 +1,97 @@
+# -*- coding: utf-8 -*-
+from netCDF4 import Dataset
+from . import VAR_DESCR
+import logging
+
+
+class GlobalTracking(object):
+    """
+    """
+
+    def __init__(self, eddy, ymd_str):
+        self.ymd_str = ymd_str
+        self.eddy = eddy
+
+    @property
+    def sign_type(self):
+        return self.eddy.SIGN_TYPE
+
+    def create_variable(self, handler_nc, kwargs_variable,
+                        attr_variable, data):
+        var = handler_nc.createVariable(
+            zlib=True,
+            complevel=1,
+            **kwargs_variable)
+        for attr, attr_value in attr_variable.iteritems():
+            var.setncattr(attr, attr_value)
+
+        var[:] = data
+
+        var.setncattr('min', var[:].min())
+        var.setncattr('max', var[:].max())
+
+    def write_netcdf(self):
+        """Write a netcdf with eddy
+        """
+        eddy_size = None
+        for key in VAR_DESCR:
+            attr_name = VAR_DESCR[key]['attr_name']
+            if attr_name is not None and hasattr(self.eddy, attr_name):
+                eddy_size = len(getattr(self.eddy, attr_name))
+                break
+
+        filename = '%s_%s.nc' % (self.sign_type, self.ymd_str)
+        with Dataset(filename, 'w', format='NETCDF4') as h_nc:
+            logging.info('Create intermediary file %s', filename)
+            # Create dimensions
+            logging.debug('Create Dimensions "Nobs"')
+            h_nc.createDimension('Nobs', eddy_size)
+            # Iter on variables to create:
+            for key, value in VAR_DESCR.iteritems():
+                attr_name = value['attr_name']
+                if attr_name is None or not hasattr(self.eddy, attr_name):
+                    continue
+                logging.debug('Create Variable %s', value['nc_name'])
+                self.create_variable(
+                    h_nc,
+                    dict(varname=value['nc_name'],
+                         datatype=value['nc_type'],
+                         dimensions=value['nc_dims']),
+                    value['nc_attr'],
+                    getattr(self.eddy, attr_name))
+
+            # Add cyclonic information
+            self.create_variable(
+                h_nc,
+                dict(varname=VAR_DESCR['type_cyc']['nc_name'],
+                     datatype=VAR_DESCR['type_cyc']['nc_type'],
+                     dimensions=VAR_DESCR['type_cyc']['nc_dims']),
+                VAR_DESCR['type_cyc']['nc_attr'],
+                -1 if self.sign_type == 'Cyclonic' else 1)
+
+    def read_tracks(self):
+        """
+        Read and sort the property data for returning to the
+        Eddy object
+        """
+#         with Dataset('Anticyclonic_20140312.nc') as nc:
+#             tracklengths = nc.variables['track_lengths'][:]
+#             for t, tracklen in enumerate(tracklengths):
+
+#                 varname = 'track_%s' % np.str(t).zfill(4)
+#                 track = nc.variables[varname][:]
+#                 dayzero = track[0].astype(bool)
+#                 saved2nc = track[1].astype(bool)
+#                 save_extras = track[2].astype(bool)
+
+#                 inds = np.arange(3, 3 + (tracklen * 8), tracklen)
+#                 lon = track[inds[0]:inds[1]]
+#                 lat = track[inds[1]:inds[2]]
+#                 amplitude = track[inds[2]:inds[3]]
+#                 radius_s = track[inds[3]:inds[4]]
+#                 radius_e = track[inds[4]:inds[5]]
+#                 uavg = track[inds[5]:inds[6]]
+#                 teke = track[inds[6]:inds[7]]
+#                 ocean_time = track[inds[7]:]
+
+#             properties = nc.variables['track_0000'][:]
