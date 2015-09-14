@@ -224,6 +224,7 @@ class PyEddyTracker(object):
         """
         Speed up frequent operations of type 0.5 * (arr[:-1] + arr[1:])
         """
+        h_one = np.copy(h_one)
         h_one += h_two
         h_one *= 0.5
         return h_one

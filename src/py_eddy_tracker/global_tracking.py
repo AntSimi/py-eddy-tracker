@@ -26,12 +26,14 @@ class GlobalTracking(object):
             var.setncattr(attr, attr_value)
 
         var[:] = data
+            # Variable names are "track_0000", "track_0001", etc.
 
         var.setncattr('min', var[:].min())
         var.setncattr('max', var[:].max())
 
     def write_netcdf(self):
         """Write a netcdf with eddy
+        Write eddy property data to tracks.
         """
         eddy_size = None
         for key in VAR_DESCR:

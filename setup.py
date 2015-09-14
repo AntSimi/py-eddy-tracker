@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext as cython_build_ext
+import numpy
 
 setup(
     name="pyeddytracker",
@@ -23,9 +24,10 @@ setup(
         'build_ext': cython_build_ext,
     },
     ext_modules=[Extension("py_eddy_tracker.tools",
-                           ["src/py_eddy_tracker/tools.pyx"])],
+                           ["src/py_eddy_tracker/tools.pyx"],
+			   include_dirs=[numpy.get_include()])],
     setup_requires=[
-        'numpy>=1.9'],
+        'numpy>=1.8'],
     install_requires=[
         'numpy>=1.9',
         'matplotlib>=1.2.1',
