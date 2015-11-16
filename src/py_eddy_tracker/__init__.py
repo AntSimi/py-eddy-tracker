@@ -1,7 +1,67 @@
 # -*- coding: utf-8 -*-
+from argparse import ArgumentParser
+import logging
+
+
+class ColoredFormatter(logging.Formatter):
+    COLOR_LEVEL = dict(
+        CRITICAL="\037[37;41m",
+        ERROR="\033[31;47m",
+        WARNING="\033[30;47m",
+        INFO="\033[36m",
+        DEBUG="\033[34m",
+        )
+
+    def __init__(self, message):
+        super(ColoredFormatter, self).__init__(message)
+
+    def format(self, record):
+        color = self.COLOR_LEVEL.get(record.levelname, '')
+        color_reset = '\033[0m'
+        model = color + '%s' + color_reset
+        record.msg = model % record.msg
+        record.funcName = model % record.funcName
+        record.module = model % record.module
+        record.levelname = model % record.levelname
+        return super(ColoredFormatter, self).format(record)
+
+
+class EddyParser(ArgumentParser):
+    """General parser for applications
+    """
+
+    FORMAT_LOG = "%(levelname)-8s %(asctime)s %(module)s." \
+                     "%(funcName)s :\n\t\t\t\t\t%(message)s"
+
+    def __init__(self, *args, **kwargs):
+        super(EddyParser, self).__init__(*args, **kwargs)
+        self.add_base_argument()
+
+    def add_base_argument(self):
+        """Base arguments
+        """
+        self.add_argument('-v', '--verbose',
+                          dest='logging_level',
+                          default='ERROR',
+                          help='Levels : DEBUG, INFO, WARNING,'
+                          ' ERROR, CRITICAL')
+        
+    def parse_args(self, *args, **kwargs):
+        # set up logging to CONSOLE
+        console = logging.StreamHandler()
+        console.setFormatter(ColoredFormatter(self.FORMAT_LOG))
+        # add the handler to the root logger
+        logging.getLogger('').addHandler(console)
+        # Parsing
+        opts = super(EddyParser, self).parse_args(*args, **kwargs)
+        # set current level
+        logging.getLogger().setLevel(getattr(logging, opts.logging_level.upper()))
+        return opts
+
+
 VAR_DESCR = dict(
     time=dict(
-        attr_name='new_time_tmp',
+        attr_name='time',
         nc_name='j1',
         nc_type='int32',
         nc_dims=('Nobs',),
@@ -34,7 +94,8 @@ VAR_DESCR = dict(
             )
         ),
     lon=dict(
-        attr_name='new_lon_tmp',
+        attr_name='lon',
+        compute_type='float64',
         nc_name='lon',
         nc_type='float32',
         nc_dims=('Nobs',),
@@ -43,7 +104,8 @@ VAR_DESCR = dict(
             )
         ),
     lat=dict(
-        attr_name='new_lat_tmp',
+        attr_name='lat',
+        compute_type='float64',
         nc_name='lat',
         nc_type='float32',
         nc_dims=('Nobs',),
@@ -52,7 +114,7 @@ VAR_DESCR = dict(
             )
         ),
     amplitude=dict(
-        attr_name='new_amp_tmp',
+        attr_name='amplitude',
         nc_name='A',
         nc_type='float32',
         nc_dims=('Nobs',),
@@ -69,6 +131,7 @@ VAR_DESCR = dict(
         nc_name='L',
         nc_type='float32',
         nc_dims=('Nobs',),
+        scale_factor=1e-3,
         nc_attr=dict(
             long_name='speed radius scale',
             units='km',
@@ -78,7 +141,8 @@ VAR_DESCR = dict(
             )
         ),
     speed_radius=dict(
-        attr_name='new_uavg_tmp',
+        attr_name='speed_radius',
+        scale_factor=100,
         nc_name='U',
         nc_type='float32',
         nc_dims=('Nobs',),
@@ -90,7 +154,7 @@ VAR_DESCR = dict(
             )
         ),
     eke=dict(
-        attr_name='new_teke_tmp',
+        attr_name='eke',
         nc_name='Teke',
         nc_type='float32',
         nc_dims=('Nobs',),
@@ -102,7 +166,8 @@ VAR_DESCR = dict(
             )
         ),
     radius_e=dict(
-        attr_name='new_radii_e_tmp',
+        attr_name='radius_e',
+        scale_factor=1e-3,
         nc_name='radius_e',
         nc_type='float32',
         nc_dims=('Nobs',),
@@ -110,6 +175,18 @@ VAR_DESCR = dict(
             long_name='effective radius scale',
             units='km',
             description='effective eddy radius',
+            )
+        ),
+    radius_s=dict(
+        attr_name='radius_s',
+        scale_factor=1e-3,
+        nc_name='L',
+        nc_type='float32',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            long_name='speed radius scale',
+            units='km',
+            description='speed eddy radius',
             )
         ),
     track=dict(
@@ -132,6 +209,48 @@ VAR_DESCR = dict(
             long_name='observation number',
             units='ordinal',
             description='observation sequence number (XX day intervals)',
+            )
+        ),
+    contour_e=dict(
+        attr_name=None,
+        nc_name='contour_e',
+        nc_type='f4',
+        nc_dims=('contour_points', 'Nobs',),
+        nc_attr=dict(
+            long_name='positions of effective contour points',
+            description='lons/lats of effective contour points; lons (lats) '
+                        'in first (last) half of vector',
+            )
+        ),
+    contour_s=dict(
+        attr_name=None,
+        nc_name='contour_s',
+        nc_type='f4',
+        nc_dims=('contour_points', 'Nobs',),
+        nc_attr=dict(
+            long_name='positions of speed-based contour points',
+            description='lons/lats of speed-based contour points; lons (lats) '
+                        'in first (last) half of vector',
+            )
+        ),
+    uavg_profile=dict(
+        attr_name=None,
+        nc_name='uavg_profile',
+        nc_type='f4',
+        nc_dims=('uavg_contour_count', 'Nobs',),
+        nc_attr=dict(
+            long_name='radial profile of uavg',
+            description='all uavg values from effective contour inwards to '
+                        'smallest inner contour (pixel == 1)',
+            )
+        ),
+    shape_error=dict(
+        attr_name=None,
+        nc_name='shape_error',
+        nc_type='f2',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            units='%',
             )
         ),
     )

@@ -1,5 +1,5 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 """
 ===============================================================================
 This file is part of py-eddy-tracker.
@@ -19,20 +19,13 @@ This file is part of py-eddy-tracker.
 
 Copyright (c) 2014-2015 by Evan Mason
 Email: emason@imedea.uib-csic.es
-===============================================================================
-
-make_eddy_track_AVISO.py
-
-Version 2.0.3
-
-===============================================================================
 """
 
 from glob import glob
 from yaml import load as yaml_load
 from datetime import datetime
 from netCDF4 import Dataset
-from argparse import ArgumentParser
+from py_eddy_tracker import EddyParser
 from scipy.ndimage import gaussian_filter
 from matplotlib.dates import date2num, num2julian
 from matplotlib.figure import Figure
@@ -47,52 +40,18 @@ from py_eddy_tracker.make_eddy_tracker_list_obj import SearchEllipse, TrackList
 from py_eddy_tracker.global_tracking import GlobalTracking
 
 
-class ColoredFormatter(logging.Formatter):
-    COLOR_LEVEL = dict(
-        CRITICAL="\037[37;41m",
-        ERROR="\033[31;47m",
-        WARNING="\033[30;47m",
-        INFO="\033[36m",
-        DEBUG="\033[34m",
-        )
-
-    def __init__(self, message):
-        super(ColoredFormatter, self).__init__(message)
-
-    def format(self, record):
-        color = self.COLOR_LEVEL.get(record.levelname, '')
-        color_reset = '\033[0m'
-        model = color + '%s' + color_reset
-        record.msg = model % record.msg
-        record.funcName = model % record.funcName
-        record.module = model % record.module
-        record.levelname = model % record.levelname
-        return super(ColoredFormatter, self).format(record)
-
 if __name__ == '__main__':
-    FORMAT_LOG = "%(levelname)-8s %(asctime)s %(module)s." \
-                 "%(funcName)s :\n\t\t\t\t\t%(message)s"
-    # set up logging to CONSOLE
-    CONSOLE = logging.StreamHandler()
-    CONSOLE.setFormatter(ColoredFormatter(FORMAT_LOG))
-    # add the handler to the root logger
-    logging.getLogger('').addHandler(CONSOLE)
-
     # Run using:
-    PARSER = ArgumentParser("Tool to detect and track eddies. "
-                            "To run use 'make_eddy_track_AVISO.py "
-                            "eddy_tracker_configuration.yaml'")
+    PARSER = EddyParser("Tool to detect and track eddies. "
+                        "To run use 'make_eddy_track_AVISO.py "
+                        "eddy_tracker_configuration.yaml'")
     PARSER.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
-    OPTS = PARSER.parse_args()
-    YAML_FILE = OPTS.yaml_file
+    YAML_FILE = PARSER.parse_args().yaml_file
 
     # Read yaml configuration file
     with open(YAML_FILE, 'r') as stream:
         CONFIG = yaml_load(stream)
-
-    logging.getLogger().setLevel(getattr(logging, CONFIG['VERBOSE'].upper()))
-    VERBOSE = 'No' if CONFIG['VERBOSE'].upper() != 'DEBUG' else 'Yes'
 
     logging.info('Launching with yaml file: %s', YAML_FILE)
 
@@ -228,8 +187,6 @@ if __name__ == '__main__':
     CONT_FIG = Figure()
     CONT_AX = CONT_FIG.add_subplot(111)
 
-    FIRST_RECORD = True
-
     START_TIME = datetime.now()
 
     logging.info('Start tracking')
@@ -343,23 +300,6 @@ if __name__ == '__main__':
         GlobalTracking(A_EDDY, grd_date).write_netcdf()
         GlobalTracking(C_EDDY, grd_date).write_netcdf()
         NB_STEP += 1
-        exit()
-
-        # Track the eddies
-        A_EDDY.track_eddies(FIRST_RECORD)
-        C_EDDY.track_eddies(FIRST_RECORD)
-
-        # Save inactive eddies to nc file
-        A_EDDY.write2netcdf(grd_int_date)
-        C_EDDY.write2netcdf(grd_int_date)
-
-        FIRST_RECORD = False
-
-    A_EDDY.kill_all_tracks()
-    C_EDDY.kill_all_tracks()
-
-    A_EDDY.write2netcdf(grd_int_date, stopper=1)
-    C_EDDY.write2netcdf(grd_int_date, stopper=1)
 
     # Total running time
     logging.info('Mean duration by loop : %s',

@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+"""
+from py_eddy_tracker import EddyParser
+
+
+if __name__ == '__main__':
+    # Run using:
+    PARSER = EddyParser(
+        "Tool to use identification step to compute tracking")

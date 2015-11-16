@@ -8,57 +8,56 @@ class GlobalTracking(object):
     """
     """
 
-    def __init__(self, eddy, ymd_str):
-        self.ymd_str = ymd_str
+    def __init__(self, eddy, date):
+        self.date = date
         self.eddy = eddy
 
     @property
     def sign_type(self):
-        return self.eddy.SIGN_TYPE
+        return self.eddy.sign_type
 
     def create_variable(self, handler_nc, kwargs_variable,
-                        attr_variable, data):
+                        attr_variable, data, scale_factor=None):
         var = handler_nc.createVariable(
             zlib=True,
             complevel=1,
             **kwargs_variable)
         for attr, attr_value in attr_variable.iteritems():
             var.setncattr(attr, attr_value)
-
-        var[:] = data
-
-        var.setncattr('min', var[:].min())
-        var.setncattr('max', var[:].max())
+            var[:] = data
+            var.set_auto_maskandscale(False)
+            if scale_factor is not None:
+                var.scale_factor = scale_factor
+            
+        try:
+            var.setncattr('min', var[:].min())
+            var.setncattr('max', var[:].max())
+        except ValueError:
+            logging.warn('Data is empty')
 
     def write_netcdf(self):
         """Write a netcdf with eddy
         """
-        eddy_size = None
-        for key in VAR_DESCR:
-            attr_name = VAR_DESCR[key]['attr_name']
-            if attr_name is not None and hasattr(self.eddy, attr_name):
-                eddy_size = len(getattr(self.eddy, attr_name))
-                break
-
-        filename = '%s_%s.nc' % (self.sign_type, self.ymd_str)
+        eddy_size = len(self.eddy.tmp_observations)
+        print dir(self)
+        exit()
+        filename = '%s_%s.nc' % (self.sign_type, self.date.strftime('%Y%m%d'))
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create intermediary file %s', filename)
             # Create dimensions
-            logging.debug('Create Dimensions "Nobs"')
+            logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
             h_nc.createDimension('Nobs', eddy_size)
             # Iter on variables to create:
-            for key, value in VAR_DESCR.iteritems():
-                attr_name = value['attr_name']
-                if attr_name is None or not hasattr(self.eddy, attr_name):
-                    continue
-                logging.debug('Create Variable %s', value['nc_name'])
+            for name, _ in self.eddy.tmp_observations.dtype:
+                logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
                 self.create_variable(
                     h_nc,
-                    dict(varname=value['nc_name'],
-                         datatype=value['nc_type'],
-                         dimensions=value['nc_dims']),
-                    value['nc_attr'],
-                    getattr(self.eddy, attr_name))
+                    dict(varname=VAR_DESCR[name]['nc_name'],
+                         datatype=VAR_DESCR[name]['nc_type'],
+                         dimensions=VAR_DESCR[name]['nc_dims']),
+                    VAR_DESCR[name]['nc_attr'],
+                    self.eddy.tmp_observations.obs[name],
+                    scale_factor=None if 'scale_factor' not in VAR_DESCR[name] else VAR_DESCR[name]['scale_factor'])
 
             # Add cyclonic information
             self.create_variable(
