@@ -37,11 +37,9 @@ class GlobalTracking(object):
 
     def write_netcdf(self):
         """Write a netcdf with eddy
-        Write eddy property data to tracks.
+                    Write eddy property data to tracks.
         """
         eddy_size = len(self.eddy.tmp_observations)
-        print dir(self)
-        exit()
         filename = '%s_%s.nc' % (self.sign_type, self.date.strftime('%Y%m%d'))
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create intermediary file %s', filename)

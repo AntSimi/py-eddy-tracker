@@ -141,7 +141,6 @@ if __name__ == '__main__':
     # For subsampling to get identical list as old_AVISO use:
     # AVISO_FILES = AVISO_FILES[5:-5:7]
     if AVISO_DT14 and AVISO_DT14_SUBSAMP:
-        print AVISO_FILES
         AVISO_FILES = AVISO_FILES[5:-5:np.int(DAYS_BTWN_RECORDS)]
 
     # Set up a grid object using first AVISO file in the list
