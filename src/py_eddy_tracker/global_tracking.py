@@ -37,6 +37,7 @@ class GlobalTracking(object):
 
     def write_netcdf(self):
         """Write a netcdf with eddy
+        Write eddy property data to tracks.
         """
         eddy_size = len(self.eddy.tmp_observations)
         print dir(self)
