@@ -35,12 +35,10 @@ class GlobalTracking(object):
         except ValueError:
             logging.warn('Data is empty')
 
-    def write_netcdf(self):
+    def write_netcdf(self, global_attr):
         """Write a netcdf with eddy
         """
         eddy_size = len(self.eddy.tmp_observations)
-        print dir(self)
-        exit()
         filename = '%s_%s.nc' % (self.sign_type, self.date.strftime('%Y%m%d'))
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create intermediary file %s', filename)
@@ -67,6 +65,10 @@ class GlobalTracking(object):
                      dimensions=VAR_DESCR['type_cyc']['nc_dims']),
                 VAR_DESCR['type_cyc']['nc_attr'],
                 -1 if self.sign_type == 'Cyclonic' else 1)
+            # Global attr
+            h_nc.title = self.sign_type + ' eddy tracks'
+            for key, value in global_attr.iteritems():
+                h_nc.setncattr(key, str(value))
 
     def read_tracks(self):
         """

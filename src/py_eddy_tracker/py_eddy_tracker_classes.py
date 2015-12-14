@@ -318,7 +318,15 @@ def _fit_circle_path(self):
                 % (lat_mean, lon_mean))
 
     c_x, c_y = proj(self.lon, self.lat)
-    centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c(c_x, c_y)
+    try:
+        centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c(c_x, c_y)
+    except ZeroDivisionError:
+        # Some time, edge is only a dot of few coordinates
+        if len(np.unique(self.lon)) == 1 and len(np.unique(self.lat)) == 1:
+            logging.warning('An edge is only define in one position')
+            logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
+                          self.lat)
+            return 0, -90, np.nan, np.nan
 
     centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
     centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
@@ -344,13 +352,7 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
     if eddy.diagnostic_type not in ['Q', 'SLA']:
         raise Exception('Unknown Diagnostic : %s' % eddy.diagnostic_type)
 
-    if 'ROMS' in eddy.product:
-        # has_ts = True
-        has_ts = False
-    elif 'AVISO' in eddy.product:
-        has_ts = False
-    else:
-        raise Exception('Unknown product : %s' % eddy.product)
+    has_ts = False
 
     sign_type = eddy.sign_type
     anticyclonic_search = 'Anticyclonic' in sign_type
@@ -522,10 +524,7 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                         eddy.mask_eff] = eddy.fillval
 
     # Leave collection_loop
-    if 'SLA' in eddy.diagnostic_type:
-        return eddy
-    else:
-        return a_list_obj, c_list_obj
+    return eddy
 
 
 def func_hann2d_fast(var, numpasses):

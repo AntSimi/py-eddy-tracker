@@ -658,7 +658,204 @@ class TrackList (object):
             nb_valid_pixel <= self.pixel_threshold[1]
 
 
-class RossbyWaveSpeed(object):
+class IdentificationList (object):
+    """
+    Class that holds list of eddy identify:
+    """
+    def __init__(self, sign_type, grd, date, **kwargs):
+        """
+        Initialise the list 'tracklist'
+        """
+        self._grd = grd
+        self.date = date
+        self.sign_type = sign_type
+
+        self.diagnostic_type = kwargs.get('DIAGNOSTIC_TYPE', 'SLA')
+        self.the_domain = kwargs.get('THE_DOMAIN', 'Regional')
+        self.track_extra_variables = kwargs.get('TRACK_EXTRA_VARIABLES', False)
+        self.smoothing = kwargs.get('SMOOTHING', True)
+        self.max_local_extrema = kwargs.get('MAX_LOCAL_EXTREMA', 1)
+        self.interp_method = kwargs.get('INTERP_METHOD', 'RectBivariate')
+        # NOTE: '.copy()' suffix is essential here
+        self.contour_parameter = kwargs.get('CONTOUR_PARAMETER').copy()
+        self.interval = self.contour_parameter[1] - self.contour_parameter[0]
+        if 'Cyclonic' in sign_type:
+            self.contour_parameter *= -1
+        self.shape_error = kwargs.get('SHAPE_ERROR', 55.)
+        self.radmin = np.float64(kwargs.get('RADMIN', 0.4))
+        self.radmax = np.float64(kwargs.get('RADMAX', 4.461))
+        self.ampmin = np.float64(kwargs.get('AMPMIN', 1.))
+        self.ampmax = np.float64(kwargs.get('AMPMAX', 150.))
+        self.evolve_amp_min = np.float64(kwargs.get('EVOLVE_AMP_MIN', .0005))
+        self.evolve_amp_max = np.float64(kwargs.get('EVOLVE_AMP_MAX', 500))
+        self.evolve_area_min = np.float64(kwargs.get('EVOLVE_AREA_MIN', .0005))
+        self.evolve_area_max = np.float64(kwargs.get('EVOLVE_AREA_MAX', 500))
+        self.rad0 = np.pi * np.float64(kwargs.get('RAD0', 60000.)) ** 2
+        self.amp0 = np.float64(kwargs.get('AMP0', 2.))
+        self.dist0 = np.float64(kwargs.get('DIST0', 25000.))
+
+        self.points = np.array([grd.lon.ravel(), grd.lat.ravel()]).T
+
+        self.sla = None
+
+        self.observations = EddiesObservations(self.track_extra_variables)
+        self.index = 0  # counter
+        self.pad = 2
+        self.pixel_threshold = None
+        # Check for a correct configuration
+        #~ assert self.product in (
+            #~ 'AVISO'), 'Unknown string in *product* parameter'
+
+    #~ @property
+    #~ def product(self):
+        #~ return self._grd.product
+
+    @property
+    def fillval(self):
+        return self._grd.fillval
+
+    def update_eddy_properties(self, properties):
+        """
+        Append new variable values to track arrays
+        """
+        self.observations += properties
+
+    def set_global_attr_netcdf(self, h_nc):
+        h_nc.title = self.sign_type + ' eddy tracks'
+        h_nc.grid_filename = self.grd.grid_filename
+        h_nc.grid_date = str(self.grd.grid_date)
+        #~ h_nc.product = self.product
+
+        h_nc.contour_parameter = self.contour_parameter
+        h_nc.shape_error = self.shape_error
+        h_nc.pixel_threshold = self.pixel_threshold
+
+        if self.smoothing in locals():
+            h_nc.smoothing = self.smoothing
+            h_nc.SMOOTH_FAC = self.SMOOTH_FAC
+        else:
+            h_nc.smoothing = 'None'
+
+        h_nc.evolve_amp_min = self.evolve_amp_min
+        h_nc.evolve_amp_max = self.evolve_amp_max
+        h_nc.evolve_area_min = self.evolve_area_min
+        h_nc.evolve_area_max = self.evolve_area_max
+
+        h_nc.llcrnrlon = self.grd.lonmin
+        h_nc.urcrnrlon = self.grd.lonmax
+        h_nc.llcrnrlat = self.grd.latmin
+        h_nc.urcrnrlat = self.grd.latmax
+
+    def create_variable(self, handler_nc, kwargs_variable,
+                        attr_variable, data, scale_factor=None):
+        var = handler_nc.createVariable(
+            zlib=True,
+            complevel=1,
+            **kwargs_variable)
+        for attr, attr_value in attr_variable.iteritems():
+            var.setncattr(attr, attr_value)
+            var[:] = data
+            var.set_auto_maskandscale(False)
+            if scale_factor is not None:
+                var.scale_factor = scale_factor
+            
+        try:
+            var.setncattr('min', var[:].min())
+            var.setncattr('max', var[:].max())
+        except ValueError:
+            logging.warn('Data is empty')
+
+    def write_netcdf(self):
+        """Write a netcdf with eddy obs
+        """
+        eddy_size = len(self.observations)
+        filename = '%s_%s.nc' % (self.sign_type, self.date.strftime('%Y%m%d'))
+        with Dataset(filename, 'w', format='NETCDF4') as h_nc:
+            logging.info('Create intermediary file %s', filename)
+            # Create dimensions
+            logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
+            h_nc.createDimension('Nobs', eddy_size)
+            # Iter on variables to create:
+            for name, _ in self.observations.dtype:
+                logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
+                self.create_variable(
+                    h_nc,
+                    dict(varname=VAR_DESCR[name]['nc_name'],
+                         datatype=VAR_DESCR[name]['nc_type'],
+                         dimensions=VAR_DESCR[name]['nc_dims']),
+                    VAR_DESCR[name]['nc_attr'],
+                    self.observations.obs[name],
+                    scale_factor=None if 'scale_factor' not in VAR_DESCR[name] else VAR_DESCR[name]['scale_factor'])
+
+            # Add cyclonic information
+            self.create_variable(
+                h_nc,
+                dict(varname=VAR_DESCR['type_cyc']['nc_name'],
+                     datatype=VAR_DESCR['type_cyc']['nc_type'],
+                     dimensions=VAR_DESCR['type_cyc']['nc_dims']),
+                VAR_DESCR['type_cyc']['nc_attr'],
+                -1 if self.sign_type == 'Cyclonic' else 1)
+            # Global attr
+            h_nc.title = self.sign_type + ' eddy tracks'
+            self.set_global_attr_netcdf(h_nc)
+
+    def set_bounds(self, contlon, contlat, grd):
+        """
+        Get indices to a bounding box around the eddy
+        WARNING won't work for a rotated grid
+        """
+        lonmin, lonmax = contlon.min(), contlon.max()
+        latmin, latmax = contlat.min(), contlat.max()
+
+        self.imin, self.jmin = nearest(lonmin, latmin,
+                                       grd.lon[0], grd.lat[:, 0])
+        self.imax, self.jmax = nearest(lonmax, latmax,
+                                       grd.lon[0], grd.lat[:, 0])
+
+        # For indexing the mins must not be less than zero
+        self.imin = max(self.imin - self.pad, 0)
+        self.jmin = max(self.jmin - self.pad, 0)
+        self.imax += self.pad + 1
+        self.jmax += self.pad + 1
+        return self
+
+    @property
+    def slice_i(self):
+        return slice(self.imin, self.imax)
+
+    @property
+    def slice_j(self):
+        return slice(self.jmin, self.jmax)
+
+    @property
+    def bounds(self):
+        return self.imin, self.imax, self.jmin, self.jmax
+
+    def set_mask_eff(self, contour, grd):
+        """
+        Set points within bounding box around eddy and calculate
+        mask for effective contour
+        """
+        self.points = np.array([grd.lon[self.slice_j,
+                                        self.slice_i].ravel(),
+                                grd.lat[self.slice_j,
+                                        self.slice_i].ravel()]).T
+        # NOTE: Path.contains_points requires matplotlib 1.2 or higher
+        self.mask_eff_1d = contour.contains_points(self.points)
+        self.mask_eff_sum = self.mask_eff_1d.sum()
+
+    def reshape_mask_eff(self, grd):
+        """
+        """
+        shape = grd.lon[self.jmin:self.jmax, self.imin:self.imax].shape
+        self.mask_eff = self.mask_eff_1d.reshape(shape)
+
+    def check_pixel_count(self, nb_valid_pixel):
+        return nb_valid_pixel >= self.pixel_threshold[0] and \
+            nb_valid_pixel <= self.pixel_threshold[1]
+
+
+class RossbyWaveSpeed_(object):
 
     def __init__(self, the_domain, grd, rw_path=None):
         """
@@ -677,6 +874,146 @@ class RossbyWaveSpeed(object):
                 rw_path,
                 dtype=[('lat', 'f2'), ('lon', 'f2'), ('defrad', 'f4')],
                 usecols=(0, 1, 3))
+            lon_min, lon_max = datas['lon'].min(), datas['lon'].max()
+            lat_min, lat_max = datas['lat'].min(), datas['lat'].max()
+            lon_step = np.diff(np.unique(datas['lon'])[:2])[0]
+            lat_step = np.diff(np.unique(datas['lat'])[:2])[0]
+            lon = np.arange(lon_min, lon_max + lon_step / 2, lon_step)
+            lat = np.arange(lat_min, lat_max + lat_step / 2, lat_step)
+            value = np.zeros((len(lon), len(lat)), dtype='f4')
+            mask = np.ones((len(lon), len(lat)), dtype='bool')
+            i_lon = np.int_((datas['lon'] - lon_min) / lon_step)
+            i_lat = np.int_((datas['lat'] - lat_min) / lat_step)
+            value[i_lon, i_lat] = datas['defrad']
+            mask[i_lon, i_lat] = False
+            opts_interpolation = {'kx': 1, 'ky': 1, 's': 0}
+            self.interpolate_val = RectBivariateSpline(lon, lat, value,
+                                                       **opts_interpolation)
+            self.interpolate_mask = RectBivariateSpline(lon, lat, mask,
+                                                        **opts_interpolation)
+            data = np.loadtxt(rw_path)
+            self._lon = data[:, 1]
+            self._lat = data[:, 0]
+            self._defrad = data[:, 3]
+            self.limits = [grd.lonmin, grd.lonmax, grd.latmin, grd.latmax]
+            if grd.lonmin < 0:
+                self._lon -= 360.
+            self._make_subset()._make_kdtree()
+            self.vartype = 'variable'
+        else:
+            self.vartype = 'constant'
+        self.start = True
+
+    def interpolate(self, *args, **kwargs):
+        return np.ma.array(self.interpolate_val(*args, **kwargs),
+                           mask=self.interpolate_mask(*args, **kwargs) != 0)
+
+    def get_rwdistance(self, xpt, ypt, days_btwn_records):
+        """
+        Return the distance required by SearchEllipse
+        to construct a search ellipse for eddy tracking.
+
+        distance (km)
+        """
+        if self.the_domain in ('Global', 'Regional', 'ROMS'):
+            distance = self._get_rlongwave_spd(xpt, ypt)
+            distance *= 86400.
+
+        elif 'BlackSea' in self.the_domain:
+            # e.g., Blokhina & Afanasyev, 2003
+            distance = 15000
+
+        elif 'MedSea' in self.the_domain:
+            distance = 20000
+
+        else:
+            raise Exception('Unknown domain : %s' % self.the_domain)
+
+        return np.abs(distance) * days_btwn_records
+
+    def _make_subset(self):
+        """
+        Make a subset of _defrad data over the domain.
+        If 'Global' is defined then widen the domain.
+        """
+        pad = 1.5  # degrees
+        lonmin, lonmax, latmin, latmax = self.limits
+
+        if self.zero_crossing:
+            ieast, iwest = (((self._lon + 360.) <= lonmax + pad),
+                            (self._lon > lonmin + pad))
+            self._lon[ieast] += 360.
+            lloi = iwest + ieast
+        else:
+            lloi = np.logical_and(self._lon >= lonmin - pad,
+                                  self._lon <= lonmax + pad)
+        lloi *= np.logical_and(self._lat >= latmin - pad,
+                               self._lat <= latmax + pad)
+        self._lon = self._lon[lloi]
+        self._lat = self._lat[lloi]
+        self._defrad = self._defrad[lloi]
+
+        if 'Global' in self.the_domain:
+            lloi = self._lon > 260.
+            self._lon = np.append(self._lon, self._lon[lloi] - 360.)
+            self._lat = np.append(self._lat, self._lat[lloi])
+            self._defrad = np.append(self._defrad, self._defrad[lloi])
+
+        self.x_val, self.y_val = self.m_val(self._lon, self._lat)
+        return self
+
+    def _make_kdtree(self):
+        """
+        Compute KDE tree for nearest indices.
+        """
+        points = np.vstack([self.x_val, self.y_val]).T
+        self._tree = cKDTree(points)
+        return self
+
+    def _get_defrad(self, xpt, ypt):
+        """
+        Get a point average of the deformation radius
+        at xpt, ypt
+        """
+        weights, i = self._tree.query(np.array([xpt, ypt]), k=4, p=2)
+        weights /= weights.sum()
+        self._weights = weights
+        self.i = i
+        return np.average(self._defrad[i], weights=weights)
+
+    def _get_rlongwave_spd(self, xpt, ypt):
+        """
+        Get the longwave phase speed, see Chelton etal (1998) pg 446:
+          c = -beta * defrad**2 (this only for extratropical waves...)
+        """
+        # km to m
+        r_spd_long = (self._get_defrad(xpt, ypt) * 1000) ** 2
+        # lat
+        beta = np.average(self._lat[self.i], weights=self._weights)
+        # 1458e-7 ~ (2 * 7.29*10**-5)
+        beta = np.cos(np.radians(beta)) * 1458e-7 / self.earth_radius
+        r_spd_long *= -beta
+        return r_spd_long
+
+class RossbyWaveSpeed(object):
+    def __init__(self, rw_path=None, domain=None):
+        """
+        Instantiate the RossbyWaveSpeed object
+        """        
+        self.the_domain = 'Global' if domain is None else domain
+        self.rw_path = rw_path
+        if self.the_domain in ('Global', 'Regional', 'ROMS'):
+            assert self.rw_path is not None, \
+                'Must supply a path for the Rossby deformation radius data'
+            datas = np.genfromtxt(
+                self.rw_path,
+                dtype=[('lat', 'f2'), ('lon', 'f2'), ('defrad', 'f4')],
+                usecols=(0, 1, 3))
+        #~ else:
+        #~ self.earth_radius = 
+        #~ self.zero_crossing = 
+            self._tree = None
+            
             lon_min, lon_max = datas['lon'].min(), datas['lon'].max()
             lat_min, lat_max = datas['lat'].min(), datas['lat'].max()
             lon_step = np.diff(np.unique(datas['lon'])[:2])[0]

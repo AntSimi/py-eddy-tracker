@@ -1,0 +1,95 @@
+# Two diagnostics, based on SLA (e.g., Chelton et al, 2011)
+DIAGNOSTIC_TYPE: 'SLA'
+
+# Specify domain
+DOMAIN:
+  #~ THE_DOMAIN: 'Global'
+  THE_DOMAIN: 'Regional'
+  LONMIN: -100
+  LONMAX: -5
+  LATMIN: 10
+  LATMAX: 45
+  DATE_STR: 2014-12-27
+  DATE_END: 2014-12-31
+
+DATASET:
+    # Path to data
+    #~ DATA_DIR: '/data/PVA/Externe/global/delayed-time/grids/msla/all-sat-merged/h/2014/'
+    DATA_DIR: '/home/adelepoulle/2014/'
+    # Model to select file
+    FILES_MODEL: dt_global_allsat_msla_h_????????_????????.nc
+    # Model to extract date (regular expression)
+    DATE_REGEXP: dt_global_allsat_msla_h_([0-9]*)_[0-9]*.nc
+    # Model to transfer date to python datetime
+    DATE_MODEL: '%Y%m%d'
+    # Grid Name to compute analysis
+    VAR_NAME: Grid_0001
+    # Longitude variable
+    LON_NAME: NbLongitudes
+    # Latitude variable
+    LAT_NAME: NbLatitudes
+    # Step to do SUBSAMPLING (1 no subsampling)
+    SUBSAMPLING: 1
+
+PATHS:
+  # Obtain file from:
+  # http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
+  RW_PATH: 'rossrad.dat'
+  # Path for saving of outputs
+  SAVE_DIR: 'test/'
+
+  # Reference Julian day (Julian date at Jan 1, 1992)
+JDAY_REFERENCE: 2448623.
+
+# Define contouring parameters
+CONTOUR_PARAMETER:
+  # Set SLA contour spacing (cm)
+  CONTOUR_PARAMETER_SLA:
+    MAX_SLA: 100.
+    INTERVAL: 1
+    #~ INTERVAL: 4
+
+# Shape error (see Kurian et al 2011)
+SHAPE_ERROR: 65. # % (Mason et al 2014 use 55%)
+    
+# Filtering
+SMOOTHING: Yes
+SMOOTHING_SLA:
+  TYPE: 'Gaussian'
+  ZWL: 20. # degrees, zonal wavelength (see Chelton etal 2011)
+  MWL: 10. # degrees, meridional wavelength
+
+# Min and max permitted eddy radii [degrees] and amplitudes (cm)
+# 0.4 for DT10, 0.35 for DT14
+RADMIN: 0.35
+RADMAX: 4.461
+AMPMIN: 0.
+AMPMAX: 150.
+
+# MPM14 use 1; CSS11 have no limit
+MAX_LOCAL_EXTREMA: 1
+
+# Typical parameters
+RAD0: 60000. # m
+AMP0: 2. # cm
+TEMP0: 15.
+SALT0: 35.
+
+# Parameters used by Chelton etal and Kurian etal (Sec. 3.2) to ensure 
+# the slow evolution of the eddies over time;
+# they use min and max values of 0.25 and 2.5
+EVOLVE_AMP_MIN: 0.0005 # min change in amplitude
+EVOLVE_AMP_MAX: 500 # max change in amplitude
+EVOLVE_AREA_MIN: 0.0005 # min change in area
+EVOLVE_AREA_MAX: 500 # max change in area
+
+# Define track_extra_variables to track and save:
+# - effective contour points
+# - speed-based contour points
+# - shape test values
+# - profiles of swirl velocity from effective contour inwards
+# Useful for working with ARGO data    
+TRACK_EXTRA_VARIABLES: No
+
+# 'RectBivariate' is faster
+INTERP_METHOD: 'RectBivariate'

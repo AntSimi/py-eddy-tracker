@@ -23,7 +23,7 @@ Email: emason@imedea.uib-csic.es
 
 from glob import glob
 from yaml import load as yaml_load
-from datetime import datetime
+import datetime as dt
 from netCDF4 import Dataset
 from py_eddy_tracker import EddyParser
 from scipy.ndimage import gaussian_filter
@@ -31,19 +31,19 @@ from matplotlib.dates import date2num, num2julian
 from matplotlib.figure import Figure
 import logging
 import numpy as np
+from re import compile as re_compile
 
 from py_eddy_tracker.py_eddy_tracker_classes import \
     collection_loop, func_hann2d_fast
 from py_eddy_tracker.py_eddy_tracker_property_classes import SwirlSpeed
 from py_eddy_tracker.grid.aviso import AvisoGrid
-from py_eddy_tracker.make_eddy_tracker_list_obj import SearchEllipse, TrackList
-from py_eddy_tracker.global_tracking import GlobalTracking
+from py_eddy_tracker.make_eddy_tracker_list_obj import IdentificationList
 
 
 if __name__ == '__main__':
     # Run using:
-    PARSER = EddyParser("Tool to detect and track eddies. "
-                        "To run use 'make_eddy_track_AVISO.py "
+    PARSER = EddyParser("Tool to detect eddies. "
+                        "To run use EddyIdentification "
                         "eddy_tracker_configuration.yaml'")
     PARSER.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
@@ -56,12 +56,11 @@ if __name__ == '__main__':
     logging.info('Launching with yaml file: %s', YAML_FILE)
 
     # Setup configuration
-    DATA_DIR = CONFIG['PATHS']['DATA_DIR']
     SAVE_DIR = CONFIG['PATHS']['SAVE_DIR']
     logging.info('Outputs saved to %(SAVE_DIR)s', CONFIG['PATHS'])
 
     DIAGNOSTIC_TYPE = CONFIG['DIAGNOSTIC_TYPE']
-    if DIAGNOSTIC_TYPE not in ['SLA', 'Q']:
+    if DIAGNOSTIC_TYPE not in ['SLA']:
         raise Exception('Unknown diagnostic %s', DIAGNOSTIC_TYPE)
 
     CONFIG['THE_DOMAIN'] = CONFIG['DOMAIN']['THE_DOMAIN']
@@ -74,7 +73,7 @@ if __name__ == '__main__':
         CONFIG['latmin'] = -80.
         CONFIG['latmax'] = 80.
 
-    elif CONFIG['THE_DOMAIN'] in ('Regional', 'MedSea'):
+    elif CONFIG['THE_DOMAIN'] in ('Regional'):
         CONFIG['lonmin'] = CONFIG['DOMAIN']['LONMIN']
         CONFIG['lonmax'] = CONFIG['DOMAIN']['LONMAX']
         CONFIG['latmin'] = CONFIG['DOMAIN']['LATMIN']
@@ -84,20 +83,6 @@ if __name__ == '__main__':
     END_DATE = CONFIG['DATE_END'] = CONFIG['DOMAIN']['DATE_END']
     if START_DATE > END_DATE:
         raise Exception('DATE_END must be larger than DATE_STR')
-
-    AVISO_DT14 = CONFIG['AVISO']['AVISO_DT14']
-    if AVISO_DT14:
-        PRODUCT = 'AVISO_DT14'
-        AVISO_DT14_SUBSAMP = CONFIG['AVISO']['AVISO_DT14_SUBSAMP']
-        if AVISO_DT14_SUBSAMP:
-            DAYS_BTWN_RECORDS = CONFIG['AVISO']['DAYS_BTWN_RECORDS']
-        else:
-            DAYS_BTWN_RECORDS = 1.
-    else:
-        PRODUCT = 'AVISO_DT10'
-        DAYS_BTWN_RECORDS = 7.  # old seven day AVISO
-    CONFIG['DAYS_BTWN_RECORDS'] = DAYS_BTWN_RECORDS
-    AVISO_FILES = CONFIG['AVISO']['AVISO_FILES']
 
     if 'SLA' in DIAGNOSTIC_TYPE:
         MAX_SLA = CONFIG['CONTOUR_PARAMETER'
@@ -110,22 +95,11 @@ if __name__ == '__main__':
         # AMPMAX = CONFIG['AMPMAX']
         AMP0 = CONFIG['AMP0']
 
-    elif 'Q' in DIAGNOSTIC_TYPE:
-        MAX_Q = CONFIG['CONTOUR_PARAMETER']['CONTOUR_PARAMETER_Q']['MAX_Q']
-        NUM_LEVS = CONFIG['CONTOUR_PARAMETER'
-                          ]['CONTOUR_PARAMETER_Q']['NUM_LEVS']
-        CONFIG['CONTOUR_PARAMETER'] = np.linspace(0, MAX_Q, NUM_LEVS)[::-1]
-        AMPMIN = 0.02  # max(abs(xi/f)) within the eddy
-        AMPMAX = 100.
-        AMP0 = 0.02  # vort/f
-
     SMOOTHING = CONFIG['SMOOTHING']
     if SMOOTHING:
         if 'SLA' in DIAGNOSTIC_TYPE:
             ZWL = np.atleast_1d(CONFIG['SMOOTHING_SLA']['ZWL'])
             MWL = np.atleast_1d(CONFIG['SMOOTHING_SLA']['MWL'])
-        elif 'Q' in DIAGNOSTIC_TYPE:
-            SMOOTH_FAC = CONFIG['SMOOTHING_Q']['SMOOTH_FAC']
         SMOOTHING_TYPE = CONFIG['SMOOTHING_SLA']['TYPE']
 
     TEMP0 = CONFIG['TEMP0']
@@ -135,34 +109,54 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
 
     # Get complete AVISO file list
-    AVISO_FILES = sorted(glob(DATA_DIR + AVISO_FILES))
-    logging.info('%d grids available', len(AVISO_FILES))
+    DATA_DIR = CONFIG['DATASET']['DATA_DIR']
+    FILES_MODEL = CONFIG['DATASET']['FILES_MODEL']
+    SUBSAMPLING_STEP = CONFIG['DATASET']['SUBSAMPLING']
+    DATE_REGEXP = re_compile('.*/' + CONFIG['DATASET']['DATE_REGEXP'])
+    PATTERN_DATE = CONFIG['DATASET']['DATE_MODEL']
+    
+    GRID_NAME = CONFIG['DATASET']['VAR_NAME']
+    LAT_NAME = CONFIG['DATASET']['LAT_NAME']
+    LON_NAME = CONFIG['DATASET']['LON_NAME']
+    
+    DATASET_FILES = glob(DATA_DIR + FILES_MODEL)
+    
+    DATASET_LIST = np.array(DATASET_FILES, dtype=[('date', 'datetime64[D]'), ('filename', 'S256')])
+    DATASET_LIST['filename'] = np.array(DATASET_FILES)
+    
+    logging.info('%s grids available', DATASET_LIST.shape[0])
+    for item in DATASET_LIST:
+        result = DATE_REGEXP.match(item['filename'])
+        if result:
+            str_date = result.groups()[0]
+            item['date'] = dt.datetime.strptime(str_date, PATTERN_DATE).date()
+    
+    DATASET_LIST.sort(order=['date','filename'])
+    MASK_DATE = (DATASET_LIST['date'] >= START_DATE) * (DATASET_LIST['date'] <= END_DATE)
+    
+    STEPS = np.unique(DATASET_LIST['date'][1:] - DATASET_LIST['date'][:-1])
+    if len(STEPS) != 1:
+        raise Exception('Several days steps in grid dataset %s' % STEPS)
+    else:
+        DAYS_BTWN_RECORDS = STEPS[0]
+    
+    if SUBSAMPLING_STEP != 1:
+        logging.info('Grid subsampling %d', SUBSAMPLING_STEP)
+        DATASET_LIST = DATASET_LIST[::SUBSAMPLING_STEP]
 
-    # For subsampling to get identical list as old_AVISO use:
-    # AVISO_FILES = AVISO_FILES[5:-5:7]
-    if AVISO_DT14 and AVISO_DT14_SUBSAMP:
-        print AVISO_FILES
-        AVISO_FILES = AVISO_FILES[5:-5:np.int(DAYS_BTWN_RECORDS)]
+    DATASET_LIST = DATASET_LIST[MASK_DATE]
 
     # Set up a grid object using first AVISO file in the list
-    SLA_GRD = AvisoGrid(AVISO_FILES[0], CONFIG['THE_DOMAIN'], PRODUCT,
+    SLA_GRD = AvisoGrid(DATASET_LIST[0]['filename'], CONFIG['THE_DOMAIN'],
                         CONFIG['lonmin'], CONFIG['lonmax'],
-                        CONFIG['latmin'], CONFIG['latmax'])
-
-    # Instantiate search ellipse object
-    SEARCH_ELLIPSE = SearchEllipse(CONFIG['THE_DOMAIN'],
-                                   SLA_GRD, DAYS_BTWN_RECORDS,
-                                   CONFIG['PATHS']['RW_PATH'])
+                        CONFIG['latmin'], CONFIG['latmax'],
+                        grid_name=GRID_NAME,
+                        lon_name=LON_NAME,
+                        lat_name=LAT_NAME)
 
     if 'Gaussian' in SMOOTHING_TYPE:
         # Get parameters for gaussian_filter
         ZRES, MRES = SLA_GRD.gaussian_resolution(ZWL, MWL)
-
-    # Initialise two eddy objects to hold data
-    # kwargs = CONFIG
-    A_EDDY = TrackList('Anticyclonic', SLA_GRD, SEARCH_ELLIPSE, **CONFIG)
-
-    C_EDDY = TrackList('Cyclonic', SLA_GRD, SEARCH_ELLIPSE, **CONFIG)
 
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
@@ -172,49 +166,36 @@ if __name__ == '__main__':
                       SLA_GRD.resolution ** 2)
     logging.info('Pixel range = %s-%s', np.int(PIXMIN), np.int(PIXMAX))
 
-    A_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
-    C_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
 
-    # Create nc files for saving of eddy tracks
-    A_EDDY.create_netcdf(
-        DATA_DIR,
-        SAVE_DIR + 'eddy_tracks_%s_AVISO_anticyclonic.nc' % DIAGNOSTIC_TYPE)
-    C_EDDY.create_netcdf(
-        DATA_DIR,
-        SAVE_DIR + 'eddy_tracks_%s_AVISO_cyclonic.nc' % DIAGNOSTIC_TYPE)
+    # Figure to get contours of parameter
+    FIG = Figure()
+    CONT_AX = FIG.add_subplot(111)
 
-    # Get contours of Q/sla parameter
-    CONT_FIG = Figure()
-    CONT_AX = CONT_FIG.add_subplot(111)
-
-    START_TIME = datetime.now()
+    START_TIME = dt.datetime.now()
 
     logging.info('Start tracking')
 
+    # To count full iteration
     NB_STEP = 0
-    for AVISO_FILE in AVISO_FILES:
-        with Dataset(AVISO_FILE) as nc:
-            if 'time' in nc.variables:
-                grd_date = nc.variables['time'][:]
-                grd_date += SLA_GRD.base_date
-            else:
-                grd_date = nc.OriginalName
-                elt_split = 'qd_' if 'qd_' in grd_date else 'h_'
-                grd_date = grd_date.partition(elt_split)[2].partition('_')[0]
-        # Bad things
-        grd_date = datetime.strptime(grd_date, '%Y%m%d').date()
-        grd_int_date = num2julian(date2num(grd_date))
+    
+    # Loop over grid
+    for date, filename in DATASET_LIST:
+        date = date.astype(dt.date)
+        # Extract grid date
+        grd_int_date = num2julian(date2num(date))
+        SLA_GRD.grid_date = date
 
-        if grd_date < START_DATE or grd_date > END_DATE:
-            continue
+        # Initialise two eddy objects to hold data
+        A_EDDY = IdentificationList('Anticyclonic', SLA_GRD, date, **CONFIG)
+        C_EDDY = IdentificationList('Cyclonic', SLA_GRD, date, **CONFIG)
+        
+        A_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
+        C_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
 
-        logging.info('AVISO_FILE : %s', AVISO_FILE)
 
-        # Holding variables
-        A_EDDY.reset_holding_variables()
-        C_EDDY.reset_holding_variables()
+        logging.info('AVISO_FILE : %s', filename)
 
-        sla = SLA_GRD.get_aviso_data(AVISO_FILE)
+        sla = SLA_GRD.get_aviso_data(filename)
         SLA_GRD.set_mask(sla).uvmask()
 
         if SMOOTHING:
@@ -276,11 +257,7 @@ if __name__ == '__main__':
                 levels=A_EDDY.contour_parameter)
             # Note that C_CS is in reverse order
             logging.info('Processing SLA contours for eddies -- Ok')
-        else:
-            raise Exception()
 
-        # clear the current axis
-        CONT_AX.cla()
 
         # Set contour coordinates and indices for calculation of
         # speed-based radius
@@ -297,13 +274,16 @@ if __name__ == '__main__':
             C_EDDY = collection_loop(CONTOURS, SLA_GRD, grd_int_date,
                                      a_list_obj=None, c_list_obj=C_EDDY)
 
-        GlobalTracking(A_EDDY, grd_date).write_netcdf()
-        GlobalTracking(C_EDDY, grd_date).write_netcdf()
+        # clear the current axis
+        CONT_AX.cla()
+        # Save file
+        A_EDDY.write_netcdf()
+        C_EDDY.write_netcdf()
         NB_STEP += 1
 
     # Total running time
     logging.info('Mean duration by loop : %s',
-                 (datetime.now() - START_TIME) / NB_STEP)
-    logging.info('Duration : %s', datetime.now() - START_TIME)
+                 (dt.datetime.now() - START_TIME) / NB_STEP)
+    logging.info('Duration : %s', dt.datetime.now() - START_TIME)
 
     logging.info('Outputs saved to %s', SAVE_DIR)

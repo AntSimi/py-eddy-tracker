@@ -5,6 +5,7 @@ from scipy import spatial
 from dateutil import parser
 import numpy as np
 import logging
+from netCDF4 import Dataset
 
 from . import PyEddyTracker
 
@@ -14,36 +15,29 @@ class AvisoGrid(PyEddyTracker):
     Class to satisfy the need of the eddy tracker
     to have a grid class
     """
-    def __init__(self, aviso_file, the_domain, product,
-                 lonmin, lonmax, latmin, latmax, with_pad=True):
+    def __init__(self, aviso_file, the_domain,
+                 lonmin, lonmax, latmin, latmax, grid_name, lon_name,
+                 lat_name,with_pad=True):
         """
         Initialise the grid object
         """
         super(AvisoGrid, self).__init__()
         logging.info('Initialising the *AVISO_grid*')
+        self.grid_filename = aviso_file
         self.the_domain = the_domain
-        if 'AVISO' in product:
-            self.product = 'AVISO'
-        else:
-            self.product = product
-        self.lonmin = lonmin
-        self.lonmax = lonmax
-        self.latmin = latmin
-        self.latmax = latmax
+        self.lonmin = float(lonmin)
+        self.lonmax = float(lonmax)
+        self.latmin = float(latmin)
+        self.latmax = float(latmax)
+        self.grid_filename = aviso_file
+        
+        self.lon_name = lon_name
+        self.lat_name = lat_name
+        self.grid_name = grid_name
 
-        try:  # new AVISO (2014)
-            self._lon = self.read_nc(aviso_file, 'lon')
-            self._lat = self.read_nc(aviso_file, 'lat')
-            self.fillval = self.read_nc_att(aviso_file, 'sla', '_FillValue')
-            base_date = self.read_nc_att(aviso_file, 'time', 'units')
-            self.base_date = date2num(
-                parser.parse(base_date.split(' ')[2:4][0]))
-
-        except Exception:  # old AVISO
-            self._lon = self.read_nc(aviso_file, 'NbLongitudes')
-            self._lat = self.read_nc(aviso_file, 'NbLatitudes')
-            self.fillval = self.read_nc_att(aviso_file,
-                                            'Grid_0001', '_FillValue')
+        self._lon = self.read_nc(self.lon_name)
+        self._lat = self.read_nc(self.lat_name)
+        self.fillval = self.read_nc_att(self.grid_name, '_FillValue')
 
         if lonmin < 0 and lonmax <= 0:
             self._lon -= 360.
@@ -77,24 +71,41 @@ class AvisoGrid(PyEddyTracker):
         """
         Read nc data from AVISO file
         """
-        if 'Grid_0001' in self.nc_variables(aviso_file):
-            # old AVISO
-            zeta = self.read_nc(aviso_file, 'Grid_0001',
-                                indices=list(self.view_pad)[::-1]).T
-        else:
-            zeta = self.read_nc(aviso_file, 'sla',
-                                indices=[0, self.view_pad[0], self.view_pad[1]]).T
-            zeta *= 100.  # m to cm
+        KNOWN_UNITS = dict(
+            m=100.,
+            cm=1.,
+            )
+        self.grid_filename = aviso_file
+        units = self.read_nc_att(self.grid_name, 'units')
+        if units not in KNOWN_UNITS:
+            raise Exception('Unknown units : %s' % units)
+            
+        with Dataset(self.grid_filename) as h_nc:
+            grid_dims = np.array(h_nc.variables[self.grid_name].dimensions)
+            lat_dim = h_nc.variables[self.lat_name].dimensions[0]
+            lon_dim = h_nc.variables[self.lon_name].dimensions[0]
+
+        i_list = []
+        transpose = False
+        if np.where(grid_dims == lat_dim)[0][0] > np.where(grid_dims == lon_dim)[0][0]:
+            transpose = True
+        for grid_dim in grid_dims:
+            if grid_dim == lat_dim:
+                i_list.append(self.view_pad[0])
+            elif grid_dim == lon_dim:
+                i_list.append(self.view_pad[1])
+            else:
+                i_list.append(0)
+
+        zeta = self.read_nc(self.grid_name, indices=i_list)
+        if transpose:
+            zeta = zeta.T
+
+        zeta *= KNOWN_UNITS[units]  # units to cm
         if hasattr(zeta, 'mask'):
             return zeta
         else:
-            try:
-                # Extrapolate over land points with fillmask
-                # Something to check in this function
-                zeta = np.ma.array(zeta)
-            except:  # In case no landpoints
-                zeta = np.ma.array(zeta)
-            return zeta
+            return np.ma.array(zeta)
 
     def set_mask(self, sla):
         """
@@ -110,30 +121,30 @@ class AvisoGrid(PyEddyTracker):
                 self.mask[:125, minus70] = True
 
                 # DT10 mask is open around Panama, so close it...
-                if 'AVISO_DT10' in self.product:
-                    self.mask[348, 92:110] = True
-                    self.mask[348:356, 92] = True
-                    self.mask[355, 71:92] = True
-                    self.mask[355:363, 71] = True
-                    self.mask[362, 66:71] = True
-                    self.mask[362:380, 66] = True
-                    self.mask[380, 47:67] = True
-                    self.mask[380:389, 47] = True
-                    self.mask[388, 13:47] = True
-                    self.mask[388:393, 13] = True
-                    self.mask[392, :13] = True
-                    ind = 4 * 360
-                    self.mask[348, 92 + ind:110 + ind] = True
-                    self.mask[348:356, 92 + ind] = True
-                    self.mask[355, 71 + ind:92 + ind] = True
-                    self.mask[355:363, 71 + ind] = True
-                    self.mask[362, 66 + ind:71 + ind] = True
-                    self.mask[362:380, 66 + ind] = True
-                    self.mask[380, 47 + ind:67 + ind] = True
-                    self.mask[380:389, 47 + ind] = True
-                    self.mask[388, 13 + ind:47 + ind] = True
-                    self.mask[388:393, 13 + ind] = True
-                    self.mask[392,  ind:13 + ind] = True
+                #~ if 'AVISO_DT10' in self.product:
+                    #~ self.mask[348, 92:110] = True
+                    #~ self.mask[348:356, 92] = True
+                    #~ self.mask[355, 71:92] = True
+                    #~ self.mask[355:363, 71] = True
+                    #~ self.mask[362, 66:71] = True
+                    #~ self.mask[362:380, 66] = True
+                    #~ self.mask[380, 47:67] = True
+                    #~ self.mask[380:389, 47] = True
+                    #~ self.mask[388, 13:47] = True
+                    #~ self.mask[388:393, 13] = True
+                    #~ self.mask[392, :13] = True
+                    #~ ind = 4 * 360
+                    #~ self.mask[348, 92 + ind:110 + ind] = True
+                    #~ self.mask[348:356, 92 + ind] = True
+                    #~ self.mask[355, 71 + ind:92 + ind] = True
+                    #~ self.mask[355:363, 71 + ind] = True
+                    #~ self.mask[362, 66 + ind:71 + ind] = True
+                    #~ self.mask[362:380, 66 + ind] = True
+                    #~ self.mask[380, 47 + ind:67 + ind] = True
+                    #~ self.mask[380:389, 47 + ind] = True
+                    #~ self.mask[388, 13 + ind:47 + ind] = True
+                    #~ self.mask[388:393, 13 + ind] = True
+                    #~ self.mask[392,  ind:13 + ind] = True
 
                 # Mask all unwanted regions (Caspian Sea, etc)
                 self.labels = ndimage.label(-self.mask)[0]

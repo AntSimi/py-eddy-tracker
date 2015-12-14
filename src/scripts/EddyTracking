@@ -3,9 +3,155 @@
 """
 """
 from py_eddy_tracker import EddyParser
+from glob import glob
+from yaml import load as yaml_load
+from py_eddy_tracker.py_eddy_tracker_property_classes import EddiesObservations, TrackEddiesObservations
+#~ from py_eddy_tracker.make_eddy_tracker_list_obj import RossbyWaveSpeed
+import logging
+import numpy as np
+import datetime as dt
 
+D2R = 0.017453292519943295
+def distance_matrix(lon0, lat0, lon1, lat1):
+    """Why it's quicker than cython version?
+    """
+    nb_elt0 = lon0.shape[0]
+    nb_elt1 = lon1.shape[0]
+    lon1, lon0 = np.meshgrid(lon1, lon0)
+    lat1, lat0 = np.meshgrid(lat1, lat0)
+    sin_dlat = np.sin((lat1 - lat0) * 0.5 * D2R)
+    sin_dlon = np.sin((lon1 - lon0) * 0.5 * D2R)
+    cos_lat1 = np.cos(lat0 * D2R)
+    cos_lat2 = np.cos(lat1 * D2R)
+    a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
+    return 6371.315 * 2 * np.arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+UINT32_MAX = 4294967295
 
 if __name__ == '__main__':
     # Run using:
     PARSER = EddyParser(
         "Tool to use identification step to compute tracking")
+    PARSER.add_argument('yaml_file',
+                        help='Yaml file to configure py-eddy-tracker')
+    YAML_FILE = PARSER.parse_args().yaml_file
+
+    # Read yaml configuration file
+    with open(YAML_FILE, 'r') as stream:
+        CONFIG = yaml_load(stream)
+    
+    NB_OBS_MIN = int(CONFIG['TRACK_DURATION_MIN'])
+
+    PATTERN = CONFIG['PATHS']['FILES_PATTERN']
+    FILENAMES = glob(PATTERN)
+    FILENAMES.sort()
+
+    e_previous = EddiesObservations.load_from_netcdf(FILENAMES[0])
+
+    START_TIME = dt.datetime.now()
+    logging.info('Start tracking on %d files', len(FILENAMES))
+    # To count id tracks
+    CURRENT_ID = 0
+    CORRESPONDANCES = []
+    START = True
+    
+    for file_name in FILENAMES[1:]:
+        logging.debug('%s match with previous state', file_name)
+        e_current = EddiesObservations.load_from_netcdf(file_name)
+        logging.debug('%d obs to match', len(e_current))
+        dist_result = distance_matrix(
+            e_previous.obs['lon'], e_previous.obs['lat'],
+            e_current.obs['lon'], e_current.obs['lat'])
+
+        #~ previous_amp, current_amp = np.meshgrid(
+            #~ e_current.obs['amplitude'], e_previous.obs['amplitude'])
+        #~ delta_amp = abs(current_amp - previous_amp) / previous_amp
+
+        #~ previous_radius, current_radius = np.meshgrid(
+            #~ e_current.obs['radius_e'], e_previous.obs['radius_e'])
+        #~ delta_radius = abs(current_radius ** 2 - previous_radius ** 2) ** .5 / previous_radius
+
+        i_previous, i_current = np.where(dist_result < 25)
+        nb_match = i_previous.shape[0]
+
+        logging.debug('%d match with previous', nb_match)
+        correspondance = np.array(i_previous, dtype=[('in', 'u2'), ('out', 'u2'), ('id', 'u4')])
+        correspondance['out'] = i_current
+        if START:
+            START=False
+            # Set an id for each match
+            correspondance['id'] = np.arange(nb_match)
+            # Set counter
+            CURRENT_ID += nb_match
+        else:
+            id_previous = np.ones(len(e_previous), dtype='u4') * UINT32_MAX
+            id_previous[CORRESPONDANCES[-1]['out']] = CORRESPONDANCES[-1]['id']
+            correspondance['id'] = id_previous[correspondance['in']]            
+            # new_id is -1 we must add a new ones
+            # we count the number of new
+            mask_new_id = correspondance['id'] == UINT32_MAX
+            nb_new_tracks = mask_new_id.sum()
+            # Set new id
+            correspondance['id'][mask_new_id] = np.arange(CURRENT_ID, CURRENT_ID + nb_new_tracks)
+            # Set counter
+            CURRENT_ID += nb_new_tracks
+        CORRESPONDANCES.append(correspondance)
+
+        e_previous = e_current
+    logging.info('Track finish')
+    logging.info('Start merging')
+    # count obs by tracks
+    nb_obs_by_tracks = np.zeros(CURRENT_ID, dtype='u2') + 1
+    for correspondance in CORRESPONDANCES:
+        nb_obs_by_tracks[correspondance['id']] += 1
+
+    i_current_by_tracks = nb_obs_by_tracks.cumsum() - nb_obs_by_tracks
+    nb_obs = nb_obs_by_tracks.sum()
+    logging.info('%d tracks will be create', CURRENT_ID)
+    logging.info('%d observations will be join', nb_obs)
+    # Start create netcdf to agglomerate all eddy
+    
+    FINAL_EDDIES = TrackEddiesObservations(size=nb_obs)
+    
+    lon = np.ones(nb_obs, dtype='f4') * np.nan
+    lat = np.ones(nb_obs, dtype='f4') * np.nan
+    n = np.arange(nb_obs, dtype='u4') - i_current_by_tracks.repeat(nb_obs_by_tracks)
+    FINAL_EDDIES.obs['n'] = np.uint16(n)
+
+    # Start
+    eddies_init = EddiesObservations.load_from_netcdf(FILENAMES[0])
+    FINAL_EDDIES.sign_type = eddies_init.sign_type
+    i_id = CORRESPONDANCES[0]['id']
+    index_final = i_current_by_tracks[i_id]
+    index_source = CORRESPONDANCES[0]['in']
+    # Copy all variable
+    for var, _ in eddies_init.obs.dtype.descr:
+        FINAL_EDDIES.obs[var][index_final] = eddies_init.obs[var][index_source]
+
+    del eddies_init
+    # Add increment for each index used
+    i_current_by_tracks[i_id] += 1
+
+    for i, file_name in enumerate(FILENAMES[1:]):
+        eddies_current = EddiesObservations.load_from_netcdf(file_name)
+        
+        i_id = CORRESPONDANCES[i]['id']
+        index_final = i_current_by_tracks[i_id]
+        index_source = CORRESPONDANCES[i]['out']
+        # Copy all variable
+        for var, _ in eddies_current.obs.dtype.descr:
+            FINAL_EDDIES.obs[var][index_final] = eddies_current.obs[var][index_source]
+        # Add increment for each index used
+        i_current_by_tracks[i_id] += 1
+    
+    
+    # Total running time
+    logging.info('Mean duration by loop : %s',
+                 (dt.datetime.now() - START_TIME) / (len(FILENAMES) - 1))
+    logging.info('Duration : %s', dt.datetime.now() - START_TIME)
+    
+    logging.info('The longest tracks have %d observations', nb_obs_by_tracks.max())
+    
+    FINAL_EDDIES.write_netcdf()
+    
+    #~ nb_obs_by_tracks = nb_obs_by_tracks.repeat(nb_obs_by_tracks)
+    #~ m = nb_obs_by_tracks > NB_OBS_MIN

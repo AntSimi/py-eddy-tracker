@@ -126,20 +126,20 @@ VAR_DESCR = dict(
                         'around the contour defining the eddy perimeter',
             )
         ),
-    radius=dict(
-        attr_name=None,
-        nc_name='L',
-        nc_type='float32',
-        nc_dims=('Nobs',),
-        scale_factor=1e-3,
-        nc_attr=dict(
-            long_name='speed radius scale',
-            units='km',
-            description='radius of a circle whose area is equal to that '
-                        'enclosed by the contour of maximum circum-average'
-                        ' speed',
-            )
-        ),
+    #~ radius=dict(
+        #~ attr_name=None,
+        #~ nc_name='L',
+        #~ nc_type='float32',
+        #~ nc_dims=('Nobs',),
+        #~ scale_factor=1e-3,
+        #~ nc_attr=dict(
+            #~ long_name='speed radius scale',
+            #~ units='km',
+            #~ description='radius of a circle whose area is equal to that '
+                        #~ 'enclosed by the contour of maximum circum-average'
+                        #~ ' speed',
+            #~ )
+        #~ ),
     speed_radius=dict(
         attr_name='speed_radius',
         scale_factor=100,
@@ -192,7 +192,7 @@ VAR_DESCR = dict(
     track=dict(
         attr_name=None,
         nc_name='track',
-        nc_type='int32',
+        nc_type='uint32',
         nc_dims=('Nobs',),
         nc_attr=dict(
             long_name='track number',
@@ -203,7 +203,7 @@ VAR_DESCR = dict(
     n=dict(
         attr_name=None,
         nc_name='n',
-        nc_type='int16',
+        nc_type='uint16',
         nc_dims=('Nobs',),
         nc_attr=dict(
             long_name='observation number',
@@ -254,3 +254,5 @@ VAR_DESCR = dict(
             )
         ),
     )
+
+VAR_DESCR_inv = {VAR_DESCR[key]['nc_name'] : key for key in VAR_DESCR.keys()}

@@ -1,0 +1,22 @@
+# Two diagnostics, based on SLA (e.g., Chelton et al, 2011)
+# or the Q-parameter (e.g., Kurian et al, 2011) are available
+DIAGNOSTIC_TYPE: 'SLA'
+
+PATHS:
+  FILES_PATTERN: /homelocal/adelepoulle/20151110_eddy_track/Anticyclonic_2014*.nc
+  #~ FILES_PATTERN: /homelocal/adelepoulle/20151110_eddy_track/Cyclonic_2014*.nc
+  # Path and filename of Chelton et al (1998) Rossby radius data
+  # Obtain file from:
+  # http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
+  RW_PATH: 'rossrad.dat'
+  # Path for saving of outputs
+  SAVE_DIR: 'test/'
+
+TRACK_DURATION_MIN: 28 # Number of observations
+  
+SEPARATION_METHOD: 'ellipse'
+#SEPARATION_METHOD: 'sum_radii'
+
+
+# Typical parameters
+DIST0: 25000. # m separation distance after ~7 days (see CSS11 fig 22)

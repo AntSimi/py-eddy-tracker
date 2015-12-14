@@ -61,20 +61,21 @@ class PyEddyTracker(object):
         self._dy = None
         self._umask = None
         self._vmask = None
+        self.grid_filename = None
+        self.grid_date = None
 
-    @staticmethod
-    def read_nc(varfile, varname, indices=slice(None)):
+    def read_nc(self, varname, indices=slice(None)):
         """
         Read data from nectdf file
           varname : variable ('temp', 'mask_rho', etc) to read
-          indices : string of index ranges, eg. '[0,:,0]'
+          indices : slice
         """
-        with Dataset(varfile) as h_nc:
+        with Dataset(self.grid_filename) as h_nc:
             return h_nc.variables[varname][:][indices]
 
-    @staticmethod
-    def nc_variables(varfile):
-        with Dataset(varfile) as h_nc:
+    @property
+    def nc_variables(self):
+        with Dataset(self.grid_filename) as h_nc:
             return h_nc.variables.keys()
 
     @property
@@ -94,13 +95,13 @@ class PyEddyTracker(object):
         return (self.slice_j_unpad,
                 self.slice_i_unpad)
 
-    def read_nc_att(self, varfile, varname, att):
+    def read_nc_att(self, varname, att):
         """
         Read data attribute from nectdf file
           varname : variable ('temp', 'mask_rho', etc) to read
           att : string of attribute, eg. 'valid_range'
         """
-        with Dataset(varfile) as h_nc:
+        with Dataset(self.grid_filename) as h_nc:
             return getattr(h_nc.variables[varname], att)
 
     @property
@@ -422,17 +423,10 @@ class PyEddyTracker(object):
         """
         Won't work for rotated grid
         """
-        if 'AVISO' in self.product:
-            self.sla_coeffs = interpolate.RectBivariateSpline(
-                self.lat[:, 0], self.lon[0], sla, kx=1, ky=1)
-            self.uspd_coeffs = interpolate.RectBivariateSpline(
-                self.lat[:, 0], self.lon[0], uspd, kx=1, ky=1)
-        elif 'ROMS' in self.product:
-            points = np.array([self.lon.ravel(), self.lat.ravel()]).T
-            self.sla_coeffs = interpolate.CloughTocher2DInterpolator(
-                points, sla.ravel())
-            self.uspd_coeffs = interpolate.CloughTocher2DInterpolator(
-                points, uspd.ravel())
+        self.sla_coeffs = interpolate.RectBivariateSpline(
+            self.lat[:, 0], self.lon[0], sla, kx=1, ky=1)
+        self.uspd_coeffs = interpolate.RectBivariateSpline(
+            self.lat[:, 0], self.lon[0], uspd, kx=1, ky=1)
         return self
 
     @staticmethod
