@@ -30,7 +30,7 @@ setup(
                            ["src/py_eddy_tracker/tools.pyx"],
                            include_dirs=[numpy.get_include()])],
     setup_requires=[
-        'numpy>=1.9'],
+        'numpy>=1.8'],
     install_requires=[
         'numpy>=1.9',
         'matplotlib>=1.2.1',
