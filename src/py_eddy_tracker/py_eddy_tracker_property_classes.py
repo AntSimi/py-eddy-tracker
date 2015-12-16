@@ -199,7 +199,7 @@ class VirtualEddiesObservations(EddiesObservations):
     @property
     def elements(self):
         elements = super(VirtualEddiesObservations, self).elements
-        elements.extend(['track'])
+        elements.extend(['track', 'segment_size', 'dlon', 'dlat'])
         return elements
     
 class TrackEddiesObservations(EddiesObservations):

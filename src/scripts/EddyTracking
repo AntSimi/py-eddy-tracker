@@ -69,17 +69,18 @@ if __name__ == '__main__':
         if FLG_VIRTUAL:
             nb_real_obs = len(e_previous)
             # If you comment this the virtual fonctionnality will be disable
+            logging.debug('%d virtual obs will be add to previous', len(virtual_obs))
             e_previous = e_previous.merge(virtual_obs)
         dist_result = np.empty((len(e_previous), len(e_current)), dtype='f8') + np.nan
         distance_matrix(
             e_previous.obs['lon'], e_previous.obs['lat'],
             e_current.obs['lon'], e_current.obs['lat'],
             dist_result)
-        i_previous, i_current = np.where(dist_result < 5.)
+        i_previous, i_current = np.where(dist_result < 20.)
         nb_match = i_previous.shape[0]
 
         logging.debug('%d match with previous', nb_match)
-        correspondance = np.array(i_previous, dtype=[('in', 'u2'), ('out', 'u2'), ('id', 'u4'), ('virtual', np.bool_)])
+        correspondance = np.array(i_previous, dtype=[('in', 'u2'), ('out', 'u2'), ('id', 'u4'), ('virtual', np.bool_), ('virtual_length', 'u1')])
         correspondance['out'] = i_current
         
         if FLG_VIRTUAL:
@@ -102,16 +103,36 @@ if __name__ == '__main__':
             id_previous[CORRESPONDANCES[-1]['out']] = previous_id
             correspondance['id'] = id_previous[correspondance['in']]            
             if FLG_VIRTUAL:
-                # Set id for virtual
-                correspondance['id'][correspondance['virtual']] = \
-                    virtual_obs.obs['track'][correspondance['in'][correspondance['virtual']] - nb_real_obs]
-                #~ correspondance['in'][correspondance['virtual']] = UINT16_MAX
+                nb_rebirth = correspondance['virtual'].sum()
+                if nb_rebirth != 0:
+                    logging.debug('%d re-birth due to prolongation with virtual observations', nb_rebirth)
+                    # Set id for virtual
+                    correspondance['id'][correspondance['virtual']] = \
+                        virtual_obs.obs['track'][correspondance['in'][correspondance['virtual']] - nb_real_obs]
+                    correspondance['virtual_length'][correspondance['virtual']] = \
+                        virtual_obs.obs['segment_size'][correspondance['in'][correspondance['virtual']] - nb_real_obs]
+                    #~ correspondance['in'][correspondance['virtual']] = UINT16_MAX
+
 
             # SECTION for virtual observation
+            nb_virtual_prolongate = 0
+            if FLG_VIRTUAL:
+                # Save previous state to count virtual obs
+                previous_virtual_obs = virtual_obs
+                virtual_dead_id = np.setdiff1d(virtual_obs.obs['track'], correspondance['id'])
+                list_previous_virtual_id = virtual_obs.obs['track'].tolist()
+                i_virtual_dead_id = [list_previous_virtual_id.index(i) for i in virtual_dead_id]
+                # Virtual obs which can be prolongate
+                alive_virtual_obs = virtual_obs.obs['segment_size'][i_virtual_dead_id] < NB_VIRTUAL_OBS_MAX_BY_SEGMENT
+                nb_virtual_prolongate = alive_virtual_obs.sum()
+                logging.debug('%d virtual obs will be prolongate on the next step', nb_virtual_prolongate)
+
             # List previous id which are not use in the next step
             dead_id = np.setdiff1d(previous_id, correspondance['id'])
+            nb_dead_track = len(dead_id)
+            logging.debug('%d death of real obs in this step', nb_dead_track)
             # Creation of an virtual step for dead one
-            virtual_obs = VirtualEddiesObservations(size=len(dead_id))
+            virtual_obs = VirtualEddiesObservations(size=nb_dead_track + nb_virtual_prolongate)
             # Find mask/index on previous correspondance to extrapolate
             # position
             list_previous_id = previous_id.tolist()
@@ -124,11 +145,23 @@ if __name__ == '__main__':
             # Position N-1 : B
             # Virtual Position : C
             # New position C = B + AB
-            virtual_obs.obs['lon'] = 2 * obs_b['lon'] - obs_a['lon']
-            virtual_obs.obs['lat'] = 2 * obs_b['lat'] - obs_a['lat']
+            virtual_obs.obs['dlon'][:nb_dead_track] = obs_b['lon'] - obs_a['lon']
+            virtual_obs.obs['dlat'][:nb_dead_track] = obs_b['lat'] - obs_a['lat']
+            virtual_obs.obs['lon'][:nb_dead_track] = obs_b['lon'] + virtual_obs.obs['dlon'][:nb_dead_track]
+            virtual_obs.obs['lat'][:nb_dead_track] = obs_b['lat'] + virtual_obs.obs['dlat'][:nb_dead_track]
             # Id which are prolongated
-            virtual_obs.obs['track'] = dead_id 
-            FLG_VIRTUAL = True
+            virtual_obs.obs['track'][:nb_dead_track] = dead_id 
+            # Add previous virtual
+            if nb_virtual_prolongate > 0:
+                obs_to_prolongate = previous_virtual_obs.obs[i_virtual_dead_id][alive_virtual_obs]
+                virtual_obs.obs['lon'][nb_dead_track:] = obs_to_prolongate['lon'] + obs_to_prolongate['dlon']
+                virtual_obs.obs['lat'][nb_dead_track:] = obs_to_prolongate['lat'] + obs_to_prolongate['dlat']
+                virtual_obs.obs['track'][nb_dead_track:] = obs_to_prolongate['track']
+                virtual_obs.obs['segment_size'][nb_dead_track:] = obs_to_prolongate['segment_size']
+            # Count 
+            virtual_obs.obs['segment_size'] += 1
+            if NB_VIRTUAL_OBS_MAX_BY_SEGMENT > 0:
+                FLG_VIRTUAL = True
             # END
 
             
@@ -136,6 +169,7 @@ if __name__ == '__main__':
             # we count the number of new
             mask_new_id = correspondance['id'] == UINT32_MAX
             nb_new_tracks = mask_new_id.sum()
+            logging.debug('%d birth in this step', nb_new_tracks)
             # Set new id
             correspondance['id'][mask_new_id] = np.arange(CURRENT_ID, CURRENT_ID + nb_new_tracks)
             # Set counter
@@ -152,17 +186,24 @@ if __name__ == '__main__':
     nb_obs_by_tracks = np.zeros(CURRENT_ID, dtype='u2') + 1
     for correspondance in CORRESPONDANCES:
         nb_obs_by_tracks[correspondance['id']] += 1
-        nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]] += 1
+        # When start is virtual, we don't have a previous correspondance
+        nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]] += correspondance['virtual_length'][correspondance['virtual']]
 
+    # Compute index of each tracks
     i_current_by_tracks = nb_obs_by_tracks.cumsum() - nb_obs_by_tracks
+    # Number of global obs
     nb_obs = nb_obs_by_tracks.sum()
     logging.info('%d tracks will be create', CURRENT_ID)
     logging.info('%d observations will be join', nb_obs)
     # Start create netcdf to agglomerate all eddy 
     FINAL_EDDIES = TrackEddiesObservations(size=nb_obs)
 
+    # Calculate the index in each tracks, we compute in u4 and translate
+    # in u2 (which are limited to 65535)
+    logging.debug('Compute global index array (N)')
     n = np.arange(nb_obs, dtype='u4') - i_current_by_tracks.repeat(nb_obs_by_tracks)
     FINAL_EDDIES.obs['n'] = np.uint16(n)
+    logging.debug('Compute global track array')
     FINAL_EDDIES.obs['track'] = np.arange(CURRENT_ID).repeat(nb_obs_by_tracks)
 
     # Start loading identification again to save in the finals tracks
@@ -192,6 +233,7 @@ if __name__ == '__main__':
                 FINAL_EDDIES.obs[var][index_final[m_first_obs]] = eddies_previous.obs[var][index_in]
             # Increment
             i_current_by_tracks[i_id[m_first_obs]] += 1
+            # Active this flag, we have only one first by tracks
             first_obs_save_in_tracks[i_id] = True
             index_final = i_current_by_tracks[i_id]
         
@@ -201,8 +243,9 @@ if __name__ == '__main__':
         m_virtual = CORRESPONDANCES[i]['virtual']
         if m_virtual.any():
             index_virtual = index_final[m_virtual]
-            FINAL_EDDIES.obs['virtual'][index_virtual] = 1
-            i_current_by_tracks[i_id[m_virtual]] += 1
+            # Incrementing index
+            i_current_by_tracks[i_id[m_virtual]] += CORRESPONDANCES[i]['virtual_length'][m_virtual]
+            # Get new index
             index_final = i_current_by_tracks[i_id]
 
         # Copy all variable
@@ -214,13 +257,20 @@ if __name__ == '__main__':
         i_current_by_tracks[i_id] += 1
         eddies_previous = eddies_current
 
-    i = np.where(FINAL_EDDIES.obs['virtual'])[0]
+    # We flag obs
+    FINAL_EDDIES.obs['virtual'] = FINAL_EDDIES.obs['time'] == 0
+
+    # Localization of virtual observation
+    m_i = FINAL_EDDIES.obs['virtual'] == 1
+    # Count virtual observations
     nb_virtual = FINAL_EDDIES.obs['virtual'].sum()
+
     logging.info('%d obs are virtual (unobserved)', nb_virtual)
-    FINAL_EDDIES.obs['lon'][i] = (FINAL_EDDIES.obs['lon'][i - 1] + FINAL_EDDIES.obs['lon'][i + 1]) / 2
-    FINAL_EDDIES.obs['lat'][i] = (FINAL_EDDIES.obs['lat'][i - 1] + FINAL_EDDIES.obs['lat'][i + 1]) / 2
-    FINAL_EDDIES.obs['time'][i] = (FINAL_EDDIES.obs['time'][i - 1] + FINAL_EDDIES.obs['time'][i + 1]) / 2
-      
+    logging.info('Start extrapolation of values for virtual observations')
+    nb_obs = len(FINAL_EDDIES)
+    index = np.arange(nb_obs)
+    for var, _ in eddies_current.obs.dtype.descr:
+        FINAL_EDDIES.obs[var][m_i] = np.interp(index[m_i], index[-m_i], FINAL_EDDIES.obs[var][-m_i])
 
     # Total running time
     logging.info('Mean duration by loop : %s',

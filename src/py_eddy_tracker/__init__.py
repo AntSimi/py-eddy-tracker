@@ -93,6 +93,27 @@ VAR_DESCR = dict(
             description='cyclonic -1; anti-cyclonic +1',
             )
         ),
+    segment_size=dict(
+        attr_name=None,
+        nc_name=None,
+        nc_type='byte',
+        nc_dims=None,
+        nc_attr=dict()
+        ),
+    dlon=dict(
+        attr_name=None,
+        nc_name=None,
+        nc_type='float64',
+        nc_dims=None,
+        nc_attr=dict()
+        ),
+    dlat=dict(
+        attr_name=None,
+        nc_name=None,
+        nc_type='float64',
+        nc_dims=None,
+        nc_attr=dict()
+        ),
     virtual=dict(
         attr_name=None,
         nc_name='virtual',
