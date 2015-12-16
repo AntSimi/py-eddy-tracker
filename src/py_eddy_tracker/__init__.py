@@ -93,6 +93,17 @@ VAR_DESCR = dict(
             description='cyclonic -1; anti-cyclonic +1',
             )
         ),
+    virtual=dict(
+        attr_name=None,
+        nc_name='virtual',
+        nc_type='byte',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            long_name='virtual_position',
+            units='boolean',
+            description='Virtual observation: 0 for real',
+            )
+        ),
     lon=dict(
         attr_name='lon',
         compute_type='float64',

@@ -13,6 +13,7 @@ ctypedef double DTYPE_coord
 
 cdef DTYPE_coord D2R = 0.017453292519943295
 cdef DTYPE_coord PI = 3.141592653589793
+cdef DTYPE_coord EARTH_DIAMETER = 6371.3150 * 2
 
 @wraparound(False)
 @boundscheck(False)
@@ -229,18 +230,24 @@ def distance_matrix(
         ndarray[DTYPE_coord, ndim=2] dist,
         ):
 
-    cdef DTYPE_coord sin_dlat, sin_dlon, cos_lat1, cos_lat2, a_val
+    cdef DTYPE_coord sin_dlat, sin_dlon, cos_lat1, cos_lat2, a_val, dlon, dlat
     cdef DTYPE_ui i_elt0, i_elt1, nb_elt0, nb_elt1
     nb_elt0 = lon0.shape[0]
     nb_elt1 = lon1.shape[0]
     for i_elt0 from 0 <= i_elt0 < nb_elt0:
         for i_elt1 from 0 <= i_elt1 < nb_elt1:
-            sin_dlat = sin((lat1[i_elt1] - lat0[i_elt0]) * 0.5 * D2R)
-            sin_dlon = sin((lon1[i_elt1] - lon0[i_elt0]) * 0.5 * D2R)
+            dlon = (lon1[i_elt1] - lon0[i_elt0] + 180) % 360 - 180
+            if dlon > 20 or dlon < -20:
+                continue
+            dlat = lat1[i_elt1] - lat0[i_elt0]
+            if dlat > 15 or dlat < -15:
+                continue
+            sin_dlat = sin(dlat * 0.5 * D2R)
+            sin_dlon = sin(dlon * 0.5 * D2R)
             cos_lat1 = cos(lat0[i_elt0] * D2R)
             cos_lat2 = cos(lat1[i_elt1] * D2R)
             a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
-            dist[i_elt0, i_elt1] = 6371315.0 * 2 * atan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+            dist[i_elt0, i_elt1] = EARTH_DIAMETER * atan2(a_val ** 0.5, (1 - a_val) ** 0.5)
 
 
 @wraparound(False)

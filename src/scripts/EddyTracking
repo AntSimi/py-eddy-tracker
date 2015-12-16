@@ -2,17 +2,21 @@
 # -*- coding: utf-8 -*-
 """
 """
+
 from py_eddy_tracker import EddyParser
 from glob import glob
 from yaml import load as yaml_load
-from py_eddy_tracker.py_eddy_tracker_property_classes import EddiesObservations, TrackEddiesObservations
+from py_eddy_tracker.py_eddy_tracker_property_classes import EddiesObservations, TrackEddiesObservations, VirtualEddiesObservations
 #~ from py_eddy_tracker.make_eddy_tracker_list_obj import RossbyWaveSpeed
+from py_eddy_tracker.tools import distance_matrix
+
 import logging
 import numpy as np
 import datetime as dt
 
 D2R = 0.017453292519943295
-def distance_matrix(lon0, lat0, lon1, lat1):
+#~ def distance_matrix(lon0, lat0, lon1, lat1):
+def distance_matrix2(lon0, lat0, lon1, lat1):
     """Why it's quicker than cython version?
     """
     nb_elt0 = lon0.shape[0]
@@ -26,6 +30,7 @@ def distance_matrix(lon0, lat0, lon1, lat1):
     a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
     return 6371.315 * 2 * np.arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
 UINT32_MAX = 4294967295
+UINT16_MAX = 65535
 
 if __name__ == '__main__':
     # Run using:
@@ -40,6 +45,7 @@ if __name__ == '__main__':
         CONFIG = yaml_load(stream)
     
     NB_OBS_MIN = int(CONFIG['TRACK_DURATION_MIN'])
+    NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG['VIRTUAL_LEGNTH_MAX'])
 
     PATTERN = CONFIG['PATHS']['FILES_PATTERN']
     FILENAMES = glob(PATTERN)
@@ -53,14 +59,179 @@ if __name__ == '__main__':
     CURRENT_ID = 0
     CORRESPONDANCES = []
     START = True
+    FLG_VIRTUAL = False
     
     for file_name in FILENAMES[1:]:
         logging.debug('%s match with previous state', file_name)
         e_current = EddiesObservations.load_from_netcdf(file_name)
         logging.debug('%d obs to match', len(e_current))
-        dist_result = distance_matrix(
+
+        if FLG_VIRTUAL:
+            nb_real_obs = len(e_previous)
+            # If you comment this the virtual fonctionnality will be disable
+            e_previous = e_previous.merge(virtual_obs)
+        dist_result = np.empty((len(e_previous), len(e_current)), dtype='f8') + np.nan
+        distance_matrix(
             e_previous.obs['lon'], e_previous.obs['lat'],
-            e_current.obs['lon'], e_current.obs['lat'])
+            e_current.obs['lon'], e_current.obs['lat'],
+            dist_result)
+        i_previous, i_current = np.where(dist_result < 5.)
+        nb_match = i_previous.shape[0]
+
+        logging.debug('%d match with previous', nb_match)
+        correspondance = np.array(i_previous, dtype=[('in', 'u2'), ('out', 'u2'), ('id', 'u4'), ('virtual', np.bool_)])
+        correspondance['out'] = i_current
+        
+        if FLG_VIRTUAL:
+            correspondance['virtual'] = i_previous >= nb_real_obs
+            
+        else:
+            correspondance['virtual'] = False
+            
+        if START:
+            START=False
+            # Set an id for each match
+            correspondance['id'] = np.arange(nb_match)
+            # Set counter
+            CURRENT_ID += nb_match
+        else:
+            # We set all id to UINT32_MAX
+            id_previous = np.ones(len(e_previous), dtype='u4') * UINT32_MAX
+            # We get old id for previously eddies tracked
+            previous_id = CORRESPONDANCES[-1]['id']
+            id_previous[CORRESPONDANCES[-1]['out']] = previous_id
+            correspondance['id'] = id_previous[correspondance['in']]            
+            if FLG_VIRTUAL:
+                # Set id for virtual
+                correspondance['id'][correspondance['virtual']] = \
+                    virtual_obs.obs['track'][correspondance['in'][correspondance['virtual']] - nb_real_obs]
+                #~ correspondance['in'][correspondance['virtual']] = UINT16_MAX
+
+            # SECTION for virtual observation
+            # List previous id which are not use in the next step
+            dead_id = np.setdiff1d(previous_id, correspondance['id'])
+            # Creation of an virtual step for dead one
+            virtual_obs = VirtualEddiesObservations(size=len(dead_id))
+            # Find mask/index on previous correspondance to extrapolate
+            # position
+            list_previous_id = previous_id.tolist()
+            i_dead_id = [list_previous_id.index(i) for i in dead_id]
+
+            # Selection of observations on N-2 and N-1
+            obs_a = e_previous2.obs[CORRESPONDANCES[-1][i_dead_id]['in']]
+            obs_b = e_previous.obs[CORRESPONDANCES[-1][i_dead_id]['out']]
+            # Position N-2 : A
+            # Position N-1 : B
+            # Virtual Position : C
+            # New position C = B + AB
+            virtual_obs.obs['lon'] = 2 * obs_b['lon'] - obs_a['lon']
+            virtual_obs.obs['lat'] = 2 * obs_b['lat'] - obs_a['lat']
+            # Id which are prolongated
+            virtual_obs.obs['track'] = dead_id 
+            FLG_VIRTUAL = True
+            # END
+
+            
+            # new_id is equal to UINT32_MAX we must add a new ones
+            # we count the number of new
+            mask_new_id = correspondance['id'] == UINT32_MAX
+            nb_new_tracks = mask_new_id.sum()
+            # Set new id
+            correspondance['id'][mask_new_id] = np.arange(CURRENT_ID, CURRENT_ID + nb_new_tracks)
+            # Set counter
+            CURRENT_ID += nb_new_tracks
+            
+        CORRESPONDANCES.append(correspondance)
+
+        e_previous2 = e_previous
+        e_previous = e_current
+
+    logging.info('Track finish')
+    logging.info('Start merging')
+    # count obs by tracks
+    nb_obs_by_tracks = np.zeros(CURRENT_ID, dtype='u2') + 1
+    for correspondance in CORRESPONDANCES:
+        nb_obs_by_tracks[correspondance['id']] += 1
+        nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]] += 1
+
+    i_current_by_tracks = nb_obs_by_tracks.cumsum() - nb_obs_by_tracks
+    nb_obs = nb_obs_by_tracks.sum()
+    logging.info('%d tracks will be create', CURRENT_ID)
+    logging.info('%d observations will be join', nb_obs)
+    # Start create netcdf to agglomerate all eddy 
+    FINAL_EDDIES = TrackEddiesObservations(size=nb_obs)
+
+    n = np.arange(nb_obs, dtype='u4') - i_current_by_tracks.repeat(nb_obs_by_tracks)
+    FINAL_EDDIES.obs['n'] = np.uint16(n)
+    FINAL_EDDIES.obs['track'] = np.arange(CURRENT_ID).repeat(nb_obs_by_tracks)
+
+    # Start loading identification again to save in the finals tracks
+    # Load first file
+    eddies_previous = EddiesObservations.load_from_netcdf(FILENAMES[0])
+    # Set type of eddy with first file
+    FINAL_EDDIES.sign_type = eddies_previous.sign_type
+
+    # To know if the track start
+    first_obs_save_in_tracks = np.zeros(i_current_by_tracks.shape, dtype=np.bool_)
+
+    for i, file_name in enumerate(FILENAMES[1:]):
+        # Load current file (we begin with second one)
+        eddies_current = EddiesObservations.load_from_netcdf(file_name)
+        # We select the list of id which are involve in the correspondance
+        i_id = CORRESPONDANCES[i]['id']
+        # Index where we will write in the final object
+        index_final = i_current_by_tracks[i_id]
+        
+        # First obs of eddies
+        m_first_obs = -first_obs_save_in_tracks[i_id]
+        if m_first_obs.any():
+            # Index in the current file
+            index_in = CORRESPONDANCES[i]['in'][m_first_obs]
+            # Copy all variable
+            for var, _ in eddies_current.obs.dtype.descr:
+                FINAL_EDDIES.obs[var][index_final[m_first_obs]] = eddies_previous.obs[var][index_in]
+            # Increment
+            i_current_by_tracks[i_id[m_first_obs]] += 1
+            first_obs_save_in_tracks[i_id] = True
+            index_final = i_current_by_tracks[i_id]
+        
+        # Index in the current file
+        index_current = CORRESPONDANCES[i]['out']
+        # If the flag virtual in correspondance is active, the previous is virtual
+        m_virtual = CORRESPONDANCES[i]['virtual']
+        if m_virtual.any():
+            index_virtual = index_final[m_virtual]
+            FINAL_EDDIES.obs['virtual'][index_virtual] = 1
+            i_current_by_tracks[i_id[m_virtual]] += 1
+            index_final = i_current_by_tracks[i_id]
+
+        # Copy all variable
+        for var, _ in eddies_current.obs.dtype.descr:
+            FINAL_EDDIES.obs[var][index_final] = eddies_current.obs[var][index_current]
+        
+
+        # Add increment for each index used
+        i_current_by_tracks[i_id] += 1
+        eddies_previous = eddies_current
+
+    i = np.where(FINAL_EDDIES.obs['virtual'])[0]
+    nb_virtual = FINAL_EDDIES.obs['virtual'].sum()
+    logging.info('%d obs are virtual (unobserved)', nb_virtual)
+    FINAL_EDDIES.obs['lon'][i] = (FINAL_EDDIES.obs['lon'][i - 1] + FINAL_EDDIES.obs['lon'][i + 1]) / 2
+    FINAL_EDDIES.obs['lat'][i] = (FINAL_EDDIES.obs['lat'][i - 1] + FINAL_EDDIES.obs['lat'][i + 1]) / 2
+    FINAL_EDDIES.obs['time'][i] = (FINAL_EDDIES.obs['time'][i - 1] + FINAL_EDDIES.obs['time'][i + 1]) / 2
+      
+
+    # Total running time
+    logging.info('Mean duration by loop : %s',
+                 (dt.datetime.now() - START_TIME) / (len(FILENAMES) - 1))
+    logging.info('Duration : %s', dt.datetime.now() - START_TIME)
+    
+    logging.info('The longest tracks have %d observations', nb_obs_by_tracks.max())
+    
+    FINAL_EDDIES.extract_longer_eddies(NB_OBS_MIN, nb_obs_by_tracks.repeat(nb_obs_by_tracks)).write_netcdf()
+
+
 
         #~ previous_amp, current_amp = np.meshgrid(
             #~ e_current.obs['amplitude'], e_previous.obs['amplitude'])
@@ -69,89 +240,3 @@ if __name__ == '__main__':
         #~ previous_radius, current_radius = np.meshgrid(
             #~ e_current.obs['radius_e'], e_previous.obs['radius_e'])
         #~ delta_radius = abs(current_radius ** 2 - previous_radius ** 2) ** .5 / previous_radius
-
-        i_previous, i_current = np.where(dist_result < 25)
-        nb_match = i_previous.shape[0]
-
-        logging.debug('%d match with previous', nb_match)
-        correspondance = np.array(i_previous, dtype=[('in', 'u2'), ('out', 'u2'), ('id', 'u4')])
-        correspondance['out'] = i_current
-        if START:
-            START=False
-            # Set an id for each match
-            correspondance['id'] = np.arange(nb_match)
-            # Set counter
-            CURRENT_ID += nb_match
-        else:
-            id_previous = np.ones(len(e_previous), dtype='u4') * UINT32_MAX
-            id_previous[CORRESPONDANCES[-1]['out']] = CORRESPONDANCES[-1]['id']
-            correspondance['id'] = id_previous[correspondance['in']]            
-            # new_id is -1 we must add a new ones
-            # we count the number of new
-            mask_new_id = correspondance['id'] == UINT32_MAX
-            nb_new_tracks = mask_new_id.sum()
-            # Set new id
-            correspondance['id'][mask_new_id] = np.arange(CURRENT_ID, CURRENT_ID + nb_new_tracks)
-            # Set counter
-            CURRENT_ID += nb_new_tracks
-        CORRESPONDANCES.append(correspondance)
-
-        e_previous = e_current
-    logging.info('Track finish')
-    logging.info('Start merging')
-    # count obs by tracks
-    nb_obs_by_tracks = np.zeros(CURRENT_ID, dtype='u2') + 1
-    for correspondance in CORRESPONDANCES:
-        nb_obs_by_tracks[correspondance['id']] += 1
-
-    i_current_by_tracks = nb_obs_by_tracks.cumsum() - nb_obs_by_tracks
-    nb_obs = nb_obs_by_tracks.sum()
-    logging.info('%d tracks will be create', CURRENT_ID)
-    logging.info('%d observations will be join', nb_obs)
-    # Start create netcdf to agglomerate all eddy
-    
-    FINAL_EDDIES = TrackEddiesObservations(size=nb_obs)
-    
-    lon = np.ones(nb_obs, dtype='f4') * np.nan
-    lat = np.ones(nb_obs, dtype='f4') * np.nan
-    n = np.arange(nb_obs, dtype='u4') - i_current_by_tracks.repeat(nb_obs_by_tracks)
-    FINAL_EDDIES.obs['n'] = np.uint16(n)
-
-    # Start
-    eddies_init = EddiesObservations.load_from_netcdf(FILENAMES[0])
-    FINAL_EDDIES.sign_type = eddies_init.sign_type
-    i_id = CORRESPONDANCES[0]['id']
-    index_final = i_current_by_tracks[i_id]
-    index_source = CORRESPONDANCES[0]['in']
-    # Copy all variable
-    for var, _ in eddies_init.obs.dtype.descr:
-        FINAL_EDDIES.obs[var][index_final] = eddies_init.obs[var][index_source]
-
-    del eddies_init
-    # Add increment for each index used
-    i_current_by_tracks[i_id] += 1
-
-    for i, file_name in enumerate(FILENAMES[1:]):
-        eddies_current = EddiesObservations.load_from_netcdf(file_name)
-        
-        i_id = CORRESPONDANCES[i]['id']
-        index_final = i_current_by_tracks[i_id]
-        index_source = CORRESPONDANCES[i]['out']
-        # Copy all variable
-        for var, _ in eddies_current.obs.dtype.descr:
-            FINAL_EDDIES.obs[var][index_final] = eddies_current.obs[var][index_source]
-        # Add increment for each index used
-        i_current_by_tracks[i_id] += 1
-    
-    
-    # Total running time
-    logging.info('Mean duration by loop : %s',
-                 (dt.datetime.now() - START_TIME) / (len(FILENAMES) - 1))
-    logging.info('Duration : %s', dt.datetime.now() - START_TIME)
-    
-    logging.info('The longest tracks have %d observations', nb_obs_by_tracks.max())
-    
-    FINAL_EDDIES.write_netcdf()
-    
-    #~ nb_obs_by_tracks = nb_obs_by_tracks.repeat(nb_obs_by_tracks)
-    #~ m = nb_obs_by_tracks > NB_OBS_MIN

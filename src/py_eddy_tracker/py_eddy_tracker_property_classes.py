@@ -114,6 +114,15 @@ class EddiesObservations(object):
 
     def coherence(self, other):
         return self.track_extra_variables == other.track_extra_variables
+    
+    def merge(self, other):
+        nb_obs_self = len(self)
+        nb_obs = nb_obs_self + len(other)
+        eddies = self.__class__(size=nb_obs)
+        eddies.obs[:nb_obs_self] = self.obs[:]
+        eddies.obs[nb_obs_self:] = other.obs[:]
+        eddies.sign_type = self.sign_type
+        return eddies
 
     def reset(self):
         self.observations = np.zeros(0, dtype=self.dtype)
@@ -185,12 +194,30 @@ class EddiesObservations(object):
         return eddies
 
 
+class VirtualEddiesObservations(EddiesObservations):
+    
+    @property
+    def elements(self):
+        elements = super(VirtualEddiesObservations, self).elements
+        elements.extend(['track'])
+        return elements
+    
 class TrackEddiesObservations(EddiesObservations):
+    
+    def extract_longer_eddies(self, nb_min, nb_obs):
+        m = nb_obs >= nb_min
+        nb_obs_select = m.sum()
+        logging.info('Selection of %d observations', nb_obs_select)
+        eddies = TrackEddiesObservations(size=nb_obs_select)
+        eddies.sign_type = self.sign_type
+        for var, _ in eddies.obs.dtype.descr:
+            eddies.obs[var] = self.obs[var][m]
+        return eddies
     
     @property
     def elements(self):
         elements = super(TrackEddiesObservations, self).elements
-        elements.extend(['track', 'n'])
+        elements.extend(['track', 'n', 'virtual'])
         return elements
     
     def create_variable(self, handler_nc, kwargs_variable,
@@ -201,10 +228,12 @@ class TrackEddiesObservations(EddiesObservations):
             **kwargs_variable)
         for attr, attr_value in attr_variable.iteritems():
             var.setncattr(attr, attr_value)
-            var[:] = data
-            var.set_auto_maskandscale(False)
-            if scale_factor is not None:
-                var.scale_factor = scale_factor
+            
+        var[:] = data
+        
+        #~ var.set_auto_maskandscale(False)
+        if scale_factor is not None:
+            var.scale_factor = scale_factor
             
         try:
             var.setncattr('min', var[:].min())
