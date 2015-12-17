@@ -211,7 +211,7 @@ VAR_DESCR = dict(
         ),
     radius_s=dict(
         attr_name='radius_s',
-        scale_factor=1e-3,
+        #~ scale_factor=1e-3,
         nc_name='L',
         nc_type='float32',
         nc_dims=('Nobs',),
