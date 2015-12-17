@@ -6,10 +6,9 @@
 from py_eddy_tracker import EddyParser
 from glob import glob
 from yaml import load as yaml_load
-from py_eddy_tracker.py_eddy_tracker_property_classes import \
+from py_eddy_tracker.observations import \
     EddiesObservations, TrackEddiesObservations, \
     VirtualEddiesObservations
-from py_eddy_tracker.tools import distance_matrix
 
 import logging
 import numpy as np
@@ -57,18 +56,12 @@ if __name__ == '__main__':
 
         if FLG_VIRTUAL:
             nb_real_obs = len(e_previous)
-            # If you comment this the virtual fonctionnality will be disable
             logging.debug('%d virtual obs will be add to previous',
                           len(virtual_obs))
+            # If you comment this the virtual fonctionnality will be disable
             e_previous = e_previous.merge(virtual_obs)
-        dist_result = np.empty((len(e_previous),
-                                len(e_current)),
-                                dtype='f8') + np.nan
-        distance_matrix(
-            e_previous.obs['lon'], e_previous.obs['lat'],
-            e_current.obs['lon'], e_current.obs['lat'],
-            dist_result)
-        i_previous, i_current = np.where(dist_result < 20.)
+        dist = e_previous.distance(e_current)
+        i_previous, i_current = np.where(dist < 20.)
         nb_match = i_previous.shape[0]
 
         logging.debug('%d match with previous', nb_match)
@@ -276,6 +269,7 @@ if __name__ == '__main__':
     # We flag obs
     FINAL_EDDIES.obs['virtual'] = FINAL_EDDIES.obs['time'] == 0
 
+    FINAL_EDDIES.filled_by_interpolation(FINAL_EDDIES.obs['virtual'] == 1)
     # Localization of virtual observation
     m_i = FINAL_EDDIES.obs['virtual'] == 1
     # Count virtual observations
@@ -299,16 +293,10 @@ if __name__ == '__main__':
     logging.info('The longest tracks have %d observations',
                  nb_obs_by_tracks.max())
 
-    FINAL_EDDIES.extract_longer_eddies(
-        NB_OBS_MIN, nb_obs_by_tracks.repeat(nb_obs_by_tracks)).write_netcdf()
+    SUBSET_EDDIES = FINAL_EDDIES.extract_longer_eddies(
+        NB_OBS_MIN, nb_obs_by_tracks.repeat(nb_obs_by_tracks))
+    
+    logging.info('%d tracks will be saved',
+                 len(np.unique(SUBSET_EDDIES.obs['track'])))
 
-
-
-#~ previous_amp, current_amp = np.meshgrid(
-    #~ e_current.obs['amplitude'], e_previous.obs['amplitude'])
-#~ delta_amp = abs(current_amp - previous_amp) / previous_amp
-
-#~ previous_radius, current_radius = np.meshgrid(
-    #~ e_current.obs['radius_e'], e_previous.obs['radius_e'])
-#~ delta_radius = abs(current_radius ** 2 - previous_radius ** 2) ** .5 \
-#~      / previous_radius
+    SUBSET_EDDIES.write_netcdf()
