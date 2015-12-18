@@ -28,7 +28,7 @@ Version 2.0.3
 ===========================================================================
 
 """
-from numpy import zeros, empty, nan, arange, interp
+from numpy import zeros, empty, nan, arange, interp, where
 from netCDF4 import Dataset
 from py_eddy_tracker.tools import distance_matrix
 from . import VAR_DESCR, VAR_DESCR_inv
@@ -185,6 +185,15 @@ class EddiesObservations(object):
                 eddies.obs[VAR_DESCR_inv[variable]] = h_nc.variables[variable][:]
             eddies.sign_type = h_nc.variables['cyc'][0]
         return eddies
+
+    def tracking(self, other):
+        """Track obs between from self to other
+        """
+        dist = self.distance(other)
+        i_self, i_other = where(dist < 20.)
+
+        logging.debug('%d match with previous', i_self.shape[0])
+        return i_self, i_other
 
 
 class VirtualEddiesObservations(EddiesObservations):

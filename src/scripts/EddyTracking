@@ -6,49 +6,81 @@
 from py_eddy_tracker import EddyParser
 from glob import glob
 from yaml import load as yaml_load
+from py_eddy_tracker.tracking import \
+    Correspondance
 from py_eddy_tracker.observations import \
     EddiesObservations, TrackEddiesObservations, \
     VirtualEddiesObservations
 
 import logging
-import numpy as np
+from numpy import array, arange, bool_, uint16, unique, setdiff1d, \
+    ones, zeros
 import datetime as dt
 
 
-D2R = 0.017453292519943295
 UINT32_MAX = 4294967295
 UINT16_MAX = 65535
+# ID limit to 4294967295
+ID_DTYPE = 'u4'
+# Track limit to 65535
+N_DTYPE = 'u2'
+# Prolongation limit to 255
+VIRTUAL_DTYPE = 'u1'
+
+
+def usage():
+    """Usage
+    """
+    # Run using:
+    parser = EddyParser(
+        "Tool to use identification step to compute tracking")
+    parser.add_argument('yaml_file',
+                        help='Yaml file to configure py-eddy-tracker')
+    yaml_file = parser.parse_args().yaml_file
+
+    # Read yaml configuration file
+    with open(yaml_file, 'r') as stream:
+        config = yaml_load(stream)
+    return config
 
 
 if __name__ == '__main__':
-    # Run using:
-    PARSER = EddyParser(
-        "Tool to use identification step to compute tracking")
-    PARSER.add_argument('yaml_file',
-                        help='Yaml file to configure py-eddy-tracker')
-    YAML_FILE = PARSER.parse_args().yaml_file
-
-    # Read yaml configuration file
-    with open(YAML_FILE, 'r') as stream:
-        CONFIG = yaml_load(stream)
+    CONFIG = usage()
 
     NB_OBS_MIN = int(CONFIG['TRACK_DURATION_MIN'])
     NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG['VIRTUAL_LEGNTH_MAX'])
+    
+    ACTIVE_VIRTUAL = NB_VIRTUAL_OBS_MAX_BY_SEGMENT > 0
 
     PATTERN = CONFIG['PATHS']['FILES_PATTERN']
     FILENAMES = glob(PATTERN)
     FILENAMES.sort()
 
-    e_previous = EddiesObservations.load_from_netcdf(FILENAMES[0])
-
     START_TIME = dt.datetime.now()
     logging.info('Start tracking on %d files', len(FILENAMES))
+
     # To count id tracks
     CURRENT_ID = 0
+    # Will contain all correspondance between each step
     CORRESPONDANCES = []
     START = True
     FLG_VIRTUAL = False
+    
+    # Dtype for correpondance
+    STANDARD_DTYPE = [
+        ('in', 'u2'),
+        ('out', 'u2'),
+        ('id', ID_DTYPE)]
 
+    if ACTIVE_VIRTUAL:
+        STANDARD_DTYPE += [
+            ('virtual', bool_),
+            ('virtual_length', VIRTUAL_DTYPE)]
+
+    # Init
+    e_previous = EddiesObservations.load_from_netcdf(FILENAMES[0])
+
+    # We begin with second file, first one is in previous
     for file_name in FILENAMES[1:]:
         logging.debug('%s match with previous state', file_name)
         e_current = EddiesObservations.load_from_netcdf(file_name)
@@ -60,35 +92,29 @@ if __name__ == '__main__':
                           len(virtual_obs))
             # If you comment this the virtual fonctionnality will be disable
             e_previous = e_previous.merge(virtual_obs)
-        dist = e_previous.distance(e_current)
-        i_previous, i_current = np.where(dist < 20.)
+        
+        i_previous, i_current = e_previous.tracking(e_current)
         nb_match = i_previous.shape[0]
 
-        logging.debug('%d match with previous', nb_match)
-        correspondance = np.array(
-            i_previous,
-            dtype=[
-                ('in', 'u2'),
-                ('out', 'u2'),
-                ('id', 'u4'),
-                ('virtual', np.bool_),
-                ('virtual_length', 'u1')])
+        #~ Correspondance()
+        correspondance = array(i_previous, dtype=STANDARD_DTYPE)
         correspondance['out'] = i_current
 
-        if FLG_VIRTUAL:
-            correspondance['virtual'] = i_previous >= nb_real_obs
-        else:
-            correspondance['virtual'] = False
+        if ACTIVE_VIRTUAL:
+            if FLG_VIRTUAL:
+                correspondance['virtual'] = i_previous >= nb_real_obs
+            else:
+                correspondance['virtual'] = False
 
         if START:
             START = False
             # Set an id for each match
-            correspondance['id'] = np.arange(nb_match)
+            correspondance['id'] = arange(nb_match)
             # Set counter
             CURRENT_ID += nb_match
         else:
             # We set all id to UINT32_MAX
-            id_previous = np.ones(len(e_previous), dtype='u4') * UINT32_MAX
+            id_previous = ones(len(e_previous), dtype=ID_DTYPE) * UINT32_MAX
             # We get old id for previously eddies tracked
             previous_id = CORRESPONDANCES[-1]['id']
             id_previous[CORRESPONDANCES[-1]['out']] = previous_id
@@ -110,7 +136,7 @@ if __name__ == '__main__':
             if FLG_VIRTUAL:
                 # Save previous state to count virtual obs
                 previous_virtual_obs = virtual_obs
-                virtual_dead_id = np.setdiff1d(virtual_obs.obs['track'],
+                virtual_dead_id = setdiff1d(virtual_obs.obs['track'],
                                                correspondance['id'])
                 list_previous_virtual_id = virtual_obs.obs['track'].tolist()
                 i_virtual_dead_id = [
@@ -122,7 +148,7 @@ if __name__ == '__main__':
                               'next step', nb_virtual_prolongate)
 
             # List previous id which are not use in the next step
-            dead_id = np.setdiff1d(previous_id, correspondance['id'])
+            dead_id = setdiff1d(previous_id, correspondance['id'])
             nb_dead_track = len(dead_id)
             logging.debug('%d death of real obs in this step', nb_dead_track)
             # Creation of an virtual step for dead one
@@ -163,7 +189,7 @@ if __name__ == '__main__':
                     ] = obs_to_prolongate['segment_size']
             # Count
             virtual_obs.obs['segment_size'] += 1
-            if NB_VIRTUAL_OBS_MAX_BY_SEGMENT > 0:
+            if ACTIVE_VIRTUAL:
                 FLG_VIRTUAL = True
             # END
 
@@ -173,7 +199,7 @@ if __name__ == '__main__':
             nb_new_tracks = mask_new_id.sum()
             logging.debug('%d birth in this step', nb_new_tracks)
             # Set new id
-            correspondance['id'][mask_new_id] = np.arange(
+            correspondance['id'][mask_new_id] = arange(
                 CURRENT_ID, CURRENT_ID + nb_new_tracks)
             # Set counter
             CURRENT_ID += nb_new_tracks
@@ -186,12 +212,13 @@ if __name__ == '__main__':
     logging.info('Track finish')
     logging.info('Start merging')
     # count obs by tracks
-    nb_obs_by_tracks = np.zeros(CURRENT_ID, dtype='u2') + 1
+    nb_obs_by_tracks = zeros(CURRENT_ID, dtype=N_DTYPE) + 1
     for correspondance in CORRESPONDANCES:
         nb_obs_by_tracks[correspondance['id']] += 1
-        # When start is virtual, we don't have a previous correspondance
-        nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]
-                         ] += correspondance['virtual_length'][correspondance['virtual']]
+        if ACTIVE_VIRTUAL:
+            # When start is virtual, we don't have a previous correspondance
+            nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]
+                             ] += correspondance['virtual_length'][correspondance['virtual']]
 
     # Compute index of each tracks
     i_current_by_tracks = nb_obs_by_tracks.cumsum() - nb_obs_by_tracks
@@ -205,11 +232,11 @@ if __name__ == '__main__':
     # Calculate the index in each tracks, we compute in u4 and translate
     # in u2 (which are limited to 65535)
     logging.debug('Compute global index array (N)')
-    n = np.arange(nb_obs,
-                  dtype='u4') - i_current_by_tracks.repeat(nb_obs_by_tracks)
-    FINAL_EDDIES.obs['n'] = np.uint16(n)
+    n = arange(nb_obs,
+               dtype='u4') - i_current_by_tracks.repeat(nb_obs_by_tracks)
+    FINAL_EDDIES.obs['n'] = uint16(n)
     logging.debug('Compute global track array')
-    FINAL_EDDIES.obs['track'] = np.arange(CURRENT_ID).repeat(nb_obs_by_tracks)
+    FINAL_EDDIES.obs['track'] = arange(CURRENT_ID).repeat(nb_obs_by_tracks)
 
     # Start loading identification again to save in the finals tracks
     # Load first file
@@ -218,8 +245,8 @@ if __name__ == '__main__':
     FINAL_EDDIES.sign_type = eddies_previous.sign_type
 
     # To know if the track start
-    first_obs_save_in_tracks = np.zeros(i_current_by_tracks.shape,
-                                        dtype=np.bool_)
+    first_obs_save_in_tracks = zeros(i_current_by_tracks.shape,
+                                        dtype=bool_)
 
     for i, file_name in enumerate(FILENAMES[1:]):
         # Load current file (we begin with second one)
@@ -246,16 +273,18 @@ if __name__ == '__main__':
 
         # Index in the current file
         index_current = CORRESPONDANCES[i]['out']
-        # If the flag virtual in correspondance is active,
-        # the previous is virtual
-        m_virtual = CORRESPONDANCES[i]['virtual']
-        if m_virtual.any():
-            index_virtual = index_final[m_virtual]
-            # Incrementing index
-            i_current_by_tracks[i_id[m_virtual]
-                ] += CORRESPONDANCES[i]['virtual_length'][m_virtual]
-            # Get new index
-            index_final = i_current_by_tracks[i_id]
+        
+        if ACTIVE_VIRTUAL:
+            # If the flag virtual in correspondance is active,
+            # the previous is virtual
+            m_virtual = CORRESPONDANCES[i]['virtual']
+            if m_virtual.any():
+                index_virtual = index_final[m_virtual]
+                # Incrementing index
+                i_current_by_tracks[i_id[m_virtual]
+                    ] += CORRESPONDANCES[i]['virtual_length'][m_virtual]
+                # Get new index
+                index_final = i_current_by_tracks[i_id]
 
         # Copy all variable
         for var, _ in eddies_current.obs.dtype.descr:
@@ -267,28 +296,16 @@ if __name__ == '__main__':
         eddies_previous = eddies_current
 
     # We flag obs
-    FINAL_EDDIES.obs['virtual'] = FINAL_EDDIES.obs['time'] == 0
+    if ACTIVE_VIRTUAL:
+        FINAL_EDDIES.obs['virtual'] = FINAL_EDDIES.obs['time'] == 0
 
-    FINAL_EDDIES.filled_by_interpolation(FINAL_EDDIES.obs['virtual'] == 1)
-    # Localization of virtual observation
-    m_i = FINAL_EDDIES.obs['virtual'] == 1
-    # Count virtual observations
-    nb_virtual = FINAL_EDDIES.obs['virtual'].sum()
-
-    logging.info('%d obs are virtual (unobserved)', nb_virtual)
-    logging.info('Start extrapolation of values for virtual observations')
-    nb_obs = len(FINAL_EDDIES)
-    index = np.arange(nb_obs)
-    for var, _ in eddies_current.obs.dtype.descr:
-        FINAL_EDDIES.obs[var][m_i] = np.interp(
-            index[m_i],
-            index[-m_i],
-            FINAL_EDDIES.obs[var][-m_i])
+        FINAL_EDDIES.filled_by_interpolation(FINAL_EDDIES.obs['virtual'] == 1)
 
     # Total running time
+    FULL_TIME = dt.datetime.now() - START_TIME
     logging.info('Mean duration by loop : %s',
-                 (dt.datetime.now() - START_TIME) / (len(FILENAMES) - 1))
-    logging.info('Duration : %s', dt.datetime.now() - START_TIME)
+                 FULL_TIME / (len(FILENAMES) - 1))
+    logging.info('Duration : %s', FULL_TIME)
 
     logging.info('The longest tracks have %d observations',
                  nb_obs_by_tracks.max())
@@ -297,6 +314,6 @@ if __name__ == '__main__':
         NB_OBS_MIN, nb_obs_by_tracks.repeat(nb_obs_by_tracks))
     
     logging.info('%d tracks will be saved',
-                 len(np.unique(SUBSET_EDDIES.obs['track'])))
+                 len(unique(SUBSET_EDDIES.obs['track'])))
 
     SUBSET_EDDIES.write_netcdf()
