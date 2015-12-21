@@ -28,7 +28,7 @@ Version 2.0.3
 ===========================================================================
 
 """
-from numpy import zeros, empty, nan, arange, interp, where
+from numpy import zeros, empty, nan, arange, interp, where, unique
 from netCDF4 import Dataset
 from py_eddy_tracker.tools import distance_matrix
 from . import VAR_DESCR, VAR_DESCR_inv
@@ -78,6 +78,11 @@ class EddiesObservations(object):
     def __repr__(self):
         return str(self.observations)
 
+    def __getitem__(self, attr):
+        if attr in self.elements:
+            return self.observations[attr]
+        raise KeyError('%s unknown' % attr)
+    
     @property
     def dtype(self):
         dtype = list()
@@ -192,7 +197,7 @@ class EddiesObservations(object):
         dist = self.distance(other)
         i_self, i_other = where(dist < 20.)
 
-        logging.debug('%d match with previous', i_self.shape[0])
+        logging.debug('%d matched with previous', i_self.shape[0])
         return i_self, i_other
 
 
@@ -222,7 +227,7 @@ class TrackEddiesObservations(EddiesObservations):
             self.obs[var][mask] = interp(index[mask], index[-mask],
                                          self.obs[var][-mask])
 
-    def extract_longer_eddies(self, nb_min, nb_obs):
+    def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
         m = nb_obs >= nb_min
         nb_obs_select = m.sum()
         logging.info('Selection of %d observations', nb_obs_select)
@@ -230,6 +235,12 @@ class TrackEddiesObservations(EddiesObservations):
         eddies.sign_type = self.sign_type
         for var, _ in eddies.obs.dtype.descr:
             eddies.obs[var] = self.obs[var][m]
+        if compress_id:
+            list_id = unique(eddies.obs['track'])
+            list_id.sort()
+            id_translate = arange(list_id.max() + 1)
+            id_translate[list_id] = arange(len(list_id)) + 1
+            eddies.obs['track'] = id_translate[eddies.obs['track']]
         return eddies
     
     @property
