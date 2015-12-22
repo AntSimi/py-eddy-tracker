@@ -141,6 +141,21 @@ class Correspondances(list):
         logging.debug('%d death of real obs in this step', nb_dead)
         if not self.virtual:
             return
+        #
+        if self.virtual_obs is not None:
+            virtual_dead_id = setdiff1d(self.virtual_obs['track'],
+                                        self[-1]['id'])
+            list_previous_virtual_id = self.virtual_obs['track'].tolist()
+            i_virtual_dead_id = [
+                list_previous_virtual_id.index(i) for i in virtual_dead_id]
+            # Virtual obs which can be prolongate
+            alive_virtual_obs = self.virtual_obs['segment_size'][i_virtual_dead_id] < self.nb_virtual
+            nb_virtual_extend = alive_virtual_obs.sum()
+            logging.debug('%d virtual obs will be prolongate on the '
+                          'next step', nb_virtual_extend)
+        
+        # Save previous state to count virtual obs
+        self.previous_virtual_obs = self.virtual_obs
         # Creation of an virtual step for dead one
         self.virtual_obs = VirtualEddiesObservations(size=nb_dead + nb_virtual_extend)
 
@@ -218,16 +233,19 @@ class Correspondances(list):
             id_previous[self[-1]['out']] = previous_id
             correspondance['id'] = id_previous[correspondance['in']]
 
+            # We set correspondance data for virtual obs : ID/LENGTH
             if FLG_VIRTUAL:
                 nb_rebirth = correspondance['virtual'].sum()
                 if nb_rebirth != 0:
                     logging.debug('%d re-birth due to prolongation with'
                                   ' virtual observations', nb_rebirth)
                     # Set id for virtual
-                    i_virtual = correspondance['in'][correspondance['virtual']] - nb_real_obs
-                    correspondance['id'][correspondance['virtual']] = \
+                    m_virtual = correspondance['virtual']
+                    # index of virtual in virtual obs
+                    i_virtual = correspondance['in'][m_virtual] - nb_real_obs
+                    correspondance['id'][m_virtual] = \
                         self.virtual_obs['track'][i_virtual]
-                    correspondance['virtual_length'][correspondance['virtual']] = \
+                    correspondance['virtual_length'][m_virtual] = \
                         self.virtual_obs['segment_size'][i_virtual]
             
             # new_id is equal to UINT32_MAX we must add a new ones
@@ -239,22 +257,6 @@ class Correspondances(list):
             correspondance['id'][mask_new_id] = self.id_generator(nb_new_tracks)
 
             self.append(correspondance)
-
-            # SECTION for virtual observation
-            nb_virtual_prolongate = 0
-            if FLG_VIRTUAL:
-                # Save previous state to count virtual obs
-                self.previous_virtual_obs = self.virtual_obs
-                virtual_dead_id = setdiff1d(self.virtual_obs['track'],
-                                            correspondance['id'])
-                list_previous_virtual_id = self.virtual_obs['track'].tolist()
-                i_virtual_dead_id = [
-                    list_previous_virtual_id.index(i) for i in virtual_dead_id]
-                # Virtual obs which can be prolongate
-                alive_virtual_obs = self.virtual_obs['segment_size'][i_virtual_dead_id] < self.nb_virtual
-                nb_virtual_prolongate = alive_virtual_obs.sum()
-                logging.debug('%d virtual obs will be prolongate on the '
-                              'next step', nb_virtual_prolongate)
 
             self.recense_dead_id_to_extend()
 
