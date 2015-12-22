@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
+Track eddy with Identification file produce with EddyIdentification
 """
-
 from py_eddy_tracker import EddyParser
 from glob import glob
 from yaml import load as yaml_load
@@ -10,8 +10,7 @@ from py_eddy_tracker.tracking import Correspondances
 from py_eddy_tracker.observations import \
     EddiesObservations, TrackEddiesObservations
 import logging
-from numpy import array, arange, bool_, uint16, unique, setdiff1d, \
-    ones, zeros
+from numpy import unique
 import datetime as dt
 
 
@@ -55,7 +54,7 @@ if __name__ == '__main__':
     
     CORRESPONDANCES.prepare_merging()
     
-    CORRESPONDANCES.merge()
+    FINAL_EDDIES = CORRESPONDANCES.merge()
 
     # We flag obs
     if CORRESPONDANCES.virtual:
@@ -70,10 +69,10 @@ if __name__ == '__main__':
     logging.info('Duration : %s', FULL_TIME)
 
     logging.info('The longest tracks have %d observations',
-                 nb_obs_by_tracks.max())
+                 CORRESPONDANCES.nb_obs_by_tracks.max())
 
     SUBSET_EDDIES = FINAL_EDDIES.extract_longer_eddies(
-        NB_OBS_MIN, nb_obs_by_tracks.repeat(nb_obs_by_tracks))
+        NB_OBS_MIN, CORRESPONDANCES.nb_obs_by_tracks.repeat(CORRESPONDANCES.nb_obs_by_tracks))
     
     logging.info('%d tracks will be saved',
                  len(unique(SUBSET_EDDIES['track'])))

@@ -60,8 +60,7 @@ class Correspondances(list):
         self.datasets = datasets
         self.previous2_obs = None
         self.previous_obs = None
-        self.current_obs = EddiesObservations.load_from_netcdf(
-            self.datasets[0])
+        self.current_obs = None
         
         # To use virtual obs
         # Number of obs which can prolongate real observations
@@ -82,6 +81,11 @@ class Correspondances(list):
         self.nb_obs = 0
         self.eddies = None
 
+    def reset_dataset_cache(self):
+        self.previous2_obs = None
+        self.previous_obs = None
+        self.current_obs = None
+
     def swap_dataset(self, dataset):
         """
         """
@@ -89,14 +93,36 @@ class Correspondances(list):
         self.previous_obs = self.current_obs
         self.current_obs = EddiesObservations.load_from_netcdf(dataset)
         
-    def store_correspondance(self, i_previous, i_current):
-        correspondance = array(
-            i_previous,
-            dtype=self.correspondance_dtype)
+    def store_correspondance(self, i_previous, i_current, nb_real_obs):
+        """Storing correspondance in an array
+        """
+        # Create array to store correspondance data
+        correspondance = array(i_previous, dtype=self.correspondance_dtype)
+        # index from current_obs
         correspondance['out'] = i_current
 
         if self.virtual:
+            # if index in previous dataset is bigger than real obs number
+            # it's a virtual data
             correspondance['virtual'] = i_previous >= nb_real_obs
+        
+        if self.previous2_obs is None:
+            # First time we set ID (Program starting)
+            nb_match = i_previous.shape[0]
+            # Set an id for each match
+            correspondance['id'] = self.id_generator(nb_match)
+            self.append(correspondance)
+            return
+
+        # We set all id to UINT32_MAX
+        id_previous = ones(len(self.previous_obs),
+                           dtype=self.ID_DTYPE) * self.UINT32_MAX
+        # We get old id for previously eddies tracked
+        id_previous[self[-1]['out']] = self[-1]['id']
+        # We store ID in correspondance if the ID is UINT32_MAX, we never
+        # track it before
+        correspondance['id'] = id_previous[correspondance['in']]
+
     
     def id_generator(self, nb_id):
         """Generation id and incrementation
@@ -153,6 +179,8 @@ class Correspondances(list):
         """
         START = True
         FLG_VIRTUAL = False
+        self.reset_dataset_cache()
+        self.swap_dataset(self.datasets[0])
         # We begin with second file, first one is in previous
         for file_name in self.datasets[1:]:
             self.swap_dataset(file_name)
@@ -169,7 +197,7 @@ class Correspondances(list):
             i_previous, i_current = self.previous_obs.tracking(self.current_obs)
             nb_match = i_previous.shape[0]
 
-            #~ self.store_correspondance(i_previous, i_current)
+            #~ self.store_correspondance(i_previous, i_current, nb_real_obs)
             correspondance = array(i_previous, dtype=self.correspondance_dtype)
             correspondance['out'] = i_current
             
@@ -204,7 +232,7 @@ class Correspondances(list):
             
             # new_id is equal to UINT32_MAX we must add a new ones
             # we count the number of new
-            mask_new_id = correspondance['id'] == UINT32_MAX
+            mask_new_id = correspondance['id'] == self.UINT32_MAX
             nb_new_tracks = mask_new_id.sum()
             logging.debug('%d birth in this step', nb_new_tracks)
             # Set new id
@@ -247,77 +275,80 @@ class Correspondances(list):
         # Compute index of each tracks
         self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
         # Number of global obs
-        self.nb_obs = nb_obs_by_tracks.sum()
+        self.nb_obs = self.nb_obs_by_tracks.sum()
         logging.info('%d tracks identified', self.current_id)
         logging.info('%d observations will be join', self.nb_obs)
 
     def merge(self):
+        """Merge all the correspondance in one array with all fields
+        """
         # Start create netcdf to agglomerate all eddy
-        self.eddies = TrackEddiesObservations(size=self.nb_obs)
+        eddies = TrackEddiesObservations(size=self.nb_obs)
 
         # Calculate the index in each tracks, we compute in u4 and translate
         # in u2 (which are limited to 65535)
         logging.debug('Compute global index array (N)')
-        n = arange(nb_obs,
+        n = arange(self.nb_obs,
                    dtype='u4') - self.i_current_by_tracks.repeat(self.nb_obs_by_tracks)
-        self.eddies['n'][:] = uint16(n)
+        eddies['n'][:] = uint16(n)
         logging.debug('Compute global track array')
-        self.eddies['track'][:] = arange(self.current_id).repeat(self.nb_obs_by_tracks)
+        eddies['track'][:] = arange(self.current_id).repeat(self.nb_obs_by_tracks)
 
         # Start loading identification again to save in the finals tracks
         # Load first file
-        eddies_previous = EddiesObservations.load_from_netcdf(self.datasets[0])
+        self.swap_dataset(self.datasets[0])
         # Set type of eddy with first file
-        self.eddies.sign_type = eddies_previous.sign_type
+        eddies.sign_type = self.current_obs.sign_type
+        # Fields to copy
+        fields = self.current_obs.obs.dtype.descr
 
         # To know if the track start
-        first_obs_save_in_tracks = zeros(i_current_by_tracks.shape,
+        first_obs_save_in_tracks = zeros(self.i_current_by_tracks.shape,
                                             dtype=bool_)
 
-        for i, file_name in enumerate(FILENAMES[1:]):
+        for i, file_name in enumerate(self.datasets[1:]):
             # Load current file (we begin with second one)
-            self.current_obs = EddiesObservations.load_from_netcdf(file_name)
+            self.swap_dataset(file_name)
             # We select the list of id which are involve in the correspondance
             i_id = self[i]['id']
             # Index where we will write in the final object
-            index_final = i_current_by_tracks[i_id]
+            index_final = self.i_current_by_tracks[i_id]
 
             # First obs of eddies
             m_first_obs = -first_obs_save_in_tracks[i_id]
             if m_first_obs.any():
-                # Index in the current file
+                # Index in the previous file
                 index_in = self[i]['in'][m_first_obs]
                 # Copy all variable
-                for var, _ in eddies_current.obs.dtype.descr:
-                    self.eddies[var][index_final[m_first_obs]
-                        ] = eddies_previous[var][index_in]
+                for var, _ in fields:
+                    eddies[var][index_final[m_first_obs]
+                        ] = self.previous_obs[var][index_in]
                 # Increment
-                i_current_by_tracks[i_id[m_first_obs]] += 1
+                self.i_current_by_tracks[i_id[m_first_obs]] += 1
                 # Active this flag, we have only one first by tracks
                 first_obs_save_in_tracks[i_id] = True
-                index_final = i_current_by_tracks[i_id]
-
-            # Index in the current file
-            index_current = self[i]['out']
+                index_final = self.i_current_by_tracks[i_id]
             
             if self.virtual:
                 # If the flag virtual in correspondance is active,
                 # the previous is virtual
                 m_virtual = self[i]['virtual']
                 if m_virtual.any():
-                    index_virtual = index_final[m_virtual]
                     # Incrementing index
-                    i_current_by_tracks[i_id[m_virtual]
+                    self.i_current_by_tracks[i_id[m_virtual]
                         ] += self[i]['virtual_length'][m_virtual]
                     # Get new index
-                    index_final = i_current_by_tracks[i_id]
+                    index_final = self.i_current_by_tracks[i_id]
 
+            # Index in the current file
+            index_current = self[i]['out']
+            
             # Copy all variable
-            for var, _ in eddies_current.obs.dtype.descr:
-                self.eddies[var][index_final
-                    ] = eddies_current[var][index_current]
+            for var, _ in fields:
+                eddies[var][index_final
+                    ] = self.current_obs[var][index_current]
 
             # Add increment for each index used
-            i_current_by_tracks[i_id] += 1
-            eddies_previous = eddies_current
-
+            self.i_current_by_tracks[i_id] += 1
+            self.previous_obs = self.current_obs
+        return eddies
