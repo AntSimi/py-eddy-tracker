@@ -112,7 +112,7 @@ class Correspondances(list):
             # Set an id for each match
             correspondance['id'] = self.id_generator(nb_match)
             self.append(correspondance)
-            return
+            return True
 
         # We set all id to UINT32_MAX
         id_previous = ones(len(self.previous_obs),
@@ -123,6 +123,33 @@ class Correspondances(list):
         # track it before
         correspondance['id'] = id_previous[correspondance['in']]
 
+        # We set correspondance data for virtual obs : ID/LENGTH
+        if self.previous2_obs is not None and self.virtual:
+            nb_rebirth = correspondance['virtual'].sum()
+            if nb_rebirth != 0:
+                logging.debug('%d re-birth due to prolongation with'
+                              ' virtual observations', nb_rebirth)
+                ## Set id for virtual
+                # get correspondance mask using virtual obs
+                m_virtual = correspondance['virtual']
+                # index of virtual in virtual obs
+                i_virtual = correspondance['in'][m_virtual] - nb_real_obs
+                correspondance['id'][m_virtual] = \
+                    self.virtual_obs['track'][i_virtual]
+                correspondance['virtual_length'][m_virtual] = \
+                    self.virtual_obs['segment_size'][i_virtual]
+        
+        # new_id is equal to UINT32_MAX we must add a new ones
+        # we count the number of new
+        mask_new_id = correspondance['id'] == self.UINT32_MAX
+        nb_new_tracks = mask_new_id.sum()
+        logging.debug('%d birth in this step', nb_new_tracks)
+        # Set new id
+        correspondance['id'][mask_new_id] = self.id_generator(nb_new_tracks)
+
+        self.append(correspondance)
+        
+        return False
     
     def id_generator(self, nb_id):
         """Generation id and incrementation
@@ -134,14 +161,14 @@ class Correspondances(list):
     def recense_dead_id_to_extend(self):
         """Recense dead id to extend in virtual observation
         """
-        nb_virtual_extend = 0
         # List previous id which are not use in the next step
         dead_id = setdiff1d(self[-2]['id'], self[-1]['id'])
         nb_dead = dead_id.shape[0]
         logging.debug('%d death of real obs in this step', nb_dead)
         if not self.virtual:
             return
-        #
+        # get id already dead from few time
+        nb_virtual_extend = 0
         if self.virtual_obs is not None:
             virtual_dead_id = setdiff1d(self.virtual_obs['track'],
                                         self[-1]['id'])
@@ -192,7 +219,6 @@ class Correspondances(list):
     def track(self):
         """Run tracking
         """
-        START = True
         FLG_VIRTUAL = False
         self.reset_dataset_cache()
         self.swap_dataset(self.datasets[0])
@@ -210,53 +236,9 @@ class Correspondances(list):
                 self.previous_obs = self.previous_obs.merge(self.virtual_obs)
         
             i_previous, i_current = self.previous_obs.tracking(self.current_obs)
-            nb_match = i_previous.shape[0]
 
-            #~ self.store_correspondance(i_previous, i_current, nb_real_obs)
-            correspondance = array(i_previous, dtype=self.correspondance_dtype)
-            correspondance['out'] = i_current
-            
-            if self.virtual:
-                correspondance['virtual'] = i_previous >= nb_real_obs
-                
-            if START:
-                START = False
-                # Set an id for each match
-                correspondance['id'] = self.id_generator(nb_match)
-                self.append(correspondance)
+            if self.store_correspondance(i_previous, i_current, nb_real_obs):
                 continue
-
-            # We set all id to UINT32_MAX
-            id_previous = ones(len(self.previous_obs), dtype=self.ID_DTYPE) * self.UINT32_MAX
-            # We get old id for previously eddies tracked
-            previous_id = self[-1]['id']
-            id_previous[self[-1]['out']] = previous_id
-            correspondance['id'] = id_previous[correspondance['in']]
-
-            # We set correspondance data for virtual obs : ID/LENGTH
-            if FLG_VIRTUAL:
-                nb_rebirth = correspondance['virtual'].sum()
-                if nb_rebirth != 0:
-                    logging.debug('%d re-birth due to prolongation with'
-                                  ' virtual observations', nb_rebirth)
-                    # Set id for virtual
-                    m_virtual = correspondance['virtual']
-                    # index of virtual in virtual obs
-                    i_virtual = correspondance['in'][m_virtual] - nb_real_obs
-                    correspondance['id'][m_virtual] = \
-                        self.virtual_obs['track'][i_virtual]
-                    correspondance['virtual_length'][m_virtual] = \
-                        self.virtual_obs['segment_size'][i_virtual]
-            
-            # new_id is equal to UINT32_MAX we must add a new ones
-            # we count the number of new
-            mask_new_id = correspondance['id'] == self.UINT32_MAX
-            nb_new_tracks = mask_new_id.sum()
-            logging.debug('%d birth in this step', nb_new_tracks)
-            # Set new id
-            correspondance['id'][mask_new_id] = self.id_generator(nb_new_tracks)
-
-            self.append(correspondance)
 
             self.recense_dead_id_to_extend()
 
