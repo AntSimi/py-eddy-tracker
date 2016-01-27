@@ -9,7 +9,7 @@ class ColoredFormatter(logging.Formatter):
         ERROR="\033[31;47m",
         WARNING="\033[30;47m",
         INFO="\033[36m",
-        DEBUG="\033[34m",
+        DEBUG="\033[34m\t",
         )
 
     def __init__(self, message):
