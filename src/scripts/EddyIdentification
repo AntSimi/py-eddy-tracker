@@ -21,24 +21,34 @@ Copyright (c) 2014-2015 by Evan Mason
 Email: emason@imedea.uib-csic.es
 """
 
+import logging
 from glob import glob
 from yaml import load as yaml_load
+from datetime import datetime
 import datetime as dt
-from netCDF4 import Dataset
-from py_eddy_tracker import EddyParser
 from scipy.ndimage import gaussian_filter
 from matplotlib.dates import date2num, num2julian
 from matplotlib.figure import Figure
-import logging
-import numpy as np
 from re import compile as re_compile
+from os.path import exists
+from os import mkdir
+from multiprocessing import Pool
+import numpy as np
 
+from py_eddy_tracker import EddyParser
 from py_eddy_tracker.py_eddy_tracker_classes import \
     collection_loop, func_hann2d_fast
 from py_eddy_tracker.py_eddy_tracker_property_classes import SwirlSpeed
 from py_eddy_tracker.grid.aviso import AvisoGrid
 from py_eddy_tracker.make_eddy_tracker_list_obj import IdentificationList
 
+
+def circle_process(paths):
+    nb_proc = 4
+    def fit_circle_path(item):
+        item._fit_circle_path()
+    threads = Pool(nb_proc)
+    threads.map(fit_circle_path, paths)
 
 if __name__ == '__main__':
     # Run using:
@@ -57,6 +67,8 @@ if __name__ == '__main__':
 
     # Setup configuration
     SAVE_DIR = CONFIG['PATHS']['SAVE_DIR']
+    if not exists(SAVE_DIR):
+        mkdir(SAVE_DIR)
     logging.info('Outputs saved to %(SAVE_DIR)s', CONFIG['PATHS'])
 
     DIAGNOSTIC_TYPE = CONFIG['DIAGNOSTIC_TYPE']
@@ -102,11 +114,8 @@ if __name__ == '__main__':
             MWL = np.atleast_1d(CONFIG['SMOOTHING_SLA']['MWL'])
         SMOOTHING_TYPE = CONFIG['SMOOTHING_SLA']['TYPE']
 
-    TEMP0 = CONFIG['TEMP0']
-    SALT0 = CONFIG['SALT0']
-
     # End user configuration setup options
-    # --------------------------------------------------------------------------
+    # ----------------------------------------------------------
 
     # Get complete AVISO file list
     DATA_DIR = CONFIG['DATASET']['DATA_DIR']
@@ -114,32 +123,35 @@ if __name__ == '__main__':
     SUBSAMPLING_STEP = CONFIG['DATASET']['SUBSAMPLING']
     DATE_REGEXP = re_compile('.*/' + CONFIG['DATASET']['DATE_REGEXP'])
     PATTERN_DATE = CONFIG['DATASET']['DATE_MODEL']
-    
+
     GRID_NAME = CONFIG['DATASET']['VAR_NAME']
     LAT_NAME = CONFIG['DATASET']['LAT_NAME']
     LON_NAME = CONFIG['DATASET']['LON_NAME']
-    
+
     DATASET_FILES = glob(DATA_DIR + FILES_MODEL)
-    
-    DATASET_LIST = np.array(DATASET_FILES, dtype=[('date', 'datetime64[D]'), ('filename', 'S256')])
+
+    DATASET_LIST = np.array(DATASET_FILES,
+                            dtype=[('date', 'datetime64[D]'),
+                                   ('filename', 'S256')])
     DATASET_LIST['filename'] = np.array(DATASET_FILES)
-    
+
     logging.info('%s grids available', DATASET_LIST.shape[0])
     for item in DATASET_LIST:
         result = DATE_REGEXP.match(item['filename'])
         if result:
             str_date = result.groups()[0]
-            item['date'] = dt.datetime.strptime(str_date, PATTERN_DATE).date()
-    
-    DATASET_LIST.sort(order=['date','filename'])
-    MASK_DATE = (DATASET_LIST['date'] >= START_DATE) * (DATASET_LIST['date'] <= END_DATE)
-    
+            item['date'] = datetime.strptime(str_date, PATTERN_DATE).date()
+
+    DATASET_LIST.sort(order=['date', 'filename'])
+    MASK_DATE = (DATASET_LIST['date'] >= START_DATE) * (
+        DATASET_LIST['date'] <= END_DATE)
+
     STEPS = np.unique(DATASET_LIST['date'][1:] - DATASET_LIST['date'][:-1])
     if len(STEPS) != 1:
         raise Exception('Several days steps in grid dataset %s' % STEPS)
     else:
         DAYS_BTWN_RECORDS = STEPS[0]
-    
+
     if SUBSAMPLING_STEP != 1:
         logging.info('Grid subsampling %d', SUBSAMPLING_STEP)
         DATASET_LIST = DATASET_LIST[::SUBSAMPLING_STEP]
@@ -166,18 +178,14 @@ if __name__ == '__main__':
                       SLA_GRD.resolution ** 2)
     logging.info('Pixel range = %s-%s', np.int(PIXMIN), np.int(PIXMAX))
 
-
     # Figure to get contours of parameter
     FIG = Figure()
     CONT_AX = FIG.add_subplot(111)
 
-    START_TIME = dt.datetime.now()
+    START_TIME = datetime.now()
 
     logging.info('Start tracking')
 
-    # To count full iteration
-    NB_STEP = 0
-    
     # Loop over grid
     for date, filename in DATASET_LIST:
         date = date.astype(dt.date)
@@ -188,10 +196,9 @@ if __name__ == '__main__':
         # Initialise two eddy objects to hold data
         A_EDDY = IdentificationList('Anticyclonic', SLA_GRD, date, **CONFIG)
         C_EDDY = IdentificationList('Cyclonic', SLA_GRD, date, **CONFIG)
-        
+
         A_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
         C_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
-
 
         logging.info('AVISO_FILE : %s', filename)
 
@@ -255,9 +262,15 @@ if __name__ == '__main__':
                 SLA_GRD.lat,
                 A_EDDY.sla,
                 levels=A_EDDY.contour_parameter)
+            
+            # MultiThreading on path to fit circle could accelerate processing
+            # may be in python 3
+            #~ paths = []
+            #~ for i in CONTOURS.collections:
+                #~ paths += i.get_paths()
+            #~ circle_process(paths)
             # Note that C_CS is in reverse order
             logging.info('Processing SLA contours for eddies -- Ok')
-
 
         # Set contour coordinates and indices for calculation of
         # speed-based radius
@@ -277,13 +290,11 @@ if __name__ == '__main__':
         # clear the current axis
         CONT_AX.cla()
         # Save file
-        A_EDDY.write_netcdf()
-        C_EDDY.write_netcdf()
-        NB_STEP += 1
+        A_EDDY.write_netcdf(path=SAVE_DIR)
+        C_EDDY.write_netcdf(path=SAVE_DIR)
 
     # Total running time
     logging.info('Mean duration by loop : %s',
-                 (dt.datetime.now() - START_TIME) / NB_STEP)
-    logging.info('Duration : %s', dt.datetime.now() - START_TIME)
-
+                 (datetime.now() - START_TIME) / len(DATASET_LIST))
+    logging.info('Duration : %s', datetime.now() - START_TIME)
     logging.info('Outputs saved to %s', SAVE_DIR)

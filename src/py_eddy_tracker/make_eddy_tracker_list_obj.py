@@ -765,11 +765,12 @@ class IdentificationList (object):
         except ValueError:
             logging.warn('Data is empty')
 
-    def write_netcdf(self):
+    def write_netcdf(self, path='./'):
         """Write a netcdf with eddy obs
         """
         eddy_size = len(self.observations)
-        filename = '%s_%s.nc' % (self.sign_type, self.date.strftime('%Y%m%d'))
+        filename = '%s/%s_%s.nc' % (
+            path,self.sign_type, self.date.strftime('%Y%m%d'))
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create intermediary file %s', filename)
             # Create dimensions

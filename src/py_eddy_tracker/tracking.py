@@ -46,10 +46,10 @@ class Correspondances(list):
     # Track limit to 65535
     N_DTYPE = 'u2'
 
-
     def __init__(self, datasets, virtual=0):
         """Initiate tracking
         """
+        super(Correspondances, self).__init__()
         # Correspondance dtype
         self.correspondance_dtype = [('in', 'u2'),
                                      ('out', 'u2'),
@@ -61,7 +61,7 @@ class Correspondances(list):
         self.previous2_obs = None
         self.previous_obs = None
         self.current_obs = None
-        
+
         # To use virtual obs
         # Number of obs which can prolongate real observations
         self.nb_virtual = virtual
@@ -74,7 +74,7 @@ class Correspondances(list):
             self.correspondance_dtype += [
                 ('virtual', bool_),
                 ('virtual_length', self.VIRTUAL_DTYPE)]
-        
+
         # Array to simply merged
         self.nb_obs_by_tracks = None
         self.i_current_by_tracks = None
@@ -87,12 +87,12 @@ class Correspondances(list):
         self.current_obs = None
 
     def swap_dataset(self, dataset):
-        """
+        """ Swap to next dataset
         """
         self.previous2_obs = self.previous_obs
         self.previous_obs = self.current_obs
         self.current_obs = EddiesObservations.load_from_netcdf(dataset)
-        
+
     def store_correspondance(self, i_previous, i_current, nb_real_obs):
         """Storing correspondance in an array
         """
@@ -105,7 +105,7 @@ class Correspondances(list):
             # if index in previous dataset is bigger than real obs number
             # it's a virtual data
             correspondance['virtual'] = i_previous >= nb_real_obs
-        
+
         if self.previous2_obs is None:
             # First time we set ID (Program starting)
             nb_match = i_previous.shape[0]
@@ -138,7 +138,7 @@ class Correspondances(list):
                     self.virtual_obs['track'][i_virtual]
                 correspondance['virtual_length'][m_virtual] = \
                     self.virtual_obs['segment_size'][i_virtual]
-        
+
         # new_id is equal to UINT32_MAX we must add a new ones
         # we count the number of new
         mask_new_id = correspondance['id'] == self.UINT32_MAX
@@ -148,16 +148,16 @@ class Correspondances(list):
         correspondance['id'][mask_new_id] = self.id_generator(nb_new_tracks)
 
         self.append(correspondance)
-        
+
         return False
-    
+
     def id_generator(self, nb_id):
         """Generation id and incrementation
         """
         values = arange(self.current_id, self.current_id + nb_id)
         self.current_id += nb_id
         return values
-    
+
     def recense_dead_id_to_extend(self):
         """Recense dead id to extend in virtual observation
         """
@@ -176,15 +176,17 @@ class Correspondances(list):
             i_virtual_dead_id = [
                 list_previous_virtual_id.index(i) for i in virtual_dead_id]
             # Virtual obs which can be prolongate
-            alive_virtual_obs = self.virtual_obs['segment_size'][i_virtual_dead_id] < self.nb_virtual
+            alive_virtual_obs = self.virtual_obs['segment_size'
+                ][i_virtual_dead_id] < self.nb_virtual
             nb_virtual_extend = alive_virtual_obs.sum()
             logging.debug('%d virtual obs will be prolongate on the '
                           'next step', nb_virtual_extend)
-        
+
         # Save previous state to count virtual obs
         self.previous_virtual_obs = self.virtual_obs
         # Creation of an virtual step for dead one
-        self.virtual_obs = VirtualEddiesObservations(size=nb_dead + nb_virtual_extend)
+        self.virtual_obs = VirtualEddiesObservations(
+            size=nb_dead + nb_virtual_extend)
 
         # Find mask/index on previous correspondance to extrapolate
         # position
@@ -208,18 +210,22 @@ class Correspondances(list):
         self.virtual_obs['track'][:nb_dead] = dead_id
         # Add previous virtual
         if nb_virtual_extend > 0:
-            obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id][alive_virtual_obs]
-            self.virtual_obs['lon'][nb_dead:] = obs_to_extend['lon'] + obs_to_extend['dlon']
-            self.virtual_obs['lat'][nb_dead:] = obs_to_extend['lat'] + obs_to_extend['dlat']
+            obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id
+                ][alive_virtual_obs]
+            self.virtual_obs['lon'][nb_dead:
+                ] = obs_to_extend['lon'] + obs_to_extend['dlon']
+            self.virtual_obs['lat'][nb_dead:
+                ] = obs_to_extend['lat'] + obs_to_extend['dlat']
             self.virtual_obs['track'][nb_dead:] = obs_to_extend['track']
-            self.virtual_obs['segment_size'][nb_dead:] = obs_to_extend['segment_size']
+            self.virtual_obs['segment_size'][nb_dead:
+                ] = obs_to_extend['segment_size']
         # Count
         self.virtual_obs['segment_size'][:] += 1
-    
+
     def track(self):
         """Run tracking
         """
-        FLG_VIRTUAL = False
+        flg_virtual = False
         self.reset_dataset_cache()
         self.swap_dataset(self.datasets[0])
         # We begin with second file, first one is in previous
@@ -227,15 +233,17 @@ class Correspondances(list):
             self.swap_dataset(file_name)
             logging.debug('%s match with previous state', file_name)
             logging.debug('%d obs to match', len(self.current_obs))
-        
+
             nb_real_obs = len(self.previous_obs)
-            if FLG_VIRTUAL:
+            if flg_virtual:
                 logging.debug('%d virtual obs will be add to previous',
                               len(self.virtual_obs))
-                # If you comment this the virtual fonctionnality will be disable
+                # If you comment this the virtual fonctionnality will be
+                # disable
                 self.previous_obs = self.previous_obs.merge(self.virtual_obs)
-        
-            i_previous, i_current = self.previous_obs.tracking(self.current_obs)
+
+            i_previous, i_current = self.previous_obs.tracking(
+                self.current_obs)
 
             if self.store_correspondance(i_previous, i_current, nb_real_obs):
                 continue
@@ -243,7 +251,7 @@ class Correspondances(list):
             self.recense_dead_id_to_extend()
 
             if self.virtual:
-                FLG_VIRTUAL = True
+                flg_virtual = True
 
     def prepare_merging(self):
         # count obs by tracks (we add directly one, because correspondance
@@ -252,12 +260,16 @@ class Correspondances(list):
         for correspondance in self:
             self.nb_obs_by_tracks[correspondance['id']] += 1
             if self.virtual:
-                # When start is virtual, we don't have a previous correspondance
-                self.nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]
-                                 ] += correspondance['virtual_length'][correspondance['virtual']]
+                # When start is virtual, we don't have a previous
+                # correspondance
+                self.nb_obs_by_tracks[
+                    correspondance['id'][correspondance['virtual']]
+                    ] += correspondance['virtual_length'][
+                        correspondance['virtual']]
 
         # Compute index of each tracks
-        self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
+        self.i_current_by_tracks = \
+            self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
         # Number of global obs
         self.nb_obs = self.nb_obs_by_tracks.sum()
         logging.info('%d tracks identified', self.current_id)
@@ -272,11 +284,12 @@ class Correspondances(list):
         # Calculate the index in each tracks, we compute in u4 and translate
         # in u2 (which are limited to 65535)
         logging.debug('Compute global index array (N)')
-        n = arange(self.nb_obs,
-                   dtype='u4') - self.i_current_by_tracks.repeat(self.nb_obs_by_tracks)
-        eddies['n'][:] = uint16(n)
+        eddies['n'][:] = uint16(
+            arange(self.nb_obs, dtype='u4')
+            - self.i_current_by_tracks.repeat(self.nb_obs_by_tracks))
         logging.debug('Compute global track array')
-        eddies['track'][:] = arange(self.current_id).repeat(self.nb_obs_by_tracks)
+        eddies['track'][:] = arange(self.current_id
+                                    ).repeat(self.nb_obs_by_tracks)
 
         # Start loading identification again to save in the finals tracks
         # Load first file
@@ -312,7 +325,7 @@ class Correspondances(list):
                 # Active this flag, we have only one first by tracks
                 first_obs_save_in_tracks[i_id] = True
                 index_final = self.i_current_by_tracks[i_id]
-            
+
             if self.virtual:
                 # If the flag virtual in correspondance is active,
                 # the previous is virtual
@@ -326,7 +339,7 @@ class Correspondances(list):
 
             # Index in the current file
             index_current = self[i]['out']
-            
+
             # Copy all variable
             for var, _ in fields:
                 eddies[var][index_final

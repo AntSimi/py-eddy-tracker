@@ -214,7 +214,7 @@ class EddiesObservations(object):
         """
         cost = self.distance(other)
         # Links available which respect a maximal cost
-        mask_accept_cost = cost < 75
+        mask_accept_cost = cost < 40
         cost = ma.array(cost, mask=-mask_accept_cost, dtype='i2')
 
         # Count number of link by self obs and other obs
@@ -351,12 +351,12 @@ class TrackEddiesObservations(EddiesObservations):
         except ValueError:
             logging.warn('Data is empty')
 
-    def write_netcdf(self):
+    def write_netcdf(self, path='./'):
         """Write a netcdf with eddy obs
         """
         eddy_size = len(self.observations)
         sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        filename = '%s.nc' % sign_type
+        filename = '%s/%s.nc' % (path, sign_type)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create file %s', filename)
             # Create dimensions

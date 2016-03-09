@@ -304,7 +304,7 @@ BasePath.nearest_grd_indice = nearest_grd_indice
 
 def fit_circle_path(self):
     if not hasattr(self, '_circle_params'):
-        self._circle_params = self._fit_circle_path()
+        self._fit_circle_path()
     return self._circle_params
 
 
@@ -326,11 +326,11 @@ def _fit_circle_path(self):
             logging.warning('An edge is only define in one position')
             logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
                           self.lat)
-            return 0, -90, np.nan, np.nan
+            self._circle_params =  0, -90, np.nan, np.nan
 
     centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
     centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
-    return centlon_e, centlat_e, eddy_radius_e, aerr
+    self._circle_params =  centlon_e, centlat_e, eddy_radius_e, aerr
 
 BasePath.fit_circle = fit_circle_path
 BasePath._fit_circle_path = _fit_circle_path

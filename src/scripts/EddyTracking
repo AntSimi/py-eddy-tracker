@@ -7,8 +7,8 @@ from py_eddy_tracker import EddyParser
 from glob import glob
 from yaml import load as yaml_load
 from py_eddy_tracker.tracking import Correspondances
-from py_eddy_tracker.observations import \
-    EddiesObservations, TrackEddiesObservations
+from os.path import exists
+from os import mkdir
 import logging
 from numpy import unique
 import datetime as dt
@@ -33,6 +33,11 @@ def usage():
 if __name__ == '__main__':
     CONFIG = usage()
 
+    # Create output directory
+    SAVE_DIR = CONFIG['PATHS']['SAVE_DIR']
+    if not exists(SAVE_DIR):
+        mkdir(SAVE_DIR)
+
     NB_OBS_MIN = int(CONFIG['TRACK_DURATION_MIN'])
     NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG['VIRTUAL_LEGNTH_MAX'])
 
@@ -43,17 +48,16 @@ if __name__ == '__main__':
     START_TIME = dt.datetime.now()
     logging.info('Start tracking on %d files', len(FILENAMES))
 
-
     CORRESPONDANCES = Correspondances(
         datasets=FILENAMES,
         virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT)
-        
+
     CORRESPONDANCES.track()
     logging.info('Track finish')
     logging.info('Start merging')
-    
+
     CORRESPONDANCES.prepare_merging()
-    
+
     FINAL_EDDIES = CORRESPONDANCES.merge()
 
     # We flag obs
@@ -70,11 +74,22 @@ if __name__ == '__main__':
 
     logging.info('The longest tracks have %d observations',
                  CORRESPONDANCES.nb_obs_by_tracks.max())
+    logging.info('The mean length is %d observations before filtering',
+                 CORRESPONDANCES.nb_obs_by_tracks.mean())
 
     SUBSET_EDDIES = FINAL_EDDIES.extract_longer_eddies(
-        NB_OBS_MIN, CORRESPONDANCES.nb_obs_by_tracks.repeat(CORRESPONDANCES.nb_obs_by_tracks))
-    
+        NB_OBS_MIN,
+        CORRESPONDANCES.nb_obs_by_tracks.repeat(
+            CORRESPONDANCES.nb_obs_by_tracks)
+        )
+
     logging.info('%d tracks will be saved',
                  len(unique(SUBSET_EDDIES['track'])))
 
-    SUBSET_EDDIES.write_netcdf()
+    logging.info(
+        'The mean length is %d observations after filtering',
+        CORRESPONDANCES.nb_obs_by_tracks[
+            CORRESPONDANCES.nb_obs_by_tracks > NB_OBS_MIN
+            ].mean())
+
+    SUBSET_EDDIES.write_netcdf(path=SAVE_DIR)
