@@ -90,6 +90,11 @@ EVOLVE_AREA_MAX: 500 # max change in area
 # - profiles of swirl velocity from effective contour inwards
 # Useful for working with ARGO data    
 TRACK_EXTRA_VARIABLES: No
+TRACK_ARRAY_VARIABLES:
+    NB_SAMPLES: 10
+    VARIABLES:
+        - contour_lon
+        - contour_lat
 
 # 'RectBivariate' is faster
 INTERP_METHOD: 'RectBivariate'

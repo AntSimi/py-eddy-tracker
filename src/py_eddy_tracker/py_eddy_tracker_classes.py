@@ -467,6 +467,9 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                     args = (eddy, contours, centlon_e, centlat_e, cont, grd,
                             anticyclonic_search)
 
+                    #~ if eddy.track_array_variables > 10:
+                        #~ print ':)'
+                        #~ exit()
                     if not eddy.track_extra_variables:
                         # (uavg, centlon_s, centlat_s,
                         # eddy_radius_s, contlon_s, contlat_s,

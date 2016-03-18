@@ -243,6 +243,26 @@ VAR_DESCR = dict(
             description='observation sequence number (XX day intervals)',
             )
         ),
+    contour_lon=dict(
+        attr_name=None,
+        nc_name='contour_lon',
+        nc_type='f4',
+        nc_dims=('Nobs', 'NbSample'),
+        nc_attr=dict(
+            long_name='Longitude of contour',
+            description='lons of contour points',
+            )
+        ),
+    contour_lat=dict(
+        attr_name=None,
+        nc_name='contour_lat',
+        nc_type='f4',
+        nc_dims=('Nobs', 'NbSample'),
+        nc_attr=dict(
+            long_name='Latitude of contour',
+            description='lats of contour points',
+            )
+        ),
     contour_e=dict(
         attr_name=None,
         nc_name='contour_e',
