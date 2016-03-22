@@ -67,8 +67,10 @@ class EddiesObservations(object):
         Time
     """
 
-    def __init__(self, size=0, track_extra_variables=False):
+    def __init__(self, size=0, track_extra_variables=False, track_array_variables=0, array_variables=[]):
         self.track_extra_variables = track_extra_variables
+        self.track_array_variables = track_array_variables
+        self.array_variables = array_variables
         for elt in self.elements:
             if elt not in VAR_DESCR:
                 raise Exception('Unknown element : %s' % elt)
@@ -90,9 +92,13 @@ class EddiesObservations(object):
         """
         dtype = list()
         for elt in self.elements:
-            dtype.append((elt, VAR_DESCR[elt][
+            data_type = VAR_DESCR[elt][
                 'compute_type' if 'compute_type' in VAR_DESCR[elt] else
-                'nc_type']))
+                'nc_type']
+            if elt in self.array_variables:
+                dtype.append((elt, data_type, (self.track_array_variables,)))
+            else:
+                dtype.append((elt, data_type))
         return dtype
 
     @property
@@ -108,7 +114,9 @@ class EddiesObservations(object):
             'speed_radius',  # 'uavg'
             'eke',  # 'teke'
             'time']  # 'rtime'
-
+        if self.track_array_variables > 0:
+            elements += self.array_variables
+        
         if self.track_extra_variables:
             elements += ['contour_e',
                          'contour_s',
@@ -120,7 +128,9 @@ class EddiesObservations(object):
     def coherence(self, other):
         """Check coherence between two dataset
         """
-        return self.track_extra_variables == other.track_extra_variables
+        test = self.track_array_variables == other.track_array_variables
+        test *= self.array_variables == other.array_variables
+        return test
 
     def merge(self, other):
         """Merge two dataset
@@ -133,9 +143,12 @@ class EddiesObservations(object):
         eddies.sign_type = self.sign_type
         return eddies
 
+    def reset(self):
+        self.observations = np.zeros(0, dtype=self.dtype)
+
     @property
     def obs(self):
-        """returan array observations
+        """return an array observations
         """
         return self.observations
 
@@ -161,7 +174,10 @@ class EddiesObservations(object):
             return self
         if index < 0:
             index = self_size + index + 1
-        eddies = self.__class__(new_size, self.track_extra_variables)
+        eddies = self.__class__(new_size, self.track_extra_variables,
+            track_array_variables=self.track_array_variables,
+            array_variables=self.array_variables
+            )
         eddies.obs[:index] = self.obs[:index]
         eddies.obs[index: index + insert_size] = other.obs
         eddies.obs[index + insert_size:] = self.obs[index:]
@@ -198,9 +214,18 @@ class EddiesObservations(object):
 
     @staticmethod
     def load_from_netcdf(filename):
+        array_dim = 'NbSample'
         with Dataset(filename) as h_nc:
             nb_obs = len(h_nc.dimensions['Nobs'])
-            eddies = EddiesObservations(size=nb_obs)
+            kwargs = dict()
+            if array_dim in h_nc.dimensions:
+                kwargs['track_array_variables'] = len(h_nc.dimensions[array_dim])
+                kwargs['array_variables'] = []
+                for variable in h_nc.variables:
+                    if array_dim in h_nc.variables[variable].dimensions:
+                        kwargs['array_variables'].append(str(variable))
+
+            eddies = EddiesObservations(size=nb_obs, ** kwargs)
             for variable in h_nc.variables:
                 if variable == 'cyc':
                     continue
@@ -297,8 +322,9 @@ class TrackEddiesObservations(EddiesObservations):
         nb_obs = len(self)
         index = arange(nb_obs)
 
-        for var, _ in self.obs.dtype.descr:
-            if var in ['n', 'virtual', 'track']:
+        for field in self.obs.dtype.descr:
+            var = field[0]
+            if var in ['n', 'virtual', 'track'] or var in self.array_variables:
                 continue
             self.obs[var][mask] = interp(index[mask], index[-mask],
                                          self.obs[var][-mask])
@@ -309,9 +335,14 @@ class TrackEddiesObservations(EddiesObservations):
         mask = nb_obs >= nb_min
         nb_obs_select = mask.sum()
         logging.info('Selection of %d observations', nb_obs_select)
-        eddies = TrackEddiesObservations(size=nb_obs_select)
+        eddies = TrackEddiesObservations(
+            size=nb_obs_select,
+            track_array_variables=self.track_array_variables,
+            array_variables=self.array_variables
+            )
         eddies.sign_type = self.sign_type
-        for var, _ in eddies.obs.dtype.descr:
+        for field in self.obs.dtype.descr:
+            var = field[0]
             eddies.obs[var] = self.obs[var][mask]
         if compress_id:
             list_id = unique(eddies.obs['track'])
@@ -329,22 +360,20 @@ class TrackEddiesObservations(EddiesObservations):
 
     @staticmethod
     def create_variable(handler_nc, kwargs_variable,
-                        attr_variable, data, scale_factor=None):
-        """Create variable
-        """
+                        attr_variable, data, scale_factor=None, add_offset=None):
         var = handler_nc.createVariable(
             zlib=True,
             complevel=1,
             **kwargs_variable)
         for attr, attr_value in attr_variable.iteritems():
             var.setncattr(attr, attr_value)
-
-        var[:] = data
-
-        #~ var.set_auto_maskandscale(False)
         if scale_factor is not None:
             var.scale_factor = scale_factor
-
+            if add_offset is not None:
+                var.add_offset = add_offset
+            else:
+                var.add_offset = 0
+        var[:] = data
         try:
             var.setncattr('min', var[:].min())
             var.setncattr('max', var[:].max())
@@ -362,19 +391,21 @@ class TrackEddiesObservations(EddiesObservations):
             # Create dimensions
             logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
             h_nc.createDimension('Nobs', eddy_size)
+            if self.track_array_variables != 0:
+                h_nc.createDimension('NbSample', self.track_array_variables)
             # Iter on variables to create:
-            for name, _ in self.observations.dtype.descr:
+            for field in self.observations.dtype.descr:
+                name = field[0]
                 logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
                 self.create_variable(
                     h_nc,
                     dict(varname=VAR_DESCR[name]['nc_name'],
-                         datatype=VAR_DESCR[name]['nc_type'],
+                         datatype=VAR_DESCR[name]['output_type'],
                          dimensions=VAR_DESCR[name]['nc_dims']),
                     VAR_DESCR[name]['nc_attr'],
                     self.observations[name],
-                    scale_factor=None
-                        if 'scale_factor' not in VAR_DESCR[name] else
-                        VAR_DESCR[name]['scale_factor']
+                    scale_factor=VAR_DESCR[name].get('scale_factor', None),
+                    add_offset=VAR_DESCR[name].get('add_offset', None)
                     )
 
             # Add cyclonic information

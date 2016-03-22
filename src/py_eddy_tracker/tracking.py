@@ -278,8 +278,16 @@ class Correspondances(list):
     def merge(self):
         """Merge all the correspondance in one array with all fields
         """
+        # Start loading identification again to save in the finals tracks
+        # Load first file
+        self.swap_dataset(self.datasets[0])
+
         # Start create netcdf to agglomerate all eddy
-        eddies = TrackEddiesObservations(size=self.nb_obs)
+        eddies = TrackEddiesObservations(
+            size=self.nb_obs,
+            track_array_variables=self.current_obs.track_array_variables,
+            array_variables=self.current_obs.array_variables,
+            )
 
         # Calculate the index in each tracks, we compute in u4 and translate
         # in u2 (which are limited to 65535)
@@ -291,9 +299,6 @@ class Correspondances(list):
         eddies['track'][:] = arange(self.current_id
                                     ).repeat(self.nb_obs_by_tracks)
 
-        # Start loading identification again to save in the finals tracks
-        # Load first file
-        self.swap_dataset(self.datasets[0])
         # Set type of eddy with first file
         eddies.sign_type = self.current_obs.sign_type
         # Fields to copy
@@ -317,7 +322,8 @@ class Correspondances(list):
                 # Index in the previous file
                 index_in = self[i]['in'][m_first_obs]
                 # Copy all variable
-                for var, _ in fields:
+                for field in fields:
+                    var = field[0]
                     eddies[var][index_final[m_first_obs]
                         ] = self.previous_obs[var][index_in]
                 # Increment
@@ -341,7 +347,8 @@ class Correspondances(list):
             index_current = self[i]['out']
 
             # Copy all variable
-            for var, _ in fields:
+            for field in fields:
+                var = field[0]
                 eddies[var][index_final
                     ] = self.current_obs[var][index_current]
 
