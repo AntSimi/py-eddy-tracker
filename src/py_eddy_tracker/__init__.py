@@ -247,6 +247,9 @@ VAR_DESCR = dict(
         attr_name=None,
         nc_name='contour_lon',
         nc_type='f4',
+        output_type='i2',
+        scale_factor=0.01,
+        add_offset=180,
         nc_dims=('Nobs', 'NbSample'),
         nc_attr=dict(
             long_name='Longitude of contour',
@@ -257,10 +260,37 @@ VAR_DESCR = dict(
         attr_name=None,
         nc_name='contour_lat',
         nc_type='f4',
+        output_type='i2',
+        scale_factor=0.01,
         nc_dims=('Nobs', 'NbSample'),
         nc_attr=dict(
             long_name='Latitude of contour',
             description='lats of contour points',
+            )
+        ),
+    contour_lon_s=dict(
+        attr_name=None,
+        nc_name='contour_lon_s',
+        nc_type='f4',
+        output_type='i2',
+        scale_factor=0.01,
+        add_offset=180,
+        nc_dims=('Nobs', 'NbSample'),
+        nc_attr=dict(
+            long_name='Longitude of speed-based contour points',
+            description='lons  of speed-based contour points',
+            )
+        ),
+    contour_lat_s=dict(
+        attr_name=None,
+        nc_name='contour_lat_s',
+        nc_type='f4',
+        output_type='i2',
+        scale_factor=0.01,
+        nc_dims=('Nobs', 'NbSample'),
+        nc_attr=dict(
+            long_name='Latitude of speed-based contour points',
+            description='lats of speed-based contour points',
             )
         ),
     contour_e=dict(
@@ -307,4 +337,8 @@ VAR_DESCR = dict(
         ),
     )
 
+for key in VAR_DESCR.keys():
+    if 'output_type' not in VAR_DESCR[key]:
+        VAR_DESCR[key]['output_type'] = VAR_DESCR[key]['nc_type']
+    
 VAR_DESCR_inv = {VAR_DESCR[key]['nc_name'] : key for key in VAR_DESCR.keys()}
