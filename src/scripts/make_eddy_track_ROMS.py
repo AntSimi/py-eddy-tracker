@@ -31,8 +31,8 @@ Version 2.0.3
 ===========================================================================
 """
 
-from py_eddy_tracker_classes import *
-from make_eddy_tracker_list_obj import *
+from py_eddy_tracker.property_functions import *
+from py_eddy_tracker.tracking_objects import *
 from make_eddy_track_AVISO import *
 from dateutil import PARSER
 import roms_grid as rg

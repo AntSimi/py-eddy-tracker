@@ -5,7 +5,7 @@ from scipy import spatial
 from pyproj import Proj
 import numpy as np
 import logging
-from ..make_eddy_tracker_list_obj import nearest
+from ..tracking_objects import nearest
 
 
 class PyEddyTracker(object):

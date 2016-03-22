@@ -42,7 +42,7 @@ from .tools import distance_vector
 from . import VAR_DESCR
 import numpy as np
 import logging
-from .py_eddy_tracker_property_classes import EddiesObservations
+from .observations import EddiesObservations
 
 
 def nearest(lon_pt, lat_pt, lon2d, lat2d):
@@ -65,7 +65,8 @@ def nearest(lon_pt, lat_pt, lon2d, lat2d):
     return i_x, i_y
 
 
-def uniform_resample(x_val, y_val, **kwargs):
+def uniform_resample(x_val, y_val, method='interp1d', extrapolate=None,
+        num_fac=2, fixed_size=None):
     """
     Resample contours to have (nearly) equal spacing
        x_val, y_val    : input contour coordinates
@@ -74,10 +75,6 @@ def uniform_resample(x_val, y_val, **kwargs):
                  (Akima is slightly slower, but may be more accurate)
        extrapolate : IS NOT RELIABLE (sometimes nans occur)
     """
-    method = kwargs.get('method', 'interp1d')
-    extrapolate = kwargs.get('extrapolate', None)
-    num_fac = kwargs.get('num_fac', 2)
-
     # Get distances
     dist = np.empty_like(x_val)
     dist[0] = 0
@@ -85,9 +82,11 @@ def uniform_resample(x_val, y_val, **kwargs):
         x_val[:-1], y_val[:-1], x_val[1:], y_val[1:], dist[1:])
     dist.cumsum(out=dist)
     # Get uniform distances
+    if fixed_size is None:
+        fixed_size = dist.size * num_fac
     d_uniform = np.linspace(0,
                             dist[-1],
-                            num=dist.size * num_fac,
+                            num=fixed_size,
                             endpoint=True)
 
     # Do 1d interpolations
@@ -478,11 +477,14 @@ class TrackList (object):
         h_nc.evolve_area_max = self.evolve_area_max
 
     def create_variable(self, handler_nc, kwargs_variable,
-                        attr_variable):
+                        attr_variable, scale_factor=None):
         var = handler_nc.createVariable(
             zlib=True,
             complevel=1,
             **kwargs_variable)
+        if scale_factor is not None:
+            var.scale_factor = scale_factor
+            print scale_factor, kwargs_variable
         for attr, attr_value in attr_variable.iteritems():
             var.setncattr(attr, attr_value)
 #         var.setncattr('min', var[:].min())
@@ -540,7 +542,8 @@ class TrackList (object):
                 dict(varname=VAR_DESCR[key_name]['nc_name'],
                      datatype=VAR_DESCR[key_name]['nc_type'],
                      dimensions=VAR_DESCR[key_name]['nc_dims']),
-                VAR_DESCR[key_name]['nc_attr']
+                VAR_DESCR[key_name]['nc_attr'],
+                scale_factor=VAR_DESCR[key_name].get('scale_factor', None)
                 )
         h_nc.close()
 
@@ -701,7 +704,11 @@ class IdentificationList (object):
 
         self.sla = None
 
-        self.observations = EddiesObservations(self.track_extra_variables)
+        self.observations = EddiesObservations(
+            track_array_variables=self.track_array_variables_sampling,
+            array_variables=self.track_array_variables
+            )
+
         self.index = 0  # counter
         self.pad = 2
         self.pixel_threshold = None
@@ -750,18 +757,20 @@ class IdentificationList (object):
         h_nc.urcrnrlat = self.grd.latmax
 
     def create_variable(self, handler_nc, kwargs_variable,
-                        attr_variable, data, scale_factor=None):
+                        attr_variable, data, scale_factor=None, add_offset=None):
         var = handler_nc.createVariable(
             zlib=True,
             complevel=1,
             **kwargs_variable)
         for attr, attr_value in attr_variable.iteritems():
             var.setncattr(attr, attr_value)
-            var[:] = data
-            var.set_auto_maskandscale(False)
-            if scale_factor is not None:
-                var.scale_factor = scale_factor
-            
+        if scale_factor is not None:
+            var.scale_factor = scale_factor
+            if add_offset is not None:
+                var.add_offset = add_offset
+            else:
+                var.add_offset = 0
+        var[:] = data
         try:
             var.setncattr('min', var[:].min())
             var.setncattr('max', var[:].max())
@@ -779,17 +788,22 @@ class IdentificationList (object):
             # Create dimensions
             logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
             h_nc.createDimension('Nobs', eddy_size)
+            if self.track_array_variables_sampling != 0:
+                h_nc.createDimension('NbSample', self.track_array_variables_sampling)
             # Iter on variables to create:
-            for name, _ in self.observations.dtype:
+            for dtype in self.observations.dtype:
+                name = dtype[0]
                 logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
                 self.create_variable(
                     h_nc,
                     dict(varname=VAR_DESCR[name]['nc_name'],
-                         datatype=VAR_DESCR[name]['nc_type'],
+                         datatype=VAR_DESCR[name]['output_type'],
                          dimensions=VAR_DESCR[name]['nc_dims']),
                     VAR_DESCR[name]['nc_attr'],
                     self.observations.obs[name],
-                    scale_factor=None if 'scale_factor' not in VAR_DESCR[name] else VAR_DESCR[name]['scale_factor'])
+                    scale_factor=VAR_DESCR[name].get('scale_factor', None),
+                    add_offset=VAR_DESCR[name].get('add_offset', None)
+                    )
 
             # Add cyclonic information
             self.create_variable(

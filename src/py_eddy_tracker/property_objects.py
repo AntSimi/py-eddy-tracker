@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 """
 ===========================================================================
 This file is part of py-eddy-tracker.
@@ -37,171 +36,21 @@ import numpy as np
 from netCDF4 import Dataset
 from .tools import index_from_nearest_path, distance_matrix
 from . import VAR_DESCR, VAR_DESCR_inv
+from .observations import EddiesObservations
 import logging
 
 
-class EddiesObservations(object):
-    """
-    Class to hold eddy properties *amplitude* and counts of
-    *local maxima/minima* within a closed region of a sea level anomaly field.
-
-    Variables:
-      centlon:
-        Longitude centroid coordinate
-
-      centlat:
-        Latitude centroid coordinate
-
-      eddy_radius_s:
-        Speed based radius
-
-      eddy_radius_e:
-        Effective radius
-
-      amplitude:
-        Eddy amplitude
-
-      uavg:
-        Average eddy swirl speed
-
-      teke:
-        Average eddy kinetic energy within eddy
-
-      rtime:
-        Time
-    """
-
-    def __init__(self, size=0, track_extra_variables=False):
-        self.track_extra_variables = track_extra_variables
-        for elt in self.elements:
-            if elt not in VAR_DESCR:
-                raise Exception('Unknown element : %s' % elt)
-        self.observations = np.zeros(size, dtype=self.dtype)
-        self.active = True
-        self.sign_type = None
-
-    def __repr__(self):
-        return str(self.observations)
-
-    @property
-    def dtype(self):
-        dtype = list()
-        for elt in self.elements:
-            dtype.append((elt, VAR_DESCR[elt][
-                'compute_type' if 'compute_type' in VAR_DESCR[elt] else
-                'nc_type']))
-        return dtype
-
-    @property
-    def elements(self):
-        elements = [
-            'lon',  # 'centlon'
-            'lat',  # 'centlat'
-            'radius_s',  # 'eddy_radius_s'
-            'radius_e',  # 'eddy_radius_e'
-            'amplitude',  # 'amplitude'
-            'speed_radius',  # 'uavg'
-            'eke',  # 'teke'
-            'time']  # 'rtime'
-
-        if self.track_extra_variables:
-            elements += ['contour_e',
-                         'contour_s',
-                         'uavg_profile',
-                         'shape_error',
-                         ]
-        return elements
-
-    def coherence(self, other):
-        return self.track_extra_variables == other.track_extra_variables
-    
-    def merge(self, other):
-        nb_obs_self = len(self)
-        nb_obs = nb_obs_self + len(other)
-        eddies = self.__class__(size=nb_obs)
-        eddies.obs[:nb_obs_self] = self.obs[:]
-        eddies.obs[nb_obs_self:] = other.obs[:]
-        eddies.sign_type = self.sign_type
-        return eddies
-
-    def reset(self):
-        self.observations = np.zeros(0, dtype=self.dtype)
-
-    @property
-    def obs(self):
-        return self.observations
-
-    def __len__(self):
-        return len(self.observations)
-
-    def __iter__(self):
-        for obs in self.obs:
-            yield obs
-
-    def insert_observations(self, other, index):
-        if not self.coherence(other):
-            raise Exception('Observations with no coherence')
-        insert_size = len(other.obs)
-        self_size = len(self.obs)
-        new_size = self_size + insert_size
-        if self_size == 0:
-            self.observations = other.obs
-            return self
-        elif insert_size == 0:
-            return self
-        if index < 0:
-            index = self_size + index + 1
-        eddies = self.__class__(new_size, self.track_extra_variables)
-        eddies.obs[:index] = self.obs[:index]
-        eddies.obs[index: index + insert_size] = other.obs
-        eddies.obs[index + insert_size:] = self.obs[index:]
-        self.observations = eddies.obs
-        return self
-
-    def append(self, other):
-        return self + other
-
-    def __add__(self, other):
-        return self.insert_observations(other, -1)
-
-    def distance_matrix(self, other):
-        """ Use haversine distance for distance matrix between every old and
-        new eddy"""
-        dist_mat = np.empty((len(self), len(other)))
-        distance_matrix(self.obs['lon'], self.obs['lat'],
-                        other.obs['lon'], other.obs['lat'],
-                        dist_mat)
-        return dist_mat
-
-    def index(self, index):
-        size = 1
-        if hasattr(index, '__iter__'):
-            size = len(index)
-        eddies = self.__class__(size, self.track_extra_variables)
-        eddies.obs[:] = self.obs[index]
-        return eddies
-    
-    @staticmethod
-    def load_from_netcdf(filename):
-        with Dataset(filename) as h_nc:
-            nb_obs = len(h_nc.dimensions['Nobs'])
-            eddies = EddiesObservations(size=nb_obs)
-            for variable in h_nc.variables:
-                if variable == 'cyc':
-                    continue
-                eddies.obs[VAR_DESCR_inv[variable]] = h_nc.variables[variable][:]
-            eddies.sign_type = h_nc.variables['cyc'][0]
-        return eddies
-
-
 class VirtualEddiesObservations(EddiesObservations):
-    
+    """Class to work with virtual obs
+    """
+
     @property
     def elements(self):
         elements = super(VirtualEddiesObservations, self).elements
         elements.extend(['track', 'segment_size', 'dlon', 'dlat'])
         return elements
-    
+
+
 class TrackEddiesObservations(EddiesObservations):
     
     def extract_longer_eddies(self, nb_min, nb_obs):

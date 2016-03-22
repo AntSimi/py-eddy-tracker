@@ -39,11 +39,11 @@ from matplotlib.figure import Figure
 import logging
 import numpy as np
 
-from py_eddy_tracker.py_eddy_tracker_classes import \
+from py_eddy_tracker.property_functions import \
     collection_loop, func_hann2d_fast
-from py_eddy_tracker.py_eddy_tracker_property_classes import SwirlSpeed
+from py_eddy_tracker.property_objects import SwirlSpeed
 from py_eddy_tracker.grid.aviso import AvisoGrid
-from py_eddy_tracker.make_eddy_tracker_list_obj import SearchEllipse, TrackList
+from py_eddy_tracker.py_eddy_tracker import SearchEllipse, TrackList
 from py_eddy_tracker.global_tracking import GlobalTracking
 
 

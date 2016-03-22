@@ -33,8 +33,9 @@ import logging
 import numpy as np
 from datetime import datetime
 from pyproj import Proj
-from .make_eddy_tracker_list_obj import uniform_resample, nearest
-from .py_eddy_tracker_property_classes import Amplitude, EddiesObservations
+from .tracking_objects import uniform_resample, nearest
+from .observations import EddiesObservations
+from .property_objects import Amplitude
 from .tools import distance, winding_number_poly, fit_circle_c
 from matplotlib.path import Path as BasePath
 from scipy.interpolate import griddata
@@ -415,7 +416,11 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                     continue
 
             # Instantiate new EddyObservation object
-            properties = EddiesObservations(size=1)
+            properties = EddiesObservations(
+                size=1,
+                track_array_variables=eddy.track_array_variables_sampling,
+                array_variables=eddy.track_array_variables
+                )
 
             # Set indices to bounding box around eddy
             eddy.set_bounds(cont.lon, cont.lat, grd)
@@ -467,9 +472,8 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                     args = (eddy, contours, centlon_e, centlat_e, cont, grd,
                             anticyclonic_search)
 
-                    #~ if eddy.track_array_variables > 10:
-                        #~ print ':)'
-                        #~ exit()
+                    #~ if eddy.track_array_variables > 0:
+                        
                     if not eddy.track_extra_variables:
                         # (uavg, centlon_s, centlat_s,
                         # eddy_radius_s, contlon_s, contlat_s,
@@ -518,6 +522,14 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                     # See CSS11 section B4
                     properties.obs['lon'] = centlon_s
                     properties.obs['lat'] = centlat_s
+                    if 'contour_lon' in eddy.track_array_variables:
+                        properties.obs['contour_lon'], properties.obs['contour_lat'] = uniform_resample(
+                            cont.lon, cont.lat,
+                            fixed_size=eddy.track_array_variables_sampling)
+                    if 'contour_lon_s' in eddy.track_array_variables:
+                        properties.obs['contour_lon_s'], properties.obs['contour_lat_s'] = uniform_resample(
+                            contlon_s, contlat_s,
+                            fixed_size=eddy.track_array_variables_sampling)
 
                     if not has_ts:  # for AVISO
                         eddy.update_eddy_properties(properties)
