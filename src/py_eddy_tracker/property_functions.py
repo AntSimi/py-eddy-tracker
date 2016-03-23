@@ -36,7 +36,7 @@ from pyproj import Proj
 from .tracking_objects import uniform_resample, nearest
 from .observations import EddiesObservations
 from .property_objects import Amplitude
-from .tools import distance, winding_number_poly, fit_circle_c
+from .tools import distance, winding_number_poly, fit_circle_c, poly_contain_poly
 from matplotlib.path import Path as BasePath
 from scipy.interpolate import griddata
 
@@ -166,7 +166,6 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
 
     if 'RectBivariate' in eddy.interp_method:
         uavg = eddy.uspd_coeffs.ev(theseglat[1:], theseglon[1:]).mean()
-
     elif 'griddata' in eddy.interp_method:
         uspd1d = eddy.uspd[eddy.slice_j, eddy.slice_i].ravel()
         uavg = griddata(points, uspd1d,
@@ -201,7 +200,6 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
         # Leave loop if no contours at level citer.index
         theindex = eddy.swirl.get_index_nearest_path(
             corrected_coll_index, centlon_e, centlat_e)
-
         if theindex is None:
             continue
 
@@ -212,7 +210,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
             continue
 
         # 2. Ensure polygon_i is within polygon_e
-        if not poly_eff.contains_path(poly_i):
+        if not poly_contain_poly(poly_eff.vertices, poly_i.vertices):
             continue
 
         # 3. Respect size range
@@ -220,7 +218,6 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
         if not (mask_i_sum >= pixel_min and
                 mask_i_sum <= eddy.pixel_threshold[1]):
             continue
-
         any_inner_contours = True
 
         seglon, seglat = (poly_i.vertices[:, 0], poly_i.vertices[:, 1])
@@ -249,27 +246,14 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
 
     if not any_inner_contours:
         # set speed based contour parameters
-        # proj = Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
-                    # % (theseglat.mean(), theseglon.mean()))
-        # cx, cy = proj(theseglon, theseglat)
-        # # cx, cy = eddy.m_val(theseglon, theseglat)
-        # centx_s, centy_s, eddy_radius_s, junk = fit_circle(cx, cy)
-        # centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
-        # # centlon_s, centlat_s = eddy.m_val(centx_s, centy_s, inverse=True)
-
-    # else:  # use the effective contour
-#         centlon_s, centlat_s = centlon_e, centlat_e
-        # eddy_radius_s = eddy_radius_e
         inner_seglon, inner_seglat = theseglon, theseglat
 
     if not save_all_uavg:
-        # return (uavg, centlon_s, centlat_s, eddy_radius_s,
-                # theseglon, theseglat, inner_seglon, inner_seglat)
-        return (uavg, theseglon, theseglat, inner_seglon, inner_seglat)
-
+        return (uavg, theseglon, theseglat,
+                inner_seglon, inner_seglat, any_inner_contours)
     else:
-        return (uavg, theseglon, theseglat, inner_seglon, inner_seglat,
-                all_uavg)
+        return (uavg, theseglon, theseglat,
+                inner_seglon, inner_seglat, any_inner_contours, all_uavg)
 
 
 def isvalid(self):
@@ -438,8 +422,6 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                 if 'Q' in eddy.diagnostic_type:
                     # KCCMC11
                     # Note, eddy amplitude == max(abs(vort/f)) within eddy,
-                    # amplitude = np.abs(x_i[jmin:jmax,imin:imax
-                    #                         ].flat[mask_eff]).max()
                     amplitude = np.abs(x_i[eddy.slice_j, eddy.slice_i
                                            ][eddy.mask_eff]).max()
 
@@ -475,19 +457,15 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                     #~ if eddy.track_array_variables > 0:
                         
                     if not eddy.track_extra_variables:
-                        # (uavg, centlon_s, centlat_s,
-                        # eddy_radius_s, contlon_s, contlat_s,
-                        # inner_contlon, inner_contlat) = get_uavg(*args)
-                        (uavg, contlon_s, contlat_s,
-                         inner_contlon, inner_contlat) = get_uavg(*args)
-                    else:
-                        # (uavg, centlon_s, centlat_s,
-                        # eddy_radius_s, contlon_s, contlat_s,
-                        # inner_contlon, inner_contlat,
-                        # uavg_profile) = get_uavg(*args, save_all_uavg=True)
                         (uavg, contlon_s, contlat_s,
                          inner_contlon, inner_contlat,
-                         uavg_profile) = get_uavg(
+                         any_inner_contours
+                         ) = get_uavg(*args)
+                    else:
+                        (uavg, contlon_s, contlat_s,
+                         inner_contlon, inner_contlat,
+                         any_inner_contours, uavg_profile
+                         ) = get_uavg(
                             *args, save_all_uavg=True)
 
                     # Use azimuth equal projection for radius

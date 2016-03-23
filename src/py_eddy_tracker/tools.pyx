@@ -134,6 +134,26 @@ cdef is_left(
 
 @wraparound(False)
 @boundscheck(False)
+def poly_contain_poly(
+    ndarray[DTYPE_coord, ndim=2] xy_poly_out,
+    ndarray[DTYPE_coord, ndim=2] xy_poly_in
+    ):
+    cdef DTYPE_ui i_elt, nb_elt
+    cdef int wn = 0
+    nb_elt = xy_poly_in.shape[0]
+    for i_elt from 0 <= i_elt < (nb_elt):
+        wn = winding_number_poly(
+            xy_poly_in[i_elt, 0],
+            xy_poly_in[i_elt, 1],
+            xy_poly_out
+            )
+        if wn ==0:
+            return False
+    return True
+
+
+@wraparound(False)
+@boundscheck(False)
 def winding_number_poly(
     DTYPE_coord x_test,
     DTYPE_coord y_test,

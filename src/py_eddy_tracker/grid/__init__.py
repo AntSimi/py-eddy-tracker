@@ -369,21 +369,17 @@ class PyEddyTracker(object):
         surface from variables f, zeta, p_m, p_n...
         Note: output at rho points
         """
-        gof = self.gof.view()
-
-        vmask = self.vmask.view()
         zeta1, zeta2 = zeta.data[1:].view(), zeta.data[:-1].view()
         pn1, pn2 = self.p_n[1:].view(), self.p_n[:-1].view()
-        self.upad[:] = self.v2rho_2d(vmask * (zeta1 - zeta2) *
-                                     0.5 * (pn1 + pn2))
-        self.upad *= -gof
+        self.upad[:] = self.v2rho_2d(
+            np.ma.array((zeta1 - zeta2) * 0.5 * (pn1 + pn2), mask= self.vmask))
+        self.upad *= -self.gof
 
-        umask = self.umask.view()
         zeta1, zeta2 = zeta.data[:, 1:].view(), zeta.data[:, :-1].view()
         pm1, pm2 = self.p_m[:, 1:].view(), self.p_m[:, :-1].view()
-        self.vpad[:] = self.u2rho_2d(umask * (zeta1 - zeta2) *
-                                     0.5 * (pm1 + pm2))
-        self.vpad *= gof
+        self.vpad[:] = self.u2rho_2d(
+            np.ma.array((zeta1 - zeta2) *0.5 * (pm1 + pm2), mask=self.umask))
+        self.vpad *= self.gof
         return self
 
     def set_u_v_eke(self, pad=2):
