@@ -402,7 +402,7 @@ class PyEddyTracker(object):
         """
         self.u_val = self.upad[self.view_unpad]
         self.v_val = self.vpad[self.view_unpad]
-        self.eke = self.u_val ** 2 + self.v_val ** 2 * 0.5
+        self.eke = (self.u_val ** 2 + self.v_val ** 2) * 0.5
 
     @property
     def uspd(self):
