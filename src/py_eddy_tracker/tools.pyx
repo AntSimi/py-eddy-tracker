@@ -276,18 +276,22 @@ cdef dist_array_size(
         DTYPE_ui i_start,
         DTYPE_ui nb_c_per_l,
         DTYPE_ui * nb_pt_per_c,
-        DTYPE_ui * c_i
+        DTYPE_ui * c_i,
+        # return param
+        DTYPE_ui * i_end,
+        DTYPE_ui * c_start,
+        DTYPE_ui * c_end
         ):
     """Give slice to select data
     """
-    cdef DTYPE_ui i_elt, i_end, nb_pts
-    i_end = i_start + nb_c_per_l
+    cdef DTYPE_ui i_elt, nb_pts
+    i_end[0] = i_start + nb_c_per_l
     nb_pts = 0
 
-    for i_elt from i_start <= i_elt < i_end:
-        nb_pts += nb_pt_per_c[i_elt]
-    i_contour = c_i[i_start]
-    return i_start, i_end, i_contour, i_contour + nb_pts
+    c_start[0] = c_i[i_start]
+    c_end[0] = c_start[0]
+    for i_elt from i_start <= i_elt < i_end[0]:
+        c_end[0] += nb_pt_per_c[i_elt]
 
 
 @wraparound(False)
@@ -314,20 +318,25 @@ def index_from_nearest_path(
     if nb_contour == 0:
         return None
 
-    main_start, main_stop, start, end = dist_array_size(
-        l_i[level_index],
+    main_start = l_i[level_index]
+    dist_array_size(
+        main_start,
         nb_contour,
         & nb_pt_per_c[0],
         & indices_of_first_pts[0],
+        & main_stop,
+        & start,
+        & end
         )
 
-    nearesti = nearest_contour_index(
+    nearest_contour_index(
         & x_value[0],
         & y_value[0],
         xpt,
         ypt,
         start,
         end,
+        &nearesti
         )
 
     for i_elt from main_start <= i_elt < main_stop:
@@ -346,6 +355,8 @@ cdef nearest_contour_index(
         DTYPE_coord ypt,
         DTYPE_ui start,
         DTYPE_ui end,
+        # return param
+        DTYPE_ui * nearesti
         ):
     """Give index fron the nearest pts
     """
@@ -358,4 +369,4 @@ cdef nearest_contour_index(
         if dist < dist_ref:
             dist_ref = dist
             i_ref = i_elt
-    return i_ref - start
+    nearesti[0] = i_ref - start
