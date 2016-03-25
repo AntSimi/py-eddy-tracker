@@ -18,10 +18,8 @@ setup(
     scripts=[
         'src/scripts/EddyIdentification',
         'src/scripts/EddyTracking',
-        'src/scripts/EddyTrackingFull',
-        'src/scripts/make_eddy_track_aviso.py',
-        'src/scripts/make_eddy_track_CLS.py',
-        'src/scripts/make_eddy_track_ROMS.py'],
+        'src/scripts/EddyTrackingFull'
+        ],
     zip_safe=False,
     cmdclass={
         'build_ext': cython_build_ext,
