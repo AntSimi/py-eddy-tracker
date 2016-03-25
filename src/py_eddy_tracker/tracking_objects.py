@@ -696,9 +696,6 @@ class IdentificationList (object):
         self.evolve_amp_max = np.float64(kwargs.get('EVOLVE_AMP_MAX', 500))
         self.evolve_area_min = np.float64(kwargs.get('EVOLVE_AREA_MIN', .0005))
         self.evolve_area_max = np.float64(kwargs.get('EVOLVE_AREA_MAX', 500))
-        self.rad0 = np.pi * np.float64(kwargs.get('RAD0', 60000.)) ** 2
-        self.amp0 = np.float64(kwargs.get('AMP0', 2.))
-        self.dist0 = np.float64(kwargs.get('DIST0', 25000.))
 
         self.points = np.array([grd.lon.ravel(), grd.lat.ravel()]).T
 
