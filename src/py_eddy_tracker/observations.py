@@ -67,10 +67,10 @@ class EddiesObservations(object):
         Time
     """
 
-    def __init__(self, size=0, track_extra_variables=False, track_array_variables=0, array_variables=[]):
+    def __init__(self, size=0, track_extra_variables=False, track_array_variables=0, array_variables=None):
         self.track_extra_variables = track_extra_variables
         self.track_array_variables = track_array_variables
-        self.array_variables = array_variables
+        self.array_variables = array_variables if array_variables is not None else []
         for elt in self.elements:
             if elt not in VAR_DESCR:
                 raise Exception('Unknown element : %s' % elt)
