@@ -69,12 +69,6 @@ AMPMAX: 150.
 # MPM14 use 1; CSS11 have no limit
 MAX_LOCAL_EXTREMA: 1
 
-# Typical parameters
-RAD0: 60000. # m
-AMP0: 2. # cm
-TEMP0: 15.
-SALT0: 35.
-
 # Parameters used by Chelton etal and Kurian etal (Sec. 3.2) to ensure 
 # the slow evolution of the eddies over time;
 # they use min and max values of 0.25 and 2.5
