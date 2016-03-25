@@ -105,7 +105,6 @@ if __name__ == '__main__':
                                                 INTERVAL)
         # AMPMIN = CONFIG['AMPMIN']
         # AMPMAX = CONFIG['AMPMAX']
-        AMP0 = CONFIG['AMP0']
 
     SMOOTHING = CONFIG['SMOOTHING']
     if SMOOTHING:
