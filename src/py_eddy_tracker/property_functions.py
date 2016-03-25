@@ -193,10 +193,6 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
         if not anticyclonic_search:
             corrected_coll_index = nb_coll - coll_index - 1
 
-        # Get contour around centlon_e, centlat_e at level [collind:][iuavg]
-        # theindex, poly_i = eddy_tracker.find_nearest_contour(
-                        # c_s.collections[citer.index], centlon_e, centlat_e)
-
         # Leave loop if no contours at level citer.index
         theindex = eddy.swirl.get_index_nearest_path(
             corrected_coll_index, centlon_e, centlat_e)
@@ -256,6 +252,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
                 inner_seglon, inner_seglat, any_inner_contours, all_uavg)
 
 
+@property
 def isvalid(self):
     return False not in (self.vertices[0] == self.vertices[-1]
                          ) and len(self.vertices) > 2
