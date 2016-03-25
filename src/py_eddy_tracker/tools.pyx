@@ -147,7 +147,7 @@ def poly_contain_poly(
             xy_poly_in[i_elt, 1],
             xy_poly_out
             )
-        if wn ==0:
+        if wn == 0:
             return False
     return True
 
@@ -273,13 +273,14 @@ def distance_matrix(
 @wraparound(False)
 @boundscheck(False)
 cdef dist_array_size(
-        DTYPE_ui l_i,
+        DTYPE_ui i_start,
         DTYPE_ui nb_c_per_l,
         DTYPE_ui * nb_pt_per_c,
         DTYPE_ui * c_i
         ):
-    cdef DTYPE_ui i_elt, i_start, i_end, nb_pts
-    i_start = l_i
+    """Give slice to select data
+    """
+    cdef DTYPE_ui i_elt, i_end, nb_pts
     i_end = i_start + nb_c_per_l
     nb_pts = 0
 
@@ -302,6 +303,8 @@ def index_from_nearest_path(
         DTYPE_coord xpt,
         DTYPE_coord ypt,
         ):
+    """Get index from nearest path
+    """
     cdef DTYPE_ui i_elt
     cdef DTYPE_ui nearesti, nb_contour
 
@@ -319,7 +322,7 @@ def index_from_nearest_path(
         )
 
     nearesti = nearest_contour_index(
-        & y_value[0],
+        & x_value[0],
         & y_value[0],
         xpt,
         ypt,
@@ -344,6 +347,8 @@ cdef nearest_contour_index(
         DTYPE_ui start,
         DTYPE_ui end,
         ):
+    """Give index fron the nearest pts
+    """
     cdef DTYPE_ui i_elt, i_ref
     cdef DTYPE_coord dist, dist_ref
     i_ref = start
@@ -353,5 +358,4 @@ cdef nearest_contour_index(
         if dist < dist_ref:
             dist_ref = dist
             i_ref = i_elt
-
     return i_ref - start
