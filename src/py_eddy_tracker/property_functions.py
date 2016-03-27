@@ -54,7 +54,7 @@ def uniform_resample(x_val, y_val, method='interp1d', extrapolate=None,
        extrapolate : IS NOT RELIABLE (sometimes nans occur)
     """
     # Get distances
-    dist = np.empty_like(x_val)
+    dist = np.empty(x_val.shape)
     dist[0] = 0
     distance_vector(
         x_val[:-1], y_val[:-1], x_val[1:], y_val[1:], dist[1:])

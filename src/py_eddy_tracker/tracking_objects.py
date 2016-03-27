@@ -37,7 +37,9 @@ from matplotlib.patches import Ellipse
 from scipy.spatial import cKDTree
 from scipy.interpolate import RectBivariateSpline
 from . import VAR_DESCR
-import numpy as np
+from numpy import arange, int_, interp, float64, array, genfromtxt, ones, \
+    zeros, unique, loadtxt, diff, ma, vstack, hstack, average, append, cos, \
+    radians
 import logging
 from .observations import EddiesObservations
 
@@ -48,13 +50,13 @@ def nearest(lon_pt, lat_pt, lon2d, lat2d):
     in a lat/lon grid
     """
     try:
-        i_x = np.int_(np.interp(lon_pt,
+        i_x = int_(interp(lon_pt,
                                 lon2d,
-                                np.arange(len(lon2d)),
+                                arange(len(lon2d)),
                                 left=0, right=-1))
-        i_y = np.int_(np.interp(lat_pt,
+        i_y = int_(interp(lat_pt,
                                 lat2d,
-                                np.arange(len(lat2d)),
+                                arange(len(lat2d)),
                                 left=0, right=-1))
     except ValueError:
         logging.error('%s, %s', lat2d, lat_pt)
@@ -89,16 +91,16 @@ class IdentificationList(object):
         if 'Cyclonic' in sign_type:
             self.contour_parameter *= -1
         self.shape_error = kwargs.get('SHAPE_ERROR', 55.)
-        self.radmin = np.float64(kwargs.get('RADMIN', 0.4))
-        self.radmax = np.float64(kwargs.get('RADMAX', 4.461))
-        self.ampmin = np.float64(kwargs.get('AMPMIN', 1.))
-        self.ampmax = np.float64(kwargs.get('AMPMAX', 150.))
-        self.evolve_amp_min = np.float64(kwargs.get('EVOLVE_AMP_MIN', .0005))
-        self.evolve_amp_max = np.float64(kwargs.get('EVOLVE_AMP_MAX', 500))
-        self.evolve_area_min = np.float64(kwargs.get('EVOLVE_AREA_MIN', .0005))
-        self.evolve_area_max = np.float64(kwargs.get('EVOLVE_AREA_MAX', 500))
+        self.radmin = float64(kwargs.get('RADMIN', 0.4))
+        self.radmax = float64(kwargs.get('RADMAX', 4.461))
+        self.ampmin = float64(kwargs.get('AMPMIN', 1.))
+        self.ampmax = float64(kwargs.get('AMPMAX', 150.))
+        self.evolve_amp_min = float64(kwargs.get('EVOLVE_AMP_MIN', .0005))
+        self.evolve_amp_max = float64(kwargs.get('EVOLVE_AMP_MAX', 500))
+        self.evolve_area_min = float64(kwargs.get('EVOLVE_AREA_MIN', .0005))
+        self.evolve_area_max = float64(kwargs.get('EVOLVE_AREA_MAX', 500))
 
-        self.points = np.array([grd.lon.ravel(), grd.lat.ravel()]).T
+        self.points = array([grd.lon.ravel(), grd.lat.ravel()]).T
 
         self.sla = None
 
@@ -252,7 +254,7 @@ class IdentificationList(object):
         Set points within bounding box around eddy and calculate
         mask for effective contour
         """
-        self.points = np.array([grd.lon[self.slice_j,
+        self.points = array([grd.lon[self.slice_j,
                                         self.slice_i].ravel(),
                                 grd.lat[self.slice_j,
                                         self.slice_i].ravel()]).T
@@ -285,20 +287,20 @@ class RossbyWaveSpeed_(object):
         if self.the_domain in ('Global', 'Regional', 'ROMS'):
             assert self.rw_path is not None, \
                 'Must supply a path for the Rossby deformation radius data'
-            datas = np.genfromtxt(
+            datas = genfromtxt(
                 rw_path,
                 dtype=[('lat', 'f2'), ('lon', 'f2'), ('defrad', 'f4')],
                 usecols=(0, 1, 3))
             lon_min, lon_max = datas['lon'].min(), datas['lon'].max()
             lat_min, lat_max = datas['lat'].min(), datas['lat'].max()
-            lon_step = np.diff(np.unique(datas['lon'])[:2])[0]
-            lat_step = np.diff(np.unique(datas['lat'])[:2])[0]
-            lon = np.arange(lon_min, lon_max + lon_step / 2, lon_step)
-            lat = np.arange(lat_min, lat_max + lat_step / 2, lat_step)
-            value = np.zeros((len(lon), len(lat)), dtype='f4')
-            mask = np.ones((len(lon), len(lat)), dtype='bool')
-            i_lon = np.int_((datas['lon'] - lon_min) / lon_step)
-            i_lat = np.int_((datas['lat'] - lat_min) / lat_step)
+            lon_step = diff(unique(datas['lon'])[:2])[0]
+            lat_step = diff(unique(datas['lat'])[:2])[0]
+            lon = arange(lon_min, lon_max + lon_step / 2, lon_step)
+            lat = arange(lat_min, lat_max + lat_step / 2, lat_step)
+            value = zeros((len(lon), len(lat)), dtype='f4')
+            mask = ones((len(lon), len(lat)), dtype='bool')
+            i_lon = int_((datas['lon'] - lon_min) / lon_step)
+            i_lat = int_((datas['lat'] - lat_min) / lat_step)
             value[i_lon, i_lat] = datas['defrad']
             mask[i_lon, i_lat] = False
             opts_interpolation = {'kx': 1, 'ky': 1, 's': 0}
@@ -306,7 +308,7 @@ class RossbyWaveSpeed_(object):
                                                        **opts_interpolation)
             self.interpolate_mask = RectBivariateSpline(lon, lat, mask,
                                                         **opts_interpolation)
-            data = np.loadtxt(rw_path)
+            data = loadtxt(rw_path)
             self._lon = data[:, 1]
             self._lat = data[:, 0]
             self._defrad = data[:, 3]
@@ -320,7 +322,7 @@ class RossbyWaveSpeed_(object):
         self.start = True
 
     def interpolate(self, *args, **kwargs):
-        return np.ma.array(self.interpolate_val(*args, **kwargs),
+        return ma.array(self.interpolate_val(*args, **kwargs),
                            mask=self.interpolate_mask(*args, **kwargs) != 0)
 
     def get_rwdistance(self, xpt, ypt, days_btwn_records):
@@ -344,7 +346,7 @@ class RossbyWaveSpeed_(object):
         else:
             raise Exception('Unknown domain : %s' % self.the_domain)
 
-        return np.abs(distance) * days_btwn_records
+        return abs(distance) * days_btwn_records
 
     def _make_subset(self):
         """
@@ -360,10 +362,8 @@ class RossbyWaveSpeed_(object):
             self._lon[ieast] += 360.
             lloi = iwest + ieast
         else:
-            lloi = np.logical_and(self._lon >= lonmin - pad,
-                                  self._lon <= lonmax + pad)
-        lloi *= np.logical_and(self._lat >= latmin - pad,
-                               self._lat <= latmax + pad)
+            lloi = (self._lon >= (lonmin - pad)) * (self._lon <= (lonmax + pad))
+        lloi *= (self._lat >= (latmin - pad)) * (self._lat <= (latmax + pad))
         self._lon = self._lon[lloi]
         self._lat = self._lat[lloi]
         self._defrad = self._defrad[lloi]
@@ -381,7 +381,7 @@ class RossbyWaveSpeed_(object):
         """
         Compute KDE tree for nearest indices.
         """
-        points = np.vstack([self.x_val, self.y_val]).T
+        points = vstack([self.x_val, self.y_val]).T
         self._tree = cKDTree(points)
         return self
 
@@ -390,11 +390,11 @@ class RossbyWaveSpeed_(object):
         Get a point average of the deformation radius
         at xpt, ypt
         """
-        weights, i = self._tree.query(np.array([xpt, ypt]), k=4, p=2)
+        weights, i = self._tree.query(array([xpt, ypt]), k=4, p=2)
         weights /= weights.sum()
         self._weights = weights
         self.i = i
-        return np.average(self._defrad[i], weights=weights)
+        return average(self._defrad[i], weights=weights)
 
     def _get_rlongwave_spd(self, xpt, ypt):
         """
@@ -404,9 +404,9 @@ class RossbyWaveSpeed_(object):
         # km to m
         r_spd_long = (self._get_defrad(xpt, ypt) * 1000) ** 2
         # lat
-        beta = np.average(self._lat[self.i], weights=self._weights)
+        beta = average(self._lat[self.i], weights=self._weights)
         # 1458e-7 ~ (2 * 7.29*10**-5)
-        beta = np.cos(np.radians(beta)) * 1458e-7 / self.earth_radius
+        beta = cos(radians(beta)) * 1458e-7 / self.earth_radius
         r_spd_long *= -beta
         return r_spd_long
 
@@ -420,7 +420,7 @@ class RossbyWaveSpeed(object):
         if self.the_domain in ('Global', 'Regional', 'ROMS'):
             assert self.rw_path is not None, \
                 'Must supply a path for the Rossby deformation radius data'
-            datas = np.genfromtxt(
+            datas = genfromtxt(
                 self.rw_path,
                 dtype=[('lat', 'f2'), ('lon', 'f2'), ('defrad', 'f4')],
                 usecols=(0, 1, 3))
@@ -431,14 +431,14 @@ class RossbyWaveSpeed(object):
             
             lon_min, lon_max = datas['lon'].min(), datas['lon'].max()
             lat_min, lat_max = datas['lat'].min(), datas['lat'].max()
-            lon_step = np.diff(np.unique(datas['lon'])[:2])[0]
-            lat_step = np.diff(np.unique(datas['lat'])[:2])[0]
-            lon = np.arange(lon_min, lon_max + lon_step / 2, lon_step)
-            lat = np.arange(lat_min, lat_max + lat_step / 2, lat_step)
-            value = np.zeros((len(lon), len(lat)), dtype='f4')
-            mask = np.ones((len(lon), len(lat)), dtype='bool')
-            i_lon = np.int_((datas['lon'] - lon_min) / lon_step)
-            i_lat = np.int_((datas['lat'] - lat_min) / lat_step)
+            lon_step = diff(unique(datas['lon'])[:2])[0]
+            lat_step = diff(unique(datas['lat'])[:2])[0]
+            lon = arange(lon_min, lon_max + lon_step / 2, lon_step)
+            lat = arange(lat_min, lat_max + lat_step / 2, lat_step)
+            value = zeros((len(lon), len(lat)), dtype='f4')
+            mask = ones((len(lon), len(lat)), dtype='bool')
+            i_lon = int_((datas['lon'] - lon_min) / lon_step)
+            i_lat = int_((datas['lat'] - lat_min) / lat_step)
             value[i_lon, i_lat] = datas['defrad']
             mask[i_lon, i_lat] = False
             opts_interpolation = {'kx': 1, 'ky': 1, 's': 0}
@@ -446,7 +446,7 @@ class RossbyWaveSpeed(object):
                                                        **opts_interpolation)
             self.interpolate_mask = RectBivariateSpline(lon, lat, mask,
                                                         **opts_interpolation)
-            data = np.loadtxt(rw_path)
+            data = loadtxt(rw_path)
             self._lon = data[:, 1]
             self._lat = data[:, 0]
             self._defrad = data[:, 3]
@@ -460,7 +460,7 @@ class RossbyWaveSpeed(object):
         self.start = True
 
     def interpolate(self, *args, **kwargs):
-        return np.ma.array(self.interpolate_val(*args, **kwargs),
+        return ma.array(self.interpolate_val(*args, **kwargs),
                            mask=self.interpolate_mask(*args, **kwargs) != 0)
 
     def get_rwdistance(self, xpt, ypt, days_btwn_records):
@@ -484,7 +484,7 @@ class RossbyWaveSpeed(object):
         else:
             raise Exception('Unknown domain : %s' % self.the_domain)
 
-        return np.abs(distance) * days_btwn_records
+        return abs(distance) * days_btwn_records
 
     def _make_subset(self):
         """
@@ -500,19 +500,17 @@ class RossbyWaveSpeed(object):
             self._lon[ieast] += 360.
             lloi = iwest + ieast
         else:
-            lloi = np.logical_and(self._lon >= lonmin - pad,
-                                  self._lon <= lonmax + pad)
-        lloi *= np.logical_and(self._lat >= latmin - pad,
-                               self._lat <= latmax + pad)
+            lloi = (self._lon >= (lonmin - pad)) * (self._lon <= (lonmax + pad))
+        lloi *= (self._lat >= (latmin - pad)) * (self._lat <= (latmax + pad))
         self._lon = self._lon[lloi]
         self._lat = self._lat[lloi]
         self._defrad = self._defrad[lloi]
 
         if 'Global' in self.the_domain:
             lloi = self._lon > 260.
-            self._lon = np.append(self._lon, self._lon[lloi] - 360.)
-            self._lat = np.append(self._lat, self._lat[lloi])
-            self._defrad = np.append(self._defrad, self._defrad[lloi])
+            self._lon = append(self._lon, self._lon[lloi] - 360.)
+            self._lat = append(self._lat, self._lat[lloi])
+            self._defrad = append(self._defrad, self._defrad[lloi])
 
         self.x_val, self.y_val = self.m_val(self._lon, self._lat)
         return self
@@ -521,7 +519,7 @@ class RossbyWaveSpeed(object):
         """
         Compute KDE tree for nearest indices.
         """
-        points = np.vstack([self.x_val, self.y_val]).T
+        points = vstack([self.x_val, self.y_val]).T
         self._tree = cKDTree(points)
         return self
 
@@ -530,11 +528,11 @@ class RossbyWaveSpeed(object):
         Get a point average of the deformation radius
         at xpt, ypt
         """
-        weights, i = self._tree.query(np.array([xpt, ypt]), k=4, p=2)
+        weights, i = self._tree.query(array([xpt, ypt]), k=4, p=2)
         weights /= weights.sum()
         self._weights = weights
         self.i = i
-        return np.average(self._defrad[i], weights=weights)
+        return average(self._defrad[i], weights=weights)
 
     def _get_rlongwave_spd(self, xpt, ypt):
         """
@@ -544,16 +542,16 @@ class RossbyWaveSpeed(object):
         # km to m
         r_spd_long = (self._get_defrad(xpt, ypt) * 1000) ** 2
         # lat
-        beta = np.average(self._lat[self.i], weights=self._weights)
+        beta = average(self._lat[self.i], weights=self._weights)
         # 1458e-7 ~ (2 * 7.29*10**-5)
-        beta = np.cos(np.radians(beta)) * 1458e-7 / self.earth_radius
+        beta = cos(radians(beta)) * 1458e-7 / self.earth_radius
         r_spd_long *= -beta
         return r_spd_long
 
 
 def west_ellips_contains(ellips_center, obs, minor, major):
     in_ellips = (((obs - ellips_center) ** 2) /
-                 np.array([major, minor]) ** 2).sum(axis=1) < 1
+                 array([major, minor]) ** 2).sum(axis=1) < 1
     in_circle = (((obs - ellips_center) / minor) ** 2).sum(axis=1) < 1
     east = obs[0] > ellips_center[0]
     return in_ellips * (- east) + in_circle
@@ -561,7 +559,7 @@ def west_ellips_contains(ellips_center, obs, minor, major):
 
 def east_ellips_contains(ellips_center, obs, minor, major):
     in_ellips = (((obs - ellips_center) ** 2) /
-                 np.array([major, minor]) ** 2).sum(axis=1) < 1
+                 array([major, minor]) ** 2).sum(axis=1) < 1
     in_circle = (((obs - ellips_center) / minor) ** 2).sum(axis=1) < 1
     east = obs[0] > ellips_center[0]
     return in_ellips * east + in_circle
@@ -628,9 +626,9 @@ class SearchEllipse (object):
         w_verts = self.west_ellipse.get_verts()
         w_size = w_verts[:, 0].size
         w_size *= 0.5
-        ew_x = np.hstack((e_verts[e_size:, 0], w_verts[:w_size, 0]))
-        ew_y = np.hstack((e_verts[e_size:, 1], w_verts[:w_size, 1]))
-        self.ellipse_path = Path(np.array([ew_x, ew_y]).T)
+        ew_x = hstack((e_verts[e_size:, 0], w_verts[:w_size, 0]))
+        ew_y = hstack((e_verts[e_size:, 1], w_verts[:w_size, 1]))
+        self.ellipse_path = Path(array([ew_x, ew_y]).T)
 
     def _set_black_sea_ellipse(self):
         """
@@ -641,7 +639,7 @@ class SearchEllipse (object):
             2. * self.rw_c_mod,
             2. * self.rw_c_mod)
         verts = self.black_sea_ellipse.get_verts()
-        self.ellipse_path = Path(np.array([verts[:, 0],
+        self.ellipse_path = Path(array([verts[:, 0],
                                            verts[:, 1]]).T)
         return self
 
@@ -664,7 +662,7 @@ class SearchEllipse (object):
             rw_c = self.rwv.get_rwdistance(xpt, ypt,
                                            self.days_btwn_records)
             self.rw_c_mod *= rw_c
-            self.rw_c_mod = np.array([self.rw_c_mod,
+            self.rw_c_mod = array([self.rw_c_mod,
                                       self.semi_n_s_minor]).max() * 2
             self._set_global_ellipse()
 

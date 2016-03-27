@@ -32,7 +32,7 @@ from scipy.interpolate import griddata
 # from scipy.ndimage import generate_binary_structure, binary_erosion
 from scipy.ndimage import binary_erosion
 from scipy.ndimage import minimum_filter
-import numpy as np
+from numpy import array, isfinite, ma, where, ones
 from .tools import index_from_nearest_path, distance_matrix
 import logging
 
@@ -69,7 +69,7 @@ class Amplitude (object):
             h_0 = grd.sla_coeffs.ev(self.contlat[1:], self.contlon[1:])
 
         elif 'griddata' in eddy.interp_method:
-            points = np.array([grd.lon()[self.jslice, self.islice].ravel(),
+            points = array([grd.lon()[self.jslice, self.islice].ravel(),
                                grd.lat()[self.jslice, self.islice].ravel()]).T
             h_0 = griddata(points, self.sla.ravel(),
                            (self.contlon[1:], self.contlat[1:]),
@@ -77,11 +77,11 @@ class Amplitude (object):
         else:
             raise Exception('Unknown method : %s' % eddy.interp_method)
 
-        self.h_0 = h_0[np.isfinite(h_0)].mean()
-        self.amplitude = 0  # np.atleast_1d(0.)
-        self.local_extrema = None  # np.int(0)
+        self.h_0 = h_0[isfinite(h_0)].mean()
+        self.amplitude = 0  # atleast_1d(0.)
+        self.local_extrema = None  # int(0)
         self.local_extrema_inds = None
-        self.sla = np.ma.masked_where(-self.mask, self.sla)
+        self.sla = ma.masked_where(-self.mask, self.sla)
 
     @property
     def islice(self):
@@ -122,7 +122,7 @@ class Amplitude (object):
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are below a given SSH threshold for cyclonic eddies.
         """
-        if np.any(self.sla > self.h_0):
+        if (self.sla > self.h_0).any():
             return False  # i.e., with self.amplitude == 0
         else:
             self._set_local_extrema(1)
@@ -130,7 +130,7 @@ class Amplitude (object):
                     self.local_extrema <= self.mle):
                 self._set_cyc_amplitude()
             elif self.local_extrema > self.mle:
-                lmi_j, lmi_i = np.where(self.local_extrema_inds)
+                lmi_j, lmi_i = where(self.local_extrema_inds)
                 levnm2 = level - (2 * self.eddy.interval)
                 slamin = 1e5
                 for j, i in zip(lmi_j, lmi_i):
@@ -151,7 +151,7 @@ class Amplitude (object):
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are above a given SSH threshold for anticyclonic eddies.
         """
-        if np.any(self.sla < self.h_0):
+        if (self.sla < self.h_0).any():
             # i.e.,with self.amplitude == 0
             return False
         else:
@@ -161,7 +161,7 @@ class Amplitude (object):
                 self._set_acyc_amplitude()
 
             elif self.local_extrema > self.mle:
-                lmi_j, lmi_i = np.where(self.local_extrema_inds)
+                lmi_j, lmi_i = where(self.local_extrema_inds)
                 levnp2 = level + (2 * self.eddy.interval)
                 slamax = -1e5
                 for j, i in zip(lmi_j, lmi_i):
@@ -191,7 +191,7 @@ class Amplitude (object):
         http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
         """
         # Equivalent
-        neighborhood = np.ones((3, 3), dtype='bool')
+        neighborhood = ones((3, 3), dtype='bool')
         #~ neighborhood = generate_binary_structure(arr.ndim, 2)
 
         # Get local mimima
@@ -238,14 +238,14 @@ class SwirlSpeed(object):
                 ci_list.append(len(coll.vertices[:, 0]))
             li_list.append(len(cont.get_paths()))
 
-        self.x_value = np.array([val for sublist in x_list for val in sublist])
-        self.y_value = np.array([val for sublist in y_list for val in sublist])
-        self.nb_pt_per_c = np.array(ci_list, dtype='u4')
-        self.c_i = np.array(self.nb_pt_per_c.cumsum() - self.nb_pt_per_c,
-                            dtype='u4')
-        self.nb_c_per_l = np.array(li_list, dtype='u4')
-        self.l_i = np.array(self.nb_c_per_l.cumsum() - self.nb_c_per_l,
-                            dtype='u4')
+        self.x_value = array([val for sublist in x_list for val in sublist])
+        self.y_value = array([val for sublist in y_list for val in sublist])
+        self.nb_pt_per_c = array(ci_list, dtype='u4')
+        self.c_i = array(self.nb_pt_per_c.cumsum() - self.nb_pt_per_c,
+                         dtype='u4')
+        self.nb_c_per_l = array(li_list, dtype='u4')
+        self.l_i = array(self.nb_c_per_l.cumsum() - self.nb_c_per_l,
+                         dtype='u4')
 
     def get_index_nearest_path(self, level, xpt, ypt):
         """
