@@ -33,7 +33,7 @@ from re import compile as re_compile
 from os.path import exists
 from os import mkdir
 from multiprocessing import Pool
-import numpy as np
+from numpy import array, arange, atleast_1d, unique, round, int, place, interp, pi
 
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.property_functions import \
@@ -101,7 +101,7 @@ if __name__ == '__main__':
                          ]['CONTOUR_PARAMETER_SLA']['MAX_SLA']
         INTERVAL = CONFIG['CONTOUR_PARAMETER'
                           ]['CONTOUR_PARAMETER_SLA']['INTERVAL']
-        CONFIG['CONTOUR_PARAMETER'] = np.arange(-MAX_SLA, MAX_SLA + INTERVAL,
+        CONFIG['CONTOUR_PARAMETER'] = arange(-MAX_SLA, MAX_SLA + INTERVAL,
                                                 INTERVAL)
         # AMPMIN = CONFIG['AMPMIN']
         # AMPMAX = CONFIG['AMPMAX']
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     SMOOTHING = CONFIG['SMOOTHING']
     if SMOOTHING:
         if 'SLA' in DIAGNOSTIC_TYPE:
-            ZWL = np.atleast_1d(CONFIG['SMOOTHING_SLA']['ZWL'])
-            MWL = np.atleast_1d(CONFIG['SMOOTHING_SLA']['MWL'])
+            ZWL = atleast_1d(CONFIG['SMOOTHING_SLA']['ZWL'])
+            MWL = atleast_1d(CONFIG['SMOOTHING_SLA']['MWL'])
         SMOOTHING_TYPE = CONFIG['SMOOTHING_SLA']['TYPE']
 
     # End user configuration setup options
@@ -129,10 +129,10 @@ if __name__ == '__main__':
 
     DATASET_FILES = glob(DATA_DIR + FILES_MODEL)
 
-    DATASET_LIST = np.array(DATASET_FILES,
+    DATASET_LIST = array(DATASET_FILES,
                             dtype=[('date', 'datetime64[D]'),
                                    ('filename', 'S256')])
-    DATASET_LIST['filename'] = np.array(DATASET_FILES)
+    DATASET_LIST['filename'] = array(DATASET_FILES)
 
     logging.info('%s grids available', DATASET_LIST.shape[0])
     for item in DATASET_LIST:
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     MASK_DATE = (DATASET_LIST['date'] >= START_DATE) * (
         DATASET_LIST['date'] <= END_DATE)
 
-    STEPS = np.unique(DATASET_LIST['date'][1:] - DATASET_LIST['date'][:-1])
+    STEPS = unique(DATASET_LIST['date'][1:] - DATASET_LIST['date'][:-1])
     if len(STEPS) != 1:
         raise Exception('Several days steps in grid dataset %s' % STEPS)
     else:
@@ -171,11 +171,11 @@ if __name__ == '__main__':
 
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
-    PIXMIN = np.round((np.pi * CONFIG['RADMIN'] ** 2) /
+    PIXMIN = round((pi * CONFIG['RADMIN'] ** 2) /
                       SLA_GRD.resolution ** 2)
-    PIXMAX = np.round((np.pi * CONFIG['RADMAX'] ** 2) /
+    PIXMAX = round((pi * CONFIG['RADMAX'] ** 2) /
                       SLA_GRD.resolution ** 2)
-    logging.info('Pixel range = %s-%s', np.int(PIXMIN), np.int(PIXMAX))
+    logging.info('Pixel range = %s-%s', int(PIXMIN), int(PIXMAX))
 
     # Figure to get contours of parameter
     FIG = Figure()
@@ -208,9 +208,9 @@ if __name__ == '__main__':
             if 'Gaussian' in SMOOTHING_TYPE:
                 logging.info('applying Gaussian high-pass filter')
                 # Set landpoints to zero
-                np.place(sla, SLA_GRD.mask, 0.)
+                place(sla, SLA_GRD.mask, 0.)
                 if hasattr(sla, 'data'):
-                    np.place(sla, sla.data == SLA_GRD.fillval, 0.)
+                    place(sla, sla.data == SLA_GRD.fillval, 0.)
                 # High pass filter, see
                 # http://stackoverflow.com/questions/6094957/high-pass-filter-
                 # for-image-processing-in-python-by-using-scipy-numpy
@@ -256,6 +256,21 @@ if __name__ == '__main__':
 
         if 'SLA' in DIAGNOSTIC_TYPE:
             logging.info('Processing SLA contours for eddies')
+            MIN_SLA, MAX_SLA = A_EDDY.sla.min(), A_EDDY.sla.max()
+            if (MIN_SLA < A_EDDY.contour_parameter[0]) or (
+                    MAX_SLA > A_EDDY.contour_parameter[-1]):
+                logging.warning('SLA values [%f,%f] is larger than levels %s',
+                                MIN_SLA, MAX_SLA, A_EDDY.contour_parameter)
+            
+            i_min, i_max = interp(
+                (MIN_SLA, MAX_SLA),
+                A_EDDY.contour_parameter,
+                arange(len(A_EDDY.contour_parameter))
+                )
+            i_min, i_max = max(0, int(i_min - 2)), int(i_max + 2)
+            A_EDDY.contour_parameter = A_EDDY.contour_parameter[i_min:i_max]
+            C_EDDY.contour_parameter = C_EDDY.contour_parameter[i_min:i_max]
+            
             CONTOURS = CONT_AX.contour(
                 SLA_GRD.lon,
                 SLA_GRD.lat,
