@@ -67,8 +67,8 @@ class EddiesObservations(object):
         Time
     """
 
-    def __init__(self, size=0, track_extra_variables=False, track_array_variables=0, array_variables=None):
-        self.track_extra_variables = track_extra_variables
+    def __init__(self, size=0, track_extra_variables=None, track_array_variables=0, array_variables=None):
+        self.track_extra_variables = track_extra_variables if track_extra_variables is not None else []
         self.track_array_variables = track_array_variables
         self.array_variables = array_variables if array_variables is not None else []
         for elt in self.elements:
@@ -117,17 +117,14 @@ class EddiesObservations(object):
         if self.track_array_variables > 0:
             elements += self.array_variables
         
-        if self.track_extra_variables:
-            elements += ['contour_e',
-                         'contour_s',
-                         'uavg_profile',
-                         'shape_error',
-                         ]
+        if len(self.track_extra_variables):
+            elements += self.track_extra_variables
         return elements
 
     def coherence(self, other):
         """Check coherence between two dataset
         """
+        test = self.track_extra_variables == other.track_extra_variables
         test = self.track_array_variables == other.track_array_variables
         test *= self.array_variables == other.array_variables
         return test
@@ -174,7 +171,8 @@ class EddiesObservations(object):
             return self
         if index < 0:
             index = self_size + index + 1
-        eddies = self.__class__(new_size, self.track_extra_variables,
+        eddies = self.__class__(new_size, 
+            track_extra_variables=self.track_extra_variables,
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables
             )

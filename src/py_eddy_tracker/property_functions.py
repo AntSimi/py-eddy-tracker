@@ -441,6 +441,7 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
             # Instantiate new EddyObservation object
             properties = EddiesObservations(
                 size=1,
+                track_extra_variables=eddy.track_extra_variables,
                 track_array_variables=eddy.track_array_variables_sampling,
                 array_variables=eddy.track_array_variables
                 )
@@ -495,17 +496,18 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
 
                     #~ if eddy.track_array_variables > 0:
                         
-                    if not eddy.track_extra_variables:
+                    #~ if not eddy.track_extra_variables:
+                    if True:
                         (uavg, contlon_s, contlat_s,
                          inner_contlon, inner_contlat,
                          any_inner_contours
                          ) = get_uavg(*args)
-                    else:
-                        (uavg, contlon_s, contlat_s,
-                         inner_contlon, inner_contlat,
-                         any_inner_contours, uavg_profile
-                         ) = get_uavg(
-                            *args, save_all_uavg=True)
+                    #~ else:
+                        #~ (uavg, contlon_s, contlat_s,
+                         #~ inner_contlon, inner_contlat,
+                         #~ any_inner_contours, uavg_profile
+                         #~ ) = get_uavg(
+                            #~ *args, save_all_uavg=True)
 
                     # Use azimuth equal projection for radius
                     proj = Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
@@ -525,13 +527,17 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                     # sure it's that important ... Antoine?)
                     # A. : I dont think, the difference is tiny
                     c_x, c_y = proj(contlon_s, contlat_s)
-                    _, _, eddy_radius_s, _ = fit_circle_c(c_x, c_y)
+                    _, _, eddy_radius_s, aerr_s = fit_circle_c(c_x, c_y)
 
                 properties.obs['radius_s'] = eddy_radius_s
                 properties.obs['speed_radius'] = uavg
                 properties.obs['radius_e'] = eddy_radius_e
                 properties.obs['time'] = rtime
                 properties.obs['eke'] = teke
+                if 'shape_error' in eddy.track_extra_variables:
+                    properties.obs['shape_error'] = aerr
+                if 'shape_error_s' in eddy.track_extra_variables:
+                    properties.obs['shape_error_s'] = aerr_s
 
                 # Update SLA eddy properties
                 if 'SLA' in eddy.diagnostic_type:
@@ -539,8 +545,8 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                     # See CSS11 section B4
                     properties.obs['lon'] = centlon_s
                     properties.obs['lat'] = centlat_s
-                    if 'contour_lon' in eddy.track_array_variables:
-                        properties.obs['contour_lon'], properties.obs['contour_lat'] = uniform_resample(
+                    if 'contour_lon_e' in eddy.track_array_variables:
+                        properties.obs['contour_lon_e'], properties.obs['contour_lat_e'] = uniform_resample(
                             cont.lon, cont.lat,
                             fixed_size=eddy.track_array_variables_sampling)
                     if 'contour_lon_s' in eddy.track_array_variables:
