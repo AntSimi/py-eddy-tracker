@@ -243,7 +243,7 @@ VAR_DESCR = dict(
             description='observation sequence number (XX day intervals)',
             )
         ),
-    contour_lon=dict(
+    contour_lon_e=dict(
         attr_name=None,
         nc_name='contour_lon',
         nc_type='f4',
@@ -256,7 +256,7 @@ VAR_DESCR = dict(
             description='lons of contour points',
             )
         ),
-    contour_lat=dict(
+    contour_lat_e=dict(
         attr_name=None,
         nc_name='contour_lat',
         nc_type='f4',
@@ -293,28 +293,6 @@ VAR_DESCR = dict(
             description='lats of speed-based contour points',
             )
         ),
-    contour_e=dict(
-        attr_name=None,
-        nc_name='contour_e',
-        nc_type='f4',
-        nc_dims=('contour_points', 'Nobs',),
-        nc_attr=dict(
-            long_name='positions of effective contour points',
-            description='lons/lats of effective contour points; lons (lats) '
-                        'in first (last) half of vector',
-            )
-        ),
-    contour_s=dict(
-        attr_name=None,
-        nc_name='contour_s',
-        nc_type='f4',
-        nc_dims=('contour_points', 'Nobs',),
-        nc_attr=dict(
-            long_name='positions of speed-based contour points',
-            description='lons/lats of speed-based contour points; lons (lats) '
-                        'in first (last) half of vector',
-            )
-        ),
     uavg_profile=dict(
         attr_name=None,
         nc_name='uavg_profile',
@@ -329,7 +307,18 @@ VAR_DESCR = dict(
     shape_error=dict(
         attr_name=None,
         nc_name='shape_error',
-        nc_type='f2',
+        nc_type='u1',
+        scale_factor=0.5,
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            units='%',
+            )
+        ),
+    shape_error_s=dict(
+        attr_name=None,
+        nc_name='shape_error_s',
+        nc_type='u1',
+        scale_factor=0.5,
         nc_dims=('Nobs',),
         nc_attr=dict(
             units='%',
