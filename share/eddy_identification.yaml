@@ -46,11 +46,10 @@ CONTOUR_PARAMETER:
   # Set SLA contour spacing (cm)
   CONTOUR_PARAMETER_SLA:
     MAX_SLA: 100.
-    INTERVAL: 1
-    #~ INTERVAL: 4
+    INTERVAL: 0.5
 
 # Shape error (see Kurian et al 2011)
-SHAPE_ERROR: 65. # % (Mason et al 2014 use 55%)
+SHAPE_ERROR: 55. # % (Mason et al 2014 use 55%)
     
 # Filtering
 SMOOTHING: Yes
@@ -82,13 +81,17 @@ EVOLVE_AREA_MAX: 500 # max change in area
 # - speed-based contour points
 # - shape test values
 # - profiles of swirl velocity from effective contour inwards
-# Useful for working with ARGO data    
-TRACK_EXTRA_VARIABLES: No
+TRACK_EXTRA_VARIABLES:
+    - shape_error
+    - shape_error_s
+
 TRACK_ARRAY_VARIABLES:
-    NB_SAMPLES: 10
+    NB_SAMPLES: 50
     VARIABLES:
-        - contour_lon
-        - contour_lat
+        - contour_lon_e
+        - contour_lat_e
+        - contour_lon_s
+        - contour_lat_s
 
 # 'RectBivariate' is faster
 INTERP_METHOD: 'RectBivariate'
