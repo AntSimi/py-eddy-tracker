@@ -294,12 +294,10 @@ if __name__ == '__main__':
         # Now we loop over the CS collection
         if 'SLA' in DIAGNOSTIC_TYPE:
             logging.info("Anticyclonic research")
-            A_EDDY = collection_loop(CONTOURS, SLA_GRD, grd_int_date,
-                                     a_list_obj=A_EDDY, c_list_obj=None)
+            A_EDDY = collection_loop(CONTOURS, SLA_GRD, grd_int_date, A_EDDY)
             # Note that C_CS is reverse order
             logging.info("Cyclonic research")
-            C_EDDY = collection_loop(CONTOURS, SLA_GRD, grd_int_date,
-                                     a_list_obj=None, c_list_obj=C_EDDY)
+            C_EDDY = collection_loop(CONTOURS, SLA_GRD, grd_int_date, C_EDDY)
 
         # clear the current axis
         CONT_AX.cla()

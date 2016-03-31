@@ -361,19 +361,11 @@ BasePath.fit_circle = fit_circle_path
 BasePath._fit_circle_path = _fit_circle_path
 
 
-def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
+def collection_loop(contours, grd, rtime, eddy,
                     x_i=None, c_s_xi=None):
     """
     Loop over each collection of contours
     """
-    if a_list_obj is not None and c_list_obj is not None:
-        raise Exception('Only one of this two parameters '
-                        '(a_list_obj, c_list_obj) must be defined')
-    if a_list_obj is not None:
-        eddy = a_list_obj
-    if c_list_obj is not None:
-        eddy = c_list_obj
-
     if eddy.diagnostic_type not in ['Q', 'SLA']:
         raise Exception('Unknown Diagnostic : %s' % eddy.diagnostic_type)
 
