@@ -3,7 +3,7 @@ from matplotlib.dates import date2num
 from scipy import ndimage
 from scipy import spatial
 from dateutil import parser
-from numpy import meshgrid, zeros, array, where, ma, argmin, vstack, ones \
+from numpy import meshgrid, zeros, array, where, ma, argmin, vstack, ones, \
     newaxis, sqrt, diff, r_
 import logging
 from netCDF4 import Dataset
