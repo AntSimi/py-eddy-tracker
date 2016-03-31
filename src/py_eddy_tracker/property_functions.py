@@ -30,7 +30,8 @@ Version 2.0.3
 """
 # External modules
 import logging
-import numpy as np
+from numpy import empty, linspace, interp, isscalar, floor, int16, array, \
+    gradient, zeros, isfinite, unique, nan, ma, int_, arange
 from datetime import datetime
 from pyproj import Proj
 from .tracking_objects import nearest
@@ -54,7 +55,7 @@ def uniform_resample(x_val, y_val, method='interp1d', extrapolate=None,
        extrapolate : IS NOT RELIABLE (sometimes nans occur)
     """
     # Get distances
-    dist = np.empty(x_val.shape)
+    dist = empty(x_val.shape)
     dist[0] = 0
     distance_vector(
         x_val[:-1], y_val[:-1], x_val[1:], y_val[1:], dist[1:])
@@ -62,15 +63,15 @@ def uniform_resample(x_val, y_val, method='interp1d', extrapolate=None,
     # Get uniform distances
     if fixed_size is None:
         fixed_size = dist.size * num_fac
-    d_uniform = np.linspace(0,
+    d_uniform = linspace(0,
                             dist[-1],
                             num=fixed_size,
                             endpoint=True)
 
     # Do 1d interpolations
     if 'interp1d' == method:
-        x_new = np.interp(d_uniform, dist, x_val)
-        y_new = np.interp(d_uniform, dist, y_val)
+        x_new = interp(d_uniform, dist, x_val)
+        y_new = interp(d_uniform, dist, y_val)
     elif 'akima' == method:
         xfunc = Akima1DInterpolator(dist, x_val)
         yfunc = Akima1DInterpolator(dist, y_val)
@@ -95,15 +96,15 @@ def oceantime2ymd(ocean_time, integer=False):
     Return strings *year*, *month*, *day* given ocean_time (seconds)
     If kwarg *integer*==*True* return integers rather than strings.
     """
-    if np.isscalar(ocean_time):
-        ocean_time = np.array([ocean_time])
+    if isscalar(ocean_time):
+        ocean_time = array([ocean_time])
     ocean_time /= 86400.
-    year = np.floor(ocean_time / 360.)
-    month = np.floor((ocean_time - year * 360.) / 30.)
-    day = np.floor(ocean_time - year * 360. - month * 30.)
-    year = (year.astype(np.int16) + 1)[0]
-    month = (month.astype(np.int16) + 1)[0]
-    day = (day.astype(np.int16) + 1)[0]
+    year = floor(ocean_time / 360.)
+    month = floor((ocean_time - year * 360.) / 30.)
+    day = floor(ocean_time - year * 360. - month * 30.)
+    year = (year.astype(int16) + 1)[0]
+    month = (month.astype(int16) + 1)[0]
+    day = (day.astype(int16) + 1)[0]
     if not integer:
         year = str(year)
         if len(year) < 2:
@@ -141,12 +142,12 @@ def okubo_weiss(grd):
     """
     def vorticity(u_val, v_val, d_x, d_y):
         """
-        Returns vorticity calculated using np.gradient
+        Returns vorticity calculated using gradient
         """
         d_x = 1 / d_x
         d_y = 1 / d_y
-        u_y, _ = np.gradient(grd.u2rho_2d(u_val), d_x, d_y)
-        _, v_x = np.gradient(grd.v2rho_2d(v_val), d_x, d_y)
+        u_y, _ = gradient(grd.u2rho_2d(u_val), d_x, d_y)
+        _, v_x = gradient(grd.v2rho_2d(v_val), d_x, d_y)
         x_i = v_x - u_y
         return x_i
 
@@ -163,7 +164,7 @@ def okubo_weiss(grd):
     # Sigma_T
     s_t = mn_product * psi2rho(von[:, 1:] - von[:, :-1] + uom[1:] - uom[:-1])
     # Sigma_N
-    s_n = np.zeros(p_m.shape)
+    s_n = zeros(p_m.shape)
     s_n[1:-1, 1:-1] = mn_product[1:-1, 1:-1] * (uon[1:-1, 1:] -
                                                 uon[1:-1, :-1] -
                                                 vom[1:, 1:-1] +
@@ -177,7 +178,7 @@ def okubo_weiss(grd):
 
 def psi2rho(var_psi):
     # Convert a psi field to rho points
-    var_rho = np.zeros((var_psi.shape[0] + 1, var_psi.shape[1] + 1))
+    var_rho = zeros((var_psi.shape[0] + 1, var_psi.shape[1] + 1))
     var_rho[1:-1, 1:-1] = quart_interp(var_psi[:-1, :-1], var_psi[:-1, 1:],
                                        var_psi[1:, :-1], var_psi[1:, 1:])
     var_rho[0] = var_rho[1]
@@ -195,7 +196,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
 
     If save_all_uavg == True we want uavg for every contour
     """
-    points = np.array([grd.lon[eddy.slice_j, eddy.slice_i].ravel(),
+    points = array([grd.lon[eddy.slice_j, eddy.slice_i].ravel(),
                        grd.lat[eddy.slice_j, eddy.slice_i].ravel()]).T
 
     # First contour is the outer one (effective)
@@ -212,7 +213,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
         uspd1d = eddy.uspd[eddy.slice_j, eddy.slice_i].ravel()
         uavg = griddata(points, uspd1d,
                         (theseglon[1:], theseglat[1:]), 'linear')
-        uavg = uavg[np.isfinite(uavg)].mean()
+        uavg = uavg[isfinite(uavg)].mean()
     else:
         raise Exception('Unknown interpolation method : %s'
                         % eddy.interp_method)
@@ -268,7 +269,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
         elif 'griddata' in eddy.interp_method:
             uavgseg = griddata(points, uspd1d, (seglon[1:], seglat[1:]),
                                'linear')
-            uavgseg = uavgseg[np.isfinite(uavgseg)].mean()
+            uavgseg = uavgseg[isfinite(uavgseg)].mean()
         else:
             raise Exception()
 
@@ -346,11 +347,11 @@ def _fit_circle_path(self):
         centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c(c_x, c_y)
     except ZeroDivisionError:
         # Some time, edge is only a dot of few coordinates
-        if len(np.unique(self.lon)) == 1 and len(np.unique(self.lat)) == 1:
+        if len(unique(self.lon)) == 1 and len(unique(self.lat)) == 1:
             logging.warning('An edge is only define in one position')
             logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
                           self.lat)
-            self._circle_params =  0, -90, np.nan, np.nan
+            self._circle_params =  0, -90, nan, nan
 
     centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
     centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
@@ -462,7 +463,7 @@ def collection_loop(contours, grd, rtime, a_list_obj, c_list_obj,
                 if 'Q' in eddy.diagnostic_type:
                     # KCCMC11
                     # Note, eddy amplitude == max(abs(vort/f)) within eddy,
-                    amplitude = np.abs(x_i[eddy.slice_j, eddy.slice_i
+                    amplitude = abs(x_i[eddy.slice_j, eddy.slice_i
                                            ][eddy.mask_eff]).max()
 
                 elif 'SLA' in eddy.diagnostic_type:
@@ -579,7 +580,7 @@ def func_hann2d_fast(var, numpasses):
     n_i = isz + 2
 
     def hann2d_fast(var, n_i, n_j):
-        var_ext = np.ma.zeros((n_j, n_i))  # add 1-more line parallell to
+        var_ext = ma.zeros((n_j, n_i))  # add 1-more line parallell to
         var_ext[1:-1, 1:-1] = var        # each of 4-sides
         var_ext[1:-1, 0] = var[:, 0]   # duplicate W-side
         var_ext[1:-1, -1] = var[:, -1]  # duplicate E-side
@@ -591,7 +592,7 @@ def func_hann2d_fast(var, numpasses):
         var_ext.mask[-1, -1] = True     # SE-corner
 
         # npts is used to count number of valid neighbors
-        npts = np.int(-var_ext.mask)
+        npts = int_(-var_ext.mask)
 
         # Replace nans with 0 to find a no-nan sum
         var_ext[var_ext.mask] = 0.
@@ -603,14 +604,14 @@ def func_hann2d_fast(var, numpasses):
         var_s = (var_ext[0:-2, 1:-1] + var_ext[2:, 1:-1] +
                  var_ext[1:-1, 0:-2] + var_ext[1:-1, 2:])
 
-        c_c[c_c == 0] = np.nan  # bring back nans in original data.
+        c_c[c_c == 0] = nan  # bring back nans in original data.
         weight = 8. - c_c  # This is the weight for values on each grid point,
 #                                         based on number of valid neighbours
         # Final smoothed version of var
         hsm = 0.125 * (var_s + weight * var_ext[1:jsz+1, 1:isz+1])
         return hsm
 
-    for _ in np.arange(numpasses):
+    for _ in arange(numpasses):
         var[:] = hann2d_fast(var, n_i, n_j)
 
     return var

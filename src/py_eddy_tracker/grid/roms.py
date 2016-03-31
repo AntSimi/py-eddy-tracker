@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 ===========================================================================
 This file is part of py-eddy-tracker.
 
@@ -30,9 +30,9 @@ Class to access ROMS gridfile information
 Useful when the output files don't contain the grid
 information
 
-'''
+"""
+
 import netCDF4 as netcdf
-# from matplotlib.mlab import load
 import numpy as np
 import matplotlib.path as Path
 from . import PyEddyTracker

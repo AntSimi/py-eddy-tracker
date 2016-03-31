@@ -3,7 +3,8 @@ from matplotlib.dates import date2num
 from scipy import ndimage
 from scipy import spatial
 from dateutil import parser
-import numpy as np
+from numpy import meshgrid, zeros, array, where, ma, argmin, vstack, ones \
+    newaxis, sqrt, diff, r_
 import logging
 from netCDF4 import Dataset
 
@@ -15,6 +16,11 @@ class AvisoGrid(PyEddyTracker):
     Class to satisfy the need of the eddy tracker
     to have a grid class
     """
+    KNOWN_UNITS = dict(
+            m=100.,
+            cm=1.,
+            )
+
     def __init__(self, aviso_file, the_domain,
                  lonmin, lonmax, latmin, latmax, grid_name, lon_name,
                  lat_name,with_pad=True):
@@ -41,8 +47,8 @@ class AvisoGrid(PyEddyTracker):
 
         if lonmin < 0 and lonmax <= 0:
             self._lon -= 360.
-        self._lon, self._lat = np.meshgrid(self._lon, self._lat)
-        self._angle = np.zeros_like(self._lon)
+        self._lon, self._lat = meshgrid(self._lon, self._lat)
+        self._angle = zeros(self._lon.shape)
 
         if 'MedSea' in self.the_domain:
             self._lon -= 360.
@@ -71,23 +77,19 @@ class AvisoGrid(PyEddyTracker):
         """
         Read nc data from AVISO file
         """
-        KNOWN_UNITS = dict(
-            m=100.,
-            cm=1.,
-            )
         self.grid_filename = aviso_file
         units = self.read_nc_att(self.grid_name, 'units')
-        if units not in KNOWN_UNITS:
+        if units not in self.KNOWN_UNITS:
             raise Exception('Unknown units : %s' % units)
             
         with Dataset(self.grid_filename) as h_nc:
-            grid_dims = np.array(h_nc.variables[self.grid_name].dimensions)
+            grid_dims = array(h_nc.variables[self.grid_name].dimensions)
             lat_dim = h_nc.variables[self.lat_name].dimensions[0]
             lon_dim = h_nc.variables[self.lon_name].dimensions[0]
 
         i_list = []
         transpose = False
-        if np.where(grid_dims == lat_dim)[0][0] > np.where(grid_dims == lon_dim)[0][0]:
+        if where(grid_dims == lat_dim)[0][0] > where(grid_dims == lon_dim)[0][0]:
             transpose = True
         for grid_dim in grid_dims:
             if grid_dim == lat_dim:
@@ -101,11 +103,11 @@ class AvisoGrid(PyEddyTracker):
         if transpose:
             zeta = zeta.T
 
-        zeta *= KNOWN_UNITS[units]  # units to cm
+        zeta *= self.KNOWN_UNITS[units]  # units to cm
         if hasattr(zeta, 'mask'):
             return zeta
         else:
-            return np.ma.array(zeta)
+            return ma.array(zeta)
 
     def set_mask(self, sla):
         """
@@ -117,7 +119,7 @@ class AvisoGrid(PyEddyTracker):
             if 'Global' in self.the_domain:
 
                 # Close Drake Passage
-                minus70 = np.argmin(np.abs(self.lonpad[0] + 70))
+                minus70 = argmin(abs(self.lonpad[0] + 70))
                 self.mask[:125, minus70] = True
 
                 # DT10 mask is open around Panama, so close it...
@@ -150,8 +152,8 @@ class AvisoGrid(PyEddyTracker):
                 self.labels = ndimage.label(-self.mask)[0]
 
                 # Set to known sea point
-                plus200 = np.argmin(np.abs(self.lonpad[0] - 200))
-                plus9 = np.argmin(np.abs(self.latpad[:, 0] - 9))
+                plus200 = argmin(abs(self.lonpad[0] - 200))
+                plus9 = argmin(abs(self.latpad[:, 0] - 9))
                 sea_label = self.labels[plus9, plus200]
                 self.mask += self.labels != sea_label
         return self
@@ -168,8 +170,8 @@ class AvisoGrid(PyEddyTracker):
 
         # Create (i, j) point arrays for good and bad data.
         # Bad data are marked by the fill_value, good data elsewhere.
-        igood = np.vstack(np.where(data != fill_value)).T
-        ibad = np.vstack(np.where(data == fill_value)).T
+        igood = vstack(where(data != fill_value)).T
+        ibad = vstack(where(data == fill_value)).T
 
         # Create a tree for the bad points, the points to be filled
         tree = spatial.cKDTree(igood)
@@ -180,14 +182,14 @@ class AvisoGrid(PyEddyTracker):
 
         # Create a normalised weight, the nearest points are weighted as 1.
         #   Points greater than one are then set to zero
-        weight = dist / (dist.min(axis=1)[:, np.newaxis])
-        weight *= np.ones_like(dist)
-        np.place(weight, weight > 1., 0.)
+        weight = dist / (dist.min(axis=1)[:, newaxis])
+        weight *= ones(dist.shape)
+        weight[weight > 1.] = 0.
 
         # Multiply the queried good points by the weight, selecting only the
         # nearest points. Divide by the number of nearest points to get average
         xfill = weight * data[igood[:, 0][iquery], igood[:, 1][iquery]]
-        xfill = (xfill / weight.sum(axis=1)[:, np.newaxis]).sum(axis=1)
+        xfill = (xfill / weight.sum(axis=1)[:, newaxis]).sum(axis=1)
 
         # Place average of nearest good points, xfill, into bad point locations
         data[ibad[:, 0], ibad[:, 1]] = xfill
@@ -262,8 +264,8 @@ class AvisoGrid(PyEddyTracker):
 
     @property
     def resolution(self):
-        return np.sqrt(np.diff(self.lon[1:], axis=1) *
-                       np.diff(self.lat[:, 1:], axis=0)).mean()
+        return sqrt(diff(self.lon[1:], axis=1) *
+                       diff(self.lat[:, 1:], axis=0)).mean()
 
     @property
     def boundary(self):
@@ -274,8 +276,8 @@ class AvisoGrid(PyEddyTracker):
         Returns:
           lon/lat boundary points
         """
-        lon = np.r_[(self.lon[:, 0], self.lon[-1],
+        lon = r_[(self.lon[:, 0], self.lon[-1],
                      self.lon[::-1, -1], self.lon[0, ::-1])]
-        lat = np.r_[(self.lat[:, 0], self.lat[-1],
+        lat = r_[(self.lat[:, 0], self.lat[-1],
                      self.lat[::-1, -1], self.lat[0, ::-1])]
         return lon, lat

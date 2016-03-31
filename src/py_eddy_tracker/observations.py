@@ -141,7 +141,7 @@ class EddiesObservations(object):
         return eddies
 
     def reset(self):
-        self.observations = np.zeros(0, dtype=self.dtype)
+        self.observations = zeros(0, dtype=self.dtype)
 
     @property
     def obs(self):

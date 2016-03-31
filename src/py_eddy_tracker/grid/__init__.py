@@ -3,7 +3,9 @@ from netCDF4 import Dataset
 from scipy import interpolate
 from scipy import spatial
 from pyproj import Proj
-import numpy as np
+from numpy import unique, array, unravel_index, r_, floor, interp, arange, \
+    sin, cos, deg2rad, arctan2, sqrt, pi, zeros, reciprocal, ma, empty, \
+    concatenate
 import logging
 from ..tracking_objects import nearest
 
@@ -106,8 +108,8 @@ class PyEddyTracker(object):
 
     @property
     def is_regular(self):
-        steps_lon = np.unique(self._lon[0, 1:] - self._lon[0,:-1])
-        steps_lat = np.unique(self._lat[1:, 0] - self._lat[:-1, 0])
+        steps_lon = unique(self._lon[0, 1:] - self._lon[0,:-1])
+        steps_lat = unique(self._lat[1:, 0] - self._lat[:-1, 0])
         return len(steps_lon) == 1 and len(steps_lat) == 1 and \
             steps_lon[0] != 0. and steps_lat[0] != 0.
     
@@ -135,14 +137,14 @@ class PyEddyTracker(object):
             
             Don't use cKDTree for regular grid
             """
-            ppoints = np.array([lon.ravel(), lat.ravel()]).T
+            ppoints = array([lon.ravel(), lat.ravel()]).T
             ptree = spatial.cKDTree(ppoints)
             pindices = ptree.query(limits, k=k)[1]
-            iind, jind = np.array([], dtype=int), np.array([], dtype=int)
+            iind, jind = array([], dtype=int), array([], dtype=int)
             for pind in pindices.ravel():
-                j, i = np.unravel_index(pind, lon.shape)
-                iind = np.r_[iind, i]
-                jind = np.r_[jind, j]
+                j, i = unravel_index(pind, lon.shape)
+                iind = r_[iind, i]
+                jind = r_[jind, j]
             return iind, jind
 
         if 'AvisoGrid' in self.__class__.__name__:
@@ -152,16 +154,16 @@ class PyEddyTracker(object):
                 Used for a zero crossing, e.g., across Agulhas region
                 """
                 if self.is_regular:
-                    i_1 = int(np.floor(np.interp((lonmin - 0.5) % 360,
+                    i_1 = int(floor(interp((lonmin - 0.5) % 360,
                                        self._lon[0],
-                                       np.arange(len(self._lon[0])))))
-                    i_0 = int(np.floor(np.interp((lonmax + 0.5) % 360,
+                                       arange(len(self._lon[0])))))
+                    i_0 = int(floor(interp((lonmax + 0.5) % 360,
                                        self._lon[0],
-                                       np.arange(len(self._lon[0])))
+                                       arange(len(self._lon[0])))
                                        ) + 1)
                 else:
                     def half_limits(lon, lat):
-                        return np.array([[lon.min(), lon.max(),
+                        return array([[lon.min(), lon.max(),
                                           lon.max(), lon.min()],
                                          [lat.min(), lat.min(),
                                           lat.max(), lat.max()]]).T
@@ -230,12 +232,12 @@ class PyEddyTracker(object):
         Return:
           distance (m)
         """
-        sin_dlat = np.sin(np.deg2rad(lat2 - lat1) * 0.5)
-        sin_dlon = np.sin(np.deg2rad(lon2 - lon1) * 0.5)
-        cos_lat1 = np.cos(np.deg2rad(lat1))
-        cos_lat2 = np.cos(np.deg2rad(lat2))
+        sin_dlat = sin(deg2rad(lat2 - lat1) * 0.5)
+        sin_dlon = sin(deg2rad(lon2 - lon1) * 0.5)
+        cos_lat1 = cos(deg2rad(lat1))
+        cos_lat2 = cos(deg2rad(lat2))
         a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
-        c_val = 2 * np.arctan2(np.sqrt(a_val), np.sqrt(1 - a_val))
+        c_val = 2 * arctan2(sqrt(a_val), sqrt(1 - a_val))
         return 6371315.0 * c_val  # Return the distance
 
     def nearest_point(self, lon, lat):
@@ -260,7 +262,7 @@ class PyEddyTracker(object):
         logging.info('--- Computing Coriolis (f), d_x(p_m),'
                      'd_y (p_n) for padded grid')
         # Get GRAVITY / Coriolis
-        self._gof = np.sin(np.deg2rad(self.latpad)) * 4. * np.pi / 86400.
+        self._gof = sin(deg2rad(self.latpad)) * 4. * pi / 86400.
         self._f_val = self._gof.copy()
         self._gof = self.GRAVITY / self._gof
 
@@ -270,21 +272,21 @@ class PyEddyTracker(object):
         latv = self.half_interp(self.latpad[:-1], self.latpad[1:])
 
         # Get p_m and p_n
-        p_m = np.zeros_like(self.lonpad)
+        p_m = zeros(self.lonpad.shape)
         p_m[:, 1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
                                            lonu[:, 1:], latu[:, 1:])
         p_m[:, 0] = p_m[:, 1]
         p_m[:, -1] = p_m[:, -2]
         self._dx = p_m
-        self._pm = np.reciprocal(p_m)
+        self._pm = reciprocal(p_m)
 
-        p_n = np.zeros_like(self.lonpad)
+        p_n = zeros(self.lonpad.shape)
         p_n[1:-1] = self.haversine_dist(lonv[:-1], latv[:-1],
                                         lonv[1:], latv[1:])
         p_n[0] = p_n[1]
         p_n[-1] = p_n[-2]
         self._dy = p_n
-        self._pn = np.reciprocal(p_n)
+        self._pn = reciprocal(p_n)
         return self
 
     def u2rho_2d(self, uu_in):
@@ -292,7 +294,7 @@ class PyEddyTracker(object):
         Convert a 2D field at u_val points to a field at rho points
         """
         def uu2ur(uu_in, m_p, l_p):
-            u_out = np.zeros((m_p, l_p))
+            u_out = zeros((m_p, l_p))
             u_out[:, 1:-1] = self.half_interp(uu_in[:, :-1], uu_in[:, 1:])
             u_out[:, 0] = u_out[:, 1]
             u_out[:, -1] = u_out[:, -2]
@@ -303,7 +305,7 @@ class PyEddyTracker(object):
     def v2rho_2d(self, vv_in):
         # Convert a 2D field at v_val points to a field at rho points
         def vv2vr(vv_in, m_p, l_p):
-            v_out = np.zeros((m_p, l_p))
+            v_out = zeros((m_p, l_p))
             v_out[1:-1] = self.half_interp(vv_in[:-1], vv_in[1:])
             v_out[0] = v_out[1]
             v_out[-1] = v_out[-2]
@@ -372,13 +374,13 @@ class PyEddyTracker(object):
         zeta1, zeta2 = zeta.data[1:].view(), zeta.data[:-1].view()
         pn1, pn2 = self.p_n[1:].view(), self.p_n[:-1].view()
         self.upad[:] = self.v2rho_2d(
-            np.ma.array((zeta1 - zeta2) * 0.5 * (pn1 + pn2), mask= self.vmask))
+            ma.array((zeta1 - zeta2) * 0.5 * (pn1 + pn2), mask= self.vmask))
         self.upad *= -self.gof
 
         zeta1, zeta2 = zeta.data[:, 1:].view(), zeta.data[:, :-1].view()
         pm1, pm2 = self.p_m[:, 1:].view(), self.p_m[:, :-1].view()
         self.vpad[:] = self.u2rho_2d(
-            np.ma.array((zeta1 - zeta2) *0.5 * (pm1 + pm2), mask=self.umask))
+            ma.array((zeta1 - zeta2) *0.5 * (pm1 + pm2), mask=self.umask))
         self.vpad *= self.gof
         return self
 
@@ -388,13 +390,13 @@ class PyEddyTracker(object):
         """
         j_size = self.slice_j_pad.stop - self.slice_j_pad.start
         if self.zero_crossing:
-            u_1 = np.empty((j_size, self.slice_i_pad.start))
-            u_0 = np.empty((j_size, self._lon.shape[1] - self.slice_i_pad.stop))
-            self.upad = np.ma.concatenate((u_0, u_1), axis=1)
+            u_1 = empty((j_size, self.slice_i_pad.start))
+            u_0 = empty((j_size, self._lon.shape[1] - self.slice_i_pad.stop))
+            self.upad = ma.concatenate((u_0, u_1), axis=1)
         else:
-            self.upad = np.empty((j_size,
+            self.upad = empty((j_size,
                                   self.slice_i_pad.stop - self.slice_i_pad.start))
-        self.vpad = np.empty_like(self.upad)
+        self.vpad = empty(self.upad.shape)
 
     def get_eke(self):
         """
@@ -412,7 +414,7 @@ class PyEddyTracker(object):
         if hasattr(uspd, 'mask'):
             uspd.mask += self.mask[self.view_unpad]
         else:
-            uspd = np.ma.array(uspd, mask=self.mask[self.view_unpad])
+            uspd = ma.array(uspd, mask=self.mask[self.view_unpad])
         return uspd
 
     def set_interp_coeffs(self, sla, uspd):
@@ -429,8 +431,8 @@ class PyEddyTracker(object):
     def create_index_inverse(slice_to_inverse, size):
         """Return an array of index
         """
-        index = np.concatenate((np.arange(slice_to_inverse.stop, size),
-                                np.arange(slice_to_inverse.start)))
+        index = concatenate((arange(slice_to_inverse.stop, size),
+                                arange(slice_to_inverse.start)))
         return index
 
     def gaussian_resolution(self, zwl, mwl):
