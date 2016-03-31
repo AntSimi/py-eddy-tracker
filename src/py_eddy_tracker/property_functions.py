@@ -345,6 +345,9 @@ def _fit_circle_path(self):
     c_x, c_y = proj(self.lon, self.lat)
     try:
         centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c(c_x, c_y)
+        centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
+        centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
+        self._circle_params =  centlon_e, centlat_e, eddy_radius_e, aerr
     except ZeroDivisionError:
         # Some time, edge is only a dot of few coordinates
         if len(unique(self.lon)) == 1 and len(unique(self.lat)) == 1:
@@ -352,10 +355,6 @@ def _fit_circle_path(self):
             logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
                           self.lat)
             self._circle_params =  0, -90, nan, nan
-
-    centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
-    centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
-    self._circle_params =  centlon_e, centlat_e, eddy_radius_e, aerr
 
 BasePath.fit_circle = fit_circle_path
 BasePath._fit_circle_path = _fit_circle_path
@@ -368,8 +367,6 @@ def collection_loop(contours, grd, rtime, eddy,
     """
     if eddy.diagnostic_type not in ['Q', 'SLA']:
         raise Exception('Unknown Diagnostic : %s' % eddy.diagnostic_type)
-
-    has_ts = False
 
     sign_type = eddy.sign_type
     anticyclonic_search = 'Anticyclonic' in sign_type
@@ -547,8 +544,8 @@ def collection_loop(contours, grd, rtime, eddy,
                             contlon_s, contlat_s,
                             fixed_size=eddy.track_array_variables_sampling)
 
-                    if not has_ts:  # for AVISO
-                        eddy.update_eddy_properties(properties)
+                    # for AVISO
+                    eddy.update_eddy_properties(properties)
 
                     # Mask out already found eddies
                     eddy.sla[eddy.slice_j, eddy.slice_i][

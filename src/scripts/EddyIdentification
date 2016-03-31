@@ -43,13 +43,6 @@ from py_eddy_tracker.grid.aviso import AvisoGrid
 from py_eddy_tracker.tracking_objects import IdentificationList
 
 
-def circle_process(paths):
-    nb_proc = 4
-    def fit_circle_path(item):
-        item._fit_circle_path()
-    threads = Pool(nb_proc)
-    threads.map(fit_circle_path, paths)
-
 if __name__ == '__main__':
     # Run using:
     PARSER = EddyParser("Tool to detect eddies. "
@@ -67,9 +60,9 @@ if __name__ == '__main__':
 
     # Setup configuration
     SAVE_DIR = CONFIG['PATHS']['SAVE_DIR']
+    logging.info('Outputs saved to %(SAVE_DIR)s', CONFIG['PATHS'])
     if not exists(SAVE_DIR):
         mkdir(SAVE_DIR)
-    logging.info('Outputs saved to %(SAVE_DIR)s', CONFIG['PATHS'])
 
     DIAGNOSTIC_TYPE = CONFIG['DIAGNOSTIC_TYPE']
     if DIAGNOSTIC_TYPE not in ['SLA']:
@@ -126,7 +119,8 @@ if __name__ == '__main__':
     GRID_NAME = CONFIG['DATASET']['VAR_NAME']
     LAT_NAME = CONFIG['DATASET']['LAT_NAME']
     LON_NAME = CONFIG['DATASET']['LON_NAME']
-
+    
+    logging.info('Search files : %s', DATA_DIR + FILES_MODEL)
     DATASET_FILES = glob(DATA_DIR + FILES_MODEL)
 
     DATASET_LIST = array(DATASET_FILES,
@@ -142,6 +136,7 @@ if __name__ == '__main__':
             item['date'] = datetime.strptime(str_date, PATTERN_DATE).date()
 
     DATASET_LIST.sort(order=['date', 'filename'])
+    logging.info('Filtering grid by time %s, %s', START_DATE, END_DATE)
     MASK_DATE = (DATASET_LIST['date'] >= START_DATE) * (
         DATASET_LIST['date'] <= END_DATE)
 
