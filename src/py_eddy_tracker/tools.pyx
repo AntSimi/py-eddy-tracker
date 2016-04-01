@@ -15,6 +15,7 @@ cdef DTYPE_coord D2R = 0.017453292519943295
 cdef DTYPE_coord PI = 3.141592653589793
 cdef DTYPE_coord EARTH_DIAMETER = 6371.3150 * 2
 
+
 @wraparound(False)
 @boundscheck(False)
 def fit_circle_c(
@@ -200,6 +201,7 @@ def winding_number_poly(
                     wn -= 1
     return wn
 
+
 @wraparound(False)
 @boundscheck(False)
 def distance(
@@ -284,9 +286,8 @@ cdef dist_array_size(
         ):
     """Give slice to select data
     """
-    cdef DTYPE_ui i_elt, nb_pts
+    cdef DTYPE_ui i_elt
     i_end[0] = i_start + nb_c_per_l
-    nb_pts = 0
 
     c_start[0] = c_i[i_start]
     c_end[0] = c_start[0]
@@ -370,3 +371,53 @@ cdef nearest_contour_index(
             dist_ref = dist
             i_ref = i_elt
     nearesti[0] = i_ref - start
+
+
+@wraparound(False)
+@boundscheck(False)
+def index_from_nearest_path_with_pt_in_bbox(
+        DTYPE_ui level_index,
+        ndarray[DTYPE_ui] l_i,
+        ndarray[DTYPE_ui] nb_c_per_l,
+        ndarray[DTYPE_ui] nb_pt_per_c,
+        ndarray[DTYPE_ui] indices_of_first_pts,
+        ndarray[DTYPE_coord] x_value,
+        ndarray[DTYPE_coord] y_value,
+        ndarray[DTYPE_coord] x_min_per_c,
+        ndarray[DTYPE_coord] y_min_per_c,
+        ndarray[DTYPE_coord] x_max_per_c,
+        ndarray[DTYPE_coord] y_max_per_c,
+        DTYPE_coord xpt,
+        DTYPE_coord ypt,
+        ):
+    """Get index from nearest path in edge bbox contain pt
+    """
+    cdef DTYPE_ui i_start_c, i_end_c, i_elt_c, i_start_pt, i_end_pt, i_elt_pt
+    cdef DTYPE_ui i_ref, nb_contour, find_contour
+    cdef DTYPE_coord dist_ref, dist
+    find_contour = 0
+    i_start_c = l_i[level_index]
+    nb_contour = nb_c_per_l[level_index]
+    if nb_contour == 0:
+        return None
+    i_end_c = i_start_c + nb_c_per_l[level_index]
+
+    i_ref = i_start_c    
+    i_start_pt = indices_of_first_pts[i_start_c]
+    dist_ref = (x_value[i_start_pt] - xpt) ** 2 + (y_value[i_start_pt] - ypt) ** 2
+
+    for i_elt_c from i_start_c <= i_elt_c < i_end_c:
+        if x_min_per_c[i_elt_c] > xpt or x_max_per_c[i_elt_c] < xpt or y_min_per_c[i_elt_c] > ypt or y_max_per_c[i_elt_c] < ypt:
+            continue
+        i_start_pt = indices_of_first_pts[i_elt_c]
+        i_end_pt = i_start_pt + nb_pt_per_c[i_elt_c]
+        find_contour = 1
+        
+        for i_elt_pt from i_start_pt <= i_elt_pt < i_end_pt:
+            dist = (x_value[i_elt_pt] - xpt) ** 2 + (y_value[i_elt_pt] - ypt) ** 2
+            if dist < dist_ref:
+                dist_ref = dist
+                i_ref = i_elt_c            
+    if find_contour == 0:
+        return None
+    return i_ref - i_start_c

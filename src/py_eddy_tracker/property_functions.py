@@ -237,7 +237,8 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
             corrected_coll_index = nb_coll - coll_index - 1
 
         # Leave loop if no contours at level citer.index
-        theindex = eddy.swirl.get_index_nearest_path(
+        #~ theindex = eddy.swirl.get_index_nearest_path(
+        theindex = eddy.swirl.get_index_nearest_path_bbox_contain_pt(
             corrected_coll_index, centlon_e, centlat_e)
         if theindex is None:
             continue

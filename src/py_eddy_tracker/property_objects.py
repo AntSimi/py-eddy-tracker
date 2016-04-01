@@ -33,7 +33,8 @@ from scipy.interpolate import griddata
 from scipy.ndimage import binary_erosion
 from scipy.ndimage import minimum_filter
 from numpy import array, isfinite, ma, where, ones
-from .tools import index_from_nearest_path, distance_matrix
+from .tools import index_from_nearest_path, \
+    index_from_nearest_path_with_pt_in_bbox, distance_matrix
 import logging
 
 
@@ -224,28 +225,61 @@ class SwirlSpeed(object):
       grd:
         A grid object
     """
-    def __init__(self, contour):
+    def __init__(self, contour, nearest_contain_in_bbox=False):
         """
         c_i : index to contours
         l_i : index to levels
         """
         x_list, y_list, ci_list, li_list = [], [], [], []
+        x_min_list, y_min_list, x_max_list, y_max_list = [], [], [], []
 
         for cont in contour.collections:
             for coll in cont.get_paths():
-                x_list.append(coll.vertices[:, 0])
-                y_list.append(coll.vertices[:, 1])
-                ci_list.append(len(coll.vertices[:, 0]))
+                x_val, y_val = coll.vertices[:, 0], coll.vertices[:, 1]
+                x_min_list.append(x_val.min())
+                x_max_list.append(x_val.max())
+                y_min_list.append(y_val.min())
+                y_max_list.append(y_val.max())
+                x_list.append(x_val)
+                y_list.append(y_val)
+                ci_list.append(coll.vertices.shape[0])
             li_list.append(len(cont.get_paths()))
 
         self.x_value = array([val for sublist in x_list for val in sublist])
         self.y_value = array([val for sublist in y_list for val in sublist])
+
+        self.x_min_per_c = array(x_min_list)
+        self.y_min_per_c = array(y_min_list)
+        self.x_max_per_c = array(x_max_list)
+        self.y_max_per_c = array(y_max_list)
+
         self.nb_pt_per_c = array(ci_list, dtype='u4')
         self.c_i = array(self.nb_pt_per_c.cumsum() - self.nb_pt_per_c,
                          dtype='u4')
         self.nb_c_per_l = array(li_list, dtype='u4')
         self.l_i = array(self.nb_c_per_l.cumsum() - self.nb_c_per_l,
                          dtype='u4')
+                         
+        self.nearest_contain_in_bbox = nearest_contain_in_bbox
+
+    def get_index_nearest_path_bbox_contain_pt(self, level, xpt, ypt):
+        """
+        """
+        return index_from_nearest_path_with_pt_in_bbox(
+            level,
+            self.l_i,
+            self.nb_c_per_l,
+            self.nb_pt_per_c,
+            self.c_i,
+            self.x_value,
+            self.y_value,
+            self.x_min_per_c,
+            self.y_min_per_c,
+            self.x_max_per_c,
+            self.y_max_per_c,
+            xpt,
+            ypt
+            )
 
     def get_index_nearest_path(self, level, xpt, ypt):
         """
