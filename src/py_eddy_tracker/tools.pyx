@@ -395,29 +395,50 @@ def index_from_nearest_path_with_pt_in_bbox(
     cdef DTYPE_ui i_start_c, i_end_c, i_elt_c, i_start_pt, i_end_pt, i_elt_pt
     cdef DTYPE_ui i_ref, nb_contour, find_contour
     cdef DTYPE_coord dist_ref, dist
-    find_contour = 0
-    i_start_c = l_i[level_index]
+    # Nb contour in level
     nb_contour = nb_c_per_l[level_index]
     if nb_contour == 0:
         return None
+    # First contour in level
+    i_start_c = l_i[level_index]
+    # First contour of the next level
     i_end_c = i_start_c + nb_c_per_l[level_index]
 
+    # Flag to check if we iterate
+    find_contour = 0
+    # We select the first pt of the first contour in the level
+    # to initialize dist
     i_ref = i_start_c    
     i_start_pt = indices_of_first_pts[i_start_c]
     dist_ref = (x_value[i_start_pt] - xpt) ** 2 + (y_value[i_start_pt] - ypt) ** 2
 
+    # We iterate over contour in the same level
     for i_elt_c from i_start_c <= i_elt_c < i_end_c:
-        if x_min_per_c[i_elt_c] > xpt or x_max_per_c[i_elt_c] < xpt or y_min_per_c[i_elt_c] > ypt or y_max_per_c[i_elt_c] < ypt:
+        # if bbox of contour doesn't contain pt, we skip this contour
+        if x_min_per_c[i_elt_c] > xpt:
             continue
+        if x_max_per_c[i_elt_c] < xpt:
+            continue
+        if y_min_per_c[i_elt_c] > ypt:
+            continue
+        if y_max_per_c[i_elt_c] < ypt:
+            continue
+        # Indice of first pt of contour
         i_start_pt = indices_of_first_pts[i_elt_c]
+        # Indice of first pt of the next contour
         i_end_pt = i_start_pt + nb_pt_per_c[i_elt_c]
+        # We set flag to true, because we check contour
         find_contour = 1
         
+        # We do iteration on pt to check dist, if it's inferior we store
+        # index of contour
         for i_elt_pt from i_start_pt <= i_elt_pt < i_end_pt:
             dist = (x_value[i_elt_pt] - xpt) ** 2 + (y_value[i_elt_pt] - ypt) ** 2
             if dist < dist_ref:
                 dist_ref = dist
                 i_ref = i_elt_c            
+    # No iteration on contour, we return no index of contour
     if find_contour == 0:
         return None
+    # We return index of contour, for the specific level
     return i_ref - i_start_c
