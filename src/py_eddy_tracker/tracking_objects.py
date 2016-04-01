@@ -79,7 +79,11 @@ class IdentificationList(object):
         self.diagnostic_type = kwargs.get('DIAGNOSTIC_TYPE', 'SLA')
         self.the_domain = kwargs.get('THE_DOMAIN', 'Regional')
         self.track_extra_variables = kwargs.get('TRACK_EXTRA_VARIABLES', [])
+        if self.track_extra_variables is None:
+           self.track_extra_variables = [] 
         array_properties = kwargs.get('TRACK_ARRAY_VARIABLES', dict())
+        if array_properties is None:
+           array_properties = dict() 
         self.track_array_variables_sampling = array_properties.get('NB_SAMPLES', 0)
         self.track_array_variables = array_properties.get('VARIABLES', [])
         self.smoothing = kwargs.get('SMOOTHING', True)
