@@ -362,16 +362,14 @@ BasePath.fit_circle = fit_circle_path
 BasePath._fit_circle_path = _fit_circle_path
 
 
-def collection_loop(contours, grd, rtime, eddy,
-                    x_i=None, c_s_xi=None):
+def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
     """
     Loop over each collection of contours
     """
     if eddy.diagnostic_type not in ['Q', 'SLA']:
         raise Exception('Unknown Diagnostic : %s' % eddy.diagnostic_type)
 
-    sign_type = eddy.sign_type
-    anticyclonic_search = 'Anticyclonic' in sign_type
+    anticyclonic_search = 'Anticyclonic' in eddy.sign_type
     iterator = 1 if anticyclonic_search else -1
 
     # Set contour coordinates and indices for calculation of
@@ -524,7 +522,6 @@ def collection_loop(contours, grd, rtime, eddy,
                 properties.obs['radius_s'] = eddy_radius_s
                 properties.obs['speed_radius'] = uavg
                 properties.obs['radius_e'] = eddy_radius_e
-                properties.obs['time'] = rtime
                 properties.obs['eke'] = teke
                 if 'shape_error' in eddy.track_extra_variables:
                     properties.obs['shape_error'] = aerr
@@ -555,8 +552,6 @@ def collection_loop(contours, grd, rtime, eddy,
                     eddy.sla[eddy.slice_j, eddy.slice_i][
                         eddy.mask_eff] = eddy.fillval
 
-    # Leave collection_loop
-    return eddy
 
 
 def func_hann2d_fast(var, numpasses):

@@ -30,10 +30,9 @@ from scipy.ndimage import gaussian_filter
 from matplotlib.dates import date2num, num2julian
 from matplotlib.figure import Figure
 from re import compile as re_compile
-from os.path import exists
+from os.path import exists, join
 from os import mkdir
-from multiprocessing import Pool
-from numpy import array, arange, atleast_1d, unique, round, int, place, interp, pi
+from numpy import array, arange, atleast_1d, unique, round, int, interp, pi
 
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.property_functions import \
@@ -43,126 +42,134 @@ from py_eddy_tracker.grid.aviso import AvisoGrid
 from py_eddy_tracker.tracking_objects import IdentificationList
 
 
-if __name__ == '__main__':
-    # Run using:
-    PARSER = EddyParser("Tool to detect eddies. "
+def load_config():
+    # Command Parser
+    parser = EddyParser("Tool to detect eddies. "
                         "To run use EddyIdentification "
                         "eddy_tracker_configuration.yaml'")
-    PARSER.add_argument('yaml_file',
+    parser.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
-    YAML_FILE = PARSER.parse_args().yaml_file
+    opts = parser.parse_args()
 
     # Read yaml configuration file
-    with open(YAML_FILE, 'r') as stream:
-        CONFIG = yaml_load(stream)
+    config = None
+    with open(opts.yaml_file, 'r') as stream:
+        config = yaml_load(stream)
+    if config is None:
+        raise Exception('Yaml file empty')
+    logging.info('Launching with yaml file: %s', opts.yaml_file)
+    
+    # Create ouput directory if needed
+    save_dir = config['PATHS']['SAVE_DIR']
+    logging.info('Outputs saved to %(SAVE_DIR)s', config['PATHS'])
+    if not exists(save_dir):
+        mkdir(save_dir)
+    
+    diagnostic_type = config['DIAGNOSTIC_TYPE']
+    if diagnostic_type not in ['SLA']:
+        raise Exception('Unknown diagnostic %s', diagnostic_type)
+    
 
-    logging.info('Launching with yaml file: %s', YAML_FILE)
-
-    # Setup configuration
-    SAVE_DIR = CONFIG['PATHS']['SAVE_DIR']
-    logging.info('Outputs saved to %(SAVE_DIR)s', CONFIG['PATHS'])
-    if not exists(SAVE_DIR):
-        mkdir(SAVE_DIR)
-
-    DIAGNOSTIC_TYPE = CONFIG['DIAGNOSTIC_TYPE']
-    if DIAGNOSTIC_TYPE not in ['SLA']:
-        raise Exception('Unknown diagnostic %s', DIAGNOSTIC_TYPE)
-
-    CONFIG['THE_DOMAIN'] = CONFIG['DOMAIN']['THE_DOMAIN']
+    config['THE_DOMAIN'] = config['DOMAIN']['THE_DOMAIN']
 
     # It is not recommended to change values given below
     # for 'Global', 'BlackSea' or 'MedSea'...
-    if 'Global' in CONFIG['THE_DOMAIN']:
-        CONFIG['lonmin'] = -100.
-        CONFIG['lonmax'] = 290.
-        CONFIG['latmin'] = -80.
-        CONFIG['latmax'] = 80.
+    if 'Global' in config['THE_DOMAIN']:
+        config['lonmin'] = -100.
+        config['lonmax'] = 290.
+        config['latmin'] = -80.
+        config['latmax'] = 80.
 
-    elif CONFIG['THE_DOMAIN'] in ('Regional'):
-        CONFIG['lonmin'] = CONFIG['DOMAIN']['LONMIN']
-        CONFIG['lonmax'] = CONFIG['DOMAIN']['LONMAX']
-        CONFIG['latmin'] = CONFIG['DOMAIN']['LATMIN']
-        CONFIG['latmax'] = CONFIG['DOMAIN']['LATMAX']
+    elif config['THE_DOMAIN'] in ('Regional'):
+        config['lonmin'] = config['DOMAIN']['LONMIN']
+        config['lonmax'] = config['DOMAIN']['LONMAX']
+        config['latmin'] = config['DOMAIN']['LATMIN']
+        config['latmax'] = config['DOMAIN']['LATMAX']
 
-    START_DATE = CONFIG['DATE_STR'] = CONFIG['DOMAIN']['DATE_STR']
-    END_DATE = CONFIG['DATE_END'] = CONFIG['DOMAIN']['DATE_END']
-    if START_DATE > END_DATE:
+    config['DATE_STR'] = config['DOMAIN']['DATE_STR']
+    config['DATE_END'] = config['DOMAIN']['DATE_END']
+    if config['DATE_STR'] > config['DATE_END']:
         raise Exception('DATE_END must be larger than DATE_STR')
 
-    if 'SLA' in DIAGNOSTIC_TYPE:
-        MAX_SLA = CONFIG['CONTOUR_PARAMETER'
-                         ]['CONTOUR_PARAMETER_SLA']['MAX_SLA']
-        INTERVAL = CONFIG['CONTOUR_PARAMETER'
-                          ]['CONTOUR_PARAMETER_SLA']['INTERVAL']
-        CONFIG['CONTOUR_PARAMETER'] = arange(-MAX_SLA, MAX_SLA + INTERVAL,
-                                                INTERVAL)
-        # AMPMIN = CONFIG['AMPMIN']
-        # AMPMAX = CONFIG['AMPMAX']
 
-    SMOOTHING = CONFIG['SMOOTHING']
-    if SMOOTHING:
-        if 'SLA' in DIAGNOSTIC_TYPE:
-            ZWL = atleast_1d(CONFIG['SMOOTHING_SLA']['ZWL'])
-            MWL = atleast_1d(CONFIG['SMOOTHING_SLA']['MWL'])
-        SMOOTHING_TYPE = CONFIG['SMOOTHING_SLA']['TYPE']
+    if 'SLA' in diagnostic_type:
+        max_sla = config['CONTOUR_PARAMETER'
+                         ]['CONTOUR_PARAMETER_SLA']['MAX_SLA']
+        interval = config['CONTOUR_PARAMETER'
+                          ]['CONTOUR_PARAMETER_SLA']['INTERVAL']
+        config['CONTOUR_PARAMETER'] = arange(-max_sla, max_sla + interval,
+                                                interval)
+
+    smoothing = config['SMOOTHING']
+    if smoothing:
+        if 'SLA' in diagnostic_type:
+            config['SMOOTHING_SLA']['ZWL'] = atleast_1d(config['SMOOTHING_SLA']['ZWL'])
+            config['SMOOTHING_SLA']['MWL'] = atleast_1d(config['SMOOTHING_SLA']['MWL'])
+    return config
+
+def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
+        start_date, end_date, sub_sampling_step=1):
+    pattern_regexp = re_compile('.*/' + date_regexp)
+    full_path = join(data_dir, files_model)
+    logging.info('Search files : %s', full_path)
+
+    dataset_list = array(glob(full_path),
+                         dtype=[('filename', 'S256'),
+                                ('date', 'datetime64[D]'),
+                                ])
+
+    logging.info('%s grids available', dataset_list.shape[0])
+    for item in dataset_list:
+        result = pattern_regexp.match(item['filename'])
+        if result:
+            str_date = result.groups()[0]
+            item['date'] = datetime.strptime(str_date, date_model).date()
+
+    dataset_list.sort(order=['date', 'filename'])
+    logging.info('Filtering grid by time %s, %s', start_date, end_date)
+    mask = (dataset_list['date'] >= start_date) * (
+        dataset_list['date'] <= end_date)
+
+    steps = unique(dataset_list['date'][1:] - dataset_list['date'][:-1])
+    if len(steps) != 1:
+        raise Exception('Several days steps in grid dataset %s' % steps)
+
+    if sub_sampling_step != 1:
+        logging.info('Grid subsampling %d', sub_sampling_step)
+        dataset_list = dataset_list[::sub_sampling_step]
+
+    dataset_list = dataset_list[mask]
+    return dataset_list
+
+
+if __name__ == '__main__':
+    CONFIG = load_config()
+    DATASET_LIST = browse_dataset_in(
+        data_dir=CONFIG['DATASET']['DATA_DIR'],
+        files_model=CONFIG['DATASET']['FILES_MODEL'],
+        date_regexp=CONFIG['DATASET']['DATE_REGEXP'],
+        date_model=CONFIG['DATASET']['DATE_MODEL'],
+        start_date=CONFIG['DATE_STR'],
+        end_date=CONFIG['DATE_END'],
+        sub_sampling_step=CONFIG['DATASET']['SUBSAMPLING'],
+        )
 
     # End user configuration setup options
     # ----------------------------------------------------------
-
-    # Get complete AVISO file list
-    DATA_DIR = CONFIG['DATASET']['DATA_DIR']
-    FILES_MODEL = CONFIG['DATASET']['FILES_MODEL']
-    SUBSAMPLING_STEP = CONFIG['DATASET']['SUBSAMPLING']
-    DATE_REGEXP = re_compile('.*/' + CONFIG['DATASET']['DATE_REGEXP'])
-    PATTERN_DATE = CONFIG['DATASET']['DATE_MODEL']
-
-    GRID_NAME = CONFIG['DATASET']['VAR_NAME']
-    LAT_NAME = CONFIG['DATASET']['LAT_NAME']
-    LON_NAME = CONFIG['DATASET']['LON_NAME']
-    
-    logging.info('Search files : %s', DATA_DIR + FILES_MODEL)
-    DATASET_FILES = glob(DATA_DIR + FILES_MODEL)
-
-    DATASET_LIST = array(DATASET_FILES,
-                            dtype=[('date', 'datetime64[D]'),
-                                   ('filename', 'S256')])
-    DATASET_LIST['filename'] = array(DATASET_FILES)
-
-    logging.info('%s grids available', DATASET_LIST.shape[0])
-    for item in DATASET_LIST:
-        result = DATE_REGEXP.match(item['filename'])
-        if result:
-            str_date = result.groups()[0]
-            item['date'] = datetime.strptime(str_date, PATTERN_DATE).date()
-
-    DATASET_LIST.sort(order=['date', 'filename'])
-    logging.info('Filtering grid by time %s, %s', START_DATE, END_DATE)
-    MASK_DATE = (DATASET_LIST['date'] >= START_DATE) * (
-        DATASET_LIST['date'] <= END_DATE)
-
-    STEPS = unique(DATASET_LIST['date'][1:] - DATASET_LIST['date'][:-1])
-    if len(STEPS) != 1:
-        raise Exception('Several days steps in grid dataset %s' % STEPS)
-    else:
-        DAYS_BTWN_RECORDS = STEPS[0]
-
-    if SUBSAMPLING_STEP != 1:
-        logging.info('Grid subsampling %d', SUBSAMPLING_STEP)
-        DATASET_LIST = DATASET_LIST[::SUBSAMPLING_STEP]
-
-    DATASET_LIST = DATASET_LIST[MASK_DATE]
 
     # Set up a grid object using first AVISO file in the list
     SLA_GRD = AvisoGrid(DATASET_LIST[0]['filename'], CONFIG['THE_DOMAIN'],
                         CONFIG['lonmin'], CONFIG['lonmax'],
                         CONFIG['latmin'], CONFIG['latmax'],
-                        grid_name=GRID_NAME,
-                        lon_name=LON_NAME,
-                        lat_name=LAT_NAME)
+                        grid_name=CONFIG['DATASET']['VAR_NAME'],
+                        lon_name=CONFIG['DATASET']['LON_NAME'],
+                        lat_name=CONFIG['DATASET']['LAT_NAME'])
 
-    if 'Gaussian' in SMOOTHING_TYPE:
+    if 'Gaussian' in CONFIG['SMOOTHING_SLA']['TYPE']:
         # Get parameters for gaussian_filter
-        ZRES, MRES = SLA_GRD.gaussian_resolution(ZWL, MWL)
+        ZRES, MRES = SLA_GRD.gaussian_resolution(
+            CONFIG['SMOOTHING_SLA']['ZWL'],
+            CONFIG['SMOOTHING_SLA']['MWL'])
 
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
@@ -181,7 +188,7 @@ if __name__ == '__main__':
     logging.info('Start tracking')
 
     # Loop over grid
-    for date, filename in DATASET_LIST:
+    for filename, date in DATASET_LIST:
         date = date.astype(dt.date)
         # Extract grid date
         grd_int_date = num2julian(date2num(date))
@@ -199,13 +206,13 @@ if __name__ == '__main__':
         sla = SLA_GRD.get_aviso_data(filename)
         SLA_GRD.set_mask(sla).uvmask()
 
-        if SMOOTHING:
-            if 'Gaussian' in SMOOTHING_TYPE:
+        if CONFIG['SMOOTHING']:
+            if 'Gaussian' in CONFIG['SMOOTHING_SLA']['TYPE']:
                 logging.info('applying Gaussian high-pass filter')
                 # Set landpoints to zero
-                place(sla, SLA_GRD.mask, 0.)
+                sla[SLA_GRD.mask] = 0.
                 if hasattr(sla, 'data'):
-                    place(sla, sla.data == SLA_GRD.fillval, 0.)
+                    sla[sla.data == SLA_GRD.fillval] = 0.
                 # High pass filter, see
                 # http://stackoverflow.com/questions/6094957/high-pass-filter-
                 # for-image-processing-in-python-by-using-scipy-numpy
@@ -234,7 +241,7 @@ if __name__ == '__main__':
         # Calculate EKE
         SLA_GRD.get_eke()
 
-        if 'SLA' in DIAGNOSTIC_TYPE:
+        if 'SLA' in CONFIG['DIAGNOSTIC_TYPE']:
             A_EDDY.sla = sla.copy()
             C_EDDY.sla = sla.copy()
 
@@ -249,7 +256,7 @@ if __name__ == '__main__':
         C_EDDY.sla_coeffs = SLA_GRD.sla_coeffs
         C_EDDY.uspd_coeffs = SLA_GRD.uspd_coeffs
 
-        if 'SLA' in DIAGNOSTIC_TYPE:
+        if 'SLA' in CONFIG['DIAGNOSTIC_TYPE']:
             logging.info('Processing SLA contours for eddies')
             MIN_SLA, MAX_SLA = A_EDDY.sla.min(), A_EDDY.sla.max()
             if (MIN_SLA < A_EDDY.contour_parameter[0]) or (
@@ -257,6 +264,7 @@ if __name__ == '__main__':
                 logging.warning('SLA values [%f,%f] is larger than levels %s',
                                 MIN_SLA, MAX_SLA, A_EDDY.contour_parameter)
             
+            # we reduce levels if don't needed
             i_min, i_max = interp(
                 (MIN_SLA, MAX_SLA),
                 A_EDDY.contour_parameter,
@@ -266,18 +274,8 @@ if __name__ == '__main__':
             A_EDDY.contour_parameter = A_EDDY.contour_parameter[i_min:i_max]
             C_EDDY.contour_parameter = C_EDDY.contour_parameter[i_min:i_max]
             
-            CONTOURS = CONT_AX.contour(
-                SLA_GRD.lon,
-                SLA_GRD.lat,
-                A_EDDY.sla,
-                levels=A_EDDY.contour_parameter)
-            
-            # MultiThreading on path to fit circle could accelerate processing
-            # may be in python 3
-            #~ paths = []
-            #~ for i in CONTOURS.collections:
-                #~ paths += i.get_paths()
-            #~ circle_process(paths)
+            CONTOURS = CONT_AX.contour(SLA_GRD.lon, SLA_GRD.lat, A_EDDY.sla,
+                                       levels=A_EDDY.contour_parameter)
             # Note that C_CS is in reverse order
             logging.info('Processing SLA contours for eddies -- Ok')
 
@@ -287,21 +285,23 @@ if __name__ == '__main__':
         C_EDDY.swirl = A_EDDY.swirl
 
         # Now we loop over the CS collection
-        if 'SLA' in DIAGNOSTIC_TYPE:
+        if 'SLA' in CONFIG['DIAGNOSTIC_TYPE']:
             logging.info("Anticyclonic research")
-            A_EDDY = collection_loop(CONTOURS, SLA_GRD, grd_int_date, A_EDDY)
-            # Note that C_CS is reverse order
+            collection_loop(CONTOURS, SLA_GRD, A_EDDY)
             logging.info("Cyclonic research")
-            C_EDDY = collection_loop(CONTOURS, SLA_GRD, grd_int_date, C_EDDY)
+            collection_loop(CONTOURS, SLA_GRD, C_EDDY)
 
+        A_EDDY.observations.obs['time'] = grd_int_date
+        C_EDDY.observations.obs['time'] = grd_int_date
         # clear the current axis
         CONT_AX.cla()
         # Save file
-        A_EDDY.write_netcdf(path=SAVE_DIR)
-        C_EDDY.write_netcdf(path=SAVE_DIR)
+        A_EDDY.write_netcdf(path=CONFIG['PATHS']['SAVE_DIR'])
+        C_EDDY.write_netcdf(path=CONFIG['PATHS']['SAVE_DIR'])
+        del CONTOURS, A_EDDY, C_EDDY
 
     # Total running time
     logging.info('Mean duration by loop : %s',
                  (datetime.now() - START_TIME) / len(DATASET_LIST))
     logging.info('Duration : %s', datetime.now() - START_TIME)
-    logging.info('Outputs saved to %s', SAVE_DIR)
+    logging.info('Outputs saved to %s', CONFIG['PATHS']['SAVE_DIR'])
