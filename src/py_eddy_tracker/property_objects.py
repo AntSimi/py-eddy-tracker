@@ -34,8 +34,7 @@ from scipy.ndimage import binary_erosion
 from scipy.ndimage import minimum_filter
 from numpy import array, isfinite, ma, where, ones
 from .tools import index_from_nearest_path, \
-    index_from_nearest_path_with_pt_in_bbox, distance_matrix
-import logging
+    index_from_nearest_path_with_pt_in_bbox
 
 
 class Amplitude (object):
@@ -59,21 +58,19 @@ class Amplitude (object):
     def __init__(self, contlon, contlat, eddy, grd):
         """
         """
-        self.contlon = contlon.copy()
-        self.contlat = contlat.copy()
         eddy.grd = grd  # temporary fix
         self.eddy = eddy
         self.sla = self.eddy.sla[self.jslice,
                                  self.islice].copy()
 
         if 'RectBivariate' in eddy.interp_method:
-            h_0 = grd.sla_coeffs.ev(self.contlat[1:], self.contlon[1:])
+            h_0 = grd.sla_coeffs.ev(contlat[1:], contlon[1:])
 
         elif 'griddata' in eddy.interp_method:
             points = array([grd.lon()[self.jslice, self.islice].ravel(),
                                grd.lat()[self.jslice, self.islice].ravel()]).T
             h_0 = griddata(points, self.sla.ravel(),
-                           (self.contlon[1:], self.contlat[1:]),
+                           (contlon[1:], contlat[1:]),
                            'linear')
         else:
             raise Exception('Unknown method : %s' % eddy.interp_method)
@@ -82,7 +79,7 @@ class Amplitude (object):
         self.amplitude = 0  # atleast_1d(0.)
         self.local_extrema = None  # int(0)
         self.local_extrema_inds = None
-        self.sla = ma.masked_where(-self.mask, self.sla)
+        self.sla = ma.array(self.sla, mask=-self.mask)
 
     @property
     def islice(self):
@@ -99,7 +96,7 @@ class Amplitude (object):
     @property
     def mle(self):
         return self.eddy.max_local_extrema
-    
+
     def within_amplitude_limits(self):
         """
         """
@@ -107,16 +104,14 @@ class Amplitude (object):
                 self.amplitude <= self.eddy.ampmax)
 
     def _set_cyc_amplitude(self):
+        """Get amplitude for cyclone
         """
-        """
-        self.amplitude = self.h_0
-        self.amplitude -= self.sla.min()
+        self.amplitude = self.h_0 - self.sla.min()
 
     def _set_acyc_amplitude(self):
+        """Get amplitude for anticyclone
         """
-        """
-        self.amplitude = self.sla.max()
-        self.amplitude -= self.h_0
+        self.amplitude = self.sla.max() - self.h_0
 
     def all_pixels_below_h0(self, level):
         """
@@ -184,7 +179,7 @@ class Amplitude (object):
         """
         self._detect_local_minima(self.sla * sign)
 
-    def _detect_local_minima(self, arr):
+    def _detect_local_minima(self, grid):
         """
         Take an array and detect the troughs using the local maximum filter.
         Returns a boolean mask of the troughs (i.e., 1 when
@@ -193,12 +188,12 @@ class Amplitude (object):
         """
         # Equivalent
         neighborhood = ones((3, 3), dtype='bool')
-        #~ neighborhood = generate_binary_structure(arr.ndim, 2)
+        #~ neighborhood = generate_binary_structure(grid.ndim, 2)
 
         # Get local mimima
         detected_minima = minimum_filter(
-            arr, footprint=neighborhood) == arr
-        background = (arr == 0)
+            grid, footprint=neighborhood) == grid
+        background = (grid == 0)
         # Aims ?
         eroded_background = binary_erosion(
             background, structure=neighborhood, border_value=1)
@@ -259,11 +254,12 @@ class SwirlSpeed(object):
         self.nb_c_per_l = array(li_list, dtype='u4')
         self.l_i = array(self.nb_c_per_l.cumsum() - self.nb_c_per_l,
                          dtype='u4')
-                         
+
         self.nearest_contain_in_bbox = nearest_contain_in_bbox
 
     def get_index_nearest_path_bbox_contain_pt(self, level, xpt, ypt):
-        """
+        """Get index from the nearest path in the level, if the bbox of the
+        path contain pt
         """
         return index_from_nearest_path_with_pt_in_bbox(
             level,
@@ -282,7 +278,7 @@ class SwirlSpeed(object):
             )
 
     def get_index_nearest_path(self, level, xpt, ypt):
-        """
+        """ Get index from the nearest path in the level
         """
         return index_from_nearest_path(
             level,

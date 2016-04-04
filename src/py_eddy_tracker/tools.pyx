@@ -415,13 +415,13 @@ def index_from_nearest_path_with_pt_in_bbox(
     # We iterate over contour in the same level
     for i_elt_c from i_start_c <= i_elt_c < i_end_c:
         # if bbox of contour doesn't contain pt, we skip this contour
-        if x_min_per_c[i_elt_c] > xpt:
-            continue
-        if x_max_per_c[i_elt_c] < xpt:
-            continue
         if y_min_per_c[i_elt_c] > ypt:
             continue
         if y_max_per_c[i_elt_c] < ypt:
+            continue
+        if x_min_per_c[i_elt_c] > xpt:
+            continue
+        if x_max_per_c[i_elt_c] < xpt:
             continue
         # Indice of first pt of contour
         i_start_pt = indices_of_first_pts[i_elt_c]

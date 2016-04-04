@@ -67,10 +67,13 @@ class EddiesObservations(object):
         Time
     """
 
-    def __init__(self, size=0, track_extra_variables=None, track_array_variables=0, array_variables=None):
-        self.track_extra_variables = track_extra_variables if track_extra_variables is not None else []
+    def __init__(self, size=0, track_extra_variables=None,
+                 track_array_variables=0, array_variables=None):
+        self.track_extra_variables = \
+            track_extra_variables if track_extra_variables is not None else []
         self.track_array_variables = track_array_variables
-        self.array_variables = array_variables if array_variables is not None else []
+        self.array_variables = \
+            array_variables if array_variables is not None else []
         for elt in self.elements:
             if elt not in VAR_DESCR:
                 raise Exception('Unknown element : %s' % elt)
@@ -116,7 +119,7 @@ class EddiesObservations(object):
             'time']  # 'rtime'
         if self.track_array_variables > 0:
             elements += self.array_variables
-        
+
         if len(self.track_extra_variables):
             elements += self.track_extra_variables
         return elements
@@ -171,7 +174,7 @@ class EddiesObservations(object):
             return self
         if index < 0:
             index = self_size + index + 1
-        eddies = self.__class__(new_size, 
+        eddies = self.__class__(new_size,
             track_extra_variables=self.track_extra_variables,
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables
@@ -217,7 +220,8 @@ class EddiesObservations(object):
             nb_obs = len(h_nc.dimensions['Nobs'])
             kwargs = dict()
             if array_dim in h_nc.dimensions:
-                kwargs['track_array_variables'] = len(h_nc.dimensions[array_dim])
+                kwargs['track_array_variables'] = len(
+                    h_nc.dimensions[array_dim])
                 kwargs['array_variables'] = []
                 for variable in h_nc.variables:
                     if array_dim in h_nc.variables[variable].dimensions:
@@ -357,8 +361,8 @@ class TrackEddiesObservations(EddiesObservations):
         return elements
 
     @staticmethod
-    def create_variable(handler_nc, kwargs_variable,
-                        attr_variable, data, scale_factor=None, add_offset=None):
+    def create_variable(handler_nc, kwargs_variable, attr_variable,
+                        data, scale_factor=None, add_offset=None):
         var = handler_nc.createVariable(
             zlib=True,
             complevel=1,

@@ -37,7 +37,8 @@ from pyproj import Proj
 from .tracking_objects import nearest
 from .observations import EddiesObservations
 from .property_objects import Amplitude
-from .tools import distance, winding_number_poly, fit_circle_c, poly_contain_poly
+from .tools import distance, winding_number_poly, fit_circle_c, \
+    poly_contain_poly
 from matplotlib.path import Path as BasePath
 from scipy.interpolate import griddata
 from .tools import distance_vector
@@ -172,7 +173,7 @@ def okubo_weiss(grd):
     # Relative vorticity
     x_i = vorticity(u_val, v_val, p_m, p_n)
     # Okubo
-    lambda2 = s_n**2 + s_t**2 - x_i**2
+    lambda2 = s_n ** 2 + s_t ** 2 - x_i ** 2
     return lambda2, x_i
 
 
@@ -352,11 +353,11 @@ def _fit_circle_path(self):
             logging.warning('An edge is only define in one position')
             logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
                           self.lat)
-            self._circle_params =  0, -90, nan, nan
+            self._circle_params = 0, -90, nan, nan
 
     centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
     centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
-    self._circle_params =  centlon_e, centlat_e, eddy_radius_e, aerr
+    self._circle_params = centlon_e, centlat_e, eddy_radius_e, aerr
 
 BasePath.fit_circle = fit_circle_path
 BasePath._fit_circle_path = _fit_circle_path
@@ -489,7 +490,7 @@ def collection_loop(contours, grd, rtime, eddy,
                             anticyclonic_search)
 
                     #~ if eddy.track_array_variables > 0:
-                        
+
                     #~ if not eddy.track_extra_variables:
                     if True:
                         (uavg, contlon_s, contlat_s,
@@ -540,11 +541,13 @@ def collection_loop(contours, grd, rtime, eddy,
                     properties.obs['lon'] = centlon_s
                     properties.obs['lat'] = centlat_s
                     if 'contour_lon_e' in eddy.track_array_variables:
-                        properties.obs['contour_lon_e'], properties.obs['contour_lat_e'] = uniform_resample(
+                        (properties.obs['contour_lon_e'],
+                         properties.obs['contour_lat_e']) = uniform_resample(
                             cont.lon, cont.lat,
                             fixed_size=eddy.track_array_variables_sampling)
                     if 'contour_lon_s' in eddy.track_array_variables:
-                        properties.obs['contour_lon_s'], properties.obs['contour_lat_s'] = uniform_resample(
+                        (properties.obs['contour_lon_s'],
+                         properties.obs['contour_lat_s']) = uniform_resample(
                             contlon_s, contlat_s,
                             fixed_size=eddy.track_array_variables_sampling)
 
@@ -601,7 +604,7 @@ def func_hann2d_fast(var, numpasses):
         weight = 8. - c_c  # This is the weight for values on each grid point,
 #                                         based on number of valid neighbours
         # Final smoothed version of var
-        hsm = 0.125 * (var_s + weight * var_ext[1:jsz+1, 1:isz+1])
+        hsm = 0.125 * (var_s + weight * var_ext[1:jsz + 1, 1:isz + 1])
         return hsm
 
     for _ in arange(numpasses):
