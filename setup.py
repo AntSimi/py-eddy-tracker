@@ -31,7 +31,8 @@ setup(
         'numpy>=1.8'],
     install_requires=[
         'numpy>=1.9',
-        'matplotlib>=1.2.1',
+        # Bug with 1.5.1 (slow memory leak)
+        'matplotlib==1.4.3',
         'scipy>=0.15.1',
         'netCDF4>=1.1.0',
         'pyyaml',
