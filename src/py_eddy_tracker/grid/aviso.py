@@ -8,10 +8,10 @@ from numpy import meshgrid, zeros, array, where, ma, argmin, vstack, ones, \
 import logging
 from netCDF4 import Dataset
 
-from . import PyEddyTracker
+from . import BaseData
 
 
-class AvisoGrid(PyEddyTracker):
+class AvisoGrid(BaseData):
     """
     Class to satisfy the need of the eddy tracker
     to have a grid class
@@ -20,6 +20,26 @@ class AvisoGrid(PyEddyTracker):
             m=100.,
             cm=1.,
             )
+    __slots__ = (
+        'lonmin',
+        'lonmax',
+        'latmin',
+        'latmax',
+        'lon_name',
+        'lat_name',
+        'grid_name',
+        '_lon',
+        '_lat',
+        'fillval',
+        '_angle',
+        'sla_coeffs',
+        'uspd_coeffs',
+        '__lon',
+        '__lat',
+        '__lonpad',
+        '__latpad',
+        'labels',
+        )
 
     def __init__(self, aviso_file, the_domain,
                  lonmin, lonmax, latmin, latmax, grid_name, lon_name,
@@ -30,7 +50,7 @@ class AvisoGrid(PyEddyTracker):
         super(AvisoGrid, self).__init__()
         logging.info('Initialising the *AVISO_grid*')
         self.grid_filename = aviso_file
-        self.the_domain = the_domain
+        self.domain = the_domain
         self.lonmin = float(lonmin)
         self.lonmax = float(lonmax)
         self.latmin = float(latmin)
@@ -50,12 +70,12 @@ class AvisoGrid(PyEddyTracker):
         self._lon, self._lat = meshgrid(self._lon, self._lat)
         self._angle = zeros(self._lon.shape)
 
-        if 'MedSea' in self.the_domain:
+        if 'MedSea' in self.domain:
             self._lon -= 360.
 
         # zero_crossing, used for handling a longitude range that
         # crosses zero degree meridian
-        if lonmin < 0 and lonmax >= 0 and 'MedSea' not in self.the_domain:
+        if lonmin < 0 and lonmax >= 0 and 'MedSea' not in self.domain:
             self.zero_crossing = True
 
         self.sla_coeffs = None
@@ -73,6 +93,9 @@ class AvisoGrid(PyEddyTracker):
 #         self.shape = (self.f_coriolis.shape[0] - pad2,
 #                       self.f_coriolis.shape[1] - pad2)
 
+    def set_filename(self, file_name):
+        self.grid_filename = file_name
+    
     def get_aviso_data(self, aviso_file):
         """
         Read nc data from AVISO file
@@ -104,10 +127,9 @@ class AvisoGrid(PyEddyTracker):
             zeta = zeta.T
 
         zeta *= self.KNOWN_UNITS[units]  # units to cm
-        if hasattr(zeta, 'mask'):
-            return zeta
-        else:
-            return ma.array(zeta)
+        if not hasattr(zeta, 'mask'):
+            zeta = ma.array(zeta)
+        return zeta
 
     def set_mask(self, sla):
         """
@@ -116,7 +138,7 @@ class AvisoGrid(PyEddyTracker):
             self.mask = None
         else:
             self.mask = sla.mask.copy()
-            if 'Global' in self.the_domain:
+            if 'Global' in self.domain:
 
                 # Close Drake Passage
                 minus70 = argmin(abs(self.lonpad[0] + 70))
@@ -156,7 +178,6 @@ class AvisoGrid(PyEddyTracker):
                 plus9 = argmin(abs(self.latpad[:, 0] - 9))
                 sea_label = self.labels[plus9, plus200]
                 self.mask += self.labels != sea_label
-        return self
 
     def fillmask(self, data, mask):
         """
@@ -164,6 +185,7 @@ class AvisoGrid(PyEddyTracker):
         neighbours
         From http://permalink.gmane.org/gmane.comp.python.scientific.user/19610
         """
+        raise Exception('Use convolution to fill data')
         assert data.ndim == 2, 'data must be a 2D array.'
         fill_value = 9999.99
         data[mask == 0] = fill_value

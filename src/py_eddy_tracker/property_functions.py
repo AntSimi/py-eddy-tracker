@@ -394,6 +394,9 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
         # Loop over individual c_s contours (i.e., every eddy in field)
         for cont in contour_paths:
             # Filter for closed contours
+            
+            # I don't understand the cost of this addition
+            #~ eddy.swirl.is_valid(eddy.swirl.level_index[corrected_coll_index] + i_cont)
             if not cont.isvalid:
                 continue
             centlon_e, centlat_e, eddy_radius_e, aerr = cont.fit_circle()

@@ -103,6 +103,7 @@ class IdentificationList(object):
         self.evolve_amp_max = float64(kwargs.get('EVOLVE_AMP_MAX', 500))
         self.evolve_area_min = float64(kwargs.get('EVOLVE_AREA_MIN', .0005))
         self.evolve_area_max = float64(kwargs.get('EVOLVE_AREA_MAX', 500))
+        self.pixel_threshold = [kwargs.get('PIXMIN'), kwargs.get('PIXMAX')]
 
         self.points = array([grd.lon.ravel(), grd.lat.ravel()]).T
 
@@ -116,7 +117,6 @@ class IdentificationList(object):
 
         self.index = 0  # counter
         self.pad = 2
-        self.pixel_threshold = None
         # Check for a correct configuration
         #~ assert self.product in (
             #~ 'AVISO'), 'Unknown string in *product* parameter'

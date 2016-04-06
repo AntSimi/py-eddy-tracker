@@ -32,7 +32,7 @@ from scipy.interpolate import griddata
 # from scipy.ndimage import generate_binary_structure, binary_erosion
 from scipy.ndimage import binary_erosion
 from scipy.ndimage import minimum_filter
-from numpy import array, isfinite, ma, where, ones
+from numpy import array, isfinite, ma, where, ones, empty
 from .tools import index_from_nearest_path, \
     index_from_nearest_path_with_pt_in_bbox
 
@@ -55,6 +55,15 @@ class Amplitude (object):
       grd:
         A grid object
     """
+    ___slots__ = (
+        'eddy',
+        'sla',
+        'h_0',
+        'amplitude',
+        'local_extrema',
+        'local_extrema_inds',
+        )
+    
     def __init__(self, contlon, contlat, eddy, grd):
         """
         """
@@ -220,59 +229,104 @@ class SwirlSpeed(object):
       grd:
         A grid object
     """
-    def __init__(self, contour, nearest_contain_in_bbox=False):
+    __slots__= (
+        'x_value',
+        'y_value',
+        'contour_index',
+        'level_index',
+        'x_min_per_contour',
+        'y_min_per_contour',
+        'x_max_per_contour',
+        'y_max_per_contour',
+        'nb_pt_per_contour',
+        'nb_contour_per_level',
+        '_is_valid',
+        )
+
+    def __init__(self, contours):
         """
         c_i : index to contours
         l_i : index to levels
         """
-        x_list, y_list, ci_list, li_list = [], [], [], []
-        x_min_list, y_min_list, x_max_list, y_max_list = [], [], [], []
+        nb_level = 0
+        nb_contour = 0
+        nb_pt = 0
+        # Count level and contour
+        for collection in contours.collections:
+            nb_level += 1
+            for contour in collection.get_paths():
+                nb_contour += 1
+                nb_pt += contour.vertices.shape[0]
+        # Type for coordinates
+        coord_dtype = contour.vertices.dtype
+        
+        # Array declaration
+        self.x_value = empty(nb_pt, dtype=coord_dtype)
+        self.y_value = empty(nb_pt, dtype=coord_dtype)
+        
+        self.level_index = empty((nb_level), dtype='u4')
+        self.nb_contour_per_level = empty((nb_level), dtype='u4')
 
-        for cont in contour.collections:
-            for coll in cont.get_paths():
-                x_val, y_val = coll.vertices[:, 0], coll.vertices[:, 1]
-                x_min_list.append(x_val.min())
-                x_max_list.append(x_val.max())
-                y_min_list.append(y_val.min())
-                y_max_list.append(y_val.max())
-                x_list.append(x_val)
-                y_list.append(y_val)
-                ci_list.append(coll.vertices.shape[0])
-            li_list.append(len(cont.get_paths()))
+        self.nb_pt_per_contour = empty((nb_contour), dtype='u4')
 
-        self.x_value = array([val for sublist in x_list for val in sublist])
-        self.y_value = array([val for sublist in y_list for val in sublist])
+        self.x_min_per_contour = empty((nb_contour), dtype=coord_dtype)
+        self.x_max_per_contour = empty((nb_contour), dtype=coord_dtype)
+        self.y_min_per_contour = empty((nb_contour), dtype=coord_dtype)
+        self.y_max_per_contour = empty((nb_contour), dtype=coord_dtype)
+        
+        #~ self._is_valid = empty((nb_contour), dtype='bool')
 
-        self.x_min_per_c = array(x_min_list)
-        self.y_min_per_c = array(y_min_list)
-        self.x_max_per_c = array(x_max_list)
-        self.y_max_per_c = array(y_max_list)
+        # Filled array
+        i_pt = 0
+        i_c = 0
+        i_l = 0
+        for collection in contours.collections:
+            self.level_index[i_l] = i_c
+            for contour in collection.get_paths():
+                nb_pt = contour.vertices.shape[0]
+                # Copy pt
+                self.x_value[i_pt:i_pt + nb_pt] = contour.vertices[:, 0]
+                self.y_value[i_pt:i_pt + nb_pt] = contour.vertices[:, 1]
 
-        self.nb_pt_per_c = array(ci_list, dtype='u4')
-        self.c_i = array(self.nb_pt_per_c.cumsum() - self.nb_pt_per_c,
-                         dtype='u4')
-        self.nb_c_per_l = array(li_list, dtype='u4')
-        self.l_i = array(self.nb_c_per_l.cumsum() - self.nb_c_per_l,
-                         dtype='u4')
+                # Set bbox
+                self.x_min_per_contour[i_c], self.y_min_per_contour[i_c] = \
+                    contour.vertices.min(axis=0)
+                self.x_max_per_contour[i_c], self.y_max_per_contour[i_c] = \
+                    contour.vertices.max(axis=0)
 
-        self.nearest_contain_in_bbox = nearest_contain_in_bbox
+                # Count pt
+                self.nb_pt_per_contour[i_c] = nb_pt
+                i_pt += nb_pt
+                i_c += 1
+            i_l += 1
 
+        self.contour_index = array(
+            self.nb_pt_per_contour.cumsum() - self.nb_pt_per_contour,
+            dtype='u4'
+            )
+        self.level_index[0] = 0
+        self.nb_contour_per_level[:-1] = self.level_index[1:] - self.level_index[:-1]
+        self.nb_contour_per_level[-1] = nb_contour - self.level_index[-1]
+    
+    #~ def is_valid(self, i_contour):
+        #~ return self._is_valid[i_contour]
+    
     def get_index_nearest_path_bbox_contain_pt(self, level, xpt, ypt):
         """Get index from the nearest path in the level, if the bbox of the
         path contain pt
         """
         return index_from_nearest_path_with_pt_in_bbox(
             level,
-            self.l_i,
-            self.nb_c_per_l,
-            self.nb_pt_per_c,
-            self.c_i,
+            self.level_index,
+            self.nb_contour_per_level,
+            self.nb_pt_per_contour,
+            self.contour_index,
             self.x_value,
             self.y_value,
-            self.x_min_per_c,
-            self.y_min_per_c,
-            self.x_max_per_c,
-            self.y_max_per_c,
+            self.x_min_per_contour,
+            self.y_min_per_contour,
+            self.x_max_per_contour,
+            self.y_max_per_contour,
             xpt,
             ypt
             )
@@ -282,10 +336,10 @@ class SwirlSpeed(object):
         """
         return index_from_nearest_path(
             level,
-            self.l_i,
-            self.nb_c_per_l,
-            self.nb_pt_per_c,
-            self.c_i,
+            self.level_index,
+            self.nb_contour_per_level,
+            self.nb_pt_per_contour,
+            self.contour_index,
             self.x_value,
             self.y_value,
             xpt,

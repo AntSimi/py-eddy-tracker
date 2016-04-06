@@ -149,9 +149,9 @@ if __name__ == '__main__':
         files_model=CONFIG['DATASET']['FILES_MODEL'],
         date_regexp=CONFIG['DATASET']['DATE_REGEXP'],
         date_model=CONFIG['DATASET']['DATE_MODEL'],
+        sub_sampling_step=CONFIG['DATASET']['SUBSAMPLING'],
         start_date=CONFIG['DATE_STR'],
         end_date=CONFIG['DATE_END'],
-        sub_sampling_step=CONFIG['DATASET']['SUBSAMPLING'],
         )
 
     # End user configuration setup options
@@ -173,11 +173,11 @@ if __name__ == '__main__':
 
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
-    PIXMIN = round((pi * CONFIG['RADMIN'] ** 2) /
+    CONFIG['PIXMIN'] = round((pi * CONFIG['RADMIN'] ** 2) /
                       SLA_GRD.resolution ** 2)
-    PIXMAX = round((pi * CONFIG['RADMAX'] ** 2) /
+    CONFIG['PIXMAX'] = round((pi * CONFIG['RADMAX'] ** 2) /
                       SLA_GRD.resolution ** 2)
-    logging.info('Pixel range = %s-%s', int(PIXMIN), int(PIXMAX))
+    logging.info('Pixel range = %(PIXMIN)d-%(PIXMAX)d', CONFIG)
 
     # Figure to get contours of parameter
     FIG = Figure()
@@ -198,13 +198,11 @@ if __name__ == '__main__':
         A_EDDY = IdentificationList('Anticyclonic', SLA_GRD, date, **CONFIG)
         C_EDDY = IdentificationList('Cyclonic', SLA_GRD, date, **CONFIG)
 
-        A_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
-        C_EDDY.pixel_threshold = [PIXMIN, PIXMAX]
-
         logging.info('AVISO_FILE : %s', filename)
 
         sla = SLA_GRD.get_aviso_data(filename)
-        SLA_GRD.set_mask(sla).uvmask()
+        SLA_GRD.set_mask(sla)
+        SLA_GRD.uvmask()
 
         if CONFIG['SMOOTHING']:
             if 'Gaussian' in CONFIG['SMOOTHING_SLA']['TYPE']:

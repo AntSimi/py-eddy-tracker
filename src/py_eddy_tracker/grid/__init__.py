@@ -10,7 +10,7 @@ import logging
 from ..tracking_objects import nearest
 
 
-class PyEddyTracker(object):
+class BaseData(object):
     """
     Base object
 
@@ -29,7 +29,42 @@ class PyEddyTracker(object):
       ROMS:   get_ROMS_f_pm_pn
 
     """
-
+    
+    __slots__ = (
+        'zero_crossing',
+        'slice_i',
+        'slice_j',
+        'slice_i_pad',
+        'slice_j_pad',
+        'slice_i_unpad',
+        'slice_j_unpad',
+        'eke',
+        'u_val',
+        'upad',
+        'v_val',
+        'vpad',
+        '_uspd',
+        'm_val',
+        'm_x',
+        'm_y',
+        '_lon',
+        '_lat',
+        '_f_val',
+        '_gof',
+        '_pm',
+        '_pn',
+        '_dx',
+        '_dy',
+        '_umask',
+        '_vmask',
+        'grid_filename',
+        'grid_date',
+        'domain',
+        'pad',
+        'shape',
+        'mask',
+        )
+    
     GRAVITY = 9.81
     earth_radius = 6371315.0
 
@@ -73,7 +108,7 @@ class PyEddyTracker(object):
           indices : slice
         """
         with Dataset(self.grid_filename) as h_nc:
-            return h_nc.variables[varname][:][indices]
+            return h_nc.variables[varname][indices]
 
     @property
     def nc_variables(self):
@@ -120,7 +155,7 @@ class PyEddyTracker(object):
         lonmin, lonmax = self.lonmin, self.lonmax
         latmin, latmax = self.latmin, self.latmax
 
-        logging.info('Setting initial indices to *%s* domain', self.the_domain)
+        logging.info('Setting initial indices to *%s* domain', self.domain)
         logging.info('lonmin = %s, lonmax = %s, latmin = %s, latmax = %s',
                      lonmin, lonmax, latmin, latmax)
         latmin_offset = latmin + (0.5 * (latmax - latmin))
@@ -287,7 +322,6 @@ class PyEddyTracker(object):
         p_n[-1] = p_n[-2]
         self._dy = p_n
         self._pn = reciprocal(p_n)
-        return self
 
     def u2rho_2d(self, uu_in):
         """
@@ -343,19 +377,12 @@ class PyEddyTracker(object):
         logging.info('Computing Basemap')
         # Create Basemap instance for Mercator projection.
         self.m_val = Proj(
-            '+proj=merc '
-            '+llcrnrlon=%(llcrnrlon)f '
-            '+llcrnrlat=%(llcrnrlat)f '
-            '+urcrnrlon=%(urcrnrlon)f '
-            '+urcrnrlat=%(urcrnrlat)f '
-            '+lat_ts=%(lat_ts)f' %
-            dict(
-                llcrnrlon=self.lonmin - 1,
-                urcrnrlon=self.lonmax + 1,
-                llcrnrlat=self.latmin - 1,
-                urcrnrlat=self.latmax + 1,
-                lat_ts=0.5 * (self.latmin + self.latmax)
-                )
+            proj='merc',
+            llcrnrlon=self.lonmin - 1,
+            urcrnrlon=self.lonmax + 1,
+            llcrnrlat=self.latmin - 1,
+            urcrnrlat=self.latmax + 1,
+            lat_ts=0.5 * (self.latmin + self.latmax)
             )
 
         if with_pad:
@@ -363,7 +390,6 @@ class PyEddyTracker(object):
         else:
             x_val, y_val = self.m_val(self.lon, self.lat)
         self.m_x, self.m_y = x_val, y_val
-        return self
 
     def set_geostrophic_velocity(self, zeta):
         """
@@ -382,7 +408,6 @@ class PyEddyTracker(object):
         self.vpad[:] = self.u2rho_2d(
             ma.array((zeta1 - zeta2) *0.5 * (pm1 + pm2), mask=self.umask))
         self.vpad *= self.gof
-        return self
 
     def set_u_v_eke(self, pad=2):
         """
@@ -425,7 +450,6 @@ class PyEddyTracker(object):
             self.lat[:, 0], self.lon[0], sla, kx=1, ky=1)
         self.uspd_coeffs = interpolate.RectBivariateSpline(
             self.lat[:, 0], self.lon[0], uspd, kx=1, ky=1)
-        return self
 
     @staticmethod
     def create_index_inverse(slice_to_inverse, size):
