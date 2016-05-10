@@ -236,14 +236,36 @@ class EddiesObservations(object):
             eddies.sign_type = h_nc.variables['cyc'][0]
         return eddies
 
+    def cost_function(self, records_in, records_out):
+        cost = ((records_in['amplitude'] - records_out['amplitude']
+                 ) / records_in['amplitude']
+                ) ** 2
+        cost += ((records_in['radius_s'] - records_out['radius_s']
+                  ) / records_in['radius_s']
+                 ) ** 2
+        return cost ** 0.5
+
     def tracking(self, other):
         """Track obs between self and other
         """
-        cost = self.distance(other)
+        dist = self.distance(other)
+        # Links available which are close (circle area selection)
+        mask_accept_dist = dist < 100
+        indexs_closest = where(mask_accept_dist)
+        cost_values = self.cost_function(
+            self.obs[indexs_closest[0]],
+            other.obs[indexs_closest[1]])
+
+        cost_mat = ma.empty(dist.shape, dtype='f4')
+        cost_mat.mask = -mask_accept_dist
+        cost_mat[mask_accept_dist] = cost_values
         # Links available which respect a maximal cost
-        mask_accept_cost = cost < 40
+        cost = dist
+        mask_accept_cost = cost < 100
         cost = ma.array(cost, mask=-mask_accept_cost, dtype='i2')
 
+        mask_accept_cost = mask_accept_dist
+        cost = cost_mat
         # Count number of link by self obs and other obs
         self_links = mask_accept_cost.sum(axis=1)
         other_links = mask_accept_cost.sum(axis=0)

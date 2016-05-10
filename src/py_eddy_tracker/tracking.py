@@ -186,7 +186,10 @@ class Correspondances(list):
         self.previous_virtual_obs = self.virtual_obs
         # Creation of an virtual step for dead one
         self.virtual_obs = VirtualEddiesObservations(
-            size=nb_dead + nb_virtual_extend)
+            size=nb_dead + nb_virtual_extend, 
+            track_extra_variables=self.previous_obs.track_extra_variables,
+            track_array_variables=self.previous_obs.track_array_variables,
+            array_variables=self.previous_obs.array_variables)
 
         # Find mask/index on previous correspondance to extrapolate
         # position
@@ -200,6 +203,11 @@ class Correspondances(list):
         # Position N-1 : B
         # Virtual Position : C
         # New position C = B + AB
+        for key in obs_b.dtype.fields.keys():
+            if key in ['lon', 'lat', 'time', 'track', 'segment_size',
+                       'dlon', 'dlat'] or 'contour_' in key:
+                continue
+            self.virtual_obs[key][:nb_dead] = obs_b[key]
         self.virtual_obs['dlon'][:nb_dead] = obs_b['lon'] - obs_a['lon']
         self.virtual_obs['dlat'][:nb_dead] = obs_b['lat'] - obs_a['lat']
         self.virtual_obs['lon'][:nb_dead
