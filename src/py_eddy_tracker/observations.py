@@ -29,9 +29,11 @@ Version 2.0.3
 
 """
 from numpy import zeros, empty, nan, arange, interp, where, unique, \
-    ma
+    ma, concatenate
 from netCDF4 import Dataset
 from py_eddy_tracker.tools import distance_matrix
+from shapely.geometry import Polygon
+from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
 import logging
 
@@ -66,6 +68,16 @@ class EddiesObservations(object):
       rtime:
         Time
     """
+    
+    ELEMENTS = [
+        'lon',  # 'centlon'
+        'lat',  # 'centlat'
+        'radius_s',  # 'eddy_radius_s'
+        'radius_e',  # 'eddy_radius_e'
+        'amplitude',  # 'amplitude'
+        'speed_radius',  # 'uavg'
+        'eke',  # 'teke'
+        'time']  # 'rtime'
 
     def __init__(self, size=0, track_extra_variables=None,
                  track_array_variables=0, array_variables=None):
@@ -108,15 +120,7 @@ class EddiesObservations(object):
     def elements(self):
         """Return all variable name
         """
-        elements = [
-            'lon',  # 'centlon'
-            'lat',  # 'centlat'
-            'radius_s',  # 'eddy_radius_s'
-            'radius_e',  # 'eddy_radius_e'
-            'amplitude',  # 'amplitude'
-            'speed_radius',  # 'uavg'
-            'eke',  # 'teke'
-            'time']  # 'rtime'
+        elements = [i for i in self.ELEMENTS]
         if self.track_array_variables > 0:
             elements += self.array_variables
 
@@ -226,6 +230,13 @@ class EddiesObservations(object):
                 for variable in h_nc.variables:
                     if array_dim in h_nc.variables[variable].dimensions:
                         kwargs['array_variables'].append(str(variable))
+            kwargs['track_extra_variables'] = []
+            for variable in h_nc.variables:
+                if variable == 'cyc':
+                    continue
+                var_inv = VAR_DESCR_inv[variable]
+                if var_inv not in EddiesObservations.ELEMENTS and var_inv not in kwargs['array_variables']:
+                    kwargs['track_extra_variables'].append(var_inv)
 
             eddies = EddiesObservations(size=nb_obs, ** kwargs)
             for variable in h_nc.variables:
@@ -236,35 +247,62 @@ class EddiesObservations(object):
             eddies.sign_type = h_nc.variables['cyc'][0]
         return eddies
 
-    def cost_function(self, records_in, records_out):
+    def cost_function2(self, records_in, records_out, distance):
+        nb_records = records_in.shape[0]
+        costs = ma.empty(nb_records,dtype='f4')
+        for i_record in xrange(nb_records):
+            poly_in = Polygon(
+                concatenate((
+                    (records_in[i_record]['contour_lon'],),
+                    (records_in[i_record]['contour_lat'],))
+                    ).T
+                )
+            poly_out = Polygon(
+                concatenate((
+                    (records_out[i_record]['contour_lon'],),
+                    (records_out[i_record]['contour_lat'],))
+                    ).T
+                )
+            try:
+                costs[i_record] = 1 - poly_in.intersection(poly_out).area / poly_in.area
+            except TopologicalError:
+                costs[i_record] = 1
+        costs.mask = costs == 1
+        return costs
+        
+    def cost_function(self, records_in, records_out, distance):
         cost = ((records_in['amplitude'] - records_out['amplitude']
                  ) / records_in['amplitude']
                 ) ** 2
         cost += ((records_in['radius_s'] - records_out['radius_s']
                   ) / records_in['radius_s']
                  ) ** 2
-        return cost ** 0.5
+        cost += (distance / 125) ** 2
+        cost **= 0.5
+        # Mask value superior at 60 % of variation
+        return ma.array(cost, mask=cost > 0.6)
 
     def tracking(self, other):
         """Track obs between self and other
         """
         dist = self.distance(other)
         # Links available which are close (circle area selection)
-        mask_accept_dist = dist < 100
+        mask_accept_dist = dist < 125
         indexs_closest = where(mask_accept_dist)
-        cost_values = self.cost_function(
+        cost_values = self.cost_function2(
             self.obs[indexs_closest[0]],
-            other.obs[indexs_closest[1]])
+            other.obs[indexs_closest[1]],
+            dist[mask_accept_dist])
 
         cost_mat = ma.empty(dist.shape, dtype='f4')
         cost_mat.mask = -mask_accept_dist
         cost_mat[mask_accept_dist] = cost_values
         # Links available which respect a maximal cost
-        cost = dist
-        mask_accept_cost = cost < 100
-        cost = ma.array(cost, mask=-mask_accept_cost, dtype='i2')
+        # cost = dist
+        # mask_accept_cost = cost < 100
+        # cost = ma.array(cost, mask=-mask_accept_cost, dtype='i2')
 
-        mask_accept_cost = mask_accept_dist
+        mask_accept_cost = -cost_mat.mask
         cost = cost_mat
         # Count number of link by self obs and other obs
         self_links = mask_accept_cost.sum(axis=1)
@@ -297,7 +335,13 @@ class EddiesObservations(object):
                                 matrix_size)
 
             links_resolve = 0
+            # Arbitrary value
+            max_iteration = max(cost_reduce.shape)
+            security_increment = 0
             while False in cost_reduce.mask:
+                if security_increment > max_iteration:
+                    raise Exception('To many iteration: %d' % security_increment)
+                security_increment += 1
                 i_min_value = cost_reduce.argmin()
                 i, j = i_min_value / shape[1], i_min_value % shape[1]
                 # Set to False all link
@@ -361,6 +405,7 @@ class TrackEddiesObservations(EddiesObservations):
         logging.info('Selection of %d observations', nb_obs_select)
         eddies = TrackEddiesObservations(
             size=nb_obs_select,
+            track_extra_variables=self.track_extra_variables,
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables
             )

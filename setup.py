@@ -35,6 +35,7 @@ setup(
         'matplotlib==1.4.3',
         'scipy>=0.15.1',
         'netCDF4>=1.1.0',
+        'shapely',
         'pyyaml',
         'pyproj',
         ],

@@ -220,6 +220,11 @@ class Correspondances(list):
         if nb_virtual_extend > 0:
             obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id
                 ][alive_virtual_obs]
+            for key in obs_b.dtype.fields.keys():
+                if key in ['lon', 'lat', 'time', 'track', 'segment_size',
+                           'dlon', 'dlat'] or 'contour_' in key:
+                    continue
+                self.virtual_obs[key][nb_dead:] = obs_to_extend[key]
             self.virtual_obs['lon'][nb_dead:
                 ] = obs_to_extend['lon'] + obs_to_extend['dlon']
             self.virtual_obs['lat'][nb_dead:
@@ -293,6 +298,7 @@ class Correspondances(list):
         # Start create netcdf to agglomerate all eddy
         eddies = TrackEddiesObservations(
             size=self.nb_obs,
+            track_extra_variables=self.current_obs.track_extra_variables,
             track_array_variables=self.current_obs.track_array_variables,
             array_variables=self.current_obs.array_variables,
             )
