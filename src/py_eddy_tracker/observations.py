@@ -29,9 +29,9 @@ Version 2.0.3
 
 """
 from numpy import zeros, empty, nan, arange, interp, where, unique, \
-    ma, concatenate
+    ma, concatenate, cos, radians, isnan
 from netCDF4 import Dataset
-from py_eddy_tracker.tools import distance_matrix
+from py_eddy_tracker.tools import distance_matrix, distance_vector
 from shapely.geometry import Polygon
 from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
@@ -280,27 +280,68 @@ class EddiesObservations(object):
         cost += (distance / 125) ** 2
         cost **= 0.5
         # Mask value superior at 60 % of variation
-        return ma.array(cost, mask=cost > 0.6)
+        # return ma.array(cost, mask=cost > 0.6)
+        return cost
+
+    def circle_mask(self, other, radius=100):
+        """Return a mask of available link"""
+        return self.distance(other) < radius
+
+    def fixed_ellipsoid_mask(self, other, minor=50, major=100, only_east=False):
+        dist = self.distance(other)
+        accepted = dist < minor
+        rejected = dist > major 
+        rejected += isnan(dist)
+
+        # All obs we are not in rejected and accepted, there are between
+        # two circle
+        needs_investigation = - (rejected + accepted)
+        index_self, index_other = where(needs_investigation)
+        
+        nb_case = index_self.shape[0]
+        if nb_case != 0:
+            c_degree = ((major ** 2 - minor ** 2) ** .5) / (111.3 * cos(radians(self.obs['lat'][index_self])))
+            
+            lon_self = self.obs['lon'][index_self]
+            lon_left_f = lon_self - c_degree
+            lon_right_f = lon_self + c_degree
+            
+            dist_left_f = empty(nb_case, dtype='f8') + nan
+            distance_vector(
+                lon_left_f, self.obs['lat'][index_self],
+                other.obs['lon'][index_other], other.obs['lat'][index_other],
+                dist_left_f)
+            dist_right_f = empty(nb_case, dtype='f8') + nan
+            distance_vector(
+                lon_right_f, self.obs['lat'][index_self],
+                other.obs['lon'][index_other], other.obs['lat'][index_other],
+                dist_right_f)
+            dist_2a = (dist_left_f + dist_right_f) / 1000
+
+            accepted[index_self, index_other] = dist_2a < (2 * major)
+            if only_east:
+                d_lon = (other.obs['lon'][index_other] - lon_self + 180) % 360 - 180
+                mask = d_lon < 0
+                accepted[index_self[mask], index_other[mask]] = False
+        return accepted
 
     def tracking(self, other):
         """Track obs between self and other
         """
         dist = self.distance(other)
         # Links available which are close (circle area selection)
-        mask_accept_dist = dist < 125
+        mask_accept_dist = self.circle_mask(other, radius=125)
+        # mask_accept_dist = self.fixed_ellipsoid_mask(other)
         indexs_closest = where(mask_accept_dist)
-        cost_values = self.cost_function2(
+
+        cost_values = self.cost_function(
             self.obs[indexs_closest[0]],
             other.obs[indexs_closest[1]],
             dist[mask_accept_dist])
 
-        cost_mat = ma.empty(dist.shape, dtype='f4')
+        cost_mat = ma.empty(mask_accept_dist.shape, dtype='f4')
         cost_mat.mask = -mask_accept_dist
         cost_mat[mask_accept_dist] = cost_values
-        # Links available which respect a maximal cost
-        # cost = dist
-        # mask_accept_cost = cost < 100
-        # cost = ma.array(cost, mask=-mask_accept_cost, dtype='i2')
 
         mask_accept_cost = -cost_mat.mask
         cost = cost_mat
