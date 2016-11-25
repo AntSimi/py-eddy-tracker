@@ -29,7 +29,7 @@ Version 2.0.3
 
 """
 from numpy import zeros, empty, nan, arange, interp, where, unique, \
-    ma, concatenate, cos, radians, isnan
+    ma, concatenate, cos, radians, isnan, ones, ndarray
 from netCDF4 import Dataset
 from py_eddy_tracker.tools import distance_matrix, distance_vector
 from shapely.geometry import Polygon
@@ -247,20 +247,21 @@ class EddiesObservations(object):
             eddies.sign_type = h_nc.variables['cyc'][0]
         return eddies
 
-    def cost_function2(self, records_in, records_out, distance):
+    @staticmethod
+    def cost_function2(records_in, records_out, distance):
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
         for i_record in xrange(nb_records):
             poly_in = Polygon(
                 concatenate((
-                    (records_in[i_record]['contour_lon'],),
-                    (records_in[i_record]['contour_lat'],))
+                    (records_in[i_record]['contour_lon_e'],),
+                    (records_in[i_record]['contour_lat_e'],))
                     ).T
                 )
             poly_out = Polygon(
                 concatenate((
-                    (records_out[i_record]['contour_lon'],),
-                    (records_out[i_record]['contour_lat'],))
+                    (records_out[i_record]['contour_lon_e'],),
+                    (records_out[i_record]['contour_lat_e'],))
                     ).T
                 )
             try:
@@ -269,8 +270,36 @@ class EddiesObservations(object):
                 costs[i_record] = 1
         costs.mask = costs == 1
         return costs
+
+    @staticmethod
+    def across_ground(record0, record1, distance):
+        from netCDF4 import Dataset
+        from scipy.interpolate  import RectBivariateSpline
+        opts_interpolation = {'kx' : 1, 'ky' : 1, 's' : 0}
         
-    def cost_function(self, records_in, records_out, distance):
+        mask = empty(record0.shape, dtype='bool')
+        
+        with Dataset('/data/adelepoulle/Test/Test_eddy/20161102_mask_from_bathy/mask.nc') as h:
+            function = RectBivariateSpline(h.variables['x'][:], h.variables['y'][:], h.variables['coast_dist'][:], **opts_interpolation)
+        
+        for i, record_in in enumerate(record0):
+            if distance[i] < 30:
+                mask[i] = False
+                continue
+            nb_point = int(distance[i] / 10)
+            dx, dy = (record1[i]['lon'] - record_in['lon']) / nb_point, (record1[i]['lat'] - record_in['lat']) / nb_point
+            nb_point += 1
+            lon_traj, lat_traj = arange(nb_point) * dx + record_in['lon'], arange(nb_point) * dy + record_in['lat']
+
+            mask[i] = (function.ev(lon_traj, lat_traj) < (record_in['radius_e'])).any()
+        return mask
+
+    @staticmethod
+    def cost_function(records_in, records_out, distance):
+        m = EddiesObservations.across_ground(records_in, records_out, distance)
+        # print m.sum()
+        # print m.shape
+        # exit()
         cost = ((records_in['amplitude'] - records_out['amplitude']
                  ) / records_in['amplitude']
                 ) ** 2
@@ -280,7 +309,7 @@ class EddiesObservations(object):
         cost += (distance / 125) ** 2
         cost **= 0.5
         # Mask value superior at 60 % of variation
-        # return ma.array(cost, mask=cost > 0.6)
+        return ma.array(cost, mask=m)
         return cost
 
     def circle_mask(self, other, radius=100):
@@ -288,7 +317,7 @@ class EddiesObservations(object):
         return self.distance(other) < radius
 
     def fixed_ellipsoid_mask(self, other, minor=50, major=100, only_east=False):
-        dist = self.distance(other)
+        dist = self.distance(other).T
         accepted = dist < minor
         rejected = dist > major 
         rejected += isnan(dist)
@@ -296,10 +325,14 @@ class EddiesObservations(object):
         # All obs we are not in rejected and accepted, there are between
         # two circle
         needs_investigation = - (rejected + accepted)
-        index_self, index_other = where(needs_investigation)
+        index_other, index_self  = where(needs_investigation)
         
         nb_case = index_self.shape[0]
         if nb_case != 0:
+            if isinstance(major, ndarray):
+                major = major[index_self]
+            if isinstance(minor, ndarray):
+                minor = minor[index_self]
             c_degree = ((major ** 2 - minor ** 2) ** .5) / (111.3 * cos(radians(self.obs['lat'][index_self])))
             
             lon_self = self.obs['lon'][index_self]
@@ -318,20 +351,40 @@ class EddiesObservations(object):
                 dist_right_f)
             dist_2a = (dist_left_f + dist_right_f) / 1000
 
-            accepted[index_self, index_other] = dist_2a < (2 * major)
+            accepted[index_other, index_self] = dist_2a < (2 * major)
             if only_east:
                 d_lon = (other.obs['lon'][index_other] - lon_self + 180) % 360 - 180
                 mask = d_lon < 0
-                accepted[index_self[mask], index_other[mask]] = False
-        return accepted
+                accepted[index_other[mask], index_self[mask]] = False
+        return accepted.T
+
+    @staticmethod
+    def basic_formula_ellips_major_axis(lats, cmin=1.5, cmax=10., c0=1.5, lat1=13.5, lat2=5.):
+        """Give major axis in km with a given latitude
+        """
+        # Straight line between lat1 and lat2:
+        # y = a * x + b
+        a = (cmin - cmax) / (lat1 - lat2)
+        b = a * -lat1 + cmin
+
+        abs_lats = abs(lats)
+        major_axis = ones(lats.shape, dtype='f8') * cmin
+        major_axis[abs_lats < lat2] = cmax
+        m = abs_lats > lat1
+        m += abs_lats < lat2
+
+        major_axis[-m] = a * abs_lats[-m] + b
+        return major_axis * 111.2
 
     def tracking(self, other):
         """Track obs between self and other
         """
         dist = self.distance(other)
         # Links available which are close (circle area selection)
-        mask_accept_dist = self.circle_mask(other, radius=125)
-        # mask_accept_dist = self.fixed_ellipsoid_mask(other)
+        # mask_accept_dist = self.circle_mask(other, radius=125)
+        y = self.basic_formula_ellips_major_axis(self.obs['lat'])
+        mask_accept_dist = self.fixed_ellipsoid_mask(other, minor=1.5 * 111.2, major=y, only_east=True)
+
         indexs_closest = where(mask_accept_dist)
 
         cost_values = self.cost_function(
@@ -368,12 +421,13 @@ class EddiesObservations(object):
             # Cost to resolve conflict
             cost_reduce = cost[i_self_keep][:, i_other_keep]
             shape = cost_reduce.shape
-            logging.debug('Shape conflict matrix : %s', shape)
+            nb_conflict = (-cost_reduce.mask).sum()
+            logging.debug('Shape conflict matrix : %s, %d conflicts', shape, nb_conflict)
 
-            matrix_size = shape[0] * shape[1]
-            if (matrix_size) >= 20000:
-                logging.warning('High number of conflict : %d (matrix_size)',
-                                matrix_size)
+            
+            if nb_conflict >= (shape[0] + shape[1]):
+                logging.warning('High number of conflict : %d (nb_conflict)',
+                                shape[0] + shape[1])
 
             links_resolve = 0
             # Arbitrary value
@@ -381,6 +435,8 @@ class EddiesObservations(object):
             security_increment = 0
             while False in cost_reduce.mask:
                 if security_increment > max_iteration:
+                    # Maybe check if the size decrease if not rise an exception
+                    # x_i, y_i = where(-cost_reduce.mask)
                     raise Exception('To many iteration: %d' % security_increment)
                 security_increment += 1
                 i_min_value = cost_reduce.argmin()
@@ -452,6 +508,7 @@ class TrackEddiesObservations(EddiesObservations):
             )
         eddies.sign_type = self.sign_type
         for field in self.obs.dtype.descr:
+            logging.debug('Copy of field %s ...', field)
             var = field[0]
             eddies.obs[var] = self.obs[var][mask]
         if compress_id:
@@ -490,12 +547,12 @@ class TrackEddiesObservations(EddiesObservations):
         except ValueError:
             logging.warn('Data is empty')
 
-    def write_netcdf(self, path='./'):
+    def write_netcdf(self, path='./', filename='%(path)s/%(sign_type)s.nc'):
         """Write a netcdf with eddy obs
         """
         eddy_size = len(self.observations)
         sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        filename = '%s/%s.nc' % (path, sign_type)
+        filename = filename % dict(path=path, sign_type=sign_type)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create file %s', filename)
             # Create dimensions

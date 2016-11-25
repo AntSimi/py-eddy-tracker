@@ -199,9 +199,10 @@ VAR_DESCR = dict(
         ),
     radius_e=dict(
         attr_name='radius_e',
-        scale_factor=1e-3,
         nc_name='radius_e',
         nc_type='float32',
+        output_type='u2',
+        scale_factor=0.05,
         nc_dims=('Nobs',),
         nc_attr=dict(
             long_name='effective radius scale',
@@ -211,9 +212,10 @@ VAR_DESCR = dict(
         ),
     radius_s=dict(
         attr_name='radius_s',
-        #~ scale_factor=1e-3,
         nc_name='L',
         nc_type='float32',
+        output_type='u2',
+        scale_factor=0.05,
         nc_dims=('Nobs',),
         nc_attr=dict(
             long_name='speed radius scale',
@@ -243,11 +245,9 @@ VAR_DESCR = dict(
             description='observation sequence number (XX day intervals)',
             )
         ),
-    # contour_lon_e=dict(
-    contour_lon=dict(
+    contour_lon_e=dict(
         attr_name=None,
-        # nc_name='contour_lon_e',
-        nc_name='contour_lon',
+        nc_name='contour_lon_e',
         nc_type='f4',
         output_type='i2',
         scale_factor=0.01,
@@ -258,11 +258,9 @@ VAR_DESCR = dict(
             description='lons of contour points',
             )
         ),
-    # contour_lat_e=dict(
-    contour_lat=dict(
+    contour_lat_e=dict(
         attr_name=None,
-        # nc_name='contour_lat_e',
-        nc_name='contour_lat',
+        nc_name='contour_lat_e',
         nc_type='f4',
         output_type='i2',
         scale_factor=0.01,
@@ -308,10 +306,11 @@ VAR_DESCR = dict(
                         'smallest inner contour (pixel == 1)',
             )
         ),
-    shape_error=dict(
+    shape_error_e=dict(
         attr_name=None,
-        nc_name='shape_error',
-        nc_type='u1',
+        nc_name='shape_error_e',
+        nc_type='f2',
+        output_type='u1',
         scale_factor=0.5,
         nc_dims=('Nobs',),
         nc_attr=dict(
@@ -321,7 +320,8 @@ VAR_DESCR = dict(
     shape_error_s=dict(
         attr_name=None,
         nc_name='shape_error_s',
-        nc_type='u1',
+        nc_type='f2',
+        output_type='u1',
         scale_factor=0.5,
         nc_dims=('Nobs',),
         nc_attr=dict(

@@ -341,7 +341,7 @@ def _fit_circle_path(self):
     # http://www.geo.hunter.cuny.edu/~jochen/gtech201/lectures/
     # lec6concepts/map%20coordinate%20systems/
     # how%20to%20choose%20a%20projection.htm
-    proj = Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
+    proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0=%s +lon_0=%s'
                 % (lat_mean, lon_mean))
 
     c_x, c_y = proj(self.lon, self.lat)
@@ -503,7 +503,7 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                             #~ *args, save_all_uavg=True)
 
                     # Use azimuth equal projection for radius
-                    proj = Proj('+proj=aeqd +lat_0=%s +lon_0=%s'
+                    proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0=%s +lon_0=%s'
                                 % (inner_contlat.mean(),
                                    inner_contlon.mean()))
 
@@ -522,15 +522,22 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                     c_x, c_y = proj(contlon_s, contlat_s)
                     _, _, eddy_radius_s, aerr_s = fit_circle_c(c_x, c_y)
 
-                properties.obs['radius_s'] = eddy_radius_s
+                properties.obs['radius_s'] = eddy_radius_s / 1000
                 properties.obs['speed_radius'] = uavg
-                properties.obs['radius_e'] = eddy_radius_e
+                properties.obs['radius_e'] = eddy_radius_e / 1000
                 properties.obs['eke'] = teke
-                if 'shape_error' in eddy.track_extra_variables:
-                    properties.obs['shape_error'] = aerr
+                if 'shape_error_e' in eddy.track_extra_variables:
+                    properties.obs['shape_error_e'] = aerr
                 if 'shape_error_s' in eddy.track_extra_variables:
                     properties.obs['shape_error_s'] = aerr_s
-
+                
+                if aerr > 99.9 or aerr_s > 99.9:
+                    logging.warning(
+                        'Strange shape at this step! shape_error : %f, %f',
+                        aerr,
+                        aerr_s)
+                    continue
+                
                 # Update SLA eddy properties
                 if 'SLA' in eddy.diagnostic_type:
 
@@ -554,7 +561,6 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                     # Mask out already found eddies
                     eddy.sla[eddy.slice_j, eddy.slice_i][
                         eddy.mask_eff] = eddy.fillval
-
 
 
 def func_hann2d_fast(var, numpasses):

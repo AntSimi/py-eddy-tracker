@@ -18,7 +18,9 @@ setup(
     scripts=[
         'src/scripts/EddyIdentification',
         'src/scripts/EddyTracking',
-        'src/scripts/EddyTrackingFull'
+        'src/scripts/EddyFinalTracking',
+        'src/scripts/EddyMergeCorrespondances',
+        # 'src/scripts/EddyTrackingFull'
         ],
     zip_safe=False,
     cmdclass={

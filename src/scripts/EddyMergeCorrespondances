@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Track eddy with Identification file produce with EddyIdentification
+"""
+from py_eddy_tracker import EddyParser
+from py_eddy_tracker.tracking import Correspondances
+from os.path import exists
+from os import mkdir
+import logging
+from numpy import unique
+import datetime as dt
+
+
+def usage():
+    """Usage
+    """
+    # Run using:
+    parser = EddyParser(
+        "Tool to use identification step to compute tracking")
+    parser.add_argument('nc_file',
+                        nargs='+',
+                        help='File of correspondances to reload link '
+                             'without tracking computation')
+    parser.add_argument('--path_out',
+                        default='./',
+                        help='Path, where to write file')
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    CONFIG = usage()
+
+    # Create output directory
+    if not exists(CONFIG.path_out):
+        mkdir(CONFIG.path_out)
+
+    START_TIME = dt.datetime.now()
+    CORRESPONDANCES = Correspondances.load(CONFIG.nc_file[0])
+    logging.info('Start merging')
+    for i in CONFIG.nc_file[1:]:
+        CORRESPONDANCES.merge_correspondance(Correspondances.load(i))
+
+    CORRESPONDANCES.save('%s/toto.nc' % CONFIG.path_out)

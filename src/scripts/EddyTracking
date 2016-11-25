@@ -22,16 +22,23 @@ def usage():
         "Tool to use identification step to compute tracking")
     parser.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
-    yaml_file = parser.parse_args().yaml_file
+    parser.add_argument('--filename',
+                        default='correpondance.nc',
+                        help='Filename to save correspondance')
+    parser.add_argument('--save_correspondance_and_stop',
+                        action='store_true',
+                        help='Stop tracking after correspondance computation,'
+                        ' merging can be done with EddyFinalTracking')
+    args = parser.parse_args()
 
     # Read yaml configuration file
-    with open(yaml_file, 'r') as stream:
+    with open(args.yaml_file, 'r') as stream:
         config = yaml_load(stream)
-    return config
+    return config, args.save_correspondance_and_stop, args.filename
 
 
 if __name__ == '__main__':
-    CONFIG = usage()
+    CONFIG, SAVE_STOP, FILENAME = usage()
 
     # Create output directory
     SAVE_DIR = CONFIG['PATHS']['SAVE_DIR']
@@ -55,7 +62,10 @@ if __name__ == '__main__':
     CORRESPONDANCES.track()
     logging.info('Track finish')
     logging.info('Start merging')
-
+    
+    if SAVE_STOP:
+        CORRESPONDANCES.save(FILENAME)
+        exit()
     CORRESPONDANCES.prepare_merging()
 
     FINAL_EDDIES = CORRESPONDANCES.merge()

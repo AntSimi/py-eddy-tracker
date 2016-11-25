@@ -30,7 +30,9 @@ Version 2.0.3
 """
 from py_eddy_tracker.observations import EddiesObservations, \
     VirtualEddiesObservations, TrackEddiesObservations
-from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16
+from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, \
+    where, empty
+from netCDF4 import Dataset
 import logging
 
 
@@ -56,6 +58,8 @@ class Correspondances(list):
                                      ('id', self.ID_DTYPE)]
         # To count ID
         self.current_id = 0
+        # To know the number maximal of link between two state
+        self.nb_link_max = 0
         # Dataset to iterate
         self.datasets = datasets
         self.previous2_obs = None
@@ -92,6 +96,39 @@ class Correspondances(list):
         self.previous2_obs = self.previous_obs
         self.previous_obs = self.current_obs
         self.current_obs = EddiesObservations.load_from_netcdf(dataset)
+
+    def merge_correspondance(self, other):
+        # Verify compliance of file
+        if self.nb_virtual != other.nb_virtual:
+            raise Exception('Different method of tracking')
+        # Determine junction
+        i = where(other.datasets == array(self.datasets[-1]))[0]
+        if len(i) != 1:
+            raise Exception('More than one intersection')
+        
+        # Merge
+        # Create a hash table
+        translate = empty(other.current_id, dtype='u4')
+        translate[:] = self.UINT32_MAX
+
+        translate[other[i[0] - 1]['id']] = self[-1]['id']
+
+        nb_max = other[i[0] - 1]['id'].max()
+        mask = translate == self.UINT32_MAX
+        # We won't translate previous id
+        mask[:nb_max] = False
+        # Next id will be shifted
+        translate[mask] = arange(mask.sum()) + self.current_id
+
+        # Translate
+        for items in other[i[0]:]:
+            items['id'] = translate[items['id']]
+        # Extend with other obs
+        self.extend(other[i[0]:])
+        # Extend datasets list, which are bounds so we add one
+        self.datasets.extend(other.datasets[i[0] + 1:])
+        # We set new id available
+        self.current_id = translate[-1] + 1
 
     def store_correspondance(self, i_previous, i_current, nb_real_obs):
         """Storing correspondance in an array
@@ -151,6 +188,10 @@ class Correspondances(list):
 
         return False
 
+    def append(self, *args, **kwargs):
+        self.nb_link_max = max(self.nb_link_max, len(args[0]))
+        super(Correspondances, self).append(*args, **kwargs)
+    
     def id_generator(self, nb_id):
         """Generation id and incrementation
         """
@@ -242,7 +283,7 @@ class Correspondances(list):
         self.reset_dataset_cache()
         self.swap_dataset(self.datasets[0])
         # We begin with second file, first one is in previous
-        for file_name in self.datasets[1:]:
+        for i, file_name in enumerate(self.datasets[1:]):
             self.swap_dataset(file_name)
             logging.debug('%s match with previous state', file_name)
             logging.debug('%d obs to match', len(self.current_obs))
@@ -266,6 +307,74 @@ class Correspondances(list):
             if self.virtual:
                 flg_virtual = True
 
+    def save(self, filename):
+        self.prepare_merging()
+        nb_step = len(self.datasets) - 1
+        with Dataset(filename, 'w', format='NETCDF4') as h_nc:
+            logging.info('Create correspondance file %s', filename)
+            # Create dimensions
+            logging.debug('Create Dimensions "Nlink" : %d', self.nb_link_max)
+            h_nc.createDimension('Nlink', self.nb_link_max)
+            
+            logging.debug('Create Dimensions "Nstep" : %d', nb_step)
+            h_nc.createDimension('Nstep', nb_step)
+            var_file_in = h_nc.createVariable(
+                zlib=True, complevel=1,
+                varname='FileIn', datatype='S1024', dimensions='Nstep')
+            var_file_out = h_nc.createVariable(
+                zlib=True, complevel=1,
+                varname='FileOut', datatype='S1024', dimensions='Nstep')
+            for i, dataset in enumerate(self.datasets[:-1]):
+                var_file_in[i] = dataset
+                var_file_out[i] = self.datasets[i + 1]
+
+            var_nb_link = h_nc.createVariable(
+                zlib=True, complevel=1,
+                varname='nb_link', datatype='u2', dimensions=('Nstep'))
+            
+            for name, dtype in self.correspondance_dtype:
+                if dtype is bool_:
+                    dtype = 'byte'
+                h_nc.createVariable(zlib=True,
+                                    complevel=1,
+                                    varname=name,
+                                    datatype=dtype,
+                                    dimensions=('Nstep','Nlink'))
+
+            for i, correspondance in enumerate(self):
+                nb_elt = correspondance.shape[0]
+                var_nb_link[i] = nb_elt
+                for name, _ in self.correspondance_dtype:
+                    h_nc.variables[name][i, :nb_elt] = correspondance[name]
+            h_nc.virtual = int(self.virtual)
+
+    @classmethod
+    def load(cls, filename):
+        with Dataset(filename, 'r', format='NETCDF4') as h_nc:
+            logging.info('load %s', filename)
+            datasets = list(h_nc.variables['FileIn'][:])
+            datasets.append(h_nc.variables['FileOut'][-1])
+
+            obj = cls(datasets, h_nc.virtual)
+
+            id_max = 0
+            for i, nb_elt in enumerate(h_nc.variables['nb_link'][:]):
+                logging.debug(
+                    'Link between %s and %s',
+                    h_nc.variables['FileIn'][i],
+                    h_nc.variables['FileOut'][i])
+                correspondance = array(h_nc.variables['in'][i, :nb_elt],
+                                       dtype=obj.correspondance_dtype)
+                for name, _ in obj.correspondance_dtype:
+                    if name == 'in':
+                        continue
+                    correspondance[name] = h_nc.variables[name][i, :nb_elt]
+                    correspondance[name] = h_nc.variables[name][i, :nb_elt]
+                id_max = max(id_max, correspondance['id'].max())
+                obj.append(correspondance)
+            obj.current_id = id_max + 1
+        return obj
+
     def prepare_merging(self):
         # count obs by tracks (we add directly one, because correspondance
         # is an interval)
@@ -288,7 +397,7 @@ class Correspondances(list):
         logging.info('%d tracks identified', self.current_id)
         logging.info('%d observations will be join', self.nb_obs)
 
-    def merge(self):
+    def merge(self, until=-1):
         """Merge all the correspondance in one array with all fields
         """
         # Start loading identification again to save in the finals tracks
@@ -296,6 +405,7 @@ class Correspondances(list):
         self.swap_dataset(self.datasets[0])
 
         # Start create netcdf to agglomerate all eddy
+        logging.debug('We will create an array (size %d)', self.nb_obs)
         eddies = TrackEddiesObservations(
             size=self.nb_obs,
             track_extra_variables=self.current_obs.track_extra_variables,
@@ -323,6 +433,9 @@ class Correspondances(list):
                                             dtype=bool_)
 
         for i, file_name in enumerate(self.datasets[1:]):
+            if until != -1 and i >= until:
+                break
+            logging.debug('Merge data from %s', file_name)
             # Load current file (we begin with second one)
             self.swap_dataset(file_name)
             # We select the list of id which are involve in the correspondance

@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Track eddy with Identification file produce with EddyIdentification
+"""
+from py_eddy_tracker import EddyParser
+from py_eddy_tracker.tracking import Correspondances
+from os.path import exists
+from os import mkdir
+import logging
+from numpy import unique
+import datetime as dt
+
+
+def usage():
+    """Usage
+    """
+    # Run using:
+    parser = EddyParser(
+        "Tool to use identification step to compute tracking")
+    parser.add_argument('nc_file',
+                        help='File of correspondances to reload link '
+                             'without tracking computation')
+    parser.add_argument('--path_out',
+                        default='./',
+                        help='Path, where to write file')
+    parser.add_argument('--nb_obs_min',
+                        type=int,
+                        default=28,
+                        help='Minimal length of tracks')
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    CONFIG = usage()
+
+    # Create output directory
+    if not exists(CONFIG.path_out):
+        mkdir(CONFIG.path_out)
+
+    START_TIME = dt.datetime.now()
+
+    CORRESPONDANCES = Correspondances.load(CONFIG.nc_file)
+
+    logging.info('Start merging')
+
+    CORRESPONDANCES.prepare_merging()
+
+    FINAL_EDDIES = CORRESPONDANCES.merge()
+
+    # We flag obs
+    if CORRESPONDANCES.virtual:
+        FINAL_EDDIES['virtual'][:] = FINAL_EDDIES['time'] == 0
+
+        FINAL_EDDIES.filled_by_interpolation(FINAL_EDDIES['virtual'] == 1)
+
+    FULL_TIME = dt.datetime.now() - START_TIME
+    logging.info('Duration : %s', FULL_TIME)
+
+    logging.info('The longest tracks have %d observations',
+                 CORRESPONDANCES.nb_obs_by_tracks.max())
+    logging.info('The mean length is %d observations before filtering',
+                 CORRESPONDANCES.nb_obs_by_tracks.mean())
+
+    SUBSET_EDDIES = FINAL_EDDIES.extract_longer_eddies(
+        CONFIG.nb_obs_min,
+        CORRESPONDANCES.nb_obs_by_tracks.repeat(
+            CORRESPONDANCES.nb_obs_by_tracks)
+        )
+
+    logging.info('%d tracks will be saved',
+                 len(unique(SUBSET_EDDIES['track'])))
+
+    logging.info(
+        'The mean length is %d observations after filtering',
+        CORRESPONDANCES.nb_obs_by_tracks[
+            CORRESPONDANCES.nb_obs_by_tracks > CONFIG.nb_obs_min
+            ].mean())
+
+    SUBSET_EDDIES.write_netcdf(path=CONFIG.path_out)
