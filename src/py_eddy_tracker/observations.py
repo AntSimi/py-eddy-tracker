@@ -29,13 +29,129 @@ Version 2.0.3
 
 """
 from numpy import zeros, empty, nan, arange, interp, where, unique, \
-    ma, concatenate, cos, radians, isnan, ones, ndarray
+    ma, concatenate, cos, radians, isnan, ones, ndarray, meshgrid, \
+    bincount, bool_, array, interp, int_, int32, round, maximum
+from scipy.interpolate  import interp1d
 from netCDF4 import Dataset
 from py_eddy_tracker.tools import distance_matrix, distance_vector
 from shapely.geometry import Polygon
 from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
 import logging
+from scipy.interpolate  import RectBivariateSpline
+
+
+class GridDataset(object):
+    """
+    Class to have basic tool on NetCDF Grid
+    """
+    __slots__ = (
+        'x_var',
+        'y_var',
+        'xinterp',
+        'yinterp',
+        'x_dim',
+        'y_dim',
+        'filename',
+        'vars',
+        'interpolators',
+        )
+    def __init__(self, filename, x_name, y_name):
+        logging.warning('We assume the position of grid is the lower left corner for %s', filename)
+        self.filename = filename
+        self.vars = dict()
+        self.interpolators = dict()
+        self.load(x_name, y_name)
+
+    def load(self, x_name, y_name):
+        with Dataset(self.filename) as h:
+            self.x_var = h.variables[x_name][:]
+            self.x_var = concatenate((self.x_var, (2 * self.x_var[-1] - self.x_var[-2],)))
+            self.y_var = h.variables[y_name][:]
+            self.y_var = concatenate((self.y_var, (2 * self.y_var[-1] - self.y_var[-2],)))
+            self.x_dim = h.variables[x_name].dimensions[0]
+            self.y_dim = h.variables[y_name].dimensions[0]
+        self.init_pos_interpolator()
+
+    def init_pos_interpolator(self):
+        self.xinterp = interp1d(self.x_var, range(self.x_var.shape[0]), assume_sorted=True)
+        self.yinterp = interp1d(self.y_var, range(self.y_var.shape[0]), assume_sorted=True)
+
+    def grid(self, varname):
+        if varname not in self.vars:
+            with Dataset(self.filename) as h:
+                dims = h.variables[varname].dimensions
+                sl = [slice(None) if dim in [self.x_dim, self.y_dim] else 0 for dim in dims]
+                self.vars[varname] = h.variables[varname][sl]
+                i_x = where(array(dims) == self.x_dim)[0][0]
+                i_y = where(array(dims) == self.y_dim)[0][0]
+                if i_x > i_y:
+                    self.vars[varname] = self.vars[varname].T
+        return self.vars[varname]
+
+    def compute_pixel_path(self, x0, y0, x1, y1):
+        # First x of grid
+        x_ori = self.x_var[0]
+        # Float index
+        f_x0 = self.xinterp((x0 - x_ori) % 360 + x_ori)
+        f_x1 = self.xinterp((x1 - x_ori) % 360 + x_ori)
+        f_y0 = self.yinterp(y0)
+        f_y1 = self.yinterp(y1)
+        # Int index
+        i_x0, i_x1 = int32(round(f_x0)), int32(round(f_x1))
+        i_y0, i_y1 = int32(round(f_y0)), int32(round(f_y1))
+
+        # Delta index of x
+        d_x = i_x1 - i_x0
+        nb_x = self.x_var.shape[0] - 1
+        d_x = (d_x + nb_x / 2) % nb_x - nb_x / 2
+        i_x1 = i_x0 + d_x
+
+        # Delta index of y
+        d_y = i_y1 - i_y0
+
+        d_max = maximum(abs(d_x), abs(d_y))
+
+        # Compute number of pixel which we go trought
+        nb_value = (abs(d_max) + 1).sum()
+        # Create an empty array to store value of pixel across the travel
+        # Max Index ~65000
+        i_g = empty(nb_value, dtype='u2')
+        j_g = empty(nb_value, dtype='u2')
+
+        # Index to determine the position in the global array
+        ii = 0
+        # Iteration on each travel
+        for i, delta in enumerate(d_max):
+            # If the travel don't cross multiple pixel
+            if delta == 0:
+                i_g[ii: ii + delta + 1] = i_x0[i]
+                j_g[ii: ii + delta + 1] = i_y0[i]
+            # Vertical move
+            elif d_x[i] == 0:
+                sup = -1 if d_y[i] < 0 else 1
+                i_g[ii: ii + delta + 1] = i_x0[i]
+                j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
+            # Horizontal move
+            elif d_y[i] == 0:
+                sup = -1 if d_x[i] < 0 else 1
+                i_g[ii: ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup) % nb_x
+                j_g[ii: ii + delta + 1] = i_y0[i]
+            # In case of multiple direction
+            else:
+                a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
+                if abs(d_x[i]) >= abs(d_y[i]):
+                    sup = -1 if d_x[i] < 0 else 1
+                    value = arange(i_x0[i], i_x1[i] + sup, sup)
+                    i_g[ii: ii + delta + 1] = value % nb_x
+                    j_g[ii: ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
+                else:
+                    sup = -1 if d_y[i] < 0 else 1
+                    j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
+                    i_g[ii: ii + delta + 1] = (int_(j_g[ii: ii + delta + 1]) - i_y0[i]) * a + i_x0[i]
+            ii += delta + 1
+        i_g %= nb_x
+        return i_g, j_g, d_max
 
 
 class EddiesObservations(object):
@@ -217,8 +333,8 @@ class EddiesObservations(object):
         eddies.obs[:] = self.obs[index]
         return eddies
 
-    @staticmethod
-    def load_from_netcdf(filename):
+    @classmethod
+    def load_from_netcdf(cls, filename):
         array_dim = 'NbSample'
         with Dataset(filename) as h_nc:
             nb_obs = len(h_nc.dimensions['Nobs'])
@@ -235,10 +351,10 @@ class EddiesObservations(object):
                 if variable == 'cyc':
                     continue
                 var_inv = VAR_DESCR_inv[variable]
-                if var_inv not in EddiesObservations.ELEMENTS and var_inv not in kwargs['array_variables']:
+                if var_inv not in cls.ELEMENTS and var_inv not in kwargs['array_variables']:
                     kwargs['track_extra_variables'].append(var_inv)
 
-            eddies = EddiesObservations(size=nb_obs, ** kwargs)
+            eddies = cls(size=nb_obs, ** kwargs)
             for variable in h_nc.variables:
                 if variable == 'cyc':
                     continue
@@ -271,35 +387,11 @@ class EddiesObservations(object):
         costs.mask = costs == 1
         return costs
 
-    @staticmethod
-    def across_ground(record0, record1, distance):
-        from netCDF4 import Dataset
-        from scipy.interpolate  import RectBivariateSpline
-        opts_interpolation = {'kx' : 1, 'ky' : 1, 's' : 0}
-        
-        mask = empty(record0.shape, dtype='bool')
-        
-        with Dataset('/data/adelepoulle/Test/Test_eddy/20161102_mask_from_bathy/mask.nc') as h:
-            function = RectBivariateSpline(h.variables['x'][:], h.variables['y'][:], h.variables['coast_dist'][:], **opts_interpolation)
-        
-        for i, record_in in enumerate(record0):
-            if distance[i] < 30:
-                mask[i] = False
-                continue
-            nb_point = int(distance[i] / 10)
-            dx, dy = (record1[i]['lon'] - record_in['lon']) / nb_point, (record1[i]['lat'] - record_in['lat']) / nb_point
-            nb_point += 1
-            lon_traj, lat_traj = arange(nb_point) * dx + record_in['lon'], arange(nb_point) * dy + record_in['lat']
-
-            mask[i] = (function.ev(lon_traj, lat_traj) < (record_in['radius_e'])).any()
-        return mask
+    def mask_function(self, other):
+        return self.circle_mask(other, radius=125)
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
-        m = EddiesObservations.across_ground(records_in, records_out, distance)
-        # print m.sum()
-        # print m.shape
-        # exit()
         cost = ((records_in['amplitude'] - records_out['amplitude']
                  ) / records_in['amplitude']
                 ) ** 2
@@ -309,14 +401,34 @@ class EddiesObservations(object):
         cost += (distance / 125) ** 2
         cost **= 0.5
         # Mask value superior at 60 % of variation
-        return ma.array(cost, mask=m)
+        # return ma.array(cost, mask=m)
         return cost
 
     def circle_mask(self, other, radius=100):
         """Return a mask of available link"""
         return self.distance(other) < radius
 
-    def fixed_ellipsoid_mask(self, other, minor=50, major=100, only_east=False):
+    def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
+        # c = (major ** 2 - minor ** 2) ** .5 + major
+        c = major
+        major = minor  + .5 * (major - minor)
+        
+      # r=.5*(c-c0)
+      # a=c0+r
+        # Focal
+        f_right = self.obs['lon']
+        f_left = f_right - (c - minor) 
+        # Ellips center
+        x_c = (f_left + f_right) * .5
+
+        o_lat, s_lat = meshgrid(other.obs['lat'], self.obs['lat'])
+        o_lon, s_lon = meshgrid(other.obs['lon'], x_c)
+        dy = o_lat - s_lat
+        dx = (o_lon - s_lon + 180) % 360 - 180
+        dist_normalize =  (dx.T ** 2) / (major ** 2) + (dy.T ** 2) / minor ** 2
+        return  dist_normalize.T < 1
+        
+    def fixed_ellipsoid_mask(self, other, minor=50, major=100, only_east=False, shifted_ellips=False):
         dist = self.distance(other).T
         accepted = dist < minor
         rejected = dist > major 
@@ -333,11 +445,17 @@ class EddiesObservations(object):
                 major = major[index_self]
             if isinstance(minor, ndarray):
                 minor = minor[index_self]
-            c_degree = ((major ** 2 - minor ** 2) ** .5) / (111.3 * cos(radians(self.obs['lat'][index_self])))
+            # focal distance
+            f_degree = ((major ** 2 - minor ** 2) ** .5) / (111.2 * cos(radians(self.obs['lat'][index_self])))
             
             lon_self = self.obs['lon'][index_self]
-            lon_left_f = lon_self - c_degree
-            lon_right_f = lon_self + c_degree
+            if shifted_ellips:
+                x_center_ellips = lon_self - (major - minor) / 2
+            else:
+                x_center_ellips = lon_self
+
+            lon_left_f = x_center_ellips - f_degree
+            lon_right_f = x_center_ellips + f_degree
             
             dist_left_f = empty(nb_case, dtype='f8') + nan
             distance_vector(
@@ -359,7 +477,7 @@ class EddiesObservations(object):
         return accepted.T
 
     @staticmethod
-    def basic_formula_ellips_major_axis(lats, cmin=1.5, cmax=10., c0=1.5, lat1=13.5, lat2=5.):
+    def basic_formula_ellips_major_axis(lats, cmin=1.5, cmax=10., c0=1.5, lat1=13.5, lat2=5., degrees=False):
         """Give major axis in km with a given latitude
         """
         # Straight line between lat1 and lat2:
@@ -374,33 +492,20 @@ class EddiesObservations(object):
         m += abs_lats < lat2
 
         major_axis[-m] = a * abs_lats[-m] + b
-        return major_axis * 111.2
+        if not degrees:
+            major_axis *= 111.2
+        return major_axis
 
-    def tracking(self, other):
-        """Track obs between self and other
-        """
-        dist = self.distance(other)
-        # Links available which are close (circle area selection)
-        # mask_accept_dist = self.circle_mask(other, radius=125)
-        y = self.basic_formula_ellips_major_axis(self.obs['lat'])
-        mask_accept_dist = self.fixed_ellipsoid_mask(other, minor=1.5 * 111.2, major=y, only_east=True)
+    @staticmethod
+    def solve_conflict(cost):
+        pass
 
-        indexs_closest = where(mask_accept_dist)
-
-        cost_values = self.cost_function(
-            self.obs[indexs_closest[0]],
-            other.obs[indexs_closest[1]],
-            dist[mask_accept_dist])
-
-        cost_mat = ma.empty(mask_accept_dist.shape, dtype='f4')
-        cost_mat.mask = -mask_accept_dist
-        cost_mat[mask_accept_dist] = cost_values
-
-        mask_accept_cost = -cost_mat.mask
-        cost = cost_mat
+    @staticmethod
+    def solve_simultaneous(cost):
+        mask = -cost.mask
         # Count number of link by self obs and other obs
-        self_links = mask_accept_cost.sum(axis=1)
-        other_links = mask_accept_cost.sum(axis=0)
+        self_links = mask.sum(axis=1)
+        other_links = mask.sum(axis=0)
         max_links = max(self_links.max(), other_links.max())
         if max_links > 5:
             logging.warning('One observation have %d links', max_links)
@@ -411,9 +516,9 @@ class EddiesObservations(object):
         test = eddies_separation.any() or eddies_merge.any()
         if test:
             # We extract matrix which contains concflict
-            obs_linking_to_self = mask_accept_cost[eddies_separation
+            obs_linking_to_self = mask[eddies_separation
                                                    ].any(axis=0)
-            obs_linking_to_other = mask_accept_cost[:, eddies_merge
+            obs_linking_to_other = mask[:, eddies_merge
                                                     ].any(axis=1)
             i_self_keep = where(obs_linking_to_other + eddies_separation)[0]
             i_other_keep = where(obs_linking_to_self + eddies_merge)[0]
@@ -424,7 +529,6 @@ class EddiesObservations(object):
             nb_conflict = (-cost_reduce.mask).sum()
             logging.debug('Shape conflict matrix : %s, %d conflicts', shape, nb_conflict)
 
-            
             if nb_conflict >= (shape[0] + shape[1]):
                 logging.warning('High number of conflict : %d (nb_conflict)',
                                 shape[0] + shape[1])
@@ -442,24 +546,99 @@ class EddiesObservations(object):
                 i_min_value = cost_reduce.argmin()
                 i, j = i_min_value / shape[1], i_min_value % shape[1]
                 # Set to False all link
-                mask_accept_cost[i_self_keep[i]] = False
-                mask_accept_cost[:, i_other_keep[j]] = False
+                mask[i_self_keep[i]] = False
+                mask[:, i_other_keep[j]] = False
                 cost_reduce.mask[i] = True
                 cost_reduce.mask[:, j] = True
                 # we active only this link
-                mask_accept_cost[i_self_keep[i], i_other_keep[j]] = True
+                mask[i_self_keep[i], i_other_keep[j]] = True
                 links_resolve += 1
             logging.debug('%d links resolve', links_resolve)
+        return mask
 
-        i_self, i_other = where(mask_accept_cost)
+    @staticmethod
+    def solve_first(cost, multiple_link=False):
+        mask = -cost.mask
+        # Count number of link by self obs and other obs
+        self_links = mask.sum(axis=1)
+        other_links = mask.sum(axis=0)
+        max_links = max(self_links.max(), other_links.max())
+        if max_links > 5:
+            logging.warning('One observation have %d links', max_links)
+
+        # If some obs have multiple link, we keep only one link by eddy
+        eddies_separation = 1 < self_links
+        eddies_merge = 1 < other_links
+        test = eddies_separation.any() or eddies_merge.any()
+        if test:
+            # We extract matrix which contains concflict
+            obs_linking_to_self = mask[eddies_separation
+                                                   ].any(axis=0)
+            obs_linking_to_other = mask[:, eddies_merge
+                                                    ].any(axis=1)
+            i_self_keep = where(obs_linking_to_other + eddies_separation)[0]
+            i_other_keep = where(obs_linking_to_self + eddies_merge)[0]
+
+            # Cost to resolve conflict
+            cost_reduce = cost[i_self_keep][:, i_other_keep]
+            shape = cost_reduce.shape
+            nb_conflict = (-cost_reduce.mask).sum()
+            logging.debug('Shape conflict matrix : %s, %d conflicts', shape, nb_conflict)
+
+            if nb_conflict >= (shape[0] + shape[1]):
+                logging.warning('High number of conflict : %d (nb_conflict)',
+                                shape[0] + shape[1])
+
+            links_resolve = 0
+            for i in range(shape[0]):
+                j = cost_reduce[i].argmin()
+                if hasattr(cost_reduce[i,j], 'mask'):
+                    continue
+                links_resolve += 1
+                # Set to False all link
+                mask[i_self_keep[i]] = False
+                cost_reduce.mask[i] = True
+                if not multiple_link:
+                    mask[:, i_other_keep[j]] = False
+                    cost_reduce.mask[:, j] = True
+                # we active only this link
+                mask[i_self_keep[i], i_other_keep[j]] = True
+
+            logging.debug('%d links resolve', links_resolve)
+        return mask
+
+    def solve_function(self, cost_matrix):
+        return where(self.solve_simultaneous(cost_matrix))
+
+    def post_process_link(self, other, i_self, i_other):
+        if unique(i_other).shape[0] != i_other.shape[0]:
+            raise Exception()
+        return i_self, i_other
+
+    def tracking(self, other):
+        """Track obs between self and other
+        """
+        dist = self.distance(other)
+        mask_accept_dist = self.mask_function(other)
+        indexs_closest = where(mask_accept_dist)
+        
+        # self.across_ground(self.obs[indexs_closest[0]], other.obs[indexs_closest[1]])
+
+        cost_values = self.cost_function(
+            self.obs[indexs_closest[0]],
+            other.obs[indexs_closest[1]],
+            dist[mask_accept_dist])
+
+        cost_mat = ma.empty(mask_accept_dist.shape, dtype='f4')
+        cost_mat.mask = -mask_accept_dist
+        cost_mat[mask_accept_dist] = cost_values
+
+        i_self, i_other = self.solve_function(cost_mat)
+
+        i_self, i_other = self.post_process_link(other, i_self, i_other)
 
         logging.debug('%d matched with previous', i_self.shape[0])
 
-        # Check
-        if unique(i_other).shape[0] != i_other.shape[0]:
-            raise Exception()
-        if unique(i_self).shape[0] != i_self.shape[0]:
-            raise Exception()
         return i_self, i_other
 
 

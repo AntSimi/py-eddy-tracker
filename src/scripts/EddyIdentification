@@ -131,7 +131,7 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
         dataset_list['date'] <= end_date)
 
     steps = unique(dataset_list['date'][1:] - dataset_list['date'][:-1])
-    if len(steps) != 1:
+    if len(steps) > 1:
         raise Exception('Several days steps in grid dataset %s' % steps)
 
     if sub_sampling_step != 1:
@@ -153,7 +153,7 @@ if __name__ == '__main__':
         start_date=CONFIG['DATE_STR'],
         end_date=CONFIG['DATE_END'],
         )
-
+    DIMENSIONS = CONFIG['DATASET'].get('DIMENSIONS', None)
     # End user configuration setup options
     # ----------------------------------------------------------
 
@@ -200,7 +200,7 @@ if __name__ == '__main__':
 
         logging.info('AVISO_FILE : %s', filename)
 
-        sla = SLA_GRD.get_aviso_data(filename)
+        sla = SLA_GRD.get_aviso_data(filename, dimensions=DIMENSIONS)
         SLA_GRD.set_mask(sla)
         SLA_GRD.uvmask()
 

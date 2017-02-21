@@ -48,7 +48,7 @@ class Correspondances(list):
     # Track limit to 65535
     N_DTYPE = 'u2'
 
-    def __init__(self, datasets, virtual=0):
+    def __init__(self, datasets, virtual=0, class_method=None):
         """Initiate tracking
         """
         super(Correspondances, self).__init__()
@@ -56,6 +56,10 @@ class Correspondances(list):
         self.correspondance_dtype = [('in', 'u2'),
                                      ('out', 'u2'),
                                      ('id', self.ID_DTYPE)]
+        if class_method is None:
+            self.class_method = EddiesObservations
+        else:
+            self.class_method = class_method
         # To count ID
         self.current_id = 0
         # To know the number maximal of link between two state
@@ -95,7 +99,7 @@ class Correspondances(list):
         """
         self.previous2_obs = self.previous_obs
         self.previous_obs = self.current_obs
-        self.current_obs = EddiesObservations.load_from_netcdf(dataset)
+        self.current_obs = self.class_method.load_from_netcdf(dataset)
 
     def merge_correspondance(self, other):
         # Verify compliance of file

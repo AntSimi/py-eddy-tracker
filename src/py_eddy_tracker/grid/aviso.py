@@ -99,10 +99,12 @@ class AvisoGrid(BaseData):
     def set_filename(self, file_name):
         self.grid_filename = file_name
     
-    def get_aviso_data(self, aviso_file):
+    def get_aviso_data(self, aviso_file, dimensions=None):
         """
         Read nc data from AVISO file
         """
+        if dimensions is None:
+            dimensions = dict()
         self.grid_filename = aviso_file
         units = self.read_nc_att(self.grid_name, 'units')
         if units not in self.KNOWN_UNITS:
@@ -123,7 +125,8 @@ class AvisoGrid(BaseData):
             elif grid_dim == lon_dim:
                 i_list.append(self.view_pad[1])
             else:
-                i_list.append(0)
+                i_list.append(
+                    dimensions[grid_dim] if grid_dim in dimensions.keys() else 0)
 
         zeta = self.read_nc(self.grid_name, indices=i_list)
         if transpose:

@@ -4,21 +4,18 @@ DIAGNOSTIC_TYPE: 'SLA'
 
 PATHS:
   # Files produces with EddyIdentification
-  FILES_PATTERN: /homelocal/adelepoulle/20151110_eddy_track/Anticyclonic_2014*.nc
+  FILES_PATTERN: id_track/acyc_eddy_stat_19930*.nc
   # Path and filename of Chelton et al (1998) Rossby radius data
   # Obtain file from:
   # http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
   RW_PATH: 'rossrad.dat'
   # Path for saving of outputs
-  SAVE_DIR: 'test/'
+  SAVE_DIR: 'tracks_acyc_test/'
 
 # Minimum number of observations to store eddy
-TRACK_DURATION_MIN: 15
-VIRTUAL_LEGNTH_MAX: 2
-  
-SEPARATION_METHOD: 'ellipse'
-#SEPARATION_METHOD: 'sum_radii'
+TRACK_DURATION_MIN: 4
+VIRTUAL_LEGNTH_MAX: 0
 
-
-# Typical parameters
-DIST0: 25000. # m separation distance after ~7 days (see CSS11 fig 22)
+CLASS:
+    MODULE: py_eddy_tracker.featured_tracking.old_tracker_reference
+    CLASS: CheltonTracker

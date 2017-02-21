@@ -55,9 +55,18 @@ if __name__ == '__main__':
     START_TIME = dt.datetime.now()
     logging.info('Start tracking on %d files', len(FILENAMES))
 
+    if 'CLASS' in CONFIG:
+        CLASS = getattr(
+            __import__(CONFIG['CLASS']['MODULE'], globals(), locals(), CONFIG['CLASS']['CLASS']),
+            CONFIG['CLASS']['CLASS'])
+            
+    else:
+        CLASS=None
+
     CORRESPONDANCES = Correspondances(
         datasets=FILENAMES,
-        virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT)
+        virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT,
+        class_method=CLASS)
 
     CORRESPONDANCES.track()
     logging.info('Track finish')
@@ -99,7 +108,7 @@ if __name__ == '__main__':
     logging.info(
         'The mean length is %d observations after filtering',
         CORRESPONDANCES.nb_obs_by_tracks[
-            CORRESPONDANCES.nb_obs_by_tracks > NB_OBS_MIN
+            CORRESPONDANCES.nb_obs_by_tracks >= NB_OBS_MIN
             ].mean())
 
     SUBSET_EDDIES.write_netcdf(path=SAVE_DIR)

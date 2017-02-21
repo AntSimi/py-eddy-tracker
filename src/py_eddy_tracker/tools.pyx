@@ -274,6 +274,40 @@ def distance_matrix(
 
 @wraparound(False)
 @boundscheck(False)
+def distance_matrix_vincenty(
+        ndarray[DTYPE_coord] lon0,
+        ndarray[DTYPE_coord] lat0,
+        ndarray[DTYPE_coord] lon1,
+        ndarray[DTYPE_coord] lat1,
+        ndarray[DTYPE_coord, ndim=2] dist,
+        ):
+
+    cdef DTYPE_coord cos_dlon, sin_dlon, sin_lat1, sin_lat2, cos_lat1, cos_lat2, a_val, dlon, dlat, top, bottom
+    cdef DTYPE_ui i_elt0, i_elt1, nb_elt0, nb_elt1
+    nb_elt0 = lon0.shape[0]
+    nb_elt1 = lon1.shape[0]
+    for i_elt0 from 0 <= i_elt0 < nb_elt0:
+        for i_elt1 from 0 <= i_elt1 < nb_elt1:
+            dlon = (lon1[i_elt1] - lon0[i_elt0] + 180) % 360 - 180
+            if dlon > 20 or dlon < -20:
+                continue
+            dlat = lat1[i_elt1] - lat0[i_elt0]
+            if dlat > 15 or dlat < -15:
+                continue
+            sin_dlon = sin(dlon * 0.5 * D2R)
+            cos_dlon = cos(dlon * 0.5 * D2R)
+            sin_lat1 = cos(lat0[i_elt0] * D2R)
+            sin_lat2 = cos(lat1[i_elt1] * D2R)
+            cos_lat1 = cos(lat0[i_elt0] * D2R)
+            cos_lat2 = cos(lat1[i_elt1] * D2R)
+            top = (cos_lat2 * sin_lat1 - sin_lat2 * cos_lat1 * cos_dlon) ** 2 + cos_lat1 ** 2 * sin_dlon ** 2
+            top = top ** .5
+            bottom = sin_lat2 * sin_lat1 + cos_lat2 * cos_lat1 * cos_dlon
+            dist[i_elt0, i_elt1] = EARTH_DIAMETER * atan2(top, bottom)
+
+
+@wraparound(False)
+@boundscheck(False)
 cdef dist_array_size(
         DTYPE_ui i_start,
         DTYPE_ui nb_c_per_l,
