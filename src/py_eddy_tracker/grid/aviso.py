@@ -150,32 +150,6 @@ class AvisoGrid(BaseData):
                 minus70 = argmin(abs(self.lonpad[0] + 70))
                 self.mask[:125, minus70] = True
 
-                # DT10 mask is open around Panama, so close it...
-                #~ if 'AVISO_DT10' in self.product:
-                    #~ self.mask[348, 92:110] = True
-                    #~ self.mask[348:356, 92] = True
-                    #~ self.mask[355, 71:92] = True
-                    #~ self.mask[355:363, 71] = True
-                    #~ self.mask[362, 66:71] = True
-                    #~ self.mask[362:380, 66] = True
-                    #~ self.mask[380, 47:67] = True
-                    #~ self.mask[380:389, 47] = True
-                    #~ self.mask[388, 13:47] = True
-                    #~ self.mask[388:393, 13] = True
-                    #~ self.mask[392, :13] = True
-                    #~ ind = 4 * 360
-                    #~ self.mask[348, 92 + ind:110 + ind] = True
-                    #~ self.mask[348:356, 92 + ind] = True
-                    #~ self.mask[355, 71 + ind:92 + ind] = True
-                    #~ self.mask[355:363, 71 + ind] = True
-                    #~ self.mask[362, 66 + ind:71 + ind] = True
-                    #~ self.mask[362:380, 66 + ind] = True
-                    #~ self.mask[380, 47 + ind:67 + ind] = True
-                    #~ self.mask[380:389, 47 + ind] = True
-                    #~ self.mask[388, 13 + ind:47 + ind] = True
-                    #~ self.mask[388:393, 13 + ind] = True
-                    #~ self.mask[392,  ind:13 + ind] = True
-
                 # Mask all unwanted regions (Caspian Sea, etc)
                 self.labels = ndimage.label(-self.mask)[0]
 

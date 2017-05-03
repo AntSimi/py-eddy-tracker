@@ -652,6 +652,56 @@ class VirtualEddiesObservations(EddiesObservations):
         elements.extend(['track', 'segment_size', 'dlon', 'dlat'])
         return elements
 
+    @classmethod
+    def init_move_function(cls, obs_a, obs_b, out):
+        """Store information to init move function
+        """
+        out['dlon'] = obs_b['lon'] - obs_a['lon']
+        out['dlat'] = obs_b['lat'] - obs_a['lat']
+
+    @classmethod
+    def move_function(cls, obs_a, obs_b, out):
+        """Basic move on the previous one
+        Position N-2 : A
+        Position N-1 : B
+        Forecast Position : C
+
+        New position C = B + AB
+        """
+        out['lon'] = obs_b['lon'] + out['dlon']
+        out['lat'] = obs_b['lat'] + out['dlat']
+
+    @classmethod
+    def forecast_move(cls, obs_a, obs_b, out):
+        """Forecast move of an eddy
+        """
+        # New dead
+        for key in obs_b.dtype.fields.keys():
+            # Copy all parameters (which are not listed below)
+            # from the previous observations
+            if key in ['lon', 'lat', 'time', 'segment_size',
+                       'dlon', 'dlat'] or 'contour_' in key:
+                continue
+            out[key] = obs_b[key]
+        cls.init_move_function(obs_a, obs_b, out)
+        cls.move_function(obs_a, obs_b, out)
+
+        # Previous dead eddies
+        # Add previous virtual
+        if nb_virtual_extend > 0:
+            obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id
+                ][alive_virtual_obs]
+            for key in obs_b.dtype.fields.keys():
+                if key in ['lon', 'lat', 'time', 'track', 'segment_size',
+                           'dlon', 'dlat'] or 'contour_' in key:
+                    continue
+                out[key][nb_dead:] = obs_to_extend[key]
+            out['lon'][nb_dead:] = obs_to_extend['lon'] + obs_to_extend['dlon']
+            out['lat'][nb_dead:] = obs_to_extend['lat'] + obs_to_extend['dlat']
+            out['track'][nb_dead:] = obs_to_extend['track']
+            out['segment_size'][nb_dead:] = obs_to_extend['segment_size']
+        # Count
+        out['segment_size'][:] += 1
 
 class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations

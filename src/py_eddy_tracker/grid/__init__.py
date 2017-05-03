@@ -8,6 +8,47 @@ from numpy import unique, array, unravel_index, r_, floor, interp, arange, \
     concatenate
 import logging
 from ..tracking_objects import nearest
+from re import compile as re_compile
+from os.path import join as join_path
+from datetime import datetime
+from glob import glob
+
+
+def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
+        start_date=None, end_date=None, sub_sampling_step=1):
+    pattern_regexp = re_compile('.*/' + date_regexp)
+    full_path = join_path(data_dir, files_model)
+    logging.info('Search files : %s', full_path)
+
+    dataset_list = array(glob(full_path),
+                         dtype=[('filename', 'S256'),
+                                ('date', 'datetime64[D]'),
+                                ])
+
+    logging.info('%s grids available', dataset_list.shape[0])
+    for item in dataset_list:
+        result = pattern_regexp.match(item['filename'])
+        if result:
+            str_date = result.groups()[0]
+            item['date'] = datetime.strptime(str_date, date_model).date()
+
+    dataset_list.sort(order=['date', 'filename'])
+
+    steps = unique(dataset_list['date'][1:] - dataset_list['date'][:-1])
+    if len(steps) > 1:
+        raise Exception('Several days steps in grid dataset %s' % steps)
+
+    if sub_sampling_step != 1:
+        logging.info('Grid subsampling %d', sub_sampling_step)
+        dataset_list = dataset_list[::sub_sampling_step]
+
+    if start_date is not None or end_date is not None:
+        logging.info('Filtering grid by time %s, %s', start_date, end_date)
+        mask = (dataset_list['date'] >= start_date) * (
+            dataset_list['date'] <= end_date)
+
+        dataset_list = dataset_list[mask]
+    return dataset_list
 
 
 class BaseData(object):

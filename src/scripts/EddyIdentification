@@ -29,8 +29,7 @@ import datetime as dt
 from scipy.ndimage import gaussian_filter
 from matplotlib.dates import date2num, num2julian
 from matplotlib.figure import Figure
-from re import compile as re_compile
-from os.path import exists, join
+from os.path import exists
 from os import mkdir
 from numpy import array, arange, atleast_1d, unique, round, int, interp, pi
 
@@ -40,7 +39,7 @@ from py_eddy_tracker.property_functions import \
 from py_eddy_tracker.property_objects import SwirlSpeed
 from py_eddy_tracker.grid.aviso import AvisoGrid
 from py_eddy_tracker.tracking_objects import IdentificationList
-
+from py_eddy_tracker.grid import browse_dataset_in
 
 def load_config():
     # Command Parser
@@ -106,40 +105,6 @@ def load_config():
             config['SMOOTHING_SLA']['ZWL'] = atleast_1d(config['SMOOTHING_SLA']['ZWL'])
             config['SMOOTHING_SLA']['MWL'] = atleast_1d(config['SMOOTHING_SLA']['MWL'])
     return config
-
-def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
-        start_date, end_date, sub_sampling_step=1):
-    pattern_regexp = re_compile('.*/' + date_regexp)
-    full_path = join(data_dir, files_model)
-    logging.info('Search files : %s', full_path)
-
-    dataset_list = array(glob(full_path),
-                         dtype=[('filename', 'S256'),
-                                ('date', 'datetime64[D]'),
-                                ])
-
-    logging.info('%s grids available', dataset_list.shape[0])
-    for item in dataset_list:
-        result = pattern_regexp.match(item['filename'])
-        if result:
-            str_date = result.groups()[0]
-            item['date'] = datetime.strptime(str_date, date_model).date()
-
-    dataset_list.sort(order=['date', 'filename'])
-    logging.info('Filtering grid by time %s, %s', start_date, end_date)
-    mask = (dataset_list['date'] >= start_date) * (
-        dataset_list['date'] <= end_date)
-
-    steps = unique(dataset_list['date'][1:] - dataset_list['date'][:-1])
-    if len(steps) > 1:
-        raise Exception('Several days steps in grid dataset %s' % steps)
-
-    if sub_sampling_step != 1:
-        logging.info('Grid subsampling %d', sub_sampling_step)
-        dataset_list = dataset_list[::sub_sampling_step]
-
-    dataset_list = dataset_list[mask]
-    return dataset_list
 
 
 if __name__ == '__main__':
