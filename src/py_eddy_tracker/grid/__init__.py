@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+"""
+===========================================================================
+This file is part of py-eddy-tracker.
+
+    py-eddy-tracker is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    py-eddy-tracker is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
+
+Copyright (c) 2014-2017 by Antoine Delepoulle and Evan Mason
+Email: emason@imedea.uib-csic.es
+===========================================================================
+
+__init__.py
+
+Version 3.0.0
+
+===========================================================================
+"""
+
 from netCDF4 import Dataset
 from scipy import interpolate
 from scipy import spatial
@@ -346,6 +374,11 @@ class BaseData(object):
         latu = self.half_interp(self.latpad[:, :-1], self.latpad[:, 1:])
         lonv = self.half_interp(self.lonpad[:-1], self.lonpad[1:])
         latv = self.half_interp(self.latpad[:-1], self.latpad[1:])
+
+        print 'self.lonpad.shape',self.lonpad.shape
+        print 'self.latpad.shape',self.latpad.shape
+        print 'self.lon.shape',self._lon.shape
+        print 'self.lat.shape',self._lat.shape
 
         # Get p_m and p_n
         p_m = zeros(self.lonpad.shape)

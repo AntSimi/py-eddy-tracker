@@ -16,14 +16,13 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2015 by Evan Mason
+Copyright (c) 2014-2017 by Evan Mason and Antoine Delepoulle
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
+observations.py
 
-py_eddy_tracker_amplitude.py
-
-Version 2.0.3
+Version 3.0.0
 
 ===========================================================================
 
@@ -392,6 +391,7 @@ class EddiesObservations(object):
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
+        m = EddiesObservations.across_ground(records_in, records_out, distance)
         cost = ((records_in['amplitude'] - records_out['amplitude']
                  ) / records_in['amplitude']
                 ) ** 2
@@ -401,7 +401,7 @@ class EddiesObservations(object):
         cost += (distance / 125) ** 2
         cost **= 0.5
         # Mask value superior at 60 % of variation
-        # return ma.array(cost, mask=m)
+        return ma.array(cost, mask=m)
         return cost
 
     def circle_mask(self, other, radius=100):

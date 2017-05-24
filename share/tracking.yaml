@@ -4,13 +4,14 @@ DIAGNOSTIC_TYPE: 'SLA'
 
 PATHS:
   # Files produces with EddyIdentification
-  FILES_PATTERN: id_track/acyc_eddy_stat_19930*.nc
+  FILES_PATTERN: /data/adelepoulle/Test/Test_eddy/20160330_brasilia_comparaison/brasil/Anticyclonic_*.nc
+  FILES_PATTERN: /home/emason/toto/Anticyclonic_*.nc
   # Path and filename of Chelton et al (1998) Rossby radius data
   # Obtain file from:
   # http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
-  RW_PATH: 'rossrad.dat'
+  RW_PATH: '/home/emason/Dropbox/rossrad.dat'
   # Path for saving of outputs
-  SAVE_DIR: 'tracks_acyc_test/'
+  SAVE_DIR: '/home/emason/toto/'
 
 # Minimum number of observations to store eddy
 TRACK_DURATION_MIN: 4
