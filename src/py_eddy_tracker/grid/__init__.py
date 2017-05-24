@@ -375,11 +375,6 @@ class BaseData(object):
         lonv = self.half_interp(self.lonpad[:-1], self.lonpad[1:])
         latv = self.half_interp(self.latpad[:-1], self.latpad[1:])
 
-        print 'self.lonpad.shape',self.lonpad.shape
-        print 'self.latpad.shape',self.latpad.shape
-        print 'self.lon.shape',self._lon.shape
-        print 'self.lat.shape',self._lat.shape
-
         # Get p_m and p_n
         p_m = zeros(self.lonpad.shape)
         p_m[:, 1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
