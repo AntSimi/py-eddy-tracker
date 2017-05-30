@@ -244,6 +244,28 @@ def distance_vector(
 
 @wraparound(False)
 @boundscheck(False)
+def distance_point_vector(
+        DTYPE_coord lon0,
+        DTYPE_coord lat0,
+        ndarray[DTYPE_coord] lon1,
+        ndarray[DTYPE_coord] lat1,
+        ndarray[DTYPE_coord] dist,
+        ):
+
+    cdef DTYPE_coord sin_dlat, sin_dlon, cos_lat1, cos_lat2, a_val
+    cdef DTYPE_ui i_elt, nb_elt
+    nb_elt = lon1.shape[0]
+    for i_elt from 0 <= i_elt < nb_elt:
+        sin_dlat = sin((lat1[i_elt] - lat0) * 0.5 * D2R)
+        sin_dlon = sin((lon1[i_elt] - lon0) * 0.5 * D2R)
+        cos_lat1 = cos(lat0 * D2R)
+        cos_lat2 = cos(lat1[i_elt] * D2R)
+        a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
+        dist[i_elt] = 6371315.0 * 2 * atan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+
+
+@wraparound(False)
+@boundscheck(False)
 def distance_matrix(
         ndarray[DTYPE_coord] lon0,
         ndarray[DTYPE_coord] lat0,

@@ -186,44 +186,6 @@ class AvisoGrid(BaseData):
                 sea_label = self.labels[plus9, plus200]
                 self.mask += self.labels != sea_label
 
-    def fillmask(self, data, mask):
-        """
-        Fill missing values in an array with an average of nearest
-        neighbours
-        From http://permalink.gmane.org/gmane.comp.python.scientific.user/19610
-        """
-        raise Exception('Use convolution to fill data')
-        assert data.ndim == 2, 'data must be a 2D array.'
-        fill_value = 9999.99
-        data[mask == 0] = fill_value
-
-        # Create (i, j) point arrays for good and bad data.
-        # Bad data are marked by the fill_value, good data elsewhere.
-        igood = vstack(where(data != fill_value)).T
-        ibad = vstack(where(data == fill_value)).T
-
-        # Create a tree for the bad points, the points to be filled
-        tree = spatial.cKDTree(igood)
-
-        # Get the four closest points to the bad points
-        # here, distance is squared
-        dist, iquery = tree.query(ibad, k=4, p=2)
-
-        # Create a normalised weight, the nearest points are weighted as 1.
-        #   Points greater than one are then set to zero
-        weight = dist / (dist.min(axis=1)[:, newaxis])
-        weight *= ones(dist.shape)
-        weight[weight > 1.] = 0.
-
-        # Multiply the queried good points by the weight, selecting only the
-        # nearest points. Divide by the number of nearest points to get average
-        xfill = weight * data[igood[:, 0][iquery], igood[:, 1][iquery]]
-        xfill = (xfill / weight.sum(axis=1)[:, newaxis]).sum(axis=1)
-
-        # Place average of nearest good points, xfill, into bad point locations
-        data[ibad[:, 0], ibad[:, 1]] = xfill
-        return data
-
     @property
     def lon(self):
         if self.__lon is None:

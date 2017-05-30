@@ -132,63 +132,6 @@ def quart_interp(h_1, h_2, h_3, h_4):
     """
     return 0.25 * (h_1 + h_2 + h_3 + h_4)
 
-
-def okubo_weiss(grd):
-    """
-    Calculate the Okubo-Weiss parameter
-    See e.g. http://ifisc.uib.es/oceantech/showOutput.php?idFile=61
-    Returns: lambda2 - Okubo-Weiss parameter [s^-2]
-             xi      - rel. vorticity [s^-1]
-    Adapted from Roms_tools
-    """
-    def vorticity(u_val, v_val, d_x, d_y):
-        """
-        Returns vorticity calculated using gradient
-        """
-        d_x = 1 / d_x
-        d_y = 1 / d_y
-        u_y, _ = gradient(grd.u2rho_2d(u_val), d_x, d_y)
-        _, v_x = gradient(grd.v2rho_2d(v_val), d_x, d_y)
-        x_i = v_x - u_y
-        return x_i
-
-    u_val = grd.rho2u_2d(grd.u_val)
-    v_val = grd.rho2v_2d(grd.v_val)
-    p_m = grd.p_m()[grd.slice_j_unpad, grd.slice_i_unpad]
-    p_n = grd.p_n()[grd.slice_j_unpad, grd.slice_i_unpad]
-
-    uom = 2. * u_val / (p_m[:, :-1] + p_m[:, 1:])
-    uon = 2. * u_val / (p_n[:, :-1] + p_n[:, 1:])
-    von = 2. * v_val / (p_n[:-1] + p_n[1:])
-    vom = 2. * v_val / (p_m[:-1] + p_m[1:])
-    mn_product = p_m * p_n
-    # Sigma_T
-    s_t = mn_product * psi2rho(von[:, 1:] - von[:, :-1] + uom[1:] - uom[:-1])
-    # Sigma_N
-    s_n = zeros(p_m.shape)
-    s_n[1:-1, 1:-1] = mn_product[1:-1, 1:-1] * (uon[1:-1, 1:] -
-                                                uon[1:-1, :-1] -
-                                                vom[1:, 1:-1] +
-                                                vom[:-1, 1:-1])
-    # Relative vorticity
-    x_i = vorticity(u_val, v_val, p_m, p_n)
-    # Okubo
-    lambda2 = s_n ** 2 + s_t ** 2 - x_i ** 2
-    return lambda2, x_i
-
-
-def psi2rho(var_psi):
-    # Convert a psi field to rho points
-    var_rho = zeros((var_psi.shape[0] + 1, var_psi.shape[1] + 1))
-    var_rho[1:-1, 1:-1] = quart_interp(var_psi[:-1, :-1], var_psi[:-1, 1:],
-                                       var_psi[1:, :-1], var_psi[1:, 1:])
-    var_rho[0] = var_rho[1]
-    var_rho[-1] = var_rho[-2]
-    var_rho[:, 0] = var_rho[:, 1]
-    var_rho[:, -1] = var_rho[:, -2]
-    return var_rho
-
-
 def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
              anticyclonic_search, save_all_uavg=False):
     """
@@ -238,7 +181,6 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
             corrected_coll_index = nb_coll - coll_index - 1
 
         # Leave loop if no contours at level citer.index
-        #~ theindex = eddy.swirl.get_index_nearest_path(
         theindex = eddy.swirl.get_index_nearest_path_bbox_contain_pt(
             corrected_coll_index, centlon_e, centlat_e)
         if theindex is None:
@@ -424,6 +366,7 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                     continue
             elif 'SLA' in eddy.diagnostic_type:
                 if eddy.sla[centj, centi] != eddy.fillval:
+                    # Test to know cyclone or anticyclone
                     acyc_not_cyc = (eddy.sla[centj, centi] >=
                                     contours.cvalues[corrected_coll_index])
                     if anticyclonic_search != acyc_not_cyc:

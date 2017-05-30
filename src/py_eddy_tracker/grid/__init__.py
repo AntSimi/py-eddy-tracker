@@ -33,7 +33,7 @@ from scipy import spatial
 from pyproj import Proj
 from numpy import unique, array, unravel_index, r_, floor, interp, arange, \
     sin, cos, deg2rad, arctan2, sqrt, pi, zeros, reciprocal, ma, empty, \
-    concatenate
+    concatenate, bytes_
 import logging
 from ..tracking_objects import nearest
 from re import compile as re_compile
@@ -48,14 +48,16 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
     full_path = join_path(data_dir, files_model)
     logging.info('Search files : %s', full_path)
 
-    dataset_list = array(glob(full_path),
+    filenames = bytes_(glob(full_path))
+    dataset_list = empty(len(filenames),
                          dtype=[('filename', 'S256'),
                                 ('date', 'datetime64[D]'),
                                 ])
+    dataset_list['filename'] = bytes_(glob(full_path))
 
     logging.info('%s grids available', dataset_list.shape[0])
     for item in dataset_list:
-        result = pattern_regexp.match(item['filename'])
+        result = pattern_regexp.match(str(item['filename']))
         if result:
             str_date = result.groups()[0]
             item['date'] = datetime.strptime(str_date, date_model).date()
@@ -176,13 +178,8 @@ class BaseData(object):
           varname : variable ('temp', 'mask_rho', etc) to read
           indices : slice
         """
-        with Dataset(self.grid_filename) as h_nc:
+        with Dataset(self.grid_filename.decode("utf-8")) as h_nc:
             return h_nc.variables[varname][indices]
-
-    @property
-    def nc_variables(self):
-        with Dataset(self.grid_filename) as h_nc:
-            return h_nc.variables.keys()
 
     @property
     def view(self):
@@ -207,7 +204,7 @@ class BaseData(object):
           varname : variable ('temp', 'mask_rho', etc) to read
           att : string of attribute, eg. 'valid_range'
         """
-        with Dataset(self.grid_filename) as h_nc:
+        with Dataset(self.grid_filename.decode("utf-8")) as h_nc:
             return getattr(h_nc.variables[varname], att)
 
     @property
