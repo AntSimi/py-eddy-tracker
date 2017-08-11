@@ -83,7 +83,7 @@ EVOLVE_AREA_MAX: 500 # max change in area
 # - profiles of swirl velocity from effective contour inwards
 # Useful for working with ARGO data    
 TRACK_EXTRA_VARIABLES:
-    - shape_error
+    - shape_error_e
     - shape_error_s
 
 TRACK_ARRAY_VARIABLES:
