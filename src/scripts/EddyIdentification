@@ -183,7 +183,7 @@ if __name__ == '__main__':
                 # http://stackoverflow.com/questions/6094957/high-pass-filter-
                 # for-image-processing-in-python-by-using-scipy-numpy
                 v = gaussian_filter(sla, sigma=[MRES, ZRES])
-                w = gaussian_filter(float_(-m), sigma=[MRES, ZRES])
+                w = gaussian_filter(float_(~m), sigma=[MRES, ZRES])
 
                 with errstate(invalid='ignore'):
                     sla -= ma.array(v / w, mask= (w==0) + m)
