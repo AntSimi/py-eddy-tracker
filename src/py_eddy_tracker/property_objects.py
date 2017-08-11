@@ -87,7 +87,7 @@ class Amplitude (object):
         self.amplitude = 0  # atleast_1d(0.)
         self.local_extrema = None  # int(0)
         self.local_extrema_inds = None
-        self.sla = ma.array(self.sla, mask=-self.mask)
+        self.sla = ma.array(self.sla, mask=~self.mask)
 
     @property
     def islice(self):
