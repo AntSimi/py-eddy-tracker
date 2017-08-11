@@ -15,7 +15,7 @@ PATHS:
 
 # Minimum number of observations to store eddy
 TRACK_DURATION_MIN: 4
-VIRTUAL_LEGNTH_MAX: 0
+VIRTUAL_LENGTH_MAX: 0
 
 CLASS:
     MODULE: py_eddy_tracker.featured_tracking.old_tracker_reference
