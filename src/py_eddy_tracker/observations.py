@@ -363,7 +363,7 @@ class EddiesObservations(object):
         return eddies
 
     @staticmethod
-    def cost_function2(records_in, records_out, distance):
+    def cost_function(records_in, records_out, distance):
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
         for i_record in xrange(nb_records):
@@ -390,7 +390,7 @@ class EddiesObservations(object):
         return self.circle_mask(other, radius=125)
 
     @staticmethod
-    def cost_function(records_in, records_out, distance):
+    def cost_function2(records_in, records_out, distance):
         m = EddiesObservations.across_ground(records_in, records_out, distance)
         cost = ((records_in['amplitude'] - records_out['amplitude']
                  ) / records_in['amplitude']
