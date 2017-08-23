@@ -363,7 +363,7 @@ class EddiesObservations(object):
         return eddies
 
     @staticmethod
-    def cost_function(records_in, records_out, distance):
+    def cost_function2(records_in, records_out, distance):
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
         for i_record in xrange(nb_records):
@@ -390,8 +390,8 @@ class EddiesObservations(object):
         return self.circle_mask(other, radius=125)
 
     @staticmethod
-    def cost_function2(records_in, records_out, distance):
-        m = EddiesObservations.across_ground(records_in, records_out, distance)
+    def cost_function(records_in, records_out, distance):
+        #m = EddiesObservations.across_ground(records_in, records_out, distance)
         cost = ((records_in['amplitude'] - records_out['amplitude']
                  ) / records_in['amplitude']
                 ) ** 2
@@ -401,7 +401,7 @@ class EddiesObservations(object):
         cost += (distance / 125) ** 2
         cost **= 0.5
         # Mask value superior at 60 % of variation
-        return ma.array(cost, mask=m)
+        #return ma.array(cost, mask=m)
         return cost
 
     def circle_mask(self, other, radius=100):
@@ -502,7 +502,7 @@ class EddiesObservations(object):
 
     @staticmethod
     def solve_simultaneous(cost):
-        mask = -cost.mask
+        mask = ~cost.mask
         # Count number of link by self obs and other obs
         self_links = mask.sum(axis=1)
         other_links = mask.sum(axis=0)
@@ -526,7 +526,7 @@ class EddiesObservations(object):
             # Cost to resolve conflict
             cost_reduce = cost[i_self_keep][:, i_other_keep]
             shape = cost_reduce.shape
-            nb_conflict = (-cost_reduce.mask).sum()
+            nb_conflict = (~cost_reduce.mask).sum()
             logging.debug('Shape conflict matrix : %s, %d conflicts', shape, nb_conflict)
 
             if nb_conflict >= (shape[0] + shape[1]):
@@ -630,7 +630,7 @@ class EddiesObservations(object):
             dist[mask_accept_dist])
 
         cost_mat = ma.empty(mask_accept_dist.shape, dtype='f4')
-        cost_mat.mask = -mask_accept_dist
+        cost_mat.mask = ~mask_accept_dist
         cost_mat[mask_accept_dist] = cost_values
 
         i_self, i_other = self.solve_function(cost_mat)
@@ -720,8 +720,8 @@ class TrackEddiesObservations(EddiesObservations):
             var = field[0]
             if var in ['n', 'virtual', 'track'] or var in self.array_variables:
                 continue
-            self.obs[var][mask] = interp(index[mask], index[-mask],
-                                         self.obs[var][-mask])
+            self.obs[var][mask] = interp(index[mask], index[~mask],
+                                         self.obs[var][~mask])
 
     def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
         """Select eddies which are longer than nb_min

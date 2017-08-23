@@ -447,7 +447,7 @@ class Correspondances(list):
             index_final = self.i_current_by_tracks[i_id]
 
             # First obs of eddies
-            m_first_obs = -first_obs_save_in_tracks[i_id]
+            m_first_obs = ~first_obs_save_in_tracks[i_id]
             if m_first_obs.any():
                 # Index in the previous file
                 index_in = self[i]['in'][m_first_obs]
