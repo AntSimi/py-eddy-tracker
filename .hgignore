@@ -1,0 +1,10 @@
+syntax: glob
+*.pyc
+*.so
+*.c
+*.egg-*
+*.eclipse.*
+syntax: regexp
+^build$
+syntax: regexp
+^dist$
