@@ -5,15 +5,17 @@ import logging
 from scipy.interpolate  import interp1d
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
-    linspace, meshgrid, sinc, errstate
+    linspace, meshgrid, sinc, errstate, float64, uint32
 from netCDF4 import Dataset
 from scipy.ndimage import gaussian_filter, convolve
 from scipy.ndimage.filters import convolve1d
+from scipy.spatial import cKDTree
 from scipy.interpolate import RectBivariateSpline
 from matplotlib.figure import Figure
 from matplotlib.path import Path as BasePath
 from pyproj import Proj
-from ..tools import fit_circle_c, distance_vector
+from ..tools import fit_circle_c, distance_vector, winding_number_poly
+from ..property_functions import uniform_resample
 
 @property
 def isvalid(self):
@@ -41,8 +43,7 @@ BasePath.lat = lat
 
 def nearest_grd_indice(self, lon_value, lat_value, grid):
     if not hasattr(self, '_grid_indices'):
-        self._grid_indices = nearest(lon_value, lat_value,
-                                     grid.lon[0], grid.lat[:, 0])
+        self._grid_indices = grid.nearest_indices(lon_value, lat_value)
     return self._grid_indices
 BasePath.nearest_grd_indice = nearest_grd_indice
 
@@ -85,8 +86,6 @@ class GridDataset(object):
     """
 
     __slots__ = (
-        '_x_var',
-        '_y_var',
         'x_c',
         'y_c',
         'x_bounds',
@@ -203,31 +202,7 @@ class GridDataset(object):
             self.vars[x_name] = h.variables[x_name][:]
             self.vars[y_name] = h.variables[y_name][:]
 
-            if self.is_centered:
-                self.x_c = self.vars[x_name]
-                self.y_c = self.vars[y_name]
-
-                self.x_bounds = concatenate((
-                    self.x_c, (2 * self.x_c[-1] - self.x_c[-2],)))
-                self.y_bounds = concatenate((
-                    self.y_c, (2 * self.y_c[-1] - self.y_c[-2],)))
-                d_x = self.x_bounds[1:] - self.x_bounds[:-1]
-                d_y = self.y_bounds[1:] - self.y_bounds[:-1]
-                self.x_bounds[:-1] -= d_x / 2
-                self.x_bounds[-1] -= d_x[-1] / 2
-                self.y_bounds[:-1] -= d_y / 2
-                self.y_bounds[-1] -= d_y[-1] / 2
-
-            else:
-                self.x_bounds = self.vars[x_name]
-                self.y_bounds = self.vars[y_name]
-
-                if len(self.x_dim) == 1:
-                    raise Exception('not test')
-                    self.x_c = (self.x_bounds[1:] + self.x_bounds[:-1]) / 2
-                    self.y_c = (self.y_bounds[1:] + self.y_bounds[:-1]) / 2
-                else:
-                    raise Exception('not write')
+        self.transform_coordinates()
 
         self.init_pos_interpolator()
 
@@ -263,113 +238,91 @@ class GridDataset(object):
         return self.x_bounds.min(), self.x_bounds.max(), \
             self.y_bounds.min(), self.y_bounds.max()
 
-    def eddy_identification(self, grid_name, step=0.005, shape_error=55):
+    def contours(self, grid_name, step):
         fig = Figure()
         ax = fig.add_subplot(111)
         data = self.grid(grid_name)
         z_min, z_max = data.min(), data.max()
         
         levels = arange(z_min - z_min % step, z_max - z_max % step + 2 * step, step)
+        logging.info('We set %d levels : %s', len(levels), levels)
 
         x, y = self.vars[self.coordinates[0]], self.vars[self.coordinates[1]]
         if len(x.shape) == 1:
             data = data.T
-        contours = ax.contour(x, y, data, levels)
+        return ax.contour(x, y, data, levels)
+
+    def eddy_identification(self, grid_name, step=0.005, shape_error=50):
+        contours = self.contours(grid_name, step)
+        grid = self.grid(grid_name)
+        u = self.grid('u')
+        v = self.grid('v')
 
         anticyclonic_search = True
         iterator = 1 if anticyclonic_search else -1
 
         # Loop over each collection
         for coll_ind, coll in enumerate(contours.collections[::iterator]):
+            corrected_coll_index = iterator * coll_ind - 1
 
-            corrected_coll_index = coll_ind
-            if iterator == -1:
-                corrected_coll_index = - coll_ind - 1
-
+            contour_value = contours.cvalues[corrected_coll_index]
             contour_paths = coll.get_paths()
             nb_paths = len(contour_paths)
-            if nb_paths > 0:
-                logging.debug('doing collection %s, contour value %s, %d paths',
-                              corrected_coll_index,
-                              contours.cvalues[corrected_coll_index],
-                              nb_paths)
-            else:
+            if nb_paths == 0:
                 continue
+            logging.debug('doing collection %s, contour value %s, %d paths',
+                          corrected_coll_index, contour_value, nb_paths)
             # Loop over individual c_s contours (i.e., every eddy in field)
-            for cont in contour_paths:
+            for contour in contour_paths:
                 # Filter for closed contours
-                if not cont.isvalid:
+                if not contour.isvalid:
                     continue
-                centlon_e, centlat_e, eddy_radius_e, aerr = cont.fit_circle()
-                # Filter for shape: >35% (>55%) is not an eddy for Q (SLA)
-                if aerr < 0 or aerr > shape_error:
+                lon_e, lat_e, radius_e, err_e = contour.fit_circle()
+                # Filter for shape: >50% is not an eddy 
+                if err_e < 0 or err_e > shape_error:
                     continue
-
 
                 # Get indices of centroid
-                # Give only 1D array of lon and lat not 2D data
-                centi, centj = cont.nearest_grd_indice(centlon_e, centlat_e, grd)
+                i_lon, j_lat = contour.nearest_grd_indice(lon_e, lat_e, self)
 
-                
-                if eddy.sla[centj, centi] != eddy.fillval:
-                    # Test to know cyclone or anticyclone
-                    acyc_not_cyc = (eddy.sla[centj, centi] >=
-                                    contours.cvalues[corrected_coll_index])
-                    if anticyclonic_search != acyc_not_cyc:
-                        continue
-                else:
+                # print(i_lon, j_lat)
+                sla = grid[i_lon, j_lat]
+                # print(sla)
+                # print(type(sla))
+                # if sla is masked:
+                    # continue
+                if anticyclonic_search != (sla >= contour_value):
                     continue
 
                 # Instantiate new EddyObservation object
-                properties = EddiesObservations(
-                    size=1,
-                    track_extra_variables=eddy.track_extra_variables,
-                    track_array_variables=eddy.track_array_variables_sampling,
-                    array_variables=eddy.track_array_variables
-                    )
+                # properties = EddiesObservations(
+                    # size=1,
+                    # track_extra_variables=eddy.track_extra_variables,
+                    # track_array_variables=eddy.track_array_variables_sampling,
+                    # array_variables=eddy.track_array_variables
+                    # )
 
+                contour_lon, contour_lat = contour.lon, contour.lat
                 # Set indices to bounding box around eddy
-                eddy.set_bounds(cont.lon, cont.lat, grd)
-
-                # Set masked points within bounding box around eddy
-                eddy.set_mask_eff(cont, grd)
+                eddy_indices = self.get_pixel_indices_in_contour(contour)
+                eddy_sla = grid[eddy_indices]
 
                 # sum(mask) between 8 and 1000, CSS11 criterion 2
-                if eddy.check_pixel_count(eddy.mask_eff_sum):
-                    eddy.reshape_mask_eff(grd)
-                    # Resample the contour points for a more even
-                    # circumferential distribution
-                    contlon_e, contlat_e = uniform_resample(cont.lon, cont.lat)
-
-                    # Instantiate Amplitude object
-                    amp = Amplitude(contlon_e, contlat_e, eddy, grd)
-
+                if len(eddy_sla) > 8:
+                    # print(eddy_indices)
                     if anticyclonic_search:
-                        reset_centroid = amp.all_pixels_above_h0(
-                            contours.levels[corrected_coll_index])
-
+                        i_max = eddy_sla.argmax()
+                        amp = eddy_sla[i_max] - contour_value
                     else:
-                        reset_centroid = amp.all_pixels_below_h0(
-                            contours.levels[corrected_coll_index])
+                        i_max = eddy_sla.argmin()
+                        amp = contour_value - eddy_sla[i_max]
 
-                    if reset_centroid:
-                        centi = reset_centroid[0]
-                        centj = reset_centroid[1]
-                        centlon_e = grd.lon[centj, centi]
-                        centlat_e = grd.lat[centj, centi]
+                    teke = (u[eddy_indices] ** 2 + u[eddy_indices] ** 2 ).sum() * 0.5
 
-                    if amp.within_amplitude_limits():
-                        properties.obs['amplitude'] = amp.amplitude
-
-                if properties.obs['amplitude'][0]:
                     # Get sum of eke within Ceff
-                    teke = grd.eke[eddy.slice_j, eddy.slice_i][eddy.mask_eff].sum()
-                    args = (eddy, contours, centlon_e, centlat_e, cont, grd,
+                    args = (eddy, contours, centlon_e, centlat_e, contour, grd,
                             anticyclonic_search)
 
-                    #~ if eddy.track_array_variables > 0:
-
-                    #~ if not eddy.track_extra_variables:
                     if True:
                         (uavg, contlon_s, contlat_s,
                          inner_contlon, inner_contlat,
@@ -426,7 +379,7 @@ class GridDataset(object):
                     if 'contour_lon_e' in eddy.track_array_variables:
                         (properties.obs['contour_lon_e'],
                          properties.obs['contour_lat_e']) = uniform_resample(
-                            cont.lon, cont.lat,
+                            contour_lon, contour_lat,
                             fixed_size=eddy.track_array_variables_sampling)
                     if 'contour_lon_s' in eddy.track_array_variables:
                         (properties.obs['contour_lon_s'],
@@ -444,26 +397,76 @@ class GridDataset(object):
     
     def _gaussian_filter(self, data, sigma, mode='reflect'):
         local_data = data.copy()
-        local_data[data.mask] = 0
+        has_mask = hasattr(data, 'mask')
+        if has_mask:
+            local_data[data.mask] = 0
 
         v = gaussian_filter(local_data, sigma=sigma, mode=mode)
-        w = gaussian_filter(float_(-data.mask), sigma=sigma, mode=mode)
+        w = gaussian_filter(
+            float_(-data.mask) if has_mask else ones(data.shape),
+            sigma=sigma,
+            mode=mode)
 
         with errstate(invalid='ignore'):
-            return ma.array(v / w, mask= w==0)
+            if has_mask:
+                return ma.array(v / w, mask= w==0)
+            else:
+                return v / w
+
+    def create_uv_var(self, ref_var):
+        h_dict = self.variables_description[ref_var]
+        for variable in ('u', 'v'):
+            self.variables_description[variable] = dict(
+                infos=h_dict['infos'].copy(),
+                attrs=h_dict['attrs'].copy(),
+                args=tuple((variable, * h_dict['args'][1:])),
+                kwargs=h_dict['kwargs'].copy(),
+                )
+            if 'units' in self.variables_description[variable]['attrs'].keys():
+                self.variables_description[variable]['attrs']['units'] += '/s'
 
 
 class UnRegularGridDataset(GridDataset):
 
-    __slots__ = ()
+    __slots__ = ('xy_interp')
+
+    def transform_coordinates(self):
+        x_name, y_name = self.coordinates
+        if self.is_centered:
+            self.x_c = self.vars[x_name]
+            self.y_c = self.vars[y_name]
+
+            #
+            # depends order of dimensions !!
+            self.x_bounds = concatenate((
+                self.x_c, (2 * self.x_c[-1] - self.x_c[-2],)))
+            self.x_bounds = concatenate((self.x_bounds, self.x_bounds[:,-1:]), axis=1)
+
+            self.y_bounds = concatenate((
+                self.y_c, 2 * self.y_c[:, -1:] - self.y_c[:, -2:-1]), axis = 1)
+            self.y_bounds = concatenate((self.y_bounds, self.y_bounds[-1:]))
+            # depends order of dimensions !!
+            #
+
+            d_x = self.x_bounds[1:] - self.x_bounds[:-1]
+            d_y = self.y_bounds[1:] - self.y_bounds[:-1]
+            self.x_bounds[:-1] -= d_x / 2
+            self.x_bounds[-1] -= d_x[-1] / 2
+            self.y_bounds[:-1] -= d_y / 2
+            self.y_bounds[-1] -= d_y[-1] / 2
+
+        else:
+            self.x_bounds = self.vars[x_name]
+            self.y_bounds = self.vars[y_name]
+
+            raise Exception('not write')
 
     def compute_pixel_path(self, x0, y0, x1, y1):
         pass
 
     def init_pos_interpolator(self):
-        pass
-        # self.xinterp = interp1d(self.x_var, range(self.x_var.shape[0]), assume_sorted=True)
-        # self.yinterp = interp1d(self.y_var, range(self.y_var.shape[0]), assume_sorted=True)
+        self.xy_interp = cKDTree(concatenate((self.x_c.reshape(1,-1), self.y_c.reshape(1,-1))).T)
+        # self.xy_interp = cKDTree(concatenate((self.x_c, self.y_c)).reshape(-1,2))
 
     def _low_filter(self, grid_name, x_cut, y_cut, factor=40.):
         data = self.grid(grid_name)
@@ -506,10 +509,134 @@ class UnRegularGridDataset(GridDataset):
         z_interp = RectBivariateSpline(x_center, y_center, z_filtered, **opts_interpolation).ev(x, y)
         return ma.array(z_interp, mask=m_interp.ev(x,y) > 0.00001)
 
+    def add_uv(self, grid_height):
+        self.create_uv_var(grid_height)
+        data = self.grid(grid_height)
+        gof = sin(deg2rad(self.y_c)) * 4. * pi / 86400.
+        # gof = sin(deg2rad(self.y_c)) * 4. * pi / (23 * 3600 + 56 *60 +4.1 )
+        with errstate(divide='ignore'):
+            gof = self.GRAVITY / gof
+
+        m_y = array((1, 0, -1)).reshape((1,3))
+        m_x = array((1, 0, -1)).reshape((3,1))
+        d_hy = convolve(
+            data,
+            weights=m_y
+            )
+        mask = convolve(
+            int8(data.mask),
+            weights=ones(m_y.shape)
+            )
+        d_hy = ma.array(d_hy, mask=mask != 0)
+
+        nb_y, nb_x = self.x_c.shape
+        shape = (nb_y - 2, nb_x)
+        d_y = empty(shape, dtype=float64).reshape(-1)
+        distance_vector(
+            self.x_c[:-2,:].reshape(-1).astype(float64),
+            self.y_c[:-2,:].reshape(-1).astype(float64),
+            self.x_c[2:,:].reshape(-1).astype(float64),
+            self.y_c[2:,:].reshape(-1).astype(float64),
+            d_y,
+            )
+        d_y_final = empty((nb_y, nb_x), dtype=float_)
+        d_y_final[1:-1] = d_y.reshape(shape)
+        d_y_final[0] = d_y_final[1] # / 2
+        d_y_final[-1] = d_y_final[-2] # / 2
+        
+        self.vars['u'] = - d_hy / d_y_final * gof
+
+        mode = 'wrap' if self.is_circular() else 'reflect'
+        d_hx = convolve(
+            data,
+            weights=m_x,
+            mode=mode,
+            )
+        mask = convolve(
+            int8(data.mask),
+            weights=ones(m_x.shape),
+            mode=mode,
+            )
+        d_hx = ma.array(d_hx, mask=mask != 0)
+
+        shape = (nb_y, nb_x - 2)
+        d_x = empty(shape, dtype=float64).reshape(-1)
+        
+        distance_vector(
+            self.x_c[:, :-2].reshape(-1).astype(float64),
+            self.y_c[:, :-2].reshape(-1).astype(float64),
+            self.x_c[:, 2:].reshape(-1).astype(float64),
+            self.y_c[:, 2:].reshape(-1).astype(float64),
+            d_x,
+            )
+        d_x_final = empty((nb_y, nb_x), dtype=float_)
+        d_x_final[:, 1:-1] = d_x.reshape(shape)
+        d_x_final[:,0] = d_x_final[:,1] # / 2
+        d_x_final[:,-1] = d_x_final[:,-2] # / 2
+
+        self.vars['v'] = d_hx / d_x_final * gof
+
+    @staticmethod
+    def unravel_index(shape, indexes):
+        nb_y, nb_x = shape
+        i_x = indexes % nb_x
+        i_y = (indexes - i_x) / nb_x
+        return uint32(i_y), uint32(i_x)
+        
+    def nearest_indices(self, xs, ys):
+        dist, indexes = self.xy_interp.query((xs,ys))
+        return self.unravel_index(self.x_c.shape, uint32(indexes))
+
+    def get_bounds(self, lons, lats, offset=1):
+        i_lons, i_lats = empty(lons.shape, dtype='u4'), empty(lons.shape, dtype='u4')
+        for i in range(len(lons)):
+            i_lons[i], i_lats[i] = self.nearest_indices(lons[i], lats[i])
+        return (
+            slice(i_lons.min() - offset, i_lons.max() + offset + 1),
+            slice(i_lats.min() - offset, i_lats.max() + offset + 1))
+
+    def get_pixel_indices_in_contour(self, contour):
+        lons, lats = contour.lon, contour.lat
+        bbox = self.get_bounds(lons, lats)
+        grid_lons, grid_lats = self.x_c[bbox].reshape(-1), self.y_c[bbox].reshape(-1)
+        ravel_indices = list()
+        for i, grid_lon in enumerate(grid_lons):
+            if winding_number_poly(grid_lon, grid_lats[i], contour.vertices) != 0:
+                ravel_indices.append(i)
+        relative_indices = self.unravel_index(
+            (bbox[0].stop - bbox[0].start, bbox[1].stop - bbox[1].start),
+            array(ravel_indices, dtype='u4'))
+        return relative_indices[0] + bbox[0].start, relative_indices[1] + bbox[1].start
+
 
 class RegularGridDataset(GridDataset):
     
     __slots__ = ()
+
+    def transform_coordinates(self):
+        x_name, y_name = self.coordinates
+        if self.is_centered:
+            self.x_c = self.vars[x_name]
+            self.y_c = self.vars[y_name]
+
+            self.x_bounds = concatenate((
+                self.x_c, (2 * self.x_c[-1] - self.x_c[-2],)))
+            self.y_bounds = concatenate((
+                self.y_c, (2 * self.y_c[-1] - self.y_c[-2],)))
+            d_x = self.x_bounds[1:] - self.x_bounds[:-1]
+            d_y = self.y_bounds[1:] - self.y_bounds[:-1]
+            self.x_bounds[:-1] -= d_x / 2
+            self.x_bounds[-1] -= d_x[-1] / 2
+            self.y_bounds[:-1] -= d_y / 2
+            self.y_bounds[-1] -= d_y[-1] / 2
+
+        else:
+            self.x_bounds = self.vars[x_name]
+            self.y_bounds = self.vars[y_name]
+
+            raise Exception('not test')
+            self.x_c = (self.x_bounds[1:] + self.x_bounds[:-1]) / 2
+            self.y_c = (self.y_bounds[1:] + self.y_bounds[:-1]) / 2
 
     def init_pos_interpolator(self):
         self.xinterp = interp1d(self.x_bounds, range(self.x_bounds.shape[0]), assume_sorted=True)
@@ -519,13 +646,13 @@ class RegularGridDataset(GridDataset):
     def xstep(self):
         """Only for regular grid with no step variation
         """
-        return self.x_var[1] - self.x_var[0]
+        return self.x_c[1] - self.x_c[0]
 
     @property
     def ystep(self):
         """Only for regular grid with no step variation
         """
-        return self.y_var[1] - self.y_var[0]
+        return self.y_c[1] - self.y_c[0]
 
     def compute_pixel_path(self, x0, y0, x1, y1):
         # First x of grid
@@ -604,22 +731,13 @@ class RegularGridDataset(GridDataset):
             x_cut, y_cut, i_x, i_y
             )
         data = self.grid(grid_name).copy()
-        data[data.mask] = 0
         return self._gaussian_filter(
             data,
             (i_x, i_y),
             mode='wrap' if self.is_circular() else 'reflect')
 
     def add_uv(self, grid_height):
-        h_dict = self.variables_description[grid_height]
-        for variable in ('u', 'v'):
-            self.variables_description[variable] = dict(
-                infos=h_dict['infos'].copy(),
-                attrs=h_dict['attrs'].copy(),
-                args=tuple((variable, * h_dict['args'][1:])),
-                kwargs=h_dict['kwargs'].copy(),
-                )
-            self.variables_description[variable]['attrs']['units'] += '/s'
+        self.create_uv_var(grid_height)
         data = self.grid(grid_height)
         gof = sin(deg2rad(self.y_c))* ones((self.x_c.shape[0], 1))  * 4. * pi / 86400.
         # gof = sin(deg2rad(self.y_c))* ones((self.x_c.shape[0], 1))  * 4. * pi / (23 * 3600 + 56 *60 +4.1 )
@@ -632,13 +750,16 @@ class RegularGridDataset(GridDataset):
             data,
             weights=m_y.reshape((-1,1)).T
             )
-        mask = convolve(
-            int8(data.mask),
-            weights=ones(m_y.shape).reshape((1,-1))
-            )
-        d_hy = ma.array(d_hy, mask=mask != 0)
+        if hasattr(data, 'mask'):
+            mask = convolve(
+                int8(data.mask),
+                weights=ones(m_y.shape).reshape((1,-1))
+                )
+            d_hy = ma.array(d_hy, mask=mask != 0)
         
+        # Bad
         d_y = self.EARTH_RADIUS * 2 * pi / 360 * convolve(self.y_c, m_y)
+        ##
         
         self.vars['u'] = - d_hy / d_y * gof
         mode = 'wrap' if self.is_circular() else 'reflect'
@@ -647,13 +768,16 @@ class RegularGridDataset(GridDataset):
             weights=m_x.reshape((-1,1)),
             mode=mode,
             )
-        mask = convolve(
-            int8(data.mask),
-            weights=ones(m_x.shape).reshape((-1, 1)),
-            mode=mode,
-            )
-        d_hx = ma.array(d_hx, mask=mask != 0)
+        if hasattr(data, 'mask'):
+            mask = convolve(
+                int8(data.mask),
+                weights=ones(m_x.shape).reshape((-1, 1)),
+                mode=mode,
+                )
+            d_hx = ma.array(d_hx, mask=mask != 0)
+        # Bad
         d_x_degrees = convolve(self.x_c, m_x, mode=mode).reshape((-1,1))
         d_x_degrees = (d_x_degrees + 180) % 360 - 180
         d_x = self.EARTH_RADIUS * 2 * pi / 360 * d_x_degrees * cos(deg2rad(self.y_c))
+        ##
         self.vars['v'] = d_hx / d_x * gof

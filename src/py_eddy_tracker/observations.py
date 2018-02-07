@@ -109,7 +109,7 @@ class GridDataset(object):
         # Delta index of y
         d_y = i_y1 - i_y0
 
-        d_max = maximum(abs(d_x), abs(d_y))
+        d_max = int_(maximum(abs(d_x), abs(d_y)))
 
         # Compute number of pixel which we go trought
         nb_value = (abs(d_max) + 1).sum()
@@ -366,7 +366,7 @@ class EddiesObservations(object):
     def cost_function2(records_in, records_out, distance):
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
-        for i_record in xrange(nb_records):
+        for i_record in range(nb_records):
             poly_in = Polygon(
                 concatenate((
                     (records_in[i_record]['contour_lon_e'],),
@@ -391,7 +391,6 @@ class EddiesObservations(object):
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
-        m = EddiesObservations.across_ground(records_in, records_out, distance)
         cost = ((records_in['amplitude'] - records_out['amplitude']
                  ) / records_in['amplitude']
                 ) ** 2
@@ -400,8 +399,6 @@ class EddiesObservations(object):
                  ) ** 2
         cost += (distance / 125) ** 2
         cost **= 0.5
-        # Mask value superior at 60 % of variation
-        return ma.array(cost, mask=m)
         return cost
 
     def circle_mask(self, other, radius=100):
@@ -544,7 +541,7 @@ class EddiesObservations(object):
                     raise Exception('To many iteration: %d' % security_increment)
                 security_increment += 1
                 i_min_value = cost_reduce.argmin()
-                i, j = i_min_value / shape[1], i_min_value % shape[1]
+                i, j = int(i_min_value / shape[1]), int(i_min_value % shape[1])
                 # Set to False all link
                 mask[i_self_keep[i]] = False
                 mask[:, i_other_keep[j]] = False
@@ -761,7 +758,7 @@ class TrackEddiesObservations(EddiesObservations):
             zlib=True,
             complevel=1,
             **kwargs_variable)
-        for attr, attr_value in attr_variable.iteritems():
+        for attr, attr_value in attr_variable.items():
             var.setncattr(attr, attr_value)
         if scale_factor is not None:
             var.scale_factor = scale_factor

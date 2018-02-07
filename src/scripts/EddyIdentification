@@ -47,6 +47,8 @@ def load_config():
     parser = EddyParser("Tool to detect eddies. "
                         "To run use EddyIdentification "
                         "eddy_tracker_configuration.yaml'")
+    parser.add_argument('--sge_id', type=int)
+    parser.add_argument('--nb_jobs', type=int)
     parser.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
     opts = parser.parse_args()
@@ -105,6 +107,8 @@ def load_config():
         if 'SLA' in diagnostic_type:
             config['SMOOTHING_SLA']['ZWL'] = atleast_1d(config['SMOOTHING_SLA']['ZWL'])
             config['SMOOTHING_SLA']['MWL'] = atleast_1d(config['SMOOTHING_SLA']['MWL'])
+    if opts.sge_id is not None and opts.nb_jobs is not None:
+        config['SGE'] = dict(id=opts.sge_id, nb_jobs=opts.nb_jobs)
     return config
 
 
@@ -119,6 +123,8 @@ if __name__ == '__main__':
         start_date=CONFIG['DATE_STR'],
         end_date=CONFIG['DATE_END'],
         )
+    NB_GRID = len(DATASET_LIST)
+
     DIMENSIONS = CONFIG['DATASET'].get('DIMENSIONS', None)
     # End user configuration setup options
     # ----------------------------------------------------------
@@ -154,10 +160,14 @@ if __name__ == '__main__':
     logging.info('Start tracking')
 
     # Loop over grid
-    for filename, date in DATASET_LIST:
+    for i_file, (filename, date) in enumerate(DATASET_LIST):
+        if 'SGE' in CONFIG.keys():
+            sge_id_affectation = int(i_file / NB_GRID * CONFIG['SGE']['nb_jobs']) + 1
+            if sge_id_affectation != CONFIG['SGE']['id']:
+                continue
+
         date = date.astype(dt.date)
         # Extract grid date
-        grd_int_date = num2julian(date2num(date))
         SLA_GRD.grid_date = date
 
         # Initialise two eddy objects to hold data
@@ -175,10 +185,15 @@ if __name__ == '__main__':
                 logging.info('applying Gaussian high-pass filter')
                 # Set landpoints to zero
                 m = SLA_GRD.mask
-                sla[SLA_GRD.mask] = 0.
+                if m is not None:
+                    sla[SLA_GRD.mask] = 0
                 if hasattr(sla, 'data'):
-                    m += sla.data == SLA_GRD.fillval
+                    if m is not None:
+                        m += sla.data == SLA_GRD.fillval
+                    else:
+                        m = sla.data == SLA_GRD.fillval
                     sla[sla.data == SLA_GRD.fillval] = 0.
+                
                 # High pass filter, see
                 # http://stackoverflow.com/questions/6094957/high-pass-filter-
                 # for-image-processing-in-python-by-using-scipy-numpy
@@ -201,7 +216,8 @@ if __name__ == '__main__':
                 raise Exception('Filter unknown : %s', SMOOTHING_TYPE)
 
         # Apply the landmask
-        sla.mask += SLA_GRD.mask
+        if getattr(SLA_GRD, 'mask', None) is not None:
+            sla.mask += SLA_GRD.mask
 
         # Multiply by 0.01 for m
         SLA_GRD.set_geostrophic_velocity(sla * 0.01)
@@ -262,6 +278,7 @@ if __name__ == '__main__':
             logging.info("Cyclonic research")
             collection_loop(CONTOURS, SLA_GRD, C_EDDY)
 
+        grd_int_date = num2julian(date2num(date)) + 0.5
         A_EDDY.observations.obs['time'] = grd_int_date
         C_EDDY.observations.obs['time'] = grd_int_date
         # clear the current axis

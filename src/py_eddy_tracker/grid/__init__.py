@@ -33,7 +33,7 @@ from scipy import spatial
 from pyproj import Proj
 from numpy import unique, array, unravel_index, r_, floor, interp, arange, \
     sin, cos, deg2rad, arctan2, sqrt, pi, zeros, reciprocal, ma, empty, \
-    concatenate, bytes_
+    concatenate, bytes_, int_
 import logging
 from ..tracking_objects import nearest
 from re import compile as re_compile
@@ -64,8 +64,12 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
 
     dataset_list.sort(order=['date', 'filename'])
 
-    steps = unique(dataset_list['date'][1:] - dataset_list['date'][:-1])
+    delta_time = dataset_list['date'][1:] - dataset_list['date'][:-1]
+    steps = unique(delta_time)
     if len(steps) > 1:
+        mask = int_(delta_time) != int_(steps[0])
+        logging.debug('File before gap : %s', dataset_list['filename'][:-1][mask])
+        logging.debug('File after  gap : %s', dataset_list['filename'][1:][mask])
         raise Exception('Several days steps in grid dataset %s' % steps)
 
     if sub_sampling_step != 1:
@@ -372,11 +376,6 @@ class BaseData(object):
         lonv = self.half_interp(self.lonpad[:-1], self.lonpad[1:])
         latv = self.half_interp(self.latpad[:-1], self.latpad[1:])
 
-        print 'self.lonpad.shape',self.lonpad.shape
-        print 'self.latpad.shape',self.latpad.shape
-        print 'self.lon.shape',self._lon.shape
-        print 'self.lat.shape',self._lat.shape
-
         # Get p_m and p_n
         p_m = zeros(self.lonpad.shape)
         p_m[:, 1:-1] = self.haversine_dist(lonu[:, :-1], latu[:, :-1],
@@ -437,8 +436,9 @@ class BaseData(object):
         Get mask at U and V points
         """
         logging.info('--- Computing umask and vmask for padded grid')
-        self._umask = self.mask[:, :-1] * self.mask[:, 1:]
-        self._vmask = self.mask[:-1] * self.mask[1:]
+        if getattr(self, 'mask', None) is not None:
+            self._umask = self.mask[:, :-1] * self.mask[:, 1:]
+            self._vmask = self.mask[:-1] * self.mask[1:]
 
     def set_basemap(self, with_pad=True):
         """
@@ -507,10 +507,11 @@ class BaseData(object):
         """Get scalar speed
         """
         uspd = (self.u_val ** 2 + self.v_val ** 2) ** .5
-        if hasattr(uspd, 'mask'):
-            uspd.mask += self.mask[self.view_unpad]
-        else:
-            uspd = ma.array(uspd, mask=self.mask[self.view_unpad])
+        if self.mask is not None:
+            if hasattr(uspd, 'mask'):
+                uspd.mask += self.mask[self.view_unpad]
+            else:
+                uspd = ma.array(uspd, mask=self.mask[self.view_unpad])
         return uspd
 
     def set_interp_coeffs(self, sla, uspd):

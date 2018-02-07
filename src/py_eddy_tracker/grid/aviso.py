@@ -136,8 +136,8 @@ class AvisoGrid(BaseData):
         units = self.read_nc_att(self.grid_name, 'units')
         if units not in self.KNOWN_UNITS:
             raise Exception('Unknown units : %s' % units)
-            
-        with Dataset(self.grid_filename) as h_nc:
+
+        with Dataset(self.grid_filename.decode('utf-8')) as h_nc:
             grid_dims = array(h_nc.variables[self.grid_name].dimensions)
             lat_dim = h_nc.variables[self.lat_name].dimensions[0]
             lon_dim = h_nc.variables[self.lon_name].dimensions[0]

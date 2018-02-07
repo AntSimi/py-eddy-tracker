@@ -167,7 +167,7 @@ class IdentificationList(object):
             zlib=True,
             complevel=1,
             **kwargs_variable)
-        for attr, attr_value in attr_variable.iteritems():
+        for attr, attr_value in attr_variable.items():
             var.setncattr(attr, attr_value)
         if scale_factor is not None:
             var.scale_factor = scale_factor
