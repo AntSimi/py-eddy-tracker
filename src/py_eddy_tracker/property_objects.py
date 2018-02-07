@@ -136,18 +136,15 @@ class Amplitude (object):
             elif self.local_extrema > self.mle:
                 lmi_j, lmi_i = where(self.local_extrema_inds)
                 levnm2 = level - (2 * self.eddy.interval)
-                slamin = 1e5
-                for j, i in zip(lmi_j, lmi_i):
-                    if slamin >= self.sla[j, i]:
-                        slamin = self.sla[j, i]
-                        jmin, imin = j, i
-                    if self.sla[j, i] >= levnm2:
-                        self._set_cyc_amplitude()
-                        # Prevent further calls to_set_cyc_amplitude
-                        levnm2 = 1e5
-                jmin += self.eddy.jmin
-                imin += self.eddy.imin
-                return (imin, jmin)
+                index = self.sla[lmi_j, lmi_i].argmin()
+                jmin_, imin_ = lmi_j[index], lmi_i[index]
+                if self.sla[jmin_, imin_] >= levnm2:
+                    self._set_cyc_amplitude()
+
+                jmin_ += self.eddy.jmin
+                imin_ += self.eddy.imin
+
+                return imin_, jmin_
         return False
 
     def all_pixels_above_h0(self, level):
@@ -326,21 +323,6 @@ class SwirlSpeed(object):
             self.y_min_per_contour,
             self.x_max_per_contour,
             self.y_max_per_contour,
-            xpt,
-            ypt
-            )
-
-    def get_index_nearest_path(self, level, xpt, ypt):
-        """ Get index from the nearest path in the level
-        """
-        return index_from_nearest_path(
-            level,
-            self.level_index,
-            self.nb_contour_per_level,
-            self.nb_pt_per_contour,
-            self.contour_index,
-            self.x_value,
-            self.y_value,
             xpt,
             ypt
             )

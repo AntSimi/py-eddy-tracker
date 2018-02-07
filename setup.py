@@ -23,12 +23,16 @@ setup(
         # 'src/scripts/EddyTrackingFull'
         ],
     zip_safe=False,
-    cmdclass={
-        'build_ext': cython_build_ext,
-    },
+    cmdclass=dict(
+        build_ext=cython_build_ext,
+        ),
+    entry_points=dict(console_scripts=[
+        'EddyUpdate = py_eddy_tracker.update.__init__:eddy_update',
+        ]),
     ext_modules=[Extension("py_eddy_tracker.tools",
                            ["src/py_eddy_tracker/tools.pyx"],
                            include_dirs=[numpy.get_include()])],
+    package_data={'py_eddy_tracker.featured_tracking': ['*.nc', ]},
     setup_requires=[
         'numpy>=1.8'],
     install_requires=[

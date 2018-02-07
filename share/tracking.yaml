@@ -4,7 +4,6 @@ DIAGNOSTIC_TYPE: 'SLA'
 
 PATHS:
   # Files produces with EddyIdentification
-  FILES_PATTERN: /data/adelepoulle/Test/Test_eddy/20160330_brasilia_comparaison/brasil/Anticyclonic_*.nc
   FILES_PATTERN: /home/emason/toto/Anticyclonic_*.nc
   # Path and filename of Chelton et al (1998) Rossby radius data
   # Obtain file from:

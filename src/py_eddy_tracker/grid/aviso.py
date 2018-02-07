@@ -31,7 +31,8 @@ from scipy import ndimage
 from scipy import spatial
 from dateutil import parser
 from numpy import meshgrid, zeros, array, where, ma, argmin, vstack, ones, \
-    newaxis, sqrt, diff, r_
+    newaxis, sqrt, diff, r_, arange
+from scipy.interpolate  import interp1d
 import logging
 from netCDF4 import Dataset
 
@@ -60,6 +61,8 @@ class AvisoGrid(BaseData):
         'fillval',
         '_angle',
         'sla_coeffs',
+        'xinterp',
+        'yinterp',
         'uspd_coeffs',
         '__lon',
         '__lat',
@@ -77,22 +80,37 @@ class AvisoGrid(BaseData):
         super(AvisoGrid, self).__init__()
         logging.info('Initialising the *AVISO_grid*')
         self.grid_filename = aviso_file
-        self.domain = the_domain
-        self.lonmin = float(lonmin)
-        self.lonmax = float(lonmax)
-        self.latmin = float(latmin)
-        self.latmax = float(latmax)
-        self.grid_filename = aviso_file
-        
+
         self.lon_name = lon_name
         self.lat_name = lat_name
         self.grid_name = grid_name
 
         self._lon = self.read_nc(self.lon_name)
         self._lat = self.read_nc(self.lat_name)
+        if the_domain is None:
+            self.domain = 'Automatic Domain'
+            dlon = abs(self._lon[1] - self._lon[0])
+            dlat = abs(self._lat[1] - self._lat[0])
+            self.lonmin = float(self._lon.min()) + dlon * 2
+            self.lonmax = float(self._lon.max()) - dlon * 2
+            self.latmin = float(self._lat.min()) + dlat * 2
+            self.latmax = float(self._lat.max()) - dlat * 2
+            if ((self._lon[-1] + dlon) % 360) == self._lon[0]:
+                self.domain = 'Global'
+                self.lonmin = -100.
+                self.lonmax = 290.
+                self.latmin = -80.
+                self.latmax = 80.
+        else:
+            self.domain = the_domain
+            self.lonmin = float(lonmin)
+            self.lonmax = float(lonmax)
+            self.latmin = float(latmin)
+            self.latmax = float(latmax)
+
         self.fillval = self.read_nc_att(self.grid_name, '_FillValue')
 
-        if lonmin < 0 and lonmax <= 0:
+        if self.lonmin < 0 and self.lonmax <= 0:
             self._lon -= 360.
         self._lon, self._lat = meshgrid(self._lon, self._lat)
         self._angle = zeros(self._lon.shape)
@@ -102,7 +120,7 @@ class AvisoGrid(BaseData):
 
         # zero_crossing, used for handling a longitude range that
         # crosses zero degree meridian
-        if lonmin < 0 and lonmax >= 0 and 'MedSea' not in self.domain:
+        if self.lonmin < 0 and self.lonmax >= 0 and 'MedSea' not in self.domain:
             if ((self.lonmax < self._lon.max()) and (self.lonmax > self._lon.min()) and (self.lonmin < self._lon.max()) and (self.lonmin > self._lon.min())):
                 pass
             else:
@@ -119,9 +137,15 @@ class AvisoGrid(BaseData):
         self.get_aviso_f_pm_pn()
         self.set_u_v_eke()
         self.shape = self.lon.shape
-#         pad2 = 2 * self.pad
-#         self.shape = (self.f_coriolis.shape[0] - pad2,
-#                       self.f_coriolis.shape[1] - pad2)
+
+        # self.init_pos_interpolator()
+
+    def init_pos_interpolator(self):
+        self.xinterp = interp1d(self.lon[0].copy(), arange(self.lon.shape[1]), assume_sorted=True, copy=False, fill_value=(0, -1), bounds_error=False, kind='nearest')
+        self.yinterp = interp1d(self.lat[:, 0].copy(), arange(self.lon.shape[0]), assume_sorted=True, copy=False, fill_value=(0, -1), bounds_error=False, kind='nearest')
+
+    def nearest_indice(self, lon, lat):
+        return self.xinterp(lon), self.yinterp(lat)
 
     def set_filename(self, file_name):
         self.grid_filename = file_name
@@ -137,7 +161,7 @@ class AvisoGrid(BaseData):
         if units not in self.KNOWN_UNITS:
             raise Exception('Unknown units : %s' % units)
             
-        with Dataset(self.grid_filename) as h_nc:
+        with Dataset(self.grid_filename.decode('utf-8')) as h_nc:
             grid_dims = array(h_nc.variables[self.grid_name].dimensions)
             lat_dim = h_nc.variables[self.lat_name].dimensions[0]
             lon_dim = h_nc.variables[self.lon_name].dimensions[0]
@@ -185,44 +209,6 @@ class AvisoGrid(BaseData):
                 plus9 = argmin(abs(self.latpad[:, 0] - 9))
                 sea_label = self.labels[plus9, plus200]
                 self.mask += self.labels != sea_label
-
-    def fillmask(self, data, mask):
-        """
-        Fill missing values in an array with an average of nearest
-        neighbours
-        From http://permalink.gmane.org/gmane.comp.python.scientific.user/19610
-        """
-        raise Exception('Use convolution to fill data')
-        assert data.ndim == 2, 'data must be a 2D array.'
-        fill_value = 9999.99
-        data[mask == 0] = fill_value
-
-        # Create (i, j) point arrays for good and bad data.
-        # Bad data are marked by the fill_value, good data elsewhere.
-        igood = vstack(where(data != fill_value)).T
-        ibad = vstack(where(data == fill_value)).T
-
-        # Create a tree for the bad points, the points to be filled
-        tree = spatial.cKDTree(igood)
-
-        # Get the four closest points to the bad points
-        # here, distance is squared
-        dist, iquery = tree.query(ibad, k=4, p=2)
-
-        # Create a normalised weight, the nearest points are weighted as 1.
-        #   Points greater than one are then set to zero
-        weight = dist / (dist.min(axis=1)[:, newaxis])
-        weight *= ones(dist.shape)
-        weight[weight > 1.] = 0.
-
-        # Multiply the queried good points by the weight, selecting only the
-        # nearest points. Divide by the number of nearest points to get average
-        xfill = weight * data[igood[:, 0][iquery], igood[:, 1][iquery]]
-        xfill = (xfill / weight.sum(axis=1)[:, newaxis]).sum(axis=1)
-
-        # Place average of nearest good points, xfill, into bad point locations
-        data[ibad[:, 0], ibad[:, 1]] = xfill
-        return data
 
     @property
     def lon(self):

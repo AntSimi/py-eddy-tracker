@@ -5,7 +5,7 @@ Track eddy with Identification file produce with EddyIdentification
 """
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.tracking import Correspondances
-from os.path import exists
+from os.path import exists, dirname
 from os import mkdir
 import logging
 from numpy import unique
@@ -22,9 +22,7 @@ def usage():
                         nargs='+',
                         help='File of correspondances to reload link '
                              'without tracking computation')
-    parser.add_argument('--path_out',
-                        default='./',
-                        help='Path, where to write file')
+    parser.add_argument('path_out', help='Path, where to write file')
     return parser.parse_args()
 
 
@@ -32,8 +30,8 @@ if __name__ == '__main__':
     CONFIG = usage()
 
     # Create output directory
-    if not exists(CONFIG.path_out):
-        mkdir(CONFIG.path_out)
+    if not exists(dirname(CONFIG.path_out)):
+        mkdir(dirname(CONFIG.path_out))
 
     START_TIME = dt.datetime.now()
     CORRESPONDANCES = Correspondances.load(CONFIG.nc_file[0])
@@ -41,4 +39,4 @@ if __name__ == '__main__':
     for i in CONFIG.nc_file[1:]:
         CORRESPONDANCES.merge_correspondance(Correspondances.load(i))
 
-    CORRESPONDANCES.save('%s/toto.nc' % CONFIG.path_out)
+    CORRESPONDANCES.save(CONFIG.path_out)

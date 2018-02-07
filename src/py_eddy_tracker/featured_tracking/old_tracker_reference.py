@@ -20,7 +20,13 @@ class CheltonTracker(Model):
         # Compute Parameter of ellips
         y = self.basic_formula_ellips_major_axis(
             self.obs['lat'],
-            degrees=True)
+            degrees=True,
+            c0=1.05,
+            cmin=1.05,
+            cmax=1.5,
+            lat1=23,
+            lat2=5,
+            )
         # mask from ellips
         mask = self.shifted_ellipsoid_degrees_mask(
             other,

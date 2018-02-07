@@ -6,7 +6,7 @@ To avoid problems with installation, use of the virtualenv Python virtual enviro
 
 Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, cython, pyproj, Shapely, ...), e.g.:
 
-* ** pip install cython **
+* ** pip install cython numpy matplotlib scipy netCDF4 shapely pyproj**
 
 Then run the following to install the eddy tracker:
 
