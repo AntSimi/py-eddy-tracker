@@ -1,21 +1,20 @@
+
 # Two diagnostics, based on SLA (e.g., Chelton et al, 2011)
 DIAGNOSTIC_TYPE: 'SLA'
 
 # Specify domain
 DOMAIN:
-  #~ THE_DOMAIN: 'Global'
   THE_DOMAIN: 'Regional'
-  LONMIN: -100
-  LONMAX: -5
-  LATMIN: 10
-  LATMAX: 45
-  DATE_STR: 2014-12-27
-  DATE_END: 2014-12-31
+  LONMIN: -40
+  LONMAX: -10
+  LATMIN: 18
+  LATMAX: 34
+  DATE_STR: 2007-06-27
+  DATE_END: 2009-12-31
 
 DATASET:
     # Path to data
-    #~ DATA_DIR: '/data/PVA/Externe/global/delayed-time/grids/msla/all-sat-merged/h/2014/'
-    DATA_DIR: '/home/adelepoulle/2014/'
+    DATA_DIR: '/marula/emason/data/altimetry/global/delayed-time/grids/msla/all-sat-merged/h/'
     # Model to select file
     FILES_MODEL: dt_global_allsat_msla_h_????????_????????.nc
     # Model to extract date (regular expression)
@@ -23,20 +22,20 @@ DATASET:
     # Model to transfer date to python datetime
     DATE_MODEL: '%Y%m%d'
     # Grid Name to compute analysis
-    VAR_NAME: Grid_0001
+    VAR_NAME: sla
     # Longitude variable
-    LON_NAME: NbLongitudes
+    LON_NAME: lon
     # Latitude variable
-    LAT_NAME: NbLatitudes
+    LAT_NAME: lat
     # Step to do SUBSAMPLING (1 no subsampling)
     SUBSAMPLING: 1
 
 PATHS:
   # Obtain file from:
   # http://www-po.coas.oregonstate.edu/research/po/research/rossby_radius/
-  RW_PATH: 'rossrad.dat'
+  RW_PATH: '/home/emason/Dropbox/rossrad.dat'
   # Path for saving of outputs
-  SAVE_DIR: 'test/'
+  SAVE_DIR: '/home/emason/toto/'
 
   # Reference Julian day (Julian date at Jan 1, 1992)
 JDAY_REFERENCE: 2448623.
@@ -46,10 +45,11 @@ CONTOUR_PARAMETER:
   # Set SLA contour spacing (cm)
   CONTOUR_PARAMETER_SLA:
     MAX_SLA: 100.
-    INTERVAL: 0.5
+    INTERVAL: 0.25
+    #~ INTERVAL: 1
 
 # Shape error (see Kurian et al 2011)
-SHAPE_ERROR: 55. # % (Mason et al 2014 use 55%)
+SHAPE_ERROR: 95. # % (Mason et al 2014 use 55%)
     
 # Filtering
 SMOOTHING: Yes
@@ -60,9 +60,9 @@ SMOOTHING_SLA:
 
 # Min and max permitted eddy radii [degrees] and amplitudes (cm)
 # 0.4 for DT10, 0.35 for DT14
-RADMIN: 0.35
+RADMIN: 0.15
 RADMAX: 4.461
-AMPMIN: 0.
+AMPMIN: 0.005
 AMPMAX: 150.
 
 # MPM14 use 1; CSS11 have no limit
@@ -81,8 +81,9 @@ EVOLVE_AREA_MAX: 500 # max change in area
 # - speed-based contour points
 # - shape test values
 # - profiles of swirl velocity from effective contour inwards
+# Useful for working with ARGO data    
 TRACK_EXTRA_VARIABLES:
-    - shape_error
+    - shape_error_e
     - shape_error_s
 
 TRACK_ARRAY_VARIABLES:

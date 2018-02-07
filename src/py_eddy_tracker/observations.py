@@ -16,14 +16,13 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2015 by Evan Mason
+Copyright (c) 2014-2017 by Evan Mason and Antoine Delepoulle
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
+observations.py
 
-py_eddy_tracker_amplitude.py
-
-Version 2.0.3
+Version 3.0.0
 
 ===========================================================================
 
@@ -509,7 +508,7 @@ class EddiesObservations(object):
 
     @staticmethod
     def solve_simultaneous(cost):
-        mask = -cost.mask
+        mask = ~cost.mask
         # Count number of link by self obs and other obs
         self_links = mask.sum(axis=1)
         other_links = mask.sum(axis=0)
@@ -533,7 +532,7 @@ class EddiesObservations(object):
             # Cost to resolve conflict
             cost_reduce = cost[i_self_keep][:, i_other_keep]
             shape = cost_reduce.shape
-            nb_conflict = (-cost_reduce.mask).sum()
+            nb_conflict = (~cost_reduce.mask).sum()
             logging.debug('Shape conflict matrix : %s, %d conflicts', shape, nb_conflict)
 
             if nb_conflict >= (shape[0] + shape[1]):
@@ -637,7 +636,7 @@ class EddiesObservations(object):
             dist[mask_accept_dist])
 
         cost_mat = ma.empty(mask_accept_dist.shape, dtype='f4')
-        cost_mat.mask = -mask_accept_dist
+        cost_mat.mask = ~mask_accept_dist
         cost_mat[mask_accept_dist] = cost_values
 
         i_self, i_other = self.solve_function(cost_mat)
@@ -727,8 +726,8 @@ class TrackEddiesObservations(EddiesObservations):
             var = field[0]
             if var in ['n', 'virtual', 'track'] or var in self.array_variables:
                 continue
-            self.obs[var][mask] = interp(index[mask], index[-mask],
-                                         self.obs[var][-mask])
+            self.obs[var][mask] = interp(index[mask], index[~mask],
+                                         self.obs[var][~mask])
 
     def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
         """Select eddies which are longer than nb_min

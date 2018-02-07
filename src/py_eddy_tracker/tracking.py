@@ -16,14 +16,13 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2015 by Evan Mason
+Copyright (c) 2014-2017 by Evan Mason and Antoine Delepoulle
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
+tracking.py
 
-py_eddy_tracker_amplitude.py
-
-Version 2.0.3
+Version 3.0.0
 
 ===========================================================================
 
@@ -448,7 +447,7 @@ class Correspondances(list):
             index_final = self.i_current_by_tracks[i_id]
 
             # First obs of eddies
-            m_first_obs = -first_obs_save_in_tracks[i_id]
+            m_first_obs = ~first_obs_save_in_tracks[i_id]
             if m_first_obs.any():
                 # Index in the previous file
                 index_in = self[i]['in'][m_first_obs]

@@ -31,7 +31,8 @@ from matplotlib.dates import date2num, num2julian
 from matplotlib.figure import Figure
 from os.path import exists
 from os import mkdir
-from numpy import array, arange, atleast_1d, unique, round, int, interp, pi
+from numpy import array, arange, atleast_1d, unique, round, int, interp, pi, \
+    float_, errstate, ma
 
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.property_functions import \
@@ -183,13 +184,20 @@ if __name__ == '__main__':
             if 'Gaussian' in CONFIG['SMOOTHING_SLA']['TYPE']:
                 logging.info('applying Gaussian high-pass filter')
                 # Set landpoints to zero
+                m = SLA_GRD.mask
                 sla[SLA_GRD.mask] = 0.
                 if hasattr(sla, 'data'):
+                    m += sla.data == SLA_GRD.fillval
                     sla[sla.data == SLA_GRD.fillval] = 0.
                 # High pass filter, see
                 # http://stackoverflow.com/questions/6094957/high-pass-filter-
                 # for-image-processing-in-python-by-using-scipy-numpy
-                sla -= gaussian_filter(sla, [MRES, ZRES])
+                v = gaussian_filter(sla, sigma=[MRES, ZRES])
+                w = gaussian_filter(float_(~m), sigma=[MRES, ZRES])
+
+                with errstate(invalid='ignore'):
+                    sla -= ma.array(v / w, mask= (w==0) + m)
+
                 logging.info('applying Gaussian high-pass filter -- OK')
 
             elif 'Hanning' in SMOOTHING_TYPE:

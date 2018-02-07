@@ -5,7 +5,7 @@ import numpy
 
 setup(
     name="pyEddyTracker",
-    version='2.0.3',
+    version='3.0.0',
     description="Py-Eddy-Tracker libraries",
     classifiers=['Development Status :: Alpha',
                  'Topic :: Eddy',

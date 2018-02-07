@@ -17,13 +17,13 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2015 by Evan Mason
+Copyright (c) 2014-2017 by Evan Mason and Antoine Delepoulle
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
-py_eddy_tracker_classes.py
+property_functions.py
 
-Version 2.0.3
+Version 3.0.0
 ===========================================================================
 
 
@@ -203,7 +203,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
             continue
         any_inner_contours = True
 
-        seglon, seglat = (poly_i.vertices[:, 0], poly_i.vertices[:, 1])
+        seglon, seglat = (poly_i.vertices[:, 0].copy(), poly_i.vertices[:, 1].copy())
         seglon, seglat = uniform_resample(seglon, seglat, method='interp1d')
 
         # Interpolate uspd to seglon, seglat, then get mean
