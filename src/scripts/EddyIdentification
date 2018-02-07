@@ -68,27 +68,38 @@ def load_config():
     if diagnostic_type not in ['SLA']:
         raise Exception('Unknown diagnostic %s', diagnostic_type)
     
-
-    config['THE_DOMAIN'] = config['DOMAIN']['THE_DOMAIN']
+    auto = False
+    if 'DOMAIN' not in config:
+        auto = True
+        config['DATE_STR'] = None
+        config['DATE_END'] = None
+        config['THE_DOMAIN'] = None
+        config['lonmin'] = None
+        config['lonmax'] = None
+        config['latmin'] = None
+        config['latmax'] = None
+    else:
+        config['THE_DOMAIN'] = config['DOMAIN'].get('THE_DOMAIN', 'Auto')
 
     # It is not recommended to change values given below
     # for 'Global', 'BlackSea' or 'MedSea'...
-    if 'Global' in config['THE_DOMAIN']:
-        config['lonmin'] = -100.
-        config['lonmax'] = 290.
-        config['latmin'] = -80.
-        config['latmax'] = 80.
+    if not auto:
+        if 'Global' in config['THE_DOMAIN']:
+            config['lonmin'] = -100.
+            config['lonmax'] = 290.
+            config['latmin'] = -80.
+            config['latmax'] = 80.
 
-    elif config['THE_DOMAIN'] in ('Regional'):
-        config['lonmin'] = config['DOMAIN']['LONMIN']
-        config['lonmax'] = config['DOMAIN']['LONMAX']
-        config['latmin'] = config['DOMAIN']['LATMIN']
-        config['latmax'] = config['DOMAIN']['LATMAX']
+        elif config['THE_DOMAIN'] == 'Regional':
+            config['lonmin'] = config['DOMAIN']['LONMIN']
+            config['lonmax'] = config['DOMAIN']['LONMAX']
+            config['latmin'] = config['DOMAIN']['LATMIN']
+            config['latmax'] = config['DOMAIN']['LATMAX']
 
-    config['DATE_STR'] = config['DOMAIN']['DATE_STR']
-    config['DATE_END'] = config['DOMAIN']['DATE_END']
-    if config['DATE_STR'] > config['DATE_END']:
-        raise Exception('DATE_END must be larger than DATE_STR')
+        config['DATE_STR'] = config['DOMAIN']['DATE_STR']
+        config['DATE_END'] = config['DOMAIN']['DATE_END']
+        if config['DATE_STR'] > config['DATE_END']:
+            raise Exception('DATE_END must be larger than DATE_STR')
 
 
     if 'SLA' in diagnostic_type:
@@ -150,13 +161,12 @@ if __name__ == '__main__':
 
     START_TIME = datetime.now()
 
-    logging.info('Start tracking')
+    logging.info('Start identification')
 
     # Loop over grid
     for filename, date in DATASET_LIST:
         date = date.astype(dt.date)
         # Extract grid date
-        grd_int_date = num2julian(date2num(date))
         SLA_GRD.grid_date = date
 
         # Initialise two eddy objects to hold data
@@ -193,7 +203,8 @@ if __name__ == '__main__':
                 raise Exception('Filter unknown : %s', SMOOTHING_TYPE)
 
         # Apply the landmask
-        sla.mask += SLA_GRD.mask
+        if SLA_GRD.mask is not None:
+            sla.mask += SLA_GRD.mask
 
         # Multiply by 0.01 for m
         SLA_GRD.set_geostrophic_velocity(sla * 0.01)
@@ -254,6 +265,7 @@ if __name__ == '__main__':
             logging.info("Cyclonic research")
             collection_loop(CONTOURS, SLA_GRD, C_EDDY)
 
+        grd_int_date = num2julian(date2num(date)) + 0.5
         A_EDDY.observations.obs['time'] = grd_int_date
         C_EDDY.observations.obs['time'] = grd_int_date
         # clear the current axis

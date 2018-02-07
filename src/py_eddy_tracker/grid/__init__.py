@@ -5,7 +5,7 @@ from scipy import spatial
 from pyproj import Proj
 from numpy import unique, array, unravel_index, r_, floor, interp, arange, \
     sin, cos, deg2rad, arctan2, sqrt, pi, zeros, reciprocal, ma, empty, \
-    concatenate
+    concatenate, bytes_
 import logging
 from ..tracking_objects import nearest
 from re import compile as re_compile
@@ -20,16 +20,35 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
     full_path = join_path(data_dir, files_model)
     logging.info('Search files : %s', full_path)
 
-    dataset_list = array(glob(full_path),
+    filenames = bytes_(glob(full_path))
+    dataset_list = empty(len(filenames),
                          dtype=[('filename', 'S256'),
                                 ('date', 'datetime64[D]'),
                                 ])
+    dataset_list['filename'] = bytes_(glob(full_path))
 
     logging.info('%s grids available', dataset_list.shape[0])
+    mode_attrs = False
+    if '(' not in date_regexp:
+        logging.debug('Attrs date : %s', date_regexp)
+        mode_attrs = date_regexp.strip().split(':')
+    else:
+        logging.debug('Pattern date : %s', date_regexp)
+
     for item in dataset_list:
-        result = pattern_regexp.match(item['filename'])
-        if result:
-            str_date = result.groups()[0]
+        str_date = None
+        if mode_attrs:
+            with Dataset(item['filename'].decode("utf-8")) as h:
+                if len(mode_attrs) == 1:
+                    str_date = getattr(h, mode_attrs[0])
+                else:
+                    str_date = getattr(h.variables[mode_attrs[0]], mode_attrs[1])
+        else:
+            result = pattern_regexp.match(str(item['filename']))
+            if result:
+                str_date = result.groups()[0]
+            
+        if str_date is not None:
             item['date'] = datetime.strptime(str_date, date_model).date()
 
     dataset_list.sort(order=['date', 'filename'])
@@ -43,6 +62,9 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
         dataset_list = dataset_list[::sub_sampling_step]
 
     if start_date is not None or end_date is not None:
+        logging.info('Available grid from %s to %s',
+                     dataset_list[0]['date'],
+                     dataset_list[-1]['date'])
         logging.info('Filtering grid by time %s, %s', start_date, end_date)
         mask = (dataset_list['date'] >= start_date) * (
             dataset_list['date'] <= end_date)
@@ -148,13 +170,8 @@ class BaseData(object):
           varname : variable ('temp', 'mask_rho', etc) to read
           indices : slice
         """
-        with Dataset(self.grid_filename) as h_nc:
+        with Dataset(self.grid_filename.decode("utf-8")) as h_nc:
             return h_nc.variables[varname][indices]
-
-    @property
-    def nc_variables(self):
-        with Dataset(self.grid_filename) as h_nc:
-            return h_nc.variables.keys()
 
     @property
     def view(self):
@@ -179,7 +196,7 @@ class BaseData(object):
           varname : variable ('temp', 'mask_rho', etc) to read
           att : string of attribute, eg. 'valid_range'
         """
-        with Dataset(self.grid_filename) as h_nc:
+        with Dataset(self.grid_filename.decode("utf-8")) as h_nc:
             return getattr(h_nc.variables[varname], att)
 
     @property
@@ -388,27 +405,14 @@ class BaseData(object):
         mshp, lshp = vv_in.shape
         return vv2vr(vv_in, mshp + 1, lshp)
 
-    def rho2u_2d(self, rho_in):
-        """
-        Convert a 2D field at rho points to a field at u_val points
-        """
-        assert rho_in.ndim == 2, 'rho_in must be 2d'
-        return ((rho_in[:, :-1] + rho_in[:, 1:]) / 2).squeeze()
-
-    def rho2v_2d(self, rho_in):
-        """
-        Convert a 2D field at rho points to a field at v_val points
-        """
-        assert rho_in.ndim == 2, 'rho_in must be 2d'
-        return ((rho_in[:-1] + rho_in[1:]) / 2).squeeze()
-
     def uvmask(self):
         """
         Get mask at U and V points
         """
         logging.info('--- Computing umask and vmask for padded grid')
-        self._umask = self.mask[:, :-1] * self.mask[:, 1:]
-        self._vmask = self.mask[:-1] * self.mask[1:]
+        if getattr(self, 'mask', None) is not None:
+            self._umask = self.mask[:, :-1] * self.mask[:, 1:]
+            self._vmask = self.mask[:-1] * self.mask[1:]
 
     def set_basemap(self, with_pad=True):
         """
@@ -477,10 +481,11 @@ class BaseData(object):
         """Get scalar speed
         """
         uspd = (self.u_val ** 2 + self.v_val ** 2) ** .5
-        if hasattr(uspd, 'mask'):
-            uspd.mask += self.mask[self.view_unpad]
-        else:
-            uspd = ma.array(uspd, mask=self.mask[self.view_unpad])
+        if self.mask is not None:
+            if hasattr(uspd, 'mask'):
+                uspd.mask += self.mask[self.view_unpad]
+            else:
+                uspd = ma.array(uspd, mask=self.mask[self.view_unpad])
         return uspd
 
     def set_interp_coeffs(self, sla, uspd):

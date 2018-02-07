@@ -110,10 +110,10 @@ class GridDataset(object):
         # Delta index of y
         d_y = i_y1 - i_y0
 
-        d_max = maximum(abs(d_x), abs(d_y))
+        d_max = int_(maximum(abs(d_x), abs(d_y)))
 
         # Compute number of pixel which we go trought
-        nb_value = (abs(d_max) + 1).sum()
+        nb_value = int((abs(d_max) + 1).sum())
         # Create an empty array to store value of pixel across the travel
         # Max Index ~65000
         i_g = empty(nb_value, dtype='u2')
@@ -257,9 +257,12 @@ class EddiesObservations(object):
         """
         nb_obs_self = len(self)
         nb_obs = nb_obs_self + len(other)
-        eddies = self.__class__(size=nb_obs)
-        eddies.obs[:nb_obs_self] = self.obs[:]
-        eddies.obs[nb_obs_self:] = other.obs[:]
+        eddies = self.new_like(self, nb_obs)
+        other_keys = other.obs.dtype.fields.keys()
+        for key in eddies.obs.dtype.fields.keys():
+            eddies.obs[key][:nb_obs_self] = self.obs[key][:]
+            if key in other_keys:
+                eddies.obs[key][nb_obs_self:] = other.obs[key][:]
         eddies.sign_type = self.sign_type
         return eddies
 
@@ -294,11 +297,7 @@ class EddiesObservations(object):
             return self
         if index < 0:
             index = self_size + index + 1
-        eddies = self.__class__(new_size,
-            track_extra_variables=self.track_extra_variables,
-            track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables
-            )
+        eddies = self.new_like(self, new_size)
         eddies.obs[:index] = self.obs[:index]
         eddies.obs[index: index + insert_size] = other.obs
         eddies.obs[index + insert_size:] = self.obs[index:]
@@ -323,13 +322,21 @@ class EddiesObservations(object):
             dist_result)
         return dist_result
 
+    @staticmethod
+    def new_like(eddies, new_size):
+        return eddies.__class__(new_size,
+            track_extra_variables=eddies.track_extra_variables,
+            track_array_variables=eddies.track_array_variables,
+            array_variables=eddies.array_variables
+            )
+
     def index(self, index):
         """Return obs from self at the index
         """
         size = 1
         if hasattr(index, '__iter__'):
             size = len(index)
-        eddies = self.__class__(size, self.track_extra_variables)
+        eddies = self.new_like(self, size)
         eddies.obs[:] = self.obs[index]
         return eddies
 
@@ -761,7 +768,10 @@ class TrackEddiesObservations(EddiesObservations):
             zlib=True,
             complevel=1,
             **kwargs_variable)
-        for attr, attr_value in attr_variable.iteritems():
+        attrs = list(attr_variable.keys())
+        attrs.sort()
+        for attr in attrs:
+            attr_value = attr_variable[attr]
             var.setncattr(attr, attr_value)
         if scale_factor is not None:
             var.scale_factor = scale_factor

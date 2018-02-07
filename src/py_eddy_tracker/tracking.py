@@ -314,8 +314,8 @@ class Correspondances(list):
     def save(self, filename):
         self.prepare_merging()
         nb_step = len(self.datasets) - 1
+        logging.info('Create correspondance file %s', filename)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
-            logging.info('Create correspondance file %s', filename)
             # Create dimensions
             logging.debug('Create Dimensions "Nlink" : %d', self.nb_link_max)
             h_nc.createDimension('Nlink', self.nb_link_max)
