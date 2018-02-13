@@ -247,7 +247,7 @@ class EddiesObservations(object):
         """Check coherence between two dataset
         """
         test = self.track_extra_variables == other.track_extra_variables
-        test = self.track_array_variables == other.track_array_variables
+        test *= self.track_array_variables == other.track_array_variables
         test *= self.array_variables == other.array_variables
         return test
 
@@ -783,7 +783,7 @@ class TrackEddiesObservations(EddiesObservations):
             var.setncattr('min', var[:].min())
             var.setncattr('max', var[:].max())
         except ValueError:
-            logging.warn('Data is empty')
+            logging.warning('Data is empty')
 
     def write_netcdf(self, path='./', filename='%(path)s/%(sign_type)s.nc'):
         """Write a netcdf with eddy obs

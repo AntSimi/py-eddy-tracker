@@ -343,7 +343,8 @@ class BaseData(object):
         self.slice_i_unpad = slice(abs(pad), -abs(pad))
         self.slice_i_pad = slice(ip0, ip1)
 
-    def haversine_dist(self, lon1, lat1, lon2, lat2):
+    @staticmethod
+    def haversine_dist(lon1, lat1, lon2, lat2):
         """
         TO DO: change to use f2py version
         Haversine formula to calculate distance between two lon/lat points
@@ -367,7 +368,8 @@ class BaseData(object):
         """
         return nearest(lon, lat, self._lon[0], self._lat[:, 0])
 
-    def half_interp(self, h_one, h_two):
+    @staticmethod
+    def half_interp(h_one, h_two):
         """
         Speed up frequent operations of type 0.5 * (arr[:-1] + arr[1:])
         """
@@ -418,7 +420,7 @@ class BaseData(object):
             u_out[:, 1:-1] = self.half_interp(uu_in[:, :-1], uu_in[:, 1:])
             u_out[:, 0] = u_out[:, 1]
             u_out[:, -1] = u_out[:, -2]
-            return (u_out.squeeze())
+            return u_out.squeeze()
         mshp, lshp = uu_in.shape
         return uu2ur(uu_in, mshp, lshp + 1)
 
@@ -429,7 +431,7 @@ class BaseData(object):
             v_out[1:-1] = self.half_interp(vv_in[:-1], vv_in[1:])
             v_out[0] = v_out[1]
             v_out[-1] = v_out[-2]
-            return (v_out.squeeze())
+            return v_out.squeeze()
         mshp, lshp = vv_in.shape
         return vv2vr(vv_in, mshp + 1, lshp)
 

@@ -4,6 +4,8 @@ syntax: glob
 *.c
 *.egg-*
 *.eclipse.*
+*.idea*
+*.project*
 syntax: regexp
 ^build$
 syntax: regexp

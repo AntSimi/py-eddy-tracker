@@ -108,8 +108,7 @@ class Amplitude (object):
     def within_amplitude_limits(self):
         """
         """
-        return (self.amplitude >= self.eddy.ampmin and
-                self.amplitude <= self.eddy.ampmax)
+        return self.eddy.ampmin <= self.amplitude <= self.eddy.ampmax
 
     def _set_cyc_amplitude(self):
         """Get amplitude for cyclone
@@ -130,8 +129,7 @@ class Amplitude (object):
             return False  # i.e., with self.amplitude == 0
         else:
             self._set_local_extrema(1)
-            if (self.local_extrema > 0 and
-                    self.local_extrema <= self.mle):
+            if 0 < self.local_extrema <= self.mle:
                 self._set_cyc_amplitude()
             elif self.local_extrema > self.mle:
                 lmi_j, lmi_i = where(self.local_extrema_inds)
@@ -157,8 +155,7 @@ class Amplitude (object):
             return False
         else:
             self._set_local_extrema(-1)
-            if (self.local_extrema > 0 and
-                    self.local_extrema <= self.mle):
+            if 0 < self.local_extrema <= self.mle:
                 self._set_acyc_amplitude()
 
             elif self.local_extrema > self.mle:
@@ -175,7 +172,7 @@ class Amplitude (object):
                         levnp2 = -1e5
                 jmax += self.eddy.jmin
                 imax += self.eddy.imin
-                return (imax, jmax)
+                return imax, jmax
         return False
 
     def _set_local_extrema(self, sign):
@@ -260,15 +257,15 @@ class SwirlSpeed(object):
         self.x_value = empty(nb_pt, dtype=coord_dtype)
         self.y_value = empty(nb_pt, dtype=coord_dtype)
         
-        self.level_index = empty((nb_level), dtype='u4')
-        self.nb_contour_per_level = empty((nb_level), dtype='u4')
+        self.level_index = empty(nb_level, dtype='u4')
+        self.nb_contour_per_level = empty(nb_level, dtype='u4')
 
-        self.nb_pt_per_contour = empty((nb_contour), dtype='u4')
+        self.nb_pt_per_contour = empty(nb_contour, dtype='u4')
 
-        self.x_min_per_contour = empty((nb_contour), dtype=coord_dtype)
-        self.x_max_per_contour = empty((nb_contour), dtype=coord_dtype)
-        self.y_min_per_contour = empty((nb_contour), dtype=coord_dtype)
-        self.y_max_per_contour = empty((nb_contour), dtype=coord_dtype)
+        self.x_min_per_contour = empty(nb_contour, dtype=coord_dtype)
+        self.x_max_per_contour = empty(nb_contour, dtype=coord_dtype)
+        self.y_min_per_contour = empty(nb_contour, dtype=coord_dtype)
+        self.y_max_per_contour = empty(nb_contour, dtype=coord_dtype)
         
         #~ self._is_valid = empty((nb_contour), dtype='bool')
 

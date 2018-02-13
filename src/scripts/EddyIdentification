@@ -42,6 +42,7 @@ from py_eddy_tracker.grid.aviso import AvisoGrid
 from py_eddy_tracker.tracking_objects import IdentificationList
 from py_eddy_tracker.grid import browse_dataset_in
 
+
 def load_config():
     # Command Parser
     parser = EddyParser("Tool to detect eddies. "
@@ -52,23 +53,22 @@ def load_config():
     opts = parser.parse_args()
 
     # Read yaml configuration file
-    config = None
     with open(opts.yaml_file, 'r') as stream:
         config = yaml_load(stream)
     if config is None:
         raise Exception('Yaml file empty')
     logging.info('Launching with yaml file: %s', opts.yaml_file)
-    
+
     # Create ouput directory if needed
     save_dir = config['PATHS']['SAVE_DIR']
     logging.info('Outputs saved to %(SAVE_DIR)s', config['PATHS'])
     if not exists(save_dir):
         mkdir(save_dir)
-    
+
     diagnostic_type = config['DIAGNOSTIC_TYPE']
     if diagnostic_type not in ['SLA']:
         raise Exception('Unknown diagnostic %s', diagnostic_type)
-    
+
     auto = False
     if 'DOMAIN' not in config:
         auto = True
@@ -102,14 +102,13 @@ def load_config():
         if config['DATE_STR'] > config['DATE_END']:
             raise Exception('DATE_END must be larger than DATE_STR')
 
-
     if 'SLA' in diagnostic_type:
         max_sla = config['CONTOUR_PARAMETER'
-                         ]['CONTOUR_PARAMETER_SLA']['MAX_SLA']
+        ]['CONTOUR_PARAMETER_SLA']['MAX_SLA']
         interval = config['CONTOUR_PARAMETER'
-                          ]['CONTOUR_PARAMETER_SLA']['INTERVAL']
+        ]['CONTOUR_PARAMETER_SLA']['INTERVAL']
         config['CONTOUR_PARAMETER'] = arange(-max_sla, max_sla + interval,
-                                                interval)
+                                             interval)
 
     smoothing = config['SMOOTHING']
     if smoothing:
@@ -129,7 +128,7 @@ if __name__ == '__main__':
         sub_sampling_step=CONFIG['DATASET']['SUBSAMPLING'],
         start_date=CONFIG['DATE_STR'],
         end_date=CONFIG['DATE_END'],
-        )
+    )
     DIMENSIONS = CONFIG['DATASET'].get('DIMENSIONS', None)
     # End user configuration setup options
     # ----------------------------------------------------------
@@ -151,9 +150,9 @@ if __name__ == '__main__':
     # See Chelton section B2 (0.4 degree radius)
     # These should give 8 and 1000 for 0.25 deg resolution
     CONFIG['PIXMIN'] = round((pi * CONFIG['RADMIN'] ** 2) /
-                      SLA_GRD.resolution ** 2)
+                             SLA_GRD.resolution ** 2)
     CONFIG['PIXMAX'] = round((pi * CONFIG['RADMAX'] ** 2) /
-                      SLA_GRD.resolution ** 2)
+                             SLA_GRD.resolution ** 2)
     logging.info('Pixel range = %(PIXMIN)d-%(PIXMAX)d', CONFIG)
 
     # Figure to get contours of parameter
@@ -196,7 +195,7 @@ if __name__ == '__main__':
                 w = gaussian_filter(float_(~m), sigma=[MRES, ZRES])
 
                 with errstate(invalid='ignore'):
-                    sla -= ma.array(v / w, mask= (w==0) + m)
+                    sla -= ma.array(v / w, mask=(w == 0) + m)
 
                 logging.info('applying Gaussian high-pass filter -- OK')
 
@@ -242,20 +241,20 @@ if __name__ == '__main__':
             logging.info('Processing SLA contours for eddies')
             MIN_SLA, MAX_SLA = A_EDDY.sla.min(), A_EDDY.sla.max()
             if (MIN_SLA < A_EDDY.contour_parameter[0]) or (
-                    MAX_SLA > A_EDDY.contour_parameter[-1]):
+                        MAX_SLA > A_EDDY.contour_parameter[-1]):
                 logging.warning('SLA values [%f,%f] is larger than levels %s',
                                 MIN_SLA, MAX_SLA, A_EDDY.contour_parameter)
-            
+
             # we reduce levels if don't needed
             i_min, i_max = interp(
                 (MIN_SLA, MAX_SLA),
                 A_EDDY.contour_parameter,
                 arange(len(A_EDDY.contour_parameter))
-                )
+            )
             i_min, i_max = max(0, int(i_min - 2)), int(i_max + 2)
             A_EDDY.contour_parameter = A_EDDY.contour_parameter[i_min:i_max]
             C_EDDY.contour_parameter = C_EDDY.contour_parameter[i_min:i_max]
-            
+
             CONTOURS = CONT_AX.contour(SLA_GRD.lon, SLA_GRD.lat, A_EDDY.sla,
                                        levels=A_EDDY.contour_parameter)
             # Note that C_CS is in reverse order

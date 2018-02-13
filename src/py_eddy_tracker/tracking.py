@@ -108,7 +108,7 @@ class Correspondances(list):
         i = where(other.datasets == array(self.datasets[-1]))[0]
         if len(i) != 1:
             raise Exception('More than one intersection')
-        
+
         # Merge
         # Create a hash table
         translate = empty(other.current_id, dtype='u4')
@@ -194,7 +194,7 @@ class Correspondances(list):
     def append(self, *args, **kwargs):
         self.nb_link_max = max(self.nb_link_max, len(args[0]))
         super(Correspondances, self).append(*args, **kwargs)
-    
+
     def id_generator(self, nb_id):
         """Generation id and incrementation
         """
@@ -221,7 +221,7 @@ class Correspondances(list):
                 list_previous_virtual_id.index(i) for i in virtual_dead_id]
             # Virtual obs which can be prolongate
             alive_virtual_obs = self.virtual_obs['segment_size'
-                ][i_virtual_dead_id] < self.nb_virtual
+                                ][i_virtual_dead_id] < self.nb_virtual
             nb_virtual_extend = alive_virtual_obs.sum()
             logging.debug('%d virtual obs will be prolongate on the '
                           'next step', nb_virtual_extend)
@@ -230,7 +230,7 @@ class Correspondances(list):
         self.previous_virtual_obs = self.virtual_obs
         # Creation of an virtual step for dead one
         self.virtual_obs = VirtualEddiesObservations(
-            size=nb_dead + nb_virtual_extend, 
+            size=nb_dead + nb_virtual_extend,
             track_extra_variables=self.previous_obs.track_extra_variables,
             track_array_variables=self.previous_obs.track_array_variables,
             array_variables=self.previous_obs.array_variables)
@@ -255,27 +255,27 @@ class Correspondances(list):
         self.virtual_obs['dlon'][:nb_dead] = obs_b['lon'] - obs_a['lon']
         self.virtual_obs['dlat'][:nb_dead] = obs_b['lat'] - obs_a['lat']
         self.virtual_obs['lon'][:nb_dead
-            ] = obs_b['lon'] + self.virtual_obs['dlon'][:nb_dead]
+        ] = obs_b['lon'] + self.virtual_obs['dlon'][:nb_dead]
         self.virtual_obs['lat'][:nb_dead
-            ] = obs_b['lat'] + self.virtual_obs['dlat'][:nb_dead]
+        ] = obs_b['lat'] + self.virtual_obs['dlat'][:nb_dead]
         # Id which are extended
         self.virtual_obs['track'][:nb_dead] = dead_id
         # Add previous virtual
         if nb_virtual_extend > 0:
             obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id
-                ][alive_virtual_obs]
+            ][alive_virtual_obs]
             for key in obs_b.dtype.fields.keys():
                 if key in ['lon', 'lat', 'time', 'track', 'segment_size',
                            'dlon', 'dlat'] or 'contour_' in key:
                     continue
                 self.virtual_obs[key][nb_dead:] = obs_to_extend[key]
             self.virtual_obs['lon'][nb_dead:
-                ] = obs_to_extend['lon'] + obs_to_extend['dlon']
+            ] = obs_to_extend['lon'] + obs_to_extend['dlon']
             self.virtual_obs['lat'][nb_dead:
-                ] = obs_to_extend['lat'] + obs_to_extend['dlat']
+            ] = obs_to_extend['lat'] + obs_to_extend['dlat']
             self.virtual_obs['track'][nb_dead:] = obs_to_extend['track']
             self.virtual_obs['segment_size'][nb_dead:
-                ] = obs_to_extend['segment_size']
+            ] = obs_to_extend['segment_size']
         # Count
         self.virtual_obs['segment_size'][:] += 1
 
@@ -318,7 +318,7 @@ class Correspondances(list):
             # Create dimensions
             logging.debug('Create Dimensions "Nlink" : %d', self.nb_link_max)
             h_nc.createDimension('Nlink', self.nb_link_max)
-            
+
             logging.debug('Create Dimensions "Nstep" : %d', nb_step)
             h_nc.createDimension('Nstep', nb_step)
             var_file_in = h_nc.createVariable(
@@ -333,8 +333,8 @@ class Correspondances(list):
 
             var_nb_link = h_nc.createVariable(
                 zlib=True, complevel=1,
-                varname='nb_link', datatype='u2', dimensions=('Nstep'))
-            
+                varname='nb_link', datatype='u2', dimensions='Nstep')
+
             for name, dtype in self.correspondance_dtype:
                 if dtype is bool_:
                     dtype = 'byte'
@@ -342,7 +342,7 @@ class Correspondances(list):
                                     complevel=1,
                                     varname=name,
                                     datatype=dtype,
-                                    dimensions=('Nstep','Nlink'))
+                                    dimensions=('Nstep', 'Nlink'))
 
             for i, correspondance in enumerate(self):
                 nb_elt = correspondance.shape[0]
@@ -389,8 +389,8 @@ class Correspondances(list):
                 # correspondance
                 self.nb_obs_by_tracks[
                     correspondance['id'][correspondance['virtual']]
-                    ] += correspondance['virtual_length'][
-                        correspondance['virtual']]
+                ] += correspondance['virtual_length'][
+                    correspondance['virtual']]
 
         # Compute index of each tracks
         self.i_current_by_tracks = \
@@ -414,7 +414,7 @@ class Correspondances(list):
             track_extra_variables=self.current_obs.track_extra_variables,
             track_array_variables=self.current_obs.track_array_variables,
             array_variables=self.current_obs.array_variables,
-            )
+        )
 
         # Calculate the index in each tracks, we compute in u4 and translate
         # in u2 (which are limited to 65535)
@@ -433,7 +433,7 @@ class Correspondances(list):
 
         # To know if the track start
         first_obs_save_in_tracks = zeros(self.i_current_by_tracks.shape,
-                                            dtype=bool_)
+                                         dtype=bool_)
 
         for i, file_name in enumerate(self.datasets[1:]):
             if until != -1 and i >= until:
@@ -455,7 +455,7 @@ class Correspondances(list):
                 for field in fields:
                     var = field[0]
                     eddies[var][index_final[m_first_obs]
-                        ] = self.previous_obs[var][index_in]
+                    ] = self.previous_obs[var][index_in]
                 # Increment
                 self.i_current_by_tracks[i_id[m_first_obs]] += 1
                 # Active this flag, we have only one first by tracks
@@ -469,7 +469,7 @@ class Correspondances(list):
                 if m_virtual.any():
                     # Incrementing index
                     self.i_current_by_tracks[i_id[m_virtual]
-                        ] += self[i]['virtual_length'][m_virtual]
+                    ] += self[i]['virtual_length'][m_virtual]
                     # Get new index
                     index_final = self.i_current_by_tracks[i_id]
 
@@ -480,7 +480,7 @@ class Correspondances(list):
             for field in fields:
                 var = field[0]
                 eddies[var][index_final
-                    ] = self.current_obs[var][index_current]
+                ] = self.current_obs[var][index_current]
 
             # Add increment for each index used
             self.i_current_by_tracks[i_id] += 1

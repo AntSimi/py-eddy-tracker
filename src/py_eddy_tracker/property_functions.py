@@ -198,8 +198,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
 
         # 3. Respect size range
         mask_i_sum = poly_i.contains_points(points).sum()
-        if not (mask_i_sum >= pixel_min and
-                mask_i_sum <= eddy.pixel_threshold[1]):
+        if not (pixel_min <= mask_i_sum <= eddy.pixel_threshold[1]):
             continue
         any_inner_contours = True
 
@@ -353,8 +352,7 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                 xilon, xilat = c_s_xi.find_nearest_contour(
                     centlon_e, centlat_e, pixel=False)[3:5]
                 eddy_radius_e = distance(centlon_e, centlat_e, xilon, xilat)
-                if not (eddy_radius_e >= eddy.radmin and
-                        eddy_radius_e <= eddy.radmax):
+                if not (eddy.radmin <= eddy_radius_e <= eddy.radmax):
                     continue
 
             # Get indices of centroid

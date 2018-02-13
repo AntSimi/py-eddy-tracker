@@ -120,8 +120,8 @@ class AvisoGrid(BaseData):
 
         # zero_crossing, used for handling a longitude range that
         # crosses zero degree meridian
-        if self.lonmin < 0 and self.lonmax >= 0 and 'MedSea' not in self.domain:
-            if ((self.lonmax < self._lon.max()) and (self.lonmax > self._lon.min()) and (self.lonmin < self._lon.max()) and (self.lonmin > self._lon.min())):
+        if self.lonmin < 0 <= self.lonmax and 'MedSea' not in self.domain:
+            if (self.lonmax < self._lon.max()) and (self.lonmax > self._lon.min()) and (self.lonmin < self._lon.max()) and (self.lonmin > self._lon.min()):
                 pass
             else:
                 self.zero_crossing = True
