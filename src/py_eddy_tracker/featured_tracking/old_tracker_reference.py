@@ -26,7 +26,7 @@ class CheltonTracker(Model):
             cmax=1.5,
             lat1=23,
             lat2=5,
-            )
+        )
         # mask from ellips
         mask = self.shifted_ellipsoid_degrees_mask(
             other,
@@ -56,10 +56,10 @@ class CheltonTracker(Model):
             y0=record0['lat'],
             x1=record1['lon'],
             y1=record1['lat'],
-            )
+        )
 
         data = cls.GROUND.grid('mask')[i, j]
-        i_ground = unique(arange(len(record0)).repeat(d_pix + 1)[data==1])
+        i_ground = unique(arange(len(record0)).repeat(d_pix + 1)[data == 1])
         mask = ones(record1.shape, dtype='bool')
         mask[i_ground] = False
         return mask

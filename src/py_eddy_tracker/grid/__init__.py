@@ -43,7 +43,7 @@ from glob import glob
 
 
 def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
-        start_date=None, end_date=None, sub_sampling_step=1):
+                      start_date=None, end_date=None, sub_sampling_step=1):
     pattern_regexp = re_compile('.*/' + date_regexp)
     full_path = join_path(data_dir, files_model)
     logging.info('Search files : %s', full_path)
@@ -75,7 +75,7 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
             result = pattern_regexp.match(str(item['filename']))
             if result:
                 str_date = result.groups()[0]
-            
+
         if str_date is not None:
             item['date'] = datetime.strptime(str_date, date_model).date()
 
@@ -120,7 +120,7 @@ class BaseData(object):
       ROMS:   get_ROMS_f_pm_pn
 
     """
-    
+
     __slots__ = (
         'zero_crossing',
         'slice_i',
@@ -154,8 +154,8 @@ class BaseData(object):
         'pad',
         'shape',
         'mask',
-        )
-    
+    )
+
     GRAVITY = 9.81
     earth_radius = 6371315.0
 
@@ -229,11 +229,11 @@ class BaseData(object):
 
     @property
     def is_regular(self):
-        steps_lon = unique(self._lon[0, 1:] - self._lon[0,:-1])
+        steps_lon = unique(self._lon[0, 1:] - self._lon[0, :-1])
         steps_lat = unique(self._lat[1:, 0] - self._lat[:-1, 0])
         return len(steps_lon) == 1 and len(steps_lat) == 1 and \
-            steps_lon[0] != 0. and steps_lat[0] != 0.
-    
+               steps_lon[0] != 0. and steps_lat[0] != 0.
+
     def set_initial_indices(self):
         """
         Set indices for desired domain
@@ -276,18 +276,19 @@ class BaseData(object):
                 """
                 if self.is_regular:
                     i_1 = int(floor(interp((lonmin - 0.5) % 360,
-                                       self._lon[0],
-                                       arange(len(self._lon[0])))))
+                                           self._lon[0],
+                                           arange(len(self._lon[0])))))
                     i_0 = int(floor(interp((lonmax + 0.5) % 360,
-                                       self._lon[0],
-                                       arange(len(self._lon[0])))
-                                       ) + 1)
+                                           self._lon[0],
+                                           arange(len(self._lon[0])))
+                                    ) + 1)
                 else:
                     def half_limits(lon, lat):
                         return array([[lon.min(), lon.max(),
-                                          lon.max(), lon.min()],
-                                         [lat.min(), lat.min(),
-                                          lat.max(), lat.max()]]).T
+                                       lon.max(), lon.min()],
+                                      [lat.min(), lat.min(),
+                                       lat.max(), lat.max()]]).T
+
                     # Get bounds for right part of grid
                     lat = self._lat[self._lon >= 360 + lonmin - 0.5]
                     lon = self._lon[self._lon >= 360 + lonmin - 0.5]
@@ -415,12 +416,14 @@ class BaseData(object):
         """
         Convert a 2D field at u_val points to a field at rho points
         """
+
         def uu2ur(uu_in, m_p, l_p):
             u_out = zeros((m_p, l_p))
             u_out[:, 1:-1] = self.half_interp(uu_in[:, :-1], uu_in[:, 1:])
             u_out[:, 0] = u_out[:, 1]
             u_out[:, -1] = u_out[:, -2]
             return u_out.squeeze()
+
         mshp, lshp = uu_in.shape
         return uu2ur(uu_in, mshp, lshp + 1)
 
@@ -432,6 +435,7 @@ class BaseData(object):
             v_out[0] = v_out[1]
             v_out[-1] = v_out[-2]
             return v_out.squeeze()
+
         mshp, lshp = vv_in.shape
         return vv2vr(vv_in, mshp + 1, lshp)
 
@@ -458,7 +462,7 @@ class BaseData(object):
             llcrnrlat=self.latmin - 1,
             urcrnrlat=self.latmax + 1,
             lat_ts=0.5 * (self.latmin + self.latmax)
-            )
+        )
 
         if with_pad:
             x_val, y_val = self.m_val(self.lonpad, self.latpad)
@@ -475,13 +479,13 @@ class BaseData(object):
         zeta1, zeta2 = zeta.data[1:].view(), zeta.data[:-1].view()
         pn1, pn2 = self.p_n[1:].view(), self.p_n[:-1].view()
         self.upad[:] = self.v2rho_2d(
-            ma.array((zeta1 - zeta2) * 0.5 * (pn1 + pn2), mask= self.vmask))
+            ma.array((zeta1 - zeta2) * 0.5 * (pn1 + pn2), mask=self.vmask))
         self.upad *= -self.gof
 
         zeta1, zeta2 = zeta.data[:, 1:].view(), zeta.data[:, :-1].view()
         pm1, pm2 = self.p_m[:, 1:].view(), self.p_m[:, :-1].view()
         self.vpad[:] = self.u2rho_2d(
-            ma.array((zeta1 - zeta2) *0.5 * (pm1 + pm2), mask=self.umask))
+            ma.array((zeta1 - zeta2) * 0.5 * (pm1 + pm2), mask=self.umask))
         self.vpad *= self.gof
 
     def set_u_v_eke(self, pad=2):
@@ -495,7 +499,7 @@ class BaseData(object):
             self.upad = ma.concatenate((u_0, u_1), axis=1)
         else:
             self.upad = empty((j_size,
-                                  self.slice_i_pad.stop - self.slice_i_pad.start))
+                               self.slice_i_pad.stop - self.slice_i_pad.start))
         self.vpad = empty(self.upad.shape)
 
     def get_eke(self):
@@ -532,7 +536,7 @@ class BaseData(object):
         """Return an array of index
         """
         index = concatenate((arange(slice_to_inverse.stop, size),
-                                arange(slice_to_inverse.start)))
+                             arange(slice_to_inverse.start)))
         return index
 
     def gaussian_resolution(self, zwl, mwl):

@@ -32,7 +32,7 @@ from scipy import spatial
 from dateutil import parser
 from numpy import meshgrid, zeros, array, where, ma, argmin, vstack, ones, \
     newaxis, sqrt, diff, r_, arange
-from scipy.interpolate  import interp1d
+from scipy.interpolate import interp1d
 import logging
 from netCDF4 import Dataset
 
@@ -45,9 +45,9 @@ class AvisoGrid(BaseData):
     to have a grid class
     """
     KNOWN_UNITS = dict(
-            m=100.,
-            cm=1.,
-            )
+        m=100.,
+        cm=1.,
+    )
     __slots__ = (
         'lonmin',
         'lonmax',
@@ -69,11 +69,11 @@ class AvisoGrid(BaseData):
         '__lonpad',
         '__latpad',
         'labels',
-        )
+    )
 
     def __init__(self, aviso_file, the_domain,
                  lonmin, lonmax, latmin, latmax, grid_name, lon_name,
-                 lat_name,with_pad=True):
+                 lat_name, with_pad=True):
         """
         Initialise the grid object
         """
@@ -121,7 +121,7 @@ class AvisoGrid(BaseData):
         # zero_crossing, used for handling a longitude range that
         # crosses zero degree meridian
         if self.lonmin < 0 <= self.lonmax and 'MedSea' not in self.domain:
-            if (self.lonmax < self._lon.max()) and (self.lonmax > self._lon.min()) and (self.lonmin < self._lon.max()) and (self.lonmin > self._lon.min()):
+            if self._lon.min() < self.lonmax < self._lon.max() and self._lon.min() < self.lonmin < self._lon.max():
                 pass
             else:
                 self.zero_crossing = True
@@ -141,15 +141,17 @@ class AvisoGrid(BaseData):
         # self.init_pos_interpolator()
 
     def init_pos_interpolator(self):
-        self.xinterp = interp1d(self.lon[0].copy(), arange(self.lon.shape[1]), assume_sorted=True, copy=False, fill_value=(0, -1), bounds_error=False, kind='nearest')
-        self.yinterp = interp1d(self.lat[:, 0].copy(), arange(self.lon.shape[0]), assume_sorted=True, copy=False, fill_value=(0, -1), bounds_error=False, kind='nearest')
+        self.xinterp = interp1d(self.lon[0].copy(), arange(self.lon.shape[1]), assume_sorted=True, copy=False,
+                                fill_value=(0, -1), bounds_error=False, kind='nearest')
+        self.yinterp = interp1d(self.lat[:, 0].copy(), arange(self.lon.shape[0]), assume_sorted=True, copy=False,
+                                fill_value=(0, -1), bounds_error=False, kind='nearest')
 
     def nearest_indice(self, lon, lat):
         return self.xinterp(lon), self.yinterp(lat)
 
     def set_filename(self, file_name):
         self.grid_filename = file_name
-    
+
     def get_aviso_data(self, aviso_file, dimensions=None):
         """
         Read nc data from AVISO file
@@ -160,7 +162,7 @@ class AvisoGrid(BaseData):
         units = self.read_nc_att(self.grid_name, 'units')
         if units not in self.KNOWN_UNITS:
             raise Exception('Unknown units : %s' % units)
-            
+
         with Dataset(self.grid_filename.decode('utf-8')) as h_nc:
             grid_dims = array(h_nc.variables[self.grid_name].dimensions)
             lat_dim = h_nc.variables[self.lat_name].dimensions[0]
@@ -196,7 +198,6 @@ class AvisoGrid(BaseData):
         else:
             self.mask = sla.mask.copy()
             if 'Global' in self.domain:
-
                 # Close Drake Passage
                 minus70 = argmin(abs(self.lonpad[0] + 70))
                 self.mask[:125, minus70] = True
@@ -232,7 +233,7 @@ class AvisoGrid(BaseData):
             self.__lonpad = self._lon[self.view_pad]
             if self.zero_crossing:
                 self.__lonpad[:, :self._lon.shape[1] - self.slice_i_pad.stop
-                              ] -= 360
+                ] -= 360
         return self.__lonpad
 
     @property
@@ -280,7 +281,7 @@ class AvisoGrid(BaseData):
     @property
     def resolution(self):
         return sqrt(diff(self.lon[1:], axis=1) *
-                       diff(self.lat[:, 1:], axis=0)).mean()
+                    diff(self.lat[:, 1:], axis=0)).mean()
 
     @property
     def boundary(self):
@@ -292,7 +293,7 @@ class AvisoGrid(BaseData):
           lon/lat boundary points
         """
         lon = r_[(self.lon[:, 0], self.lon[-1],
-                     self.lon[::-1, -1], self.lon[0, ::-1])]
+                  self.lon[::-1, -1], self.lon[0, ::-1])]
         lat = r_[(self.lat[:, 0], self.lat[-1],
-                     self.lat[::-1, -1], self.lat[0, ::-1])]
+                  self.lat[::-1, -1], self.lat[0, ::-1])]
         return lon, lat

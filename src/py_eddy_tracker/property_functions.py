@@ -46,7 +46,7 @@ from scipy.interpolate import Akima1DInterpolator
 
 
 def uniform_resample(x_val, y_val, method='interp1d', extrapolate=None,
-        num_fac=2, fixed_size=None):
+                     num_fac=2, fixed_size=None):
     """
     Resample contours to have (nearly) equal spacing
        x_val, y_val    : input contour coordinates
@@ -65,9 +65,9 @@ def uniform_resample(x_val, y_val, method='interp1d', extrapolate=None,
     if fixed_size is None:
         fixed_size = dist.size * num_fac
     d_uniform = linspace(0,
-                            dist[-1],
-                            num=fixed_size,
-                            endpoint=True)
+                         dist[-1],
+                         num=fixed_size,
+                         endpoint=True)
 
     # Do 1d interpolations
     if 'interp1d' == method:
@@ -132,6 +132,7 @@ def quart_interp(h_1, h_2, h_3, h_4):
     """
     return 0.25 * (h_1 + h_2 + h_3 + h_4)
 
+
 def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
              anticyclonic_search, save_all_uavg=False):
     """
@@ -141,7 +142,7 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
     If save_all_uavg == True we want uavg for every contour
     """
     points = array([grd.lon[eddy.slice_j, eddy.slice_i].ravel(),
-                       grd.lat[eddy.slice_j, eddy.slice_i].ravel()]).T
+                    grd.lat[eddy.slice_j, eddy.slice_i].ravel()]).T
 
     # First contour is the outer one (effective)
     # Copy ?
@@ -242,23 +243,31 @@ def get_uavg(eddy, contours, centlon_e, centlat_e, poly_eff, grd,
 def isvalid(self):
     return False not in (self.vertices[0] == self.vertices[-1]
                          ) and len(self.vertices) > 2
+
+
 BasePath.isvalid = isvalid
 
 
 def mean_coordinates(self):
     return self.vertices.mean(axis=0)
+
+
 BasePath.mean_coordinates = mean_coordinates
 
 
 @property
 def lon(self):
     return self.vertices[:, 0]
+
+
 BasePath.lon = lon
 
 
 @property
 def lat(self):
     return self.vertices[:, 1]
+
+
 BasePath.lat = lat
 
 
@@ -267,6 +276,8 @@ def nearest_grd_indice(self, lon_value, lat_value, grid):
         self._grid_indices = nearest(lon_value, lat_value,
                                      grid.lon[0], grid.lat[:, 0])
     return self._grid_indices
+
+
 BasePath.nearest_grd_indice = nearest_grd_indice
 
 
@@ -290,7 +301,7 @@ def _fit_circle_path(self):
         centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c(c_x, c_y)
         centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
         centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
-        self._circle_params =  centlon_e, centlat_e, eddy_radius_e, aerr
+        self._circle_params = centlon_e, centlat_e, eddy_radius_e, aerr
     except ZeroDivisionError:
         # Some time, edge is only a dot of few coordinates
         if len(unique(self.lon)) == 1 and len(unique(self.lat)) == 1:
@@ -298,6 +309,7 @@ def _fit_circle_path(self):
             logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
                           self.lat)
             self._circle_params = 0, -90, nan, nan
+
 
 BasePath.fit_circle = fit_circle_path
 BasePath._fit_circle_path = _fit_circle_path
@@ -335,9 +347,9 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
         # Loop over individual c_s contours (i.e., every eddy in field)
         for cont in contour_paths:
             # Filter for closed contours
-            
+
             # I don't understand the cost of this addition
-            #~ eddy.swirl.is_valid(eddy.swirl.level_index[corrected_coll_index] + i_cont)
+            # ~ eddy.swirl.is_valid(eddy.swirl.level_index[corrected_coll_index] + i_cont)
             if not cont.isvalid:
                 continue
             centlon_e, centlat_e, eddy_radius_e, aerr = cont.fit_circle()
@@ -378,7 +390,7 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                 track_extra_variables=eddy.track_extra_variables,
                 track_array_variables=eddy.track_array_variables_sampling,
                 array_variables=eddy.track_array_variables
-                )
+            )
 
             # Set indices to bounding box around eddy
             eddy.set_bounds(cont.lon, cont.lat, grd)
@@ -397,7 +409,7 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                     # KCCMC11
                     # Note, eddy amplitude == max(abs(vort/f)) within eddy,
                     amplitude = abs(x_i[eddy.slice_j, eddy.slice_i
-                                           ][eddy.mask_eff]).max()
+                                    ][eddy.mask_eff]).max()
 
                 elif 'SLA' in eddy.diagnostic_type:
 
@@ -428,20 +440,20 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                     args = (eddy, contours, centlon_e, centlat_e, cont, grd,
                             anticyclonic_search)
 
-                    #~ if eddy.track_array_variables > 0:
+                    # ~ if eddy.track_array_variables > 0:
 
-                    #~ if not eddy.track_extra_variables:
+                    # ~ if not eddy.track_extra_variables:
                     if True:
                         (uavg, contlon_s, contlat_s,
                          inner_contlon, inner_contlat,
                          any_inner_contours
                          ) = get_uavg(*args)
-                    #~ else:
-                        #~ (uavg, contlon_s, contlat_s,
-                         #~ inner_contlon, inner_contlat,
-                         #~ any_inner_contours, uavg_profile
-                         #~ ) = get_uavg(
-                            #~ *args, save_all_uavg=True)
+                        # ~ else:
+                        # ~ (uavg, contlon_s, contlat_s,
+                        # ~ inner_contlon, inner_contlat,
+                        # ~ any_inner_contours, uavg_profile
+                        # ~ ) = get_uavg(
+                        # ~ *args, save_all_uavg=True)
 
                     # Use azimuth equal projection for radius
                     proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0=%s +lon_0=%s'
@@ -471,14 +483,14 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                     properties.obs['shape_error_e'] = aerr
                 if 'shape_error_s' in eddy.track_extra_variables:
                     properties.obs['shape_error_s'] = aerr_s
-                
+
                 if aerr > 99.9 or aerr_s > 99.9:
                     logging.warning(
                         'Strange shape at this step! shape_error : %f, %f',
                         aerr,
                         aerr_s)
                     continue
-                
+
                 # Update SLA eddy properties
                 if 'SLA' in eddy.diagnostic_type:
 
@@ -519,15 +531,15 @@ def func_hann2d_fast(var, numpasses):
 
     def hann2d_fast(var, n_i, n_j):
         var_ext = ma.zeros((n_j, n_i))  # add 1-more line parallell to
-        var_ext[1:-1, 1:-1] = var        # each of 4-sides
-        var_ext[1:-1, 0] = var[:, 0]   # duplicate W-side
+        var_ext[1:-1, 1:-1] = var  # each of 4-sides
+        var_ext[1:-1, 0] = var[:, 0]  # duplicate W-side
         var_ext[1:-1, -1] = var[:, -1]  # duplicate E-side
-        var_ext[0, 1:-1] = var[0]   # duplicate N-side
+        var_ext[0, 1:-1] = var[0]  # duplicate N-side
         var_ext[-1, 1:-1] = var[-1]  # duplicate S-side
-        var_ext.mask[0, 0] = True     # NW-corner
-        var_ext.mask[0, -1] = True     # NE-corner
-        var_ext.mask[-1, 0] = True     # SW-corner
-        var_ext.mask[-1, -1] = True     # SE-corner
+        var_ext.mask[0, 0] = True  # NW-corner
+        var_ext.mask[0, -1] = True  # NE-corner
+        var_ext.mask[-1, 0] = True  # SW-corner
+        var_ext.mask[-1, -1] = True  # SE-corner
 
         # npts is used to count number of valid neighbors
         npts = int_(-var_ext.mask)
@@ -544,7 +556,7 @@ def func_hann2d_fast(var, numpasses):
 
         c_c[c_c == 0] = nan  # bring back nans in original data.
         weight = 8. - c_c  # This is the weight for values on each grid point,
-#                                         based on number of valid neighbours
+        #                                         based on number of valid neighbours
         # Final smoothed version of var
         hsm = 0.125 * (var_s + weight * var_ext[1:jsz + 1, 1:isz + 1])
         return hsm
