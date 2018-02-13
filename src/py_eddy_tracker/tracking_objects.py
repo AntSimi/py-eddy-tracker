@@ -51,13 +51,13 @@ def nearest(lon_pt, lat_pt, lon2d, lat2d):
     """
     try:
         i_x = int_(interp(lon_pt,
-                                lon2d,
-                                arange(len(lon2d)),
-                                left=0, right=-1))
+                          lon2d,
+                          arange(len(lon2d)),
+                          left=0, right=-1))
         i_y = int_(interp(lat_pt,
-                                lat2d,
-                                arange(len(lat2d)),
-                                left=0, right=-1))
+                          lat2d,
+                          arange(len(lat2d)),
+                          left=0, right=-1))
     except ValueError:
         logging.error('%s, %s', lat2d, lat_pt)
         raise ValueError()
@@ -68,6 +68,7 @@ class IdentificationList(object):
     """
     Class that holds list of eddy identify:
     """
+
     def __init__(self, sign_type, grd, date, **kwargs):
         """
         Initialise the list 'tracklist'
@@ -80,10 +81,10 @@ class IdentificationList(object):
         self.the_domain = kwargs.get('THE_DOMAIN', 'Regional')
         self.track_extra_variables = kwargs.get('TRACK_EXTRA_VARIABLES', [])
         if self.track_extra_variables is None:
-           self.track_extra_variables = [] 
+            self.track_extra_variables = []
         array_properties = kwargs.get('TRACK_ARRAY_VARIABLES', dict())
         if array_properties is None:
-           array_properties = dict() 
+            array_properties = dict()
         self.track_array_variables_sampling = array_properties.get('NB_SAMPLES', 0)
         self.track_array_variables = array_properties.get('VARIABLES', [])
         self.smoothing = kwargs.get('SMOOTHING', True)
@@ -113,7 +114,7 @@ class IdentificationList(object):
             track_extra_variables=self.track_extra_variables,
             track_array_variables=self.track_array_variables_sampling,
             array_variables=self.track_array_variables
-            )
+        )
 
         self.index = 0  # counter
         self.pad = 2
@@ -180,14 +181,14 @@ class IdentificationList(object):
             var.setncattr('min', var[:].min())
             var.setncattr('max', var[:].max())
         except ValueError:
-            logging.warn('Data is empty')
+            logging.warning('Data is empty')
 
     def write_netcdf(self, path='./'):
         """Write a netcdf with eddy obs
         """
         eddy_size = len(self.observations)
         filename = '%s/%s_%s.nc' % (
-            path,self.sign_type, self.date.strftime('%Y%m%d'))
+            path, self.sign_type, self.date.strftime('%Y%m%d'))
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create intermediary file %s', filename)
             # Create dimensions
@@ -208,7 +209,7 @@ class IdentificationList(object):
                     self.observations.obs[name],
                     scale_factor=VAR_DESCR[name].get('scale_factor', None),
                     add_offset=VAR_DESCR[name].get('add_offset', None)
-                    )
+                )
 
             # Add cyclonic information
             self.create_variable(
@@ -260,9 +261,9 @@ class IdentificationList(object):
         mask for effective contour
         """
         self.points = array([grd.lon[self.slice_j,
-                                        self.slice_i].ravel(),
-                                grd.lat[self.slice_j,
-                                        self.slice_i].ravel()]).T
+                                     self.slice_i].ravel(),
+                             grd.lat[self.slice_j,
+                                     self.slice_i].ravel()]).T
         # NOTE: Path.contains_points requires matplotlib 1.2 or higher
         self.mask_eff_1d = contour.contains_points(self.points)
         self.mask_eff_sum = self.mask_eff_1d.sum()
@@ -274,5 +275,4 @@ class IdentificationList(object):
         self.mask_eff = self.mask_eff_1d.reshape(shape)
 
     def check_pixel_count(self, nb_valid_pixel):
-        return nb_valid_pixel >= self.pixel_threshold[0] and \
-            nb_valid_pixel <= self.pixel_threshold[1]
+        return self.pixel_threshold[0] <= nb_valid_pixel <= self.pixel_threshold[1]

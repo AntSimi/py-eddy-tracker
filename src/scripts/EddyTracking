@@ -28,7 +28,7 @@ def usage():
     parser.add_argument('--save_correspondance_and_stop',
                         action='store_true',
                         help='Stop tracking after correspondance computation,'
-                        ' merging can be done with EddyFinalTracking')
+                             ' merging can be done with EddyFinalTracking')
     args = parser.parse_args()
 
     # Read yaml configuration file
@@ -59,9 +59,9 @@ if __name__ == '__main__':
         CLASS = getattr(
             __import__(CONFIG['CLASS']['MODULE'], globals(), locals(), CONFIG['CLASS']['CLASS']),
             CONFIG['CLASS']['CLASS'])
-            
+
     else:
-        CLASS=None
+        CLASS = None
 
     CORRESPONDANCES = Correspondances(
         datasets=FILENAMES,
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     CORRESPONDANCES.track()
     logging.info('Track finish')
     logging.info('Start merging')
-    
+
     if SAVE_STOP:
         CORRESPONDANCES.save(FILENAME)
         exit()
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         NB_OBS_MIN,
         CORRESPONDANCES.nb_obs_by_tracks.repeat(
             CORRESPONDANCES.nb_obs_by_tracks)
-        )
+    )
 
     logging.info('%d tracks will be saved',
                  len(unique(SUBSET_EDDIES['track'])))
