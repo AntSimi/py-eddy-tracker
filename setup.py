@@ -34,9 +34,9 @@ setup(
                            include_dirs=[numpy.get_include()])],
     package_data={'py_eddy_tracker.featured_tracking': ['*.nc', ]},
     setup_requires=[
-        'numpy>=1.8'],
+        'numpy>=1.14'],
     install_requires=[
-        'numpy>=1.9',
+        'numpy>=1.14',
         # Bug with 1.5.1 (slow memory leak)
         'matplotlib>=2.0.0',
         'scipy>=0.15.1',
