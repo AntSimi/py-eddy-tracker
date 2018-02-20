@@ -29,10 +29,8 @@ Version 3.0.0
 """
 from matplotlib.dates import julian2num, num2date
 
-from py_eddy_tracker.observations import EddiesObservations, \
-    VirtualEddiesObservations, TrackEddiesObservations
-from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, \
-    where, empty
+from py_eddy_tracker.observations import EddiesObservations, VirtualEddiesObservations, TrackEddiesObservations
+from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin
 from netCDF4 import Dataset
 import logging
 
@@ -237,17 +235,13 @@ class Correspondances(list):
         # get id already dead from few time
         nb_virtual_extend = 0
         if self.virtual_obs is not None:
-            virtual_dead_id = setdiff1d(self.virtual_obs['track'],
-                                        self[-1]['id'])
+            virtual_dead_id = setdiff1d(self.virtual_obs['track'], self[-1]['id'])
             list_previous_virtual_id = self.virtual_obs['track'].tolist()
-            i_virtual_dead_id = [
-                list_previous_virtual_id.index(i) for i in virtual_dead_id]
+            i_virtual_dead_id = [list_previous_virtual_id.index(i) for i in virtual_dead_id]
             # Virtual obs which can be prolongate
-            alive_virtual_obs = self.virtual_obs['segment_size'
-                                ][i_virtual_dead_id] < self.nb_virtual
+            alive_virtual_obs = self.virtual_obs['segment_size'][i_virtual_dead_id] < self.nb_virtual
             nb_virtual_extend = alive_virtual_obs.sum()
-            logging.debug('%d virtual obs will be prolongate on the '
-                          'next step', nb_virtual_extend)
+            logging.debug('%d virtual obs will be prolongate on the next step', nb_virtual_extend)
 
         # Save previous state to count virtual obs
         self.previous_virtual_obs = self.virtual_obs
@@ -270,35 +264,27 @@ class Correspondances(list):
         # Position N-1 : B
         # Virtual Position : C
         # New position C = B + AB
-        for key in obs_b.dtype.fields.keys():
-            if key in ['lon', 'lat', 'time', 'track', 'segment_size',
-                       'dlon', 'dlat'] or 'contour_' in key:
+        for key in self.previous_obs.elements:
+            if key in ['lon', 'lat', 'time'] or 'contour_' in key:
                 continue
             self.virtual_obs[key][:nb_dead] = obs_b[key]
         self.virtual_obs['dlon'][:nb_dead] = obs_b['lon'] - obs_a['lon']
         self.virtual_obs['dlat'][:nb_dead] = obs_b['lat'] - obs_a['lat']
-        self.virtual_obs['lon'][:nb_dead
-        ] = obs_b['lon'] + self.virtual_obs['dlon'][:nb_dead]
-        self.virtual_obs['lat'][:nb_dead
-        ] = obs_b['lat'] + self.virtual_obs['dlat'][:nb_dead]
+        self.virtual_obs['lon'][:nb_dead] = obs_b['lon'] + self.virtual_obs['dlon'][:nb_dead]
+        self.virtual_obs['lat'][:nb_dead] = obs_b['lat'] + self.virtual_obs['dlat'][:nb_dead]
         # Id which are extended
         self.virtual_obs['track'][:nb_dead] = dead_id
         # Add previous virtual
         if nb_virtual_extend > 0:
-            obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id
-            ][alive_virtual_obs]
-            for key in obs_b.dtype.fields.keys():
-                if key in ['lon', 'lat', 'time', 'track', 'segment_size',
-                           'dlon', 'dlat'] or 'contour_' in key:
+            obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id][alive_virtual_obs]
+            for key in self.virtual_obs.elements:
+                if key in ['lon', 'lat', 'time', 'track', 'segment_size'] or 'contour_' in key:
                     continue
                 self.virtual_obs[key][nb_dead:] = obs_to_extend[key]
-            self.virtual_obs['lon'][nb_dead:
-            ] = obs_to_extend['lon'] + obs_to_extend['dlon']
-            self.virtual_obs['lat'][nb_dead:
-            ] = obs_to_extend['lat'] + obs_to_extend['dlat']
+            self.virtual_obs['lon'][nb_dead:] = obs_to_extend['lon'] + obs_to_extend['dlon']
+            self.virtual_obs['lat'][nb_dead:] = obs_to_extend['lat'] + obs_to_extend['dlat']
             self.virtual_obs['track'][nb_dead:] = obs_to_extend['track']
-            self.virtual_obs['segment_size'][nb_dead:
-            ] = obs_to_extend['segment_size']
+            self.virtual_obs['segment_size'][nb_dead:] = obs_to_extend['segment_size']
         # Count
         self.virtual_obs['segment_size'][:] += 1
 
@@ -335,11 +321,9 @@ class Correspondances(list):
 
             nb_real_obs = len(self.previous_obs)
             if flg_virtual:
-                logging.debug('%d virtual obs will be add to previous',
-                              len(self.virtual_obs))
+                logging.debug('%d virtual obs will be add to previous', len(self.virtual_obs))
                 self.previous_obs = self.previous_obs.merge(self.virtual_obs)
-            i_previous, i_current = self.previous_obs.tracking(
-                self.current_obs)
+            i_previous, i_current = self.previous_obs.tracking(self.current_obs)
 
             # return true if the first time (previous2obs is none)
             if self.store_correspondance(i_previous, i_current, nb_real_obs):
@@ -455,50 +439,55 @@ class Correspondances(list):
     def prepare_merging(self):
         # count obs by tracks (we add directly one, because correspondance
         # is an interval)
-        self.nb_obs_by_tracks = zeros(self.current_id, dtype=self.N_DTYPE) + 1
+        self.nb_obs_by_tracks = ones(self.current_id, dtype=self.N_DTYPE)
         for correspondance in self:
             self.nb_obs_by_tracks[correspondance['id']] += 1
             if self.virtual:
                 # When start is virtual, we don't have a previous
                 # correspondance
-                self.nb_obs_by_tracks[
-                    correspondance['id'][correspondance['virtual']]
-                ] += correspondance['virtual_length'][
-                    correspondance['virtual']]
+                self.nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]
+                    ] += correspondance['virtual_length'][correspondance['virtual']]
 
         # Compute index of each tracks
-        self.i_current_by_tracks = \
-            self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
+        self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
         # Number of global obs
         self.nb_obs = self.nb_obs_by_tracks.sum()
         logging.info('%d tracks identified', self.current_id)
         logging.info('%d observations will be join', self.nb_obs)
 
-    def merge(self, until=-1):
+    def merge(self, until=-1, size_min=None):
         """Merge all the correspondance in one array with all fields
         """
         # Start loading identification again to save in the finals tracks
         # Load first file
+        self.reset_dataset_cache()
         self.swap_dataset(self.datasets[0])
 
         # Start create netcdf to agglomerate all eddy
         logging.debug('We will create an array (size %d)', self.nb_obs)
+        i_keep_track = slice(None)
+        if size_min is not None:
+            i_keep_track = where(self.nb_obs_by_tracks >= size_min)
+            self.nb_obs_by_tracks = self.nb_obs_by_tracks[i_keep_track]
+            self.i_current_by_tracks[i_keep_track] = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
+            self.nb_obs = self.nb_obs_by_tracks.sum()
+            # ??
+            self.current_id = self.nb_obs_by_tracks.shape[0]
         eddies = TrackEddiesObservations(
             size=self.nb_obs,
             track_extra_variables=self.current_obs.track_extra_variables,
             track_array_variables=self.current_obs.track_array_variables,
-            array_variables=self.current_obs.array_variables,
-        )
+            array_variables=self.current_obs.array_variables)
 
         # Calculate the index in each tracks, we compute in u4 and translate
         # in u2 (which are limited to 65535)
         logging.debug('Compute global index array (N)')
         eddies['n'][:] = uint16(
-            arange(self.nb_obs, dtype='u4')
-            - self.i_current_by_tracks.repeat(self.nb_obs_by_tracks))
+            arange(self.nb_obs, dtype='u4') - self.i_current_by_tracks[i_keep_track].repeat(self.nb_obs_by_tracks))
         logging.debug('Compute global track array')
-        eddies['track'][:] = arange(self.current_id
-                                    ).repeat(self.nb_obs_by_tracks)
+        eddies['track'][:] = arange(self.current_id).repeat(self.nb_obs_by_tracks)
+        if size_min is not None:
+            eddies['track'][:] += 1
 
         # Set type of eddy with first file
         eddies.sign_type = self.current_obs.sign_type
@@ -506,8 +495,7 @@ class Correspondances(list):
         fields = self.current_obs.obs.dtype.descr
 
         # To know if the track start
-        first_obs_save_in_tracks = zeros(self.i_current_by_tracks.shape,
-                                         dtype=bool_)
+        first_obs_save_in_tracks = zeros(self.i_current_by_tracks.shape, dtype=bool_)
 
         for i, file_name in enumerate(self.datasets[1:]):
             if until != -1 and i >= until:
@@ -517,19 +505,23 @@ class Correspondances(list):
             self.swap_dataset(file_name)
             # We select the list of id which are involve in the correspondance
             i_id = self[i]['id']
-            # Index where we will write in the final object
+            if size_min is not None:
+                m_id = isin(i_id, i_keep_track)
+                i_id= i_id[m_id]
+            else:
+                m_id = slice(None)
+                # Index where we will write in the final object
             index_final = self.i_current_by_tracks[i_id]
 
             # First obs of eddies
             m_first_obs = ~first_obs_save_in_tracks[i_id]
             if m_first_obs.any():
                 # Index in the previous file
-                index_in = self[i]['in'][m_first_obs]
+                index_in = self[i]['in'][m_id][m_first_obs]
                 # Copy all variable
                 for field in fields:
                     var = field[0]
-                    eddies[var][index_final[m_first_obs]
-                    ] = self.previous_obs[var][index_in]
+                    eddies[var][index_final[m_first_obs]] = self.previous_obs[var][index_in]
                 # Increment
                 self.i_current_by_tracks[i_id[m_first_obs]] += 1
                 # Active this flag, we have only one first by tracks
@@ -539,22 +531,20 @@ class Correspondances(list):
             if self.virtual:
                 # If the flag virtual in correspondance is active,
                 # the previous is virtual
-                m_virtual = self[i]['virtual']
+                m_virtual = self[i]['virtual'][m_id]
                 if m_virtual.any():
                     # Incrementing index
-                    self.i_current_by_tracks[i_id[m_virtual]
-                    ] += self[i]['virtual_length'][m_virtual]
+                    self.i_current_by_tracks[i_id[m_virtual]] += self[i]['virtual_length'][m_id][m_virtual]
                     # Get new index
                     index_final = self.i_current_by_tracks[i_id]
 
             # Index in the current file
-            index_current = self[i]['out']
+            index_current = self[i]['out'][m_id]
 
             # Copy all variable
             for field in fields:
                 var = field[0]
-                eddies[var][index_final
-                ] = self.current_obs[var][index_current]
+                eddies[var][index_final] = self.current_obs[var][index_current]
 
             # Add increment for each index used
             self.i_current_by_tracks[i_id] += 1
