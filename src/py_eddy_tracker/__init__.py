@@ -123,23 +123,23 @@ VAR_DESCR = dict(
         ),
     segment_size=dict(
         attr_name=None,
-        nc_name=None,
+        nc_name='segment_size',
         nc_type='byte',
-        nc_dims=None,
+        nc_dims=('Nobs',),
         nc_attr=dict()
         ),
     dlon=dict(
         attr_name=None,
-        nc_name=None,
+        nc_name='dlon',
         nc_type='float64',
-        nc_dims=None,
+        nc_dims=('Nobs',),
         nc_attr=dict()
         ),
     dlat=dict(
         attr_name=None,
-        nc_name=None,
+        nc_name='dlat',
         nc_type='float64',
-        nc_dims=None,
+        nc_dims=('Nobs',),
         nc_attr=dict()
         ),
     virtual=dict(

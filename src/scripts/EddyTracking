@@ -23,7 +23,6 @@ def usage():
     parser.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
     parser.add_argument('--filename',
-                        default='correpondance.nc',
                         help='Filename to save correspondance')
     parser.add_argument('--save_correspondance_and_stop',
                         action='store_true',
@@ -38,43 +37,59 @@ def usage():
 
 
 if __name__ == '__main__':
-    CONFIG, SAVE_STOP, FILENAME = usage()
+    CONFIG, SAVE_STOP, CORRESPONDANCES_OUT = usage()
 
     # Create output directory
-    SAVE_DIR = CONFIG['PATHS']['SAVE_DIR']
-    if not exists(SAVE_DIR):
+    SAVE_DIR = CONFIG['PATHS'].get('SAVE_DIR', None)
+    if SAVE_DIR is not None and not exists(SAVE_DIR):
         mkdir(SAVE_DIR)
 
-    NB_OBS_MIN = int(CONFIG['TRACK_DURATION_MIN'])
-    NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG['VIRTUAL_LENGTH_MAX'])
-
-    PATTERN = CONFIG['PATHS']['FILES_PATTERN']
-    FILENAMES = glob(PATTERN)
-    FILENAMES.sort()
-
-    START_TIME = dt.datetime.now()
-    logging.info('Start tracking on %d files', len(FILENAMES))
+    YAML_CORRESPONDANCES_OUT = CONFIG['PATHS'].get('CORRESPONDANCES_OUT', None)
+    if CORRESPONDANCES_OUT is None and YAML_CORRESPONDANCES_OUT is not None:
+        CORRESPONDANCES_OUT = YAML_CORRESPONDANCES_OUT
+    else:
+        CORRESPONDANCES_OUT = 'Correspondances.nc'
 
     if 'CLASS' in CONFIG:
         CLASS = getattr(
             __import__(CONFIG['CLASS']['MODULE'], globals(), locals(), CONFIG['CLASS']['CLASS']),
             CONFIG['CLASS']['CLASS'])
-
     else:
         CLASS = None
+
+    NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG.get('VIRTUAL_LENGTH_MAX', 0))
+
+    PATTERN = CONFIG['PATHS']['FILES_PATTERN']
+    FILENAMES = list()
+    if isinstance(PATTERN, list):
+        for pattern in PATTERN:
+            FILENAMES += glob(pattern)
+    else:
+        FILENAMES += glob(PATTERN)
+    FILENAMES.sort()
+
+    START_TIME = dt.datetime.now()
+    logging.info('Start tracking on %d files', len(FILENAMES))
 
     CORRESPONDANCES = Correspondances(
         datasets=FILENAMES,
         virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT,
-        class_method=CLASS)
+        class_method=CLASS,
+        previous_correspondance=CONFIG['PATHS'].get('CORRESPONDANCES_IN', None))
+
+    DATE_START, DATE_STOP = CORRESPONDANCES.period
+    DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME)
 
     CORRESPONDANCES.track()
     logging.info('Track finish')
     logging.info('Start merging')
 
     if SAVE_STOP:
-        CORRESPONDANCES.save(FILENAME)
+        CORRESPONDANCES.save(CORRESPONDANCES_OUT, DICT_COMPLETION)
         exit()
+
+    # Merge correspondanc, only do if we stop and store just after compute of correspondance
+    NB_OBS_MIN = int(CONFIG['TRACK_DURATION_MIN'])
     CORRESPONDANCES.prepare_merging()
 
     FINAL_EDDIES = CORRESPONDANCES.merge()

@@ -27,6 +27,8 @@ Version 3.0.0
 ===========================================================================
 
 """
+from matplotlib.dates import julian2num, num2date
+
 from py_eddy_tracker.observations import EddiesObservations, \
     VirtualEddiesObservations, TrackEddiesObservations
 from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, \
@@ -47,7 +49,7 @@ class Correspondances(list):
     # Track limit to 65535
     N_DTYPE = 'u2'
 
-    def __init__(self, datasets, virtual=0, class_method=None):
+    def __init__(self, datasets, virtual=0, class_method=None, previous_correspondance=None):
         """Initiate tracking
         """
         super(Correspondances, self).__init__()
@@ -59,6 +61,7 @@ class Correspondances(list):
             self.class_method = EddiesObservations
         else:
             self.class_method = class_method
+
         # To count ID
         self.current_id = 0
         # To know the number maximal of link between two state
@@ -76,10 +79,17 @@ class Correspondances(list):
         self.virtual = virtual > 0
         self.virtual_obs = None
         self.previous_virtual_obs = None
+
+        # Correspondance to prolongate
+        self.filename_previous_correspondance = previous_correspondance
+        self.previous_correspondance = self.load_compatible(self.filename_previous_correspondance)
+
         if self.virtual:
             # Add field to dtype to follow virtual observations
             self.correspondance_dtype += [
+                # True if it isn't a real obs
                 ('virtual', bool_),
+                # Length of virtual segment
                 ('virtual_length', self.VIRTUAL_DTYPE)]
 
         # Array to simply merged
@@ -92,6 +102,17 @@ class Correspondances(list):
         self.previous2_obs = None
         self.previous_obs = None
         self.current_obs = None
+
+    @property
+    def period(self):
+        """To rethink
+
+        Returns: period coverage by obs
+
+        """
+        date_start = num2date(julian2num(self.class_method.load_from_netcdf(self.datasets[0]).obs['time'][0] - 0.5))
+        date_stop = num2date(julian2num(self.class_method.load_from_netcdf(self.datasets[-1]).obs['time'][0] - 0.5))
+        return date_start, date_stop
 
     def swap_dataset(self, dataset):
         """ Swap to next dataset
@@ -138,6 +159,8 @@ class Correspondances(list):
         """
         # Create array to store correspondance data
         correspondance = array(i_previous, dtype=self.correspondance_dtype)
+        if self.virtual:
+            correspondance['virtual_length'][:] = 255
         # index from current_obs
         correspondance['out'] = i_current
 
@@ -279,14 +302,33 @@ class Correspondances(list):
         # Count
         self.virtual_obs['segment_size'][:] += 1
 
+    def load_state(self):
+        # If we have a previous file of correspondance, we will replay only recent part
+        if self.previous_correspondance is not None:
+            first_dataset = len(self.previous_correspondance.datasets)
+            for correspondance in self.previous_correspondance[:first_dataset]:
+                self.append(correspondance)
+            self.current_obs = self.class_method.load_from_netcdf(self.datasets[first_dataset - 2])
+            flg_virtual = self.previous_correspondance.virtual
+            with Dataset(self.filename_previous_correspondance) as general_handler:
+                self.current_id = general_handler.last_current_id
+                # Load last virtual obs
+                self.virtual_obs = VirtualEddiesObservations.from_netcdf(general_handler.groups['LastVirtualObs'])
+                # Load and last previous virtual obs to be merge with current => will be previous2_obs
+                self.current_obs = self.current_obs.merge(
+                    VirtualEddiesObservations.from_netcdf(general_handler.groups['LastPreviousVirtualObs']))
+            return first_dataset, flg_virtual
+        return 1, False
+
     def track(self):
         """Run tracking
         """
-        flg_virtual = False
         self.reset_dataset_cache()
-        self.swap_dataset(self.datasets[0])
+        first_dataset, flg_virtual = self.load_state()
+
+        self.swap_dataset(self.datasets[first_dataset - 1])
         # We begin with second file, first one is in previous
-        for i, file_name in enumerate(self.datasets[1:]):
+        for file_name in self.datasets[first_dataset:]:
             self.swap_dataset(file_name)
             logging.debug('%s match with previous state', file_name)
             logging.debug('%d obs to match', len(self.current_obs))
@@ -295,13 +337,11 @@ class Correspondances(list):
             if flg_virtual:
                 logging.debug('%d virtual obs will be add to previous',
                               len(self.virtual_obs))
-                # If you comment this the virtual fonctionnality will be
-                # disable
                 self.previous_obs = self.previous_obs.merge(self.virtual_obs)
-
             i_previous, i_current = self.previous_obs.tracking(
                 self.current_obs)
 
+            # return true if the first time (previous2obs is none)
             if self.store_correspondance(i_previous, i_current, nb_real_obs):
                 continue
 
@@ -310,9 +350,11 @@ class Correspondances(list):
             if self.virtual:
                 flg_virtual = True
 
-    def save(self, filename):
+    def save(self, filename, dict_completion=None):
         self.prepare_merging()
         nb_step = len(self.datasets) - 1
+        if isinstance(dict_completion, dict):
+            filename = filename.format(**dict_completion)
         logging.info('Create correspondance file %s', filename)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             # Create dimensions
@@ -337,19 +379,46 @@ class Correspondances(list):
 
             for name, dtype in self.correspondance_dtype:
                 if dtype is bool_:
-                    dtype = 'byte'
+                    dtype = 'u1'
+                kwargs_cv = dict()
+                if 'u1' in dtype:
+                    kwargs_cv['fill_value'] = 255,
                 h_nc.createVariable(zlib=True,
                                     complevel=1,
                                     varname=name,
                                     datatype=dtype,
-                                    dimensions=('Nstep', 'Nlink'))
+                                    dimensions=('Nstep', 'Nlink'),
+                                    **kwargs_cv
+                                    )
 
             for i, correspondance in enumerate(self):
                 nb_elt = correspondance.shape[0]
                 var_nb_link[i] = nb_elt
                 for name, _ in self.correspondance_dtype:
                     h_nc.variables[name][i, :nb_elt] = correspondance[name]
-            h_nc.virtual = int(self.virtual)
+            h_nc.virtual_use = str(self.virtual)
+            h_nc.virtual_max_segment = self.nb_virtual
+            h_nc.last_current_id = self.current_id
+            if self.virtual_obs is not None:
+                group = h_nc.createGroup('LastVirtualObs')
+                self.virtual_obs.to_netcdf(group)
+                group = h_nc.createGroup('LastPreviousVirtualObs')
+                self.previous_virtual_obs.to_netcdf(group)
+            h_nc.module = self.class_method.__module__
+            h_nc.classname = self.class_method.__qualname__
+
+    def load_compatible(self, filename):
+        if filename is None:
+            return None
+        previous_correspondance = Correspondances.load(filename)
+        if self.nb_virtual != previous_correspondance.nb_virtual:
+            raise Exception('File of correspondance IN contains a different virtual segment size : file(%d), yaml(%d)' %
+                            (previous_correspondance.nb_virtual, self.nb_virtual))
+
+        if self.class_method != previous_correspondance.class_method:
+            raise Exception('File of correspondance IN contains a different class method: file(%s), yaml(%s)' %
+                            (previous_correspondance.class_method, self.class_method))
+        return previous_correspondance
 
     @classmethod
     def load(cls, filename):
@@ -358,7 +427,11 @@ class Correspondances(list):
             datasets = list(h_nc.variables['FileIn'][:])
             datasets.append(h_nc.variables['FileOut'][-1])
 
-            obj = cls(datasets, h_nc.virtual)
+            if hasattr(h_nc, 'module'):
+                class_method= getattr(__import__(h_nc.module, globals(), locals(), h_nc.classname), h_nc.classname)
+            else:
+                class_method= None
+            obj = cls(datasets, h_nc.virtual_max_segment, class_method=class_method)
 
             id_max = 0
             for i, nb_elt in enumerate(h_nc.variables['nb_link'][:]):
@@ -371,7 +444,8 @@ class Correspondances(list):
                 for name, _ in obj.correspondance_dtype:
                     if name == 'in':
                         continue
-                    correspondance[name] = h_nc.variables[name][i, :nb_elt]
+                    if name == 'virtual_length':
+                        correspondance[name] = 255
                     correspondance[name] = h_nc.variables[name][i, :nb_elt]
                 id_max = max(id_max, correspondance['id'].max())
                 obj.append(correspondance)

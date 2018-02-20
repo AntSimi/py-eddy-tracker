@@ -208,6 +208,10 @@ class EddiesObservations(object):
         self.active = True
         self.sign_type = None
 
+    @property
+    def shape(self):
+        return self.observations.shape
+
     def __repr__(self):
         return str(self.observations)
 
@@ -369,11 +373,26 @@ class EddiesObservations(object):
             eddies.sign_type = h_nc.variables['cyc'][0]
         return eddies
 
+    @classmethod
+    def from_netcdf(cls, handler):
+        nb_obs = len(handler.dimensions['Nobs'])
+        kwargs = dict()
+        if hasattr(handler, 'track_array_variables'):
+            kwargs['track_array_variables'] = handler.track_array_variables
+            kwargs['array_variables'] = handler.array_variables.split(',')
+        kwargs['track_extra_variables'] = handler.track_extra_variables.split(',')
+        for variable in handler.variables:
+            var_inv = VAR_DESCR_inv[variable]
+        eddies = cls(size=nb_obs, **kwargs)
+        for variable in handler.variables:
+            eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
+        return eddies
+
     @staticmethod
     def cost_function2(records_in, records_out, distance):
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
-        for i_record in xrange(nb_records):
+        for i_record in range(nb_records):
             poly_in = Polygon(
                 concatenate((
                     (records_in[i_record]['contour_lon_e'],),
@@ -647,6 +666,55 @@ class EddiesObservations(object):
 
         return i_self, i_other
 
+    def to_netcdf(self, handler):
+        eddy_size = len(self)
+        logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
+        handler.createDimension('Nobs', eddy_size)
+        handler.track_extra_variables = ','.join(self.track_extra_variables)
+        if self.track_array_variables != 0:
+            handler.createDimension('NbSample', self.track_array_variables)
+            handler.track_array_variables = self.track_array_variables
+            handler.array_variables = ','.join(self.array_variables)
+        # Iter on variables to create:
+        for field in self.observations.dtype.descr:
+            name = field[0]
+            logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
+            self.create_variable(
+                handler,
+                dict(varname=VAR_DESCR[name]['nc_name'],
+                     datatype=VAR_DESCR[name]['output_type'],
+                     dimensions=VAR_DESCR[name]['nc_dims']),
+                VAR_DESCR[name]['nc_attr'],
+                self.observations[name],
+                scale_factor=VAR_DESCR[name].get('scale_factor', None),
+                add_offset=VAR_DESCR[name].get('add_offset', None)
+            )
+
+    @staticmethod
+    def create_variable(handler_nc, kwargs_variable, attr_variable,
+                        data, scale_factor=None, add_offset=None):
+        var = handler_nc.createVariable(
+            zlib=True,
+            complevel=1,
+            **kwargs_variable)
+        attrs = list(attr_variable.keys())
+        attrs.sort()
+        for attr in attrs:
+            attr_value = attr_variable[attr]
+            var.setncattr(attr, attr_value)
+        if scale_factor is not None:
+            var.scale_factor = scale_factor
+            if add_offset is not None:
+                var.add_offset = add_offset
+            else:
+                var.add_offset = 0
+        var[:] = data
+        try:
+            var.setncattr('min', var[:].min())
+            var.setncattr('max', var[:].max())
+        except ValueError:
+            logging.warning('Data is empty')
+
 
 class VirtualEddiesObservations(EddiesObservations):
     """Class to work with virtual obs
@@ -680,6 +748,7 @@ class VirtualEddiesObservations(EddiesObservations):
     @classmethod
     def forecast_move(cls, obs_a, obs_b, out):
         """Forecast move of an eddy
+        work to do
         """
         # New dead
         for key in obs_b.dtype.fields.keys():
@@ -708,6 +777,7 @@ class VirtualEddiesObservations(EddiesObservations):
             out['segment_size'][nb_dead:] = obs_to_extend['segment_size']
         # Count
         out['segment_size'][:] += 1
+
 
 class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations
@@ -760,37 +830,13 @@ class TrackEddiesObservations(EddiesObservations):
         elements.extend(['track', 'n', 'virtual'])
         return elements
 
-    @staticmethod
-    def create_variable(handler_nc, kwargs_variable, attr_variable,
-                        data, scale_factor=None, add_offset=None):
-        var = handler_nc.createVariable(
-            zlib=True,
-            complevel=1,
-            **kwargs_variable)
-        attrs = list(attr_variable.keys())
-        attrs.sort()
-        for attr in attrs:
-            attr_value = attr_variable[attr]
-            var.setncattr(attr, attr_value)
-        if scale_factor is not None:
-            var.scale_factor = scale_factor
-            if add_offset is not None:
-                var.add_offset = add_offset
-            else:
-                var.add_offset = 0
-        var[:] = data
-        try:
-            var.setncattr('min', var[:].min())
-            var.setncattr('max', var[:].max())
-        except ValueError:
-            logging.warning('Data is empty')
-
     def write_netcdf(self, path='./', filename='%(path)s/%(sign_type)s.nc'):
         """Write a netcdf with eddy obs
         """
         eddy_size = len(self.observations)
         sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
         filename = filename % dict(path=path, sign_type=sign_type)
+        logging.info('Store in %s', filename)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create file %s', filename)
             # Create dimensions
