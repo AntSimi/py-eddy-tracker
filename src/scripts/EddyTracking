@@ -22,32 +22,43 @@ def usage():
         "Tool to use identification step to compute tracking")
     parser.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
-    parser.add_argument('--filename',
+    parser.add_argument('--correspondance_in',
+                        help='Filename to save correspondance')
+    parser.add_argument('--correspondance_out',
                         help='Filename to save correspondance')
     parser.add_argument('--save_correspondance_and_stop',
                         action='store_true',
                         help='Stop tracking after correspondance computation,'
                              ' merging can be done with EddyFinalTracking')
+    parser.add_argument('--blank_period',
+                        type=int,
+                        default=0,
+                        help='Nb of detection which will not use at the end of the period')
     args = parser.parse_args()
 
     # Read yaml configuration file
     with open(args.yaml_file, 'r') as stream:
         config = yaml_load(stream)
-    return config, args.save_correspondance_and_stop, args.filename
+    if not exists(args.correspondance_in):
+        args.correspondance_in = None
+    return config, args.save_correspondance_and_stop, args.correspondance_in, args.correspondance_out, args.blank_period
 
 
 if __name__ == '__main__':
-    CONFIG, SAVE_STOP, CORRESPONDANCES_OUT = usage()
+    CONFIG, SAVE_STOP, CORRESPONDANCES_IN, CORRESPONDANCES_OUT, BLANK_PERIOD = usage()
 
     # Create output directory
     SAVE_DIR = CONFIG['PATHS'].get('SAVE_DIR', None)
     if SAVE_DIR is not None and not exists(SAVE_DIR):
         mkdir(SAVE_DIR)
 
+    YAML_CORRESPONDANCES_IN = CONFIG['PATHS'].get('CORRESPONDANCES_IN', None)
     YAML_CORRESPONDANCES_OUT = CONFIG['PATHS'].get('CORRESPONDANCES_OUT', None)
-    if CORRESPONDANCES_OUT is None and YAML_CORRESPONDANCES_OUT is not None:
+    if CORRESPONDANCES_IN is None:
+        CORRESPONDANCES_IN = YAML_CORRESPONDANCES_IN
+    if CORRESPONDANCES_OUT is None:
         CORRESPONDANCES_OUT = YAML_CORRESPONDANCES_OUT
-    else:
+    if YAML_CORRESPONDANCES_OUT is None and CORRESPONDANCES_OUT is None:
         CORRESPONDANCES_OUT = 'Correspondances.nc'
 
     if 'CLASS' in CONFIG:
@@ -68,6 +79,10 @@ if __name__ == '__main__':
         FILENAMES += glob(PATTERN)
     FILENAMES.sort()
 
+    if BLANK_PERIOD > 0:
+        FILENAMES = FILENAMES[:-BLANK_PERIOD]
+        logging.info('Last %d files will be pop', BLANK_PERIOD)
+
     START_TIME = dt.datetime.now()
     logging.info('Start tracking on %d files', len(FILENAMES))
 
@@ -75,7 +90,7 @@ if __name__ == '__main__':
         datasets=FILENAMES,
         virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT,
         class_method=CLASS,
-        previous_correspondance=CONFIG['PATHS'].get('CORRESPONDANCES_IN', None))
+        previous_correspondance=CORRESPONDANCES_IN)
 
     DATE_START, DATE_STOP = CORRESPONDANCES.period
     DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME)

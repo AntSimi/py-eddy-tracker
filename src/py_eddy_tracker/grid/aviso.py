@@ -203,7 +203,7 @@ class AvisoGrid(BaseData):
                 self.mask[:125, minus70] = True
 
                 # Mask all unwanted regions (Caspian Sea, etc)
-                self.labels = ndimage.label(-self.mask)[0]
+                self.labels = ndimage.label(~self.mask)[0]
 
                 # Set to known sea point
                 plus200 = argmin(abs(self.lonpad[0] - 200))

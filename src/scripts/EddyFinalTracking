@@ -24,6 +24,9 @@ def usage():
     parser.add_argument('--path_out',
                         default='./',
                         help='Path, where to write file')
+    parser.add_argument('--filename_model',
+                        default='%(path)s/%(sign_type)s.nc',
+                        help='Model to create file')
     parser.add_argument('--nb_obs_min',
                         type=int,
                         default=28,
@@ -61,4 +64,4 @@ if __name__ == '__main__':
     logging.info('%d tracks will be saved', len(unique(FINAL_EDDIES['track'])))
     logging.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
-    FINAL_EDDIES.write_netcdf(path=CONFIG.path_out)
+    FINAL_EDDIES.write_netcdf(path=CONFIG.path_out, filename=CONFIG.filename_model)

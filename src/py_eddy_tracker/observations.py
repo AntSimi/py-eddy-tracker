@@ -37,6 +37,7 @@ from shapely.geometry import Polygon
 from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
 import logging
+from datetime import datetime
 from scipy.interpolate  import RectBivariateSpline
 
 
@@ -781,7 +782,7 @@ class TrackEddiesObservations(EddiesObservations):
         """
         eddy_size = len(self.observations)
         sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        filename = filename % dict(path=path, sign_type=sign_type)
+        filename = filename % dict(path=path, sign_type=sign_type, prod_time=datetime.now().strftime('%Y%d%d'))
         logging.info('Store in %s', filename)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create file %s', filename)

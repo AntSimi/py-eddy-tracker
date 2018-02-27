@@ -298,11 +298,12 @@ class Correspondances(list):
             flg_virtual = self.previous_correspondance.virtual
             with Dataset(self.filename_previous_correspondance) as general_handler:
                 self.current_id = general_handler.last_current_id
-                # Load last virtual obs
-                self.virtual_obs = VirtualEddiesObservations.from_netcdf(general_handler.groups['LastVirtualObs'])
-                # Load and last previous virtual obs to be merge with current => will be previous2_obs
-                self.current_obs = self.current_obs.merge(
-                    VirtualEddiesObservations.from_netcdf(general_handler.groups['LastPreviousVirtualObs']))
+                if flg_virtual:
+                    # Load last virtual obs
+                    self.virtual_obs = VirtualEddiesObservations.from_netcdf(general_handler.groups['LastVirtualObs'])
+                    # Load and last previous virtual obs to be merge with current => will be previous2_obs
+                    self.current_obs = self.current_obs.merge(
+                        VirtualEddiesObservations.from_netcdf(general_handler.groups['LastPreviousVirtualObs']))
             return first_dataset, flg_virtual
         return 1, False
 
@@ -406,8 +407,8 @@ class Correspondances(list):
 
     @classmethod
     def load(cls, filename):
+        logging.info('Try load %s', filename)
         with Dataset(filename, 'r', format='NETCDF4') as h_nc:
-            logging.info('load %s', filename)
             datasets = list(h_nc.variables['FileIn'][:])
             datasets.append(h_nc.variables['FileOut'][-1])
 
