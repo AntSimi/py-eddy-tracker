@@ -199,7 +199,7 @@ class Amplitude (object):
         # Aims ?
         eroded_background = binary_erosion(
             background, structure=neighborhood, border_value=1)
-        detected_minima -= eroded_background
+        detected_minima ^= eroded_background
         # mask of minima
         self.local_extrema_inds = detected_minima
         # nb of minima
