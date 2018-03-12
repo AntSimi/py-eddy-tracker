@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 # h.high_filter('Grid_0001', 10, 5)
 # h.eddy_identification('Grid_0001', 0.5)
 
-h = UnRegularGridDataset('unregular.nc', 'nav_lon', 'nav_lat')
+h = UnRegularGridDataset('/home/tildou/ant_work/data/unregular.nc', 'nav_lon', 'nav_lat')
 h.eddy_identification('sossheig')
 
 # h = RegularGridDataset('madt_h_20170425T000000_20170425T000000.nc', 'NbLongitudes', 'NbLatitudes')
