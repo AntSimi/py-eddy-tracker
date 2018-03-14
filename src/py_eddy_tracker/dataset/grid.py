@@ -13,11 +13,18 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.spatial import cKDTree
 from matplotlib.figure import Figure
 from matplotlib.path import Path as BasePath
+from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
 from ..tools import fit_circle_c, distance_vector
 from ..observations import EddiesObservations
-from ..eddy_feature import Amplitude
+from ..eddy_feature import Amplitude, get_uavg
 
+
+def contour_iter(self, anticyclonic_search):
+    for coll in self.collections[::1 if anticyclonic_search else -1]:
+        yield coll
+
+BaseQuadContourSet.iter_ = contour_iter
 
 @property
 def isvalid(self):
@@ -51,12 +58,34 @@ def lat(self):
 BasePath.lat = lat
 
 
-# def nearest_grd_indice(self, lon_value, lat_value, grid):
-# if not hasattr(self, '_grid_indices'):
-# self._grid_indices = nearest(lon_value, lat_value,
-# grid.lon[0], grid.lat[:, 0])
-# return self._grid_indices
-# BasePath.nearest_grd_indice = nearest_grd_indice
+def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
+    """
+    Resample contours to have (nearly) equal spacing
+       x_val, y_val    : input contour coordinates
+       num_fac : factor to increase lengths of output coordinates
+    """
+    # Get distances
+    dist = empty(x_val.shape)
+    dist[0] = 0
+    distance_vector(
+        x_val[:-1], y_val[:-1], x_val[1:], y_val[1:], dist[1:])
+    dist.cumsum(out=dist)
+    # Get uniform distances
+    if fixed_size is None:
+        fixed_size = dist.size * num_fac
+    d_uniform = linspace(0, dist[-1], num=fixed_size)
+    x_new = interp(d_uniform, dist, x_val)
+    y_new = interp(d_uniform, dist, y_val)
+    return x_new, y_new
+
+
+@property
+def regular_coordinates(self):
+    """Give a standard/regular/double sample of contour
+    """
+    if hasattr(self, '_regular_coordinates'):
+        self._regular_coordinates = uniform_resample(self.lon, self.lat)
+    return self._regular_coordinates
 
 
 def fit_circle_path(self):
@@ -93,25 +122,21 @@ BasePath.fit_circle = fit_circle_path
 BasePath._fit_circle_path = _fit_circle_path
 
 
-def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
-    """
-    Resample contours to have (nearly) equal spacing
-       x_val, y_val    : input contour coordinates
-       num_fac : factor to increase lengths of output coordinates
-    """
-    # Get distances
-    dist = empty(x_val.shape)
-    dist[0] = 0
-    distance_vector(
-        x_val[:-1], y_val[:-1], x_val[1:], y_val[1:], dist[1:])
-    dist.cumsum(out=dist)
-    # Get uniform distances
-    if fixed_size is None:
-        fixed_size = dist.size * num_fac
-    d_uniform = linspace(0, dist[-1], num=fixed_size)
-    x_new = interp(d_uniform, dist, x_val)
-    y_new = interp(d_uniform, dist, y_val)
-    return x_new, y_new
+def pixels_in(self, grid):
+    if not hasattr(self, '_pixels_in'):
+        self._pixels_in = grid.get_pixels_in(self)
+    return self._pixels_in
+
+
+@property
+def nb_pixel(self):
+    if not hasattr(self, '_pixels_in'):
+        raise Exception('No pixels_in call before!')
+    return self._pixels_in[0].shape[0]
+
+    
+BasePath.pixels_in = pixels_in
+BasePath.nb_pixel = nb_pixel
 
 
 class GridDataset(object):
@@ -138,6 +163,7 @@ class GridDataset(object):
         'global_attrs',
         'vars',
         'interpolators',
+        'speed_coef',
     )
 
     GRAVITY = 9.807
@@ -179,6 +205,7 @@ class GridDataset(object):
     def load_general_features(self):
         """Load attrs
         """
+        logging.debug('Load general feature from %(filename)s', dict(filename=self.filename))
         with Dataset(self.filename) as h:
             # Load generals
             self.dimensions = {i: len(v) for i, v in h.dimensions.items()}
@@ -286,6 +313,7 @@ class GridDataset(object):
         if varname not in self.vars:
             coordinates_dims = list(self.x_dim)
             coordinates_dims.extend(list(self.y_dim))
+            logging.debug('Load %(varname)s from %(filename)s', dict(varname=varname, filename=self.filename))
             with Dataset(self.filename) as h:
                 dims = h.variables[varname].dimensions
                 sl = [slice(None) if dim in coordinates_dims else 0 for dim in dims]
@@ -316,7 +344,7 @@ class GridDataset(object):
         """
         return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
 
-    def eddy_identification(self, grid_name, step=0.005, shape_error=55, extra_variables=None,
+    def eddy_identification(self, grid_height, step=0.005, shape_error=55, extra_variables=None,
                             extra_array_variables=None, array_sampling=50, pixel_limit=None):
         if extra_variables is None:
             extra_variables = list()
@@ -324,9 +352,10 @@ class GridDataset(object):
             extra_array_variables = list()
         if pixel_limit is None:
             pixel_limit = (8, 1000)
-        fig = Figure()
-        ax = fig.add_subplot(111)
-        data = self.grid(grid_name)
+
+        self.init_speed_coef()
+
+        data = self.grid(grid_height)
         z_min, z_max = data.min(), data.max()
 
         levels = arange(z_min - z_min % step, z_max - z_max % step + 2 * step, step)
@@ -336,7 +365,11 @@ class GridDataset(object):
         if len(x.shape) == 1:
             data = data.T
         ## 
+        logging.debug('Start computing iso lines')
+        fig = Figure()
+        ax = fig.add_subplot(111)
         contours = ax.contour(x, y, data, levels)
+        logging.debug('Finish computing iso lines')
 
         anticyclonic_search = True
         iterator = 1 if anticyclonic_search else -1
@@ -353,7 +386,7 @@ class GridDataset(object):
             if nb_paths == 0:
                 continue
             cvalues = contours.cvalues[corrected_coll_index]
-            logging.debug('doing collection %s, contour value %s, %d paths',
+            logging.debug('doing collection %s, contour value %.4f, %d paths',
                           corrected_coll_index, cvalues, nb_paths)
 
             # Loop over individual c_s contours (i.e., every eddy in field)
@@ -377,57 +410,36 @@ class GridDataset(object):
                 if anticyclonic_search != acyc_not_cyc:
                     continue
 
-                i_x_in, i_y_in = self.get_pixels_in(cont)
-                nb_pixel = i_x_in.shape[0]
+                i_x_in, i_y_in = cont.pixels_in(self)
 
                 # Maybe limit max must be replace with a maximum of surface
-                if nb_pixel < pixel_limit[0] or nb_pixel > pixel_limit[1]:
+                if cont.nb_pixel < pixel_limit[0] or cont.nb_pixel > pixel_limit[1]:
                     continue
 
-                # Resample the contour points for a more even
-                # circumferential distribution
-                contlon_e, contlat_e = uniform_resample(cont.lon, cont.lat)
+                reset_centroid, amp = self.get_amplitude(i_x_in, i_y_in, cvalues, data,
+                    anticyclonic_search=anticyclonic_search, level=contours.levels[corrected_coll_index], step=step)
 
-                amp = self.get_amplitude(contlon_e, contlat_e, i_x_in, i_y_in, cvalues, data,
-                                         anticyclonic_search=anticyclonic_search)
-
-                print(amp.within_amplitude_limits(), amp.amplitude)
+                # If we have a valid amplitude
                 if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
-                    continue
-
-                eddy.reshape_mask_eff(grd)
-                # Instantiate Amplitude object
-                amp = Amplitude(contlon_e, contlat_e, eddy, grd)
-
-                if anticyclonic_search:
-                    reset_centroid = amp.all_pixels_above_h0(
-                        contours.levels[corrected_coll_index])
-
-                else:
-                    reset_centroid = amp.all_pixels_below_h0(
-                        contours.levels[corrected_coll_index])
-
-                if not amp.within_amplitude_limits() or amp.amplitude:
                     continue
 
                 if reset_centroid:
                     centi = reset_centroid[0]
                     centj = reset_centroid[1]
-                    centlon_e = grd.lon[centj, centi]
-                    centlat_e = grd.lat[centj, centi]
+                    centlon_e = x[centj, centi]
+                    centlat_e = y[centj, centi]
 
                 # Get sum of eke within Ceff
-                teke = grd.eke[eddy.slice_j, eddy.slice_i][eddy.mask_eff].sum()
+                #~ teke = grd.eke[eddy.slice_j, eddy.slice_i][eddy.mask_eff].sum()
 
-                (uavg, contlon_s, contlat_s, inner_contlon, inner_contlat,
-                 any_inner_contours
-                 ) = get_uavg(eddy, contours, centlon_e, centlat_e, cont, grd,
-                              anticyclonic_search)
+                #~ (uavg, contlon_s, contlat_s, inner_contlon, inner_contlat, any_inner_contours
+                    #~ ) = get_uavg(eddy, contours, centlon_e, centlat_e, cont, grd, anticyclonic_search)
+                (uavg, contlon_s, contlat_s, inner_contlon, inner_contlat, any_inner_contours
+                    ) = get_uavg(self, contours, centlon_e, centlat_e, cont, anticyclonic_search)
 
                 # Use azimuth equal projection for radius
                 proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0=%s +lon_0=%s'
-                            % (inner_contlat.mean(),
-                               inner_contlon.mean()))
+                            % (inner_contlat.mean(), inner_contlon.mean()))
 
                 # First, get position based on innermost
                 # contour
@@ -455,7 +467,7 @@ class GridDataset(object):
                 properties.obs['radius_s'] = eddy_radius_s / 1000
                 properties.obs['speed_radius'] = uavg
                 properties.obs['radius_e'] = eddy_radius_e / 1000
-                properties.obs['eke'] = teke
+                #~ properties.obs['eke'] = teke
                 if 'shape_error_e' in eddy.track_extra_variables:
                     properties.obs['shape_error_e'] = aerr
                 if 'shape_error_s' in eddy.track_extra_variables:
@@ -505,33 +517,36 @@ class GridDataset(object):
             return ma.array(v / w, mask=w == 0)
 
     @staticmethod
-    def get_amplitude(cont_x, cont_y, i_x_in, i_y_in, contour_height, data, anticyclonic_search=True):
+    def get_amplitude(i_x_in, i_y_in, contour_height, data, anticyclonic_search=True, level=None, step=None):
         # Instantiate Amplitude object
         amp = Amplitude(
-            contour_x=cont_x,
-            contour_y=cont_y,
+            # Indices of all pixels in contour
             i_contour_x=i_x_in,
             i_contour_y=i_y_in,
+            # Height of level
             contour_height=contour_height,
-            data=data)
+            # All grid
+            data=data,
+            # Step by level
+            interval=step)
 
         if anticyclonic_search:
-            reset_centroid = amp.all_pixels_above_h0()
+            reset_centroid = amp.all_pixels_above_h0(level)
 
         else:
-            reset_centroid = amp.all_pixels_below_h0(
-                contours.levels[corrected_coll_index])
+            reset_centroid = amp.all_pixels_below_h0(level)
 
-        return amp
-        # if not amp.within_amplitude_limits() or amp.amplitude:
-        # continue
+        return reset_centroid, amp
 
 
 class UnRegularGridDataset(GridDataset):
     """Class which manage unregular grid
     """
 
-    __slots__ = 'index_interp'
+    __slots__ = (
+        'index_interp',
+        '_speed_norm',
+        )
 
     def bbox_indice(self, vertices):
         dist, idx = self.index_interp.query(vertices, k=1)
@@ -568,11 +583,13 @@ class UnRegularGridDataset(GridDataset):
         pass
 
     def init_pos_interpolator(self):
+        logging.debug('Create a KdTree could be long ...')
         self.index_interp = cKDTree(
             column_stack((
                 self.x_c.reshape(-1),
                 self.y_c.reshape(-1)
             )))
+        logging.debug('... OK')
 
     def _low_filter(self, grid_name, x_cut, y_cut, factor=40.):
         data = self.grid(grid_name)
@@ -613,6 +630,16 @@ class UnRegularGridDataset(GridDataset):
         m_interp = RectBivariateSpline(x_center, y_center, m, **opts_interpolation)
         z_interp = RectBivariateSpline(x_center, y_center, z_filtered, **opts_interpolation).ev(x, y)
         return ma.array(z_interp, mask=m_interp.ev(x, y) > 0.00001)
+
+    def speed_coef(self, contour):
+        dist, idx = self.index_interp.query(contour.regular_coordinates[1:], k=4)
+        i_y = idx % self.x_c.shape[1]
+        i_x = int_((idx - i_y) / self.x_c.shape[1])
+        # A simplified solution to be change by a weight mean
+        return self._speed_norm[i_x, i_y].mean(axis=1)
+
+    def init_speed_coef(self, uname='u', vname='v'):
+        self._speed_norm = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** .5
 
 
 class RegularGridDataset(GridDataset):
@@ -782,3 +809,9 @@ class RegularGridDataset(GridDataset):
         d_x_degrees = (d_x_degrees + 180) % 360 - 180
         d_x = self.EARTH_RADIUS * 2 * pi / 360 * d_x_degrees * cos(deg2rad(self.y_c))
         self.vars['v'] = d_hx / d_x * gof
+
+    def init_speed_coef(self, uname='u', vname='v'):
+        """Draft
+        """
+        uspd = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** .5
+        self.speed_coef = RectBivariateSpline(self.xc, self.yc, uspd, kx=1, ky=1).ev
