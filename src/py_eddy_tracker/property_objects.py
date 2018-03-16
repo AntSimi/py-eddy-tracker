@@ -300,10 +300,7 @@ class SwirlSpeed(object):
         self.level_index[0] = 0
         self.nb_contour_per_level[:-1] = self.level_index[1:] - self.level_index[:-1]
         self.nb_contour_per_level[-1] = nb_contour - self.level_index[-1]
-    
-    #~ def is_valid(self, i_contour):
-        #~ return self._is_valid[i_contour]
-    
+
     def get_index_nearest_path_bbox_contain_pt(self, level, xpt, ypt):
         """Get index from the nearest path in the level, if the bbox of the
         path contain pt

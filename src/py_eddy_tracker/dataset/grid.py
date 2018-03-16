@@ -5,19 +5,17 @@ import logging
 from scipy.interpolate import interp1d
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
-    linspace, meshgrid, sinc, errstate, round_, int_, column_stack, interp
+    linspace, errstate, round_, int_, column_stack, interp
 from netCDF4 import Dataset
 from scipy.ndimage import gaussian_filter, convolve
-from scipy.ndimage.filters import convolve1d
 from scipy.interpolate import RectBivariateSpline
 from scipy.spatial import cKDTree
-from matplotlib.figure import Figure
 from matplotlib.path import Path as BasePath
 from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
 from ..tools import fit_circle_c, distance_vector
 from ..observations import EddiesObservations
-from ..eddy_feature import Amplitude, get_uavg
+from ..eddy_feature import Amplitude, get_uavg, Contours
 
 
 def contour_iter(self, anticyclonic_search):
@@ -35,6 +33,7 @@ def isvalid(self):
 BasePath.isvalid = isvalid
 
 
+@property
 def mean_coordinates(self):
     return self.vertices.mean(axis=0)
 
@@ -83,9 +82,12 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
 def regular_coordinates(self):
     """Give a standard/regular/double sample of contour
     """
-    if hasattr(self, '_regular_coordinates'):
-        self._regular_coordinates = uniform_resample(self.lon, self.lat)
+    if not hasattr(self, '_regular_coordinates'):
+        self._regular_coordinates = column_stack(uniform_resample(self.lon, self.lat))
     return self._regular_coordinates
+
+
+BasePath.regular_coordinates = regular_coordinates
 
 
 def fit_circle_path(self):
@@ -95,7 +97,7 @@ def fit_circle_path(self):
 
 
 def _fit_circle_path(self):
-    lon_mean, lat_mean = self.mean_coordinates()
+    lon_mean, lat_mean = self.mean_coordinates
     # Prepare for shape test and get eddy_radius_e
     # http://www.geo.hunter.cuny.edu/~jochen/gtech201/lectures/
     # lec6concepts/map%20coordinate%20systems/
@@ -344,12 +346,7 @@ class GridDataset(object):
         """
         return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
 
-    def eddy_identification(self, grid_height, step=0.005, shape_error=55, extra_variables=None,
-                            extra_array_variables=None, array_sampling=50, pixel_limit=None):
-        if extra_variables is None:
-            extra_variables = list()
-        if extra_array_variables is None:
-            extra_array_variables = list()
+    def eddy_identification(self, grid_height, step=0.005, shape_error=55, array_sampling=50, pixel_limit=None):
         if pixel_limit is None:
             pixel_limit = (8, 1000)
 
@@ -361,22 +358,15 @@ class GridDataset(object):
         levels = arange(z_min - z_min % step, z_max - z_max % step + 2 * step, step)
 
         x, y = self.vars[self.coordinates[0]], self.vars[self.coordinates[1]]
-        ## To re write
-        if len(x.shape) == 1:
-            data = data.T
-        ## 
-        logging.debug('Start computing iso lines')
-        fig = Figure()
-        ax = fig.add_subplot(111)
-        contours = ax.contour(x, y, data, levels)
-        logging.debug('Finish computing iso lines')
+
+        eddies = list()
+        contours = Contours(x, y, data, levels)
 
         anticyclonic_search = True
         iterator = 1 if anticyclonic_search else -1
 
         # Loop over each collection
-        for coll_ind, coll in enumerate(contours.collections[::iterator]):
-
+        for coll_ind, coll in enumerate(contours.iter(step=iterator)):
             corrected_coll_index = coll_ind
             if iterator == -1:
                 corrected_coll_index = - coll_ind - 1
@@ -390,11 +380,13 @@ class GridDataset(object):
                           corrected_coll_index, cvalues, nb_paths)
 
             # Loop over individual c_s contours (i.e., every eddy in field)
-            for cont in contour_paths:
-                # Filter for closed contours
-                if not cont.isvalid:
+            for current_contour in contour_paths:
+                if current_contour.used:
                     continue
-                centlon_e, centlat_e, eddy_radius_e, aerr = cont.fit_circle()
+                # Filter for closed contours
+                if not current_contour.isvalid:
+                    continue
+                centlon_e, centlat_e, eddy_radius_e, aerr = current_contour.fit_circle()
                 # Filter for shape
                 if aerr < 0 or aerr > shape_error:
                     continue
@@ -410,10 +402,10 @@ class GridDataset(object):
                 if anticyclonic_search != acyc_not_cyc:
                     continue
 
-                i_x_in, i_y_in = cont.pixels_in(self)
+                i_x_in, i_y_in = current_contour.pixels_in(self)
 
                 # Maybe limit max must be replace with a maximum of surface
-                if cont.nb_pixel < pixel_limit[0] or cont.nb_pixel > pixel_limit[1]:
+                if current_contour.nb_pixel < pixel_limit[0] or current_contour.nb_pixel > pixel_limit[1]:
                     continue
 
                 reset_centroid, amp = self.get_amplitude(i_x_in, i_y_in, cvalues, data,
@@ -426,82 +418,50 @@ class GridDataset(object):
                 if reset_centroid:
                     centi = reset_centroid[0]
                     centj = reset_centroid[1]
-                    centlon_e = x[centj, centi]
-                    centlat_e = y[centj, centi]
+                    centlon_e = x[centi, centj]
+                    centlat_e = y[centi, centj]
 
-                # Get sum of eke within Ceff
-                #~ teke = grd.eke[eddy.slice_j, eddy.slice_i][eddy.mask_eff].sum()
-
-                #~ (uavg, contlon_s, contlat_s, inner_contlon, inner_contlat, any_inner_contours
-                    #~ ) = get_uavg(eddy, contours, centlon_e, centlat_e, cont, grd, anticyclonic_search)
-                (uavg, contlon_s, contlat_s, inner_contlon, inner_contlat, any_inner_contours
-                    ) = get_uavg(self, contours, centlon_e, centlat_e, cont, anticyclonic_search)
+                average_speed, speed_contour, inner_contour, speed_array = \
+                    get_uavg(self, contours, centlon_e, centlat_e, current_contour, anticyclonic_search, corrected_coll_index)
 
                 # Use azimuth equal projection for radius
-                proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0=%s +lon_0=%s'
-                            % (inner_contlat.mean(), inner_contlon.mean()))
-
+                proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0={1} +lon_0={0}'.format(*inner_contour.mean_coordinates))
                 # First, get position based on innermost
                 # contour
-                c_x, c_y = proj(inner_contlon, inner_contlat)
+                c_x, c_y = proj(inner_contour.lon, inner_contour.lat)
                 centx_s, centy_s, _, _ = fit_circle_c(c_x, c_y)
-                centlon_s, centlat_s = proj(centx_s, centy_s,
-                                            inverse=True)
+                centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
                 # Second, get speed-based radius based on
                 # contour of max uavg
-                # (perhaps we should make a new proj here
-                # based on contlon_s, contlat_s but I'm not
-                # sure it's that important ... Antoine?)
-                # A. : I dont think, the difference is tiny
-                c_x, c_y = proj(contlon_s, contlat_s)
+                c_x, c_y = proj(speed_contour.lon, speed_contour.lat)
                 _, _, eddy_radius_s, aerr_s = fit_circle_c(c_x, c_y)
 
                 # Instantiate new EddyObservation object
                 properties = EddiesObservations(
                     size=1,
-                    track_extra_variables=extra_variables,
+                    track_extra_variables=['shape_error_e', 'shape_error_s'],
                     track_array_variables=array_sampling,
-                    array_variables=extra_array_variables
+                    array_variables=['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s']
                 )
                 properties.obs['amplitude'] = amp.amplitude
                 properties.obs['radius_s'] = eddy_radius_s / 1000
-                properties.obs['speed_radius'] = uavg
+                properties.obs['speed_radius'] = average_speed
                 properties.obs['radius_e'] = eddy_radius_e / 1000
-                #~ properties.obs['eke'] = teke
-                if 'shape_error_e' in eddy.track_extra_variables:
-                    properties.obs['shape_error_e'] = aerr
-                if 'shape_error_s' in eddy.track_extra_variables:
-                    properties.obs['shape_error_s'] = aerr_s
-
-                if aerr > 99.9 or aerr_s > 99.9:
-                    logging.warning(
-                        'Strange shape at this step! shape_error : %f, %f',
-                        aerr,
-                        aerr_s)
-                    continue
-
-                # Update SLA eddy properties
-
-                # See CSS11 section B4
+                properties.obs['shape_error_e'] = aerr
+                properties.obs['shape_error_s'] = aerr_s
                 properties.obs['lon'] = centlon_s
                 properties.obs['lat'] = centlat_s
-                if 'contour_lon_e' in extra_array_variables:
-                    (properties.obs['contour_lon_e'],
-                     properties.obs['contour_lat_e']) = uniform_resample(
-                        cont.lon, cont.lat,
-                        fixed_size=array_sampling)
-                if 'contour_lon_s' in extra_array_variables:
-                    (properties.obs['contour_lon_s'],
-                     properties.obs['contour_lat_s']) = uniform_resample(
-                        contlon_s, contlat_s,
-                        fixed_size=array_sampling)
+                properties.obs['contour_lon_e'], properties.obs['contour_lat_e'] = uniform_resample(
+                    current_contour.lon, current_contour.lat, fixed_size=array_sampling)
+                properties.obs['contour_lon_s'], properties.obs['contour_lat_s'] = uniform_resample(
+                        speed_contour.lon, speed_contour.lat, fixed_size=array_sampling)
+                if aerr > 99.9 or aerr_s > 99.9:
+                    logging.warning('Strange shape at this step! shape_error : %f, %f', aerr, aerr_s)
 
-                # for AVISO
-                eddy.update_eddy_properties(properties)
-
-                # Mask out already found eddies
-                eddy.sla[eddy.slice_j, eddy.slice_i][
-                    eddy.mask_eff] = eddy.fillval
+                eddies.append(properties)
+                # To reserve definitively the area
+                data.mask[i_x_in, i_y_in] = True
+        return eddies
 
     @staticmethod
     def _gaussian_filter(data, sigma, mode='reflect'):
@@ -562,15 +522,6 @@ class UnRegularGridDataset(GridDataset):
         i_x, i_y = where(mask)
         i_x += slice_x.start
         i_y += slice_y.start
-
-        # import matplotlib
-        # matplotlib.use('AGG')
-        # import matplotlib.pyplot as plt
-        # plt.figure()    
-        # plt.plot(self.x_c[i_x, i_y], self.y_c[i_x, i_y], 'g.', zorder=-10, markersize=20)
-        # plt.plot(self.x_c[slice_x, slice_y], self.y_c[slice_x, slice_y], 'r.', zorder=+10)
-        # plt.plot(contour.lon, contour.lat, 'b', zorder=20)
-        # plt.savefig('/tmp/toto.png')
         return i_x, i_y
 
     def nearest_grd_indice(self, x, y):
