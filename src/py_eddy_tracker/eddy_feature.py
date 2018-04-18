@@ -97,25 +97,27 @@ class Amplitude(object):
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are below a given SSH threshold for cyclonic eddies.
         """
-        if (self.sla > self.h_0).any():
-            return False  # i.e., with self.amplitude == 0
+        sla = self.data[self.ix, self.iy]
+        if (sla > self.h_0).any():
+            return False
         else:
             self._set_local_extrema(1)
             if 0 < self.local_extrema <= self.mle:
                 self._set_cyc_amplitude()
+                return False
             elif self.local_extrema > self.mle:
-                lmi_j, lmi_i = where(self.local_extrema_inds)
+                lmi_i, lmi_j = where(self.local_extrema_inds)
                 levnm2 = level - (2 * self.interval)
                 slamin = 1e5
-                for j, i in zip(lmi_j, lmi_i):
-                    if slamin >= self.sla[j, i]:
-                        slamin = self.sla[j, i]
-                        jmin, imin = j, i
-                    if self.sla[j, i] >= levnm2:
+                for i, j in zip(lmi_i, lmi_j):
+                    if slamin >= self.data[i, j]:
+                        slamin = self.data[i, j]
+                        imin, jmin = i, j
+                    if self.data[i, j] >= levnm2:
                         self._set_cyc_amplitude()
                         # Prevent further calls to_set_cyc_amplitude
                         levnm2 = 1e5
-                return imin, jmin
+                return imin + self.slice_x.start, jmin + self.slice_y.start
         return False
 
     def all_pixels_above_h0(self, level):
@@ -132,6 +134,7 @@ class Amplitude(object):
             # If we have a number of extrema avoid, we compute amplitude
             if 0 < self.local_extrema <= self.mle:
                 self._set_acyc_amplitude()
+                return False
 
             # More than avoid
             elif self.local_extrema > self.mle:
@@ -214,7 +217,6 @@ class Contours(object):
         'y_max_per_contour',
         'nb_pt_per_contour',
         'nb_contour_per_level',
-        '_is_valid',
     )
 
     def __init__(self, x, y, z, levels):
@@ -222,11 +224,14 @@ class Contours(object):
         c_i : index to contours
         l_i : index to levels
         """
-        logging.debug('Start computing iso lines')
+        logging.info('Start computing iso lines')
         fig = Figure()
         ax = fig.add_subplot(111)
-        self.contours = ax.contour(x, y, z, levels)
-        logging.debug('Finish computing iso lines')
+        logging.debug('X shape : %s', x.shape)
+        logging.debug('Y shape : %s', y.shape)
+        logging.debug('Z shape : %s', z.shape)
+        self.contours = ax.contour(x, y, z.T, levels)
+        logging.info('Finish computing iso lines')
 
         nb_level = 0
         nb_contour = 0
@@ -256,8 +261,6 @@ class Contours(object):
         self.x_max_per_contour = empty(nb_contour, dtype=coord_dtype)
         self.y_min_per_contour = empty(nb_contour, dtype=coord_dtype)
         self.y_max_per_contour = empty(nb_contour, dtype=coord_dtype)
-
-        # ~ self._is_valid = empty((nb_contour), dtype='bool')
 
         # Filled array
         i_pt = 0

@@ -29,7 +29,7 @@ Version 3.0.0
 """
 from numpy import zeros, empty, nan, arange, interp, where, unique, \
     ma, concatenate, cos, radians, isnan, ones, ndarray, meshgrid, \
-    bincount, bool_, array, interp, int_, int32, round, maximum
+    bincount, bool_, array, interp, int_, int32, round, maximum, floor
 from scipy.interpolate  import interp1d
 from netCDF4 import Dataset
 from py_eddy_tracker.tools import distance_matrix, distance_vector
@@ -159,30 +159,6 @@ class EddiesObservations(object):
     Class to hold eddy properties *amplitude* and counts of
     *local maxima/minima* within a closed region of a sea level anomaly field.
 
-    Variables:
-      centlon:
-        Longitude centroid coordinate
-
-      centlat:
-        Latitude centroid coordinate
-
-      eddy_radius_s:
-        Speed based radius
-
-      eddy_radius_e:
-        Effective radius
-
-      amplitude:
-        Eddy amplitude
-
-      uavg:
-        Average eddy swirl speed
-
-      teke:
-        Average eddy kinetic energy within eddy
-
-      rtime:
-        Time
     """
     
     ELEMENTS = [
@@ -255,6 +231,24 @@ class EddiesObservations(object):
         test *= self.track_array_variables == other.track_array_variables
         test *= self.array_variables == other.array_variables
         return test
+
+    @classmethod
+    def concatenate(cls, observations):
+        nb_obs = 0
+        ref_obs = observations[0]
+        for obs in observations:
+            if not ref_obs.coherence(obs):
+                raise Exception('Merge of different type of observations')
+            nb_obs += len(obs)
+        eddies = cls.new_like(ref_obs, nb_obs)
+
+        i = 0
+        for obs in observations:
+            nb_obs = len(obs)
+            eddies.obs[i:i + nb_obs] = obs.obs
+            i += nb_obs
+        eddies.sign_type = ref_obs.sign_type
+        return eddies
 
     def merge(self, other):
         """Merge two dataset
@@ -570,7 +564,7 @@ class EddiesObservations(object):
                     raise Exception('To many iteration: %d' % security_increment)
                 security_increment += 1
                 i_min_value = cost_reduce.argmin()
-                i, j = i_min_value / shape[1], i_min_value % shape[1]
+                i, j = floor(i_min_value / shape[1]).astype(int), i_min_value % shape[1]
                 # Set to False all link
                 mask[i_self_keep[i]] = False
                 mask[:, i_other_keep[j]] = False
@@ -782,7 +776,7 @@ class TrackEddiesObservations(EddiesObservations):
         """
         eddy_size = len(self.observations)
         sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        filename = filename % dict(path=path, sign_type=sign_type, prod_time=datetime.now().strftime('%Y%d%d'))
+        filename = filename % dict(path=path, sign_type=sign_type, prod_time=datetime.now().strftime('%Y%m%d'))
         logging.info('Store in %s', filename)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create file %s', filename)
