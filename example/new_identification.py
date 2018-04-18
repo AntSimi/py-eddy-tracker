@@ -1,3 +1,4 @@
+from netCDF4 import Dataset
 from py_eddy_tracker.dataset.grid import RegularGridDataset, UnRegularGridDataset
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -7,15 +8,15 @@ logging.basicConfig(level=logging.DEBUG)
 # h.add_uv('sossheig')
 # h.write('unregular.nc')
 
-# h = RegularGridDataset('msla_h_20170425T000000_20170425T000000.nc', 'NbLongitudes', 'NbLatitudes')
-# h.high_filter('Grid_0001', 10, 5)
-# h.eddy_identification('Grid_0001', 0.5)
+h = RegularGridDataset('/data/adelepoulle/Test/Test_eddy/20180417_eddy_tracker_validation_object_oriented/nrt_global_allsat_phy_l4_20180409_20180415.nc', 'longitude', 'latitude')
+h.high_filter('sla', 10, 5)
+anticyclonic, cyclonic = h.eddy_identification('sla', 'ugos', 'vgos', 0.0025)
+print(len(anticyclonic))
+print(len(cyclonic))
+with Dataset('/tmp/a.nc', 'w') as h:
+    anticyclonic.to_netcdf(h)
+with Dataset('/tmp/c.nc', 'w') as h:
+    cyclonic.to_netcdf(h)
 
-h = UnRegularGridDataset('/home/tildou/ant_work/data/unregular.nc', 'nav_lon', 'nav_lat')
-h.eddy_identification('sossheig')
-
-# h = RegularGridDataset('madt_h_20170425T000000_20170425T000000.nc', 'NbLongitudes', 'NbLatitudes')
-
-# h.add_uv('Grid_0001')
-# h.write('regular.nc')
-
+# h = UnRegularGridDataset('/tmp/t.nc', 'nav_lon', 'nav_lat')
+# eddies = h.eddy_identification('sossheig', step=0.005)
