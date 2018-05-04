@@ -98,7 +98,7 @@ class Amplitude(object):
         are below a given SSH threshold for cyclonic eddies.
         """
         sla = self.data[self.ix, self.iy]
-        if (sla > self.h_0).any():
+        if (sla > self.h_0).any() or (hasattr(sla, 'mask') and sla.mask.any()):
             return False
         else:
             self._set_local_extrema(1)
@@ -126,7 +126,7 @@ class Amplitude(object):
         are above a given SSH threshold for anticyclonic eddies.
         """
         sla = self.data[self.ix, self.iy]
-        if (sla < self.h_0).any():
+        if (sla < self.h_0).any() or (hasattr(sla, 'mask') and sla.mask.any()):
             # i.e.,with self.amplitude == 0
             return False
         else:
@@ -335,21 +335,25 @@ def get_uavg(grid, all_contours, centlon_e, centlat_e, original_contour, anticyc
     Calculate geostrophic speed around successive contours
     Returns the average
     """
-    average_speed = grid.speed_coef(original_contour).mean()
-    speed_array = [average_speed]
+    max_average_speed = grid.speed_coef(original_contour).mean()
+    speed_array = [max_average_speed]
     pixel_min = 1
 
     eddy_contours = [original_contour]
     inner_contour = selected_contour = original_contour
     # Must start only on upper or lower contour, no need to test the two part
-    for coll in all_contours.iter(start=level_start + 1, step=1 if anticyclonic_search else -1):
+    step = 1 if anticyclonic_search else -1
+    i_inner = i_max_speed = -1
+
+    for i, coll in enumerate(all_contours.iter(start=level_start + step, step=step)):
         level_contour = coll.get_nearest_path_bbox_contain_pt(centlon_e, centlat_e)
         # Leave loop if no contours at level
         if level_contour is None:
             break
-        # 1. Ensure polygon_i contains point centlon_e, centlat_e
-        if winding_number_poly(centlon_e, centlat_e, level_contour.vertices) == 0:
-            break
+        # 1. Ensure polygon_i contains point centlon_e, centlat_e (Maybe we loose some inner contour if eddy
+        #        core are not centered)
+        # if winding_number_poly(centlon_e, centlat_e, level_contour.vertices) == 0:
+        #     break
         # 2. Ensure polygon_i is within polygon_e
         if not poly_contain_poly(original_contour.vertices, level_contour.vertices):
             break
@@ -360,11 +364,15 @@ def get_uavg(grid, all_contours, centlon_e, centlat_e, original_contour, anticyc
         # Interpolate uspd to seglon, seglat, then get mean
         level_average_speed = grid.speed_coef(level_contour).mean()
         speed_array.append(level_average_speed)
-        if level_average_speed >= average_speed:
-            average_speed = level_average_speed
+        if level_average_speed >= max_average_speed:
+            max_average_speed = level_average_speed
+            i_max_speed = i
             selected_contour = level_contour
         inner_contour = level_contour
         eddy_contours.append(level_contour)
+        i_inner = i
     for contour in eddy_contours:
         contour.used = True
-    return average_speed, selected_contour, inner_contour, speed_array
+    i_max_speed = level_start + step + step * i_max_speed
+    i_inner = level_start + step + step * i_inner
+    return max_average_speed, selected_contour, inner_contour, array(speed_array), i_max_speed, i_inner

@@ -2,7 +2,6 @@
 """
 """
 import logging
-from scipy.interpolate import interp1d
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, column_stack, interp, meshgrid, unique, nan
@@ -16,6 +15,11 @@ from pyproj import Proj
 from ..tools import fit_circle_c, distance_vector
 from ..observations import EddiesObservations
 from ..eddy_feature import Amplitude, get_uavg, Contours
+
+
+def raw_resample(datas, fixed_size):
+    nb_value = datas.shape[0]
+    return interp(arange(fixed_size), arange(nb_value) * (fixed_size - 1) / (nb_value - 1) , datas)
 
 
 def contour_iter(self, anticyclonic_search):
@@ -441,7 +445,7 @@ class GridDataset(object):
                             centlat_e = y[centi, centj]
 
                     # centlat_e and centlon_e must be index of maximum, we will loose some inner contour, if it's not
-                    average_speed, speed_contour, inner_contour, speed_array = \
+                    max_average_speed, speed_contour, inner_contour, speed_array, i_max_speed, i_inner = \
                         get_uavg(self, contours, centlon_e, centlat_e, current_contour, anticyclonic_search, corrected_coll_index)
 
                     # Use azimuth equal projection for radius
@@ -459,13 +463,31 @@ class GridDataset(object):
                     # Instantiate new EddyObservation object
                     properties = EddiesObservations(
                         size=1,
-                        track_extra_variables=['shape_error_e', 'shape_error_s'],
+                        track_extra_variables=['shape_error_e', 'shape_error_s', 'height_max_speed_contour',
+                                               'height_external_contour', 'height_inner_contour', 'nb_contour_selected'],
                         track_array_variables=array_sampling,
-                        array_variables=['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s']
+                        array_variables=['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s', 'uavg_profile']
                     )
+
+                    properties.obs['height_max_speed_contour'] = contours.cvalues[i_max_speed]
+                    properties.obs['height_external_contour'] = cvalues
+                    properties.obs['height_inner_contour'] = contours.cvalues[i_inner]
+                    array_size = speed_array.shape[0]
+                    properties.obs['nb_contour_selected'] = array_size
+                    properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling)
+                    # from matplotlib import pyplot as plt
+                    # if array_size > 10:
+                    #     plt.figure()
+                    #     plt.plot(linspace(properties.obs['height_external_contour'],properties.obs['height_inner_contour'], speed_array.shape[0]), speed_array, 'b')
+                    #     plt.axvline(properties.obs['height_inner_contour'], color='g')
+                    #     plt.axvline(properties.obs['height_max_speed_contour'], color='r')
+                    #     plt.axvline(properties.obs['height_external_contour'], color='k')
+                    #     plt.title('%d' % array_size)
+                    #     plt.ylim(0,None)
+                    #     plt.show()
                     properties.obs['amplitude'] = amp.amplitude
                     properties.obs['radius_s'] = eddy_radius_s / 1000
-                    properties.obs['speed_radius'] = average_speed
+                    properties.obs['speed_radius'] = max_average_speed
                     properties.obs['radius_e'] = eddy_radius_e / 1000
                     properties.obs['shape_error_e'] = aerr
                     properties.obs['shape_error_s'] = aerr_s
@@ -820,5 +842,7 @@ class RegularGridDataset(GridDataset):
     def init_speed_coef(self, uname='u', vname='v'):
         """Draft
         """
-        uspd = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** .5
-        self._speed_ev = RectBivariateSpline(self.x_c, self.y_c, uspd, kx=1, ky=1).ev
+        speed = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** .5
+        # Evaluation near masked value will be smoothed to 0 !!!, not perfect
+        speed[speed.mask] = 0
+        self._speed_ev = RectBivariateSpline(self.x_c, self.y_c, speed, kx=1, ky=1).ev

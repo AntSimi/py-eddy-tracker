@@ -213,6 +213,26 @@ VAR_DESCR = dict(
                         'scale L',
             )
         ),
+    i=dict(
+        attr_name='i',
+        nc_name='i',
+        nc_type='uint16',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            long_name='longitude index in the grid of the detection',
+            description='longitude index in the grid of the detection',
+            )
+        ),
+    j=dict(
+        attr_name='j',
+        nc_name='j',
+        nc_type='uint16',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            long_name='latitude index in the grid of the detection',
+            description='latitude index in the grid of the detection',
+            )
+        ),
     eke=dict(
         attr_name='eke',
         nc_name='Teke',
@@ -327,7 +347,7 @@ VAR_DESCR = dict(
         attr_name=None,
         nc_name='uavg_profile',
         nc_type='f4',
-        nc_dims=('uavg_contour_count', 'Nobs',),
+        nc_dims=('Nobs', 'NbSample'),
         nc_attr=dict(
             long_name='radial profile of uavg',
             description='all uavg values from effective contour inwards to '
@@ -354,6 +374,42 @@ VAR_DESCR = dict(
         nc_dims=('Nobs',),
         nc_attr=dict(
             units='%',
+            )
+        ),
+    height_max_speed_contour=dict(
+        attr_name=None,
+        nc_name='height_max_speed_contour',
+        nc_type='f4',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            units='m',
+            )
+        ),
+    height_external_contour=dict(
+        attr_name=None,
+        nc_name='height_external_contour',
+        nc_type='f4',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            units='m',
+            )
+        ),
+    height_inner_contour=dict(
+        attr_name=None,
+        nc_name='height_inner_contour',
+        nc_type='f4',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            units='m',
+            )
+        ),
+    nb_contour_selected=dict(
+        attr_name=None,
+        nc_name='nb_contour_selected',
+        nc_type='u2',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            units='1',
             )
         ),
     )

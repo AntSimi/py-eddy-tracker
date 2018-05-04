@@ -356,7 +356,7 @@ class EddiesObservations(object):
                 if variable == 'cyc':
                     continue
                 var_inv = VAR_DESCR_inv[variable]
-                if var_inv not in cls.ELEMENTS and var_inv not in kwargs['array_variables']:
+                if var_inv not in cls.ELEMENTS and var_inv not in kwargs.get('array_variables', list()):
                     kwargs['track_extra_variables'].append(var_inv)
 
             eddies = cls(size=nb_obs, ** kwargs)
@@ -366,6 +366,9 @@ class EddiesObservations(object):
                 eddies.obs[VAR_DESCR_inv[variable]
                            ] = h_nc.variables[variable][:]
             eddies.sign_type = h_nc.variables['cyc'][0]
+            if eddies.sign_type == 0:
+                logging.info('File come from another algorithm')
+                eddies.sign_type = -1
         return eddies
 
     @classmethod
