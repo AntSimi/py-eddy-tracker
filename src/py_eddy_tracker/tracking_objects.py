@@ -162,7 +162,8 @@ class IdentificationList(object):
         h_nc.llcrnrlat = self.grd.latmin
         h_nc.urcrnrlat = self.grd.latmax
 
-    def create_variable(self, handler_nc, kwargs_variable,
+    @staticmethod
+    def create_variable(handler_nc, kwargs_variable,
                         attr_variable, data, scale_factor=None, add_offset=None):
         var = handler_nc.createVariable(
             zlib=True,

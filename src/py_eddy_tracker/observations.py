@@ -429,7 +429,7 @@ class EddiesObservations(object):
 
     def circle_mask(self, other, radius=100):
         """Return a mask of available link"""
-        return self.distance(other) < radius
+        return (self.distance(other).T < radius).T
 
     def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
         # c = (major ** 2 - minor ** 2) ** .5 + major
@@ -711,6 +711,49 @@ class EddiesObservations(object):
         except ValueError:
             logging.warning('Data is empty')
 
+    def write_netcdf(self, path='./', filename='%(path)s/%(sign_type)s.nc'):
+        """Write a netcdf with eddy obs
+        """
+        eddy_size = len(self.observations)
+        sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
+        filename = filename % dict(path=path, sign_type=sign_type, prod_time=datetime.now().strftime('%Y%m%d'))
+        logging.info('Store in %s', filename)
+        with Dataset(filename, 'w', format='NETCDF4') as h_nc:
+            logging.info('Create file %s', filename)
+            # Create dimensions
+            logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
+            h_nc.createDimension('Nobs', eddy_size)
+            if self.track_array_variables != 0:
+                h_nc.createDimension('NbSample', self.track_array_variables)
+            # Iter on variables to create:
+            for field in self.observations.dtype.descr:
+                name = field[0]
+                logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
+                self.create_variable(
+                    h_nc,
+                    dict(varname=VAR_DESCR[name]['nc_name'],
+                         datatype=VAR_DESCR[name]['output_type'],
+                         dimensions=VAR_DESCR[name]['nc_dims']),
+                    VAR_DESCR[name]['nc_attr'],
+                    self.observations[name],
+                    scale_factor=VAR_DESCR[name].get('scale_factor', None),
+                    add_offset=VAR_DESCR[name].get('add_offset', None)
+                    )
+
+            # Add cyclonic information
+            self.create_variable(
+                h_nc,
+                dict(varname=VAR_DESCR['type_cyc']['nc_name'],
+                     datatype=VAR_DESCR['type_cyc']['nc_type'],
+                     dimensions=VAR_DESCR['type_cyc']['nc_dims']),
+                VAR_DESCR['type_cyc']['nc_attr'],
+                self.sign_type)
+            # Global attr
+            self.set_global_attr_netcdf(h_nc)
+
+    def set_global_attr_netcdf(self, h_nc):
+        pass
+
 
 class VirtualEddiesObservations(EddiesObservations):
     """Class to work with virtual obs
@@ -773,46 +816,6 @@ class TrackEddiesObservations(EddiesObservations):
         elements = super(TrackEddiesObservations, self).elements
         elements.extend(['track', 'n', 'virtual'])
         return elements
-
-    def write_netcdf(self, path='./', filename='%(path)s/%(sign_type)s.nc'):
-        """Write a netcdf with eddy obs
-        """
-        eddy_size = len(self.observations)
-        sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        filename = filename % dict(path=path, sign_type=sign_type, prod_time=datetime.now().strftime('%Y%m%d'))
-        logging.info('Store in %s', filename)
-        with Dataset(filename, 'w', format='NETCDF4') as h_nc:
-            logging.info('Create file %s', filename)
-            # Create dimensions
-            logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
-            h_nc.createDimension('Nobs', eddy_size)
-            if self.track_array_variables != 0:
-                h_nc.createDimension('NbSample', self.track_array_variables)
-            # Iter on variables to create:
-            for field in self.observations.dtype.descr:
-                name = field[0]
-                logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
-                self.create_variable(
-                    h_nc,
-                    dict(varname=VAR_DESCR[name]['nc_name'],
-                         datatype=VAR_DESCR[name]['output_type'],
-                         dimensions=VAR_DESCR[name]['nc_dims']),
-                    VAR_DESCR[name]['nc_attr'],
-                    self.observations[name],
-                    scale_factor=VAR_DESCR[name].get('scale_factor', None),
-                    add_offset=VAR_DESCR[name].get('add_offset', None)
-                    )
-
-            # Add cyclonic information
-            self.create_variable(
-                h_nc,
-                dict(varname=VAR_DESCR['type_cyc']['nc_name'],
-                     datatype=VAR_DESCR['type_cyc']['nc_type'],
-                     dimensions=VAR_DESCR['type_cyc']['nc_dims']),
-                VAR_DESCR['type_cyc']['nc_attr'],
-                self.sign_type)
-            # Global attr
-            self.set_global_attr_netcdf(h_nc)
 
     def set_global_attr_netcdf(self, h_nc):
         """Set global attr

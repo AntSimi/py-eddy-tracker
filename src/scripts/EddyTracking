@@ -59,7 +59,7 @@ if __name__ == '__main__':
     if CORRESPONDANCES_OUT is None:
         CORRESPONDANCES_OUT = YAML_CORRESPONDANCES_OUT
     if YAML_CORRESPONDANCES_OUT is None and CORRESPONDANCES_OUT is None:
-        CORRESPONDANCES_OUT = 'Correspondances.nc'
+        CORRESPONDANCES_OUT = '{path}/{sign_type}_correspondances.nc'
 
     if 'CLASS' in CONFIG:
         CLASS = getattr(
@@ -93,14 +93,14 @@ if __name__ == '__main__':
         previous_correspondance=CORRESPONDANCES_IN)
 
     DATE_START, DATE_STOP = CORRESPONDANCES.period
-    DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME)
+    DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME, path=SAVE_DIR, sign_type='c')
 
     CORRESPONDANCES.track()
     logging.info('Track finish')
     logging.info('Start merging')
 
+    CORRESPONDANCES.save(CORRESPONDANCES_OUT, DICT_COMPLETION)
     if SAVE_STOP:
-        CORRESPONDANCES.save(CORRESPONDANCES_OUT, DICT_COMPLETION)
         exit()
 
     # Merge correspondanc, only do if we stop and store just after compute of correspondance
@@ -109,12 +109,25 @@ if __name__ == '__main__':
 
     logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
-    FINAL_EDDIES = CORRESPONDANCES.merge(size_min=NB_OBS_MIN)
+
+    CORRESPONDANCES.get_unused_data().write_netcdf(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc')
+
+    SHORT_CORRESPONDANCES = CORRESPONDANCES._copy()
+    SHORT_CORRESPONDANCES.shorter_than(size_max=NB_OBS_MIN)
+
+    CORRESPONDANCES.longer_than(size_min=NB_OBS_MIN)
+
+    FINAL_EDDIES = CORRESPONDANCES.merge()
+    SHORT_TRACK = SHORT_CORRESPONDANCES.merge()
 
     # We flag obs
     if CORRESPONDANCES.virtual:
         FINAL_EDDIES['virtual'][:] = FINAL_EDDIES['time'] == 0
         FINAL_EDDIES.filled_by_interpolation(FINAL_EDDIES['virtual'] == 1)
+        SHORT_TRACK['virtual'][:] = SHORT_TRACK['time'] == 0
+        SHORT_TRACK.filled_by_interpolation(SHORT_TRACK['virtual'] == 1)
+
+
 
     # Total running time
     FULL_TIME = dt.datetime.now() - START_TIME
@@ -122,7 +135,8 @@ if __name__ == '__main__':
                  FULL_TIME / (len(FILENAMES) - 1))
     logging.info('Duration : %s', FULL_TIME)
 
-    logging.info('%d tracks will be saved', CORRESPONDANCES.nb_obs_by_tracks.max())
+    logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
     FINAL_EDDIES.write_netcdf(path=SAVE_DIR)
+    SHORT_TRACK.write_netcdf(filename='%(path)s/%(sign_type)s_track_too_short.nc', path=SAVE_DIR)

@@ -30,7 +30,7 @@ Version 3.0.0
 from matplotlib.dates import julian2num, num2date
 
 from py_eddy_tracker.observations import EddiesObservations, VirtualEddiesObservations, TrackEddiesObservations
-from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin
+from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate
 from netCDF4 import Dataset
 import logging
 
@@ -95,6 +95,21 @@ class Correspondances(list):
         self.i_current_by_tracks = None
         self.nb_obs = 0
         self.eddies = None
+
+    def _copy(self):
+        new = self.__class__(
+            datasets=self.datasets,
+            virtual=self.nb_virtual,
+            class_method=self.class_method,
+            previous_correspondance=self.filename_previous_correspondance)
+        for i in self:
+            new.append(i)
+        new.current_id = self.current_id
+        new.nb_link_max = self.nb_link_max
+        new.nb_obs = self.nb_obs
+        new.prepare_merging()
+        logging.debug('Copy done')
+        return new
 
     def reset_dataset_cache(self):
         self.previous2_obs = None
@@ -317,7 +332,7 @@ class Correspondances(list):
         # We begin with second file, first one is in previous
         for file_name in self.datasets[first_dataset:]:
             self.swap_dataset(file_name)
-            logging.debug('%s match with previous state', file_name)
+            logging.info('%s match with previous state', file_name)
             logging.debug('%d obs to match', len(self.current_obs))
 
             nb_real_obs = len(self.previous_obs)
@@ -391,6 +406,7 @@ class Correspondances(list):
                 self.previous_virtual_obs.to_netcdf(group)
             h_nc.module = self.class_method.__module__
             h_nc.classname = self.class_method.__qualname__
+        logging.info('Create correspondance file done')
 
     def load_compatible(self, filename):
         if filename is None:
@@ -456,7 +472,45 @@ class Correspondances(list):
         logging.info('%d tracks identified', self.current_id)
         logging.info('%d observations will be join', self.nb_obs)
 
-    def merge(self, until=-1, size_min=None):
+    def longer_than(self, size_min):
+        """Remove from correspondance table all association for shorter eddies than size_min
+        """
+        # Identify eddies longer than
+        i_keep_track = where(self.nb_obs_by_tracks >= size_min)[0]
+        # Reduce array
+        self.nb_obs_by_tracks = self.nb_obs_by_tracks[i_keep_track]
+        self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
+        self.nb_obs = self.nb_obs_by_tracks.sum()
+        # Give the last id used
+        self.current_id = self.nb_obs_by_tracks.shape[0]
+        translate = empty(i_keep_track.max() + 1, dtype='u4')
+        translate[i_keep_track] = arange(self.current_id)
+        for i, correspondance in enumerate(self):
+            m_keep = isin(correspondance['id'], i_keep_track)
+            self[i] = correspondance[m_keep]
+            self[i]['id'] = translate[self[i]['id']]
+        logging.debug('Select longer than %d done', size_min)
+
+    def shorter_than(self, size_max):
+        """Remove from correspondance table all association for longer eddies than size_max
+        """
+        # Identify eddies longer than
+        i_keep_track = where(self.nb_obs_by_tracks < size_max)[0]
+        # Reduce array
+        self.nb_obs_by_tracks = self.nb_obs_by_tracks[i_keep_track]
+        self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
+        self.nb_obs = self.nb_obs_by_tracks.sum()
+        # Give the last id used
+        self.current_id = self.nb_obs_by_tracks.shape[0]
+        translate = empty(i_keep_track.max() + 1, dtype='u4')
+        translate[i_keep_track] = arange(self.current_id)
+        for i, correspondance in enumerate(self):
+            m_keep = isin(correspondance['id'], i_keep_track)
+            self[i] = correspondance[m_keep]
+            self[i]['id'] = translate[self[i]['id']]
+        logging.debug('Select shorter than %d done', size_max)
+
+    def merge(self, until=-1):
         """Merge all the correspondance in one array with all fields
         """
         # Start loading identification again to save in the finals tracks
@@ -466,14 +520,6 @@ class Correspondances(list):
 
         # Start create netcdf to agglomerate all eddy
         logging.debug('We will create an array (size %d)', self.nb_obs)
-        i_keep_track = slice(None)
-        if size_min is not None:
-            i_keep_track = where(self.nb_obs_by_tracks >= size_min)
-            self.nb_obs_by_tracks = self.nb_obs_by_tracks[i_keep_track]
-            self.i_current_by_tracks[i_keep_track] = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
-            self.nb_obs = self.nb_obs_by_tracks.sum()
-            # ??
-            self.current_id = self.nb_obs_by_tracks.shape[0]
         eddies = TrackEddiesObservations(
             size=self.nb_obs,
             track_extra_variables=self.current_obs.track_extra_variables,
@@ -484,11 +530,9 @@ class Correspondances(list):
         # in u2 (which are limited to 65535)
         logging.debug('Compute global index array (N)')
         eddies['n'][:] = uint16(
-            arange(self.nb_obs, dtype='u4') - self.i_current_by_tracks[i_keep_track].repeat(self.nb_obs_by_tracks))
+            arange(self.nb_obs, dtype='u4') - self.i_current_by_tracks.repeat(self.nb_obs_by_tracks))
         logging.debug('Compute global track array')
         eddies['track'][:] = arange(self.current_id).repeat(self.nb_obs_by_tracks)
-        if size_min is not None:
-            eddies['track'][:] += 1
 
         # Set type of eddy with first file
         eddies.sign_type = self.current_obs.sign_type
@@ -506,19 +550,15 @@ class Correspondances(list):
             self.swap_dataset(file_name)
             # We select the list of id which are involve in the correspondance
             i_id = self[i]['id']
-            if size_min is not None:
-                m_id = isin(i_id, i_keep_track)
-                i_id= i_id[m_id]
-            else:
-                m_id = slice(None)
-                # Index where we will write in the final object
+            # Index where we will write in the final object
+            print(i_id.max())
             index_final = self.i_current_by_tracks[i_id]
 
             # First obs of eddies
             m_first_obs = ~first_obs_save_in_tracks[i_id]
             if m_first_obs.any():
                 # Index in the previous file
-                index_in = self[i]['in'][m_id][m_first_obs]
+                index_in = self[i]['in'][m_first_obs]
                 # Copy all variable
                 for field in fields:
                     var = field[0]
@@ -532,15 +572,15 @@ class Correspondances(list):
             if self.virtual:
                 # If the flag virtual in correspondance is active,
                 # the previous is virtual
-                m_virtual = self[i]['virtual'][m_id]
+                m_virtual = self[i]['virtual']
                 if m_virtual.any():
                     # Incrementing index
-                    self.i_current_by_tracks[i_id[m_virtual]] += self[i]['virtual_length'][m_id][m_virtual]
+                    self.i_current_by_tracks[i_id[m_virtual]] += self[i]['virtual_length'][m_virtual]
                     # Get new index
                     index_final = self.i_current_by_tracks[i_id]
 
             # Index in the current file
-            index_current = self[i]['out'][m_id]
+            index_current = self[i]['out']
 
             # Copy all variable
             for field in fields:
@@ -550,4 +590,57 @@ class Correspondances(list):
             # Add increment for each index used
             self.i_current_by_tracks[i_id] += 1
             self.previous_obs = self.current_obs
+        return eddies
+
+    def get_unused_data(self):
+        """
+        Add in track object all the observations which aren't selected
+        Returns: Unused Eddies
+
+        """
+        self.reset_dataset_cache()
+        self.swap_dataset(self.datasets[0])
+
+        nb_dataset = len(self.datasets)
+        # Get the number of obs unused
+        nb_obs = 0
+        list_mask= list()
+        has_virtual = 'virtual' in self[0].dtype.names
+        for i, filename in enumerate(self.datasets):
+            last_dataset = i == (nb_dataset - 1)
+            first_dataset = i == 0
+            if has_virtual:
+                if not last_dataset:
+                    m_in = ~self[i]['virtual']
+                if not first_dataset:
+                    m_out = ~self[i - 1]['virtual']
+            else:
+                m_in, m_out = slice(None), slice(None)
+            if i == 0:
+                eddies_used = self[i]['in'][m_in]
+            elif last_dataset:
+                eddies_used = self[i - 1]['out'][m_out]
+            else:
+                eddies_used = unique(concatenate((self[i - 1]['out'][m_out], self[i]['in'][m_in])))
+            with Dataset(filename) as h:
+                nb_obs_day = len(h.dimensions['Nobs'])
+            m = ones(nb_obs_day, dtype='bool')
+            m[eddies_used] = False
+            list_mask.append(m)
+            nb_obs += m.sum()
+
+        eddies = EddiesObservations(
+            size=nb_obs,
+            track_extra_variables=self.current_obs.track_extra_variables,
+            track_array_variables=self.current_obs.track_array_variables,
+            array_variables=self.current_obs.array_variables)
+        j = 0
+        for i, dataset in enumerate(self.datasets):
+            current_obs = self.class_method.load_from_netcdf(dataset)
+            if i ==0:
+                eddies.sign_type = current_obs.sign_type
+            unused_obs = current_obs.observations[list_mask[i]]
+            nb = unused_obs.shape[0]
+            eddies.observations[j:j + nb] = unused_obs
+            j += nb
         return eddies
