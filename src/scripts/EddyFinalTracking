@@ -51,7 +51,8 @@ if __name__ == '__main__':
 
     logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
-    FINAL_EDDIES = CORRESPONDANCES.merge(size_min=CONFIG.nb_obs_min)
+    CORRESPONDANCES.longer_than(size_min=CONFIG.nb_obs_min)
+    FINAL_EDDIES = CORRESPONDANCES.merge()
 
     # We flag obs
     if CORRESPONDANCES.virtual:

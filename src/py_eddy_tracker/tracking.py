@@ -30,7 +30,7 @@ Version 3.0.0
 from matplotlib.dates import julian2num, num2date
 
 from py_eddy_tracker.observations import EddiesObservations, VirtualEddiesObservations, TrackEddiesObservations
-from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate
+from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate, ma
 from netCDF4 import Dataset
 import logging
 
@@ -377,6 +377,7 @@ class Correspondances(list):
                 zlib=True, complevel=1,
                 varname='nb_link', datatype='u2', dimensions='Nstep')
 
+            datas = dict()
             for name, dtype in self.correspondance_dtype:
                 if dtype is bool_:
                     dtype = 'u1'
@@ -390,12 +391,18 @@ class Correspondances(list):
                                     dimensions=('Nstep', 'Nlink'),
                                     **kwargs_cv
                                     )
+                datas[name] = ma.empty((nb_step, self.nb_link_max),dtype=dtype)
+                datas[name].mask = datas[name] == datas[name]
 
             for i, correspondance in enumerate(self):
+                logging.debug('correspondance %d', i)
                 nb_elt = correspondance.shape[0]
                 var_nb_link[i] = nb_elt
                 for name, _ in self.correspondance_dtype:
-                    h_nc.variables[name][i, :nb_elt] = correspondance[name]
+                    datas[name][i, :nb_elt] = correspondance[name]
+            for name, data in datas.items():
+                h_nc.variables[name][:] = data
+
             h_nc.virtual_use = str(self.virtual)
             h_nc.virtual_max_segment = self.nb_virtual
             h_nc.last_current_id = self.current_id
@@ -425,8 +432,10 @@ class Correspondances(list):
     def load(cls, filename):
         logging.info('Try load %s', filename)
         with Dataset(filename, 'r', format='NETCDF4') as h_nc:
-            datasets = list(h_nc.variables['FileIn'][:])
-            datasets.append(h_nc.variables['FileOut'][-1])
+            datas = {varname: data[:] for varname, data in h_nc.variables.items()}
+
+            datasets = list(datas['FileIn'])
+            datasets.append(datas['FileOut'][-1])
 
             if hasattr(h_nc, 'module'):
                 class_method= getattr(__import__(h_nc.module, globals(), locals(), h_nc.classname), h_nc.classname)
@@ -435,19 +444,19 @@ class Correspondances(list):
             obj = cls(datasets, h_nc.virtual_max_segment, class_method=class_method)
 
             id_max = 0
-            for i, nb_elt in enumerate(h_nc.variables['nb_link'][:]):
+            for i, nb_elt in enumerate(datas['nb_link'][:]):
                 logging.debug(
                     'Link between %s and %s',
-                    h_nc.variables['FileIn'][i],
-                    h_nc.variables['FileOut'][i])
-                correspondance = array(h_nc.variables['in'][i, :nb_elt],
+                    datas['FileIn'][i],
+                    datas['FileOut'][i])
+                correspondance = array(datas['in'][i, :nb_elt],
                                        dtype=obj.correspondance_dtype)
                 for name, _ in obj.correspondance_dtype:
                     if name == 'in':
                         continue
                     if name == 'virtual_length':
                         correspondance[name] = 255
-                    correspondance[name] = h_nc.variables[name][i, :nb_elt]
+                    correspondance[name] = datas[name][i, :nb_elt]
                 id_max = max(id_max, correspondance['id'].max())
                 obj.append(correspondance)
             obj.current_id = id_max + 1
@@ -551,7 +560,6 @@ class Correspondances(list):
             # We select the list of id which are involve in the correspondance
             i_id = self[i]['id']
             # Index where we will write in the final object
-            print(i_id.max())
             index_final = self.i_current_by_tracks[i_id]
 
             # First obs of eddies

@@ -367,7 +367,7 @@ class EddiesObservations(object):
                            ] = h_nc.variables[variable][:]
             eddies.sign_type = h_nc.variables['cyc'][0]
             if eddies.sign_type == 0:
-                logging.info('File come from another algorithm')
+                logging.debug('File come from another algorithm of identification')
                 eddies.sign_type = -1
         return eddies
 
