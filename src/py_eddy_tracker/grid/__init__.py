@@ -50,10 +50,10 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
 
     filenames = bytes_(glob(full_path))
     dataset_list = empty(len(filenames),
-                         dtype=[('filename', 'S256'),
+                         dtype=[('filename', 'S500'),
                                 ('date', 'datetime64[D]'),
                                 ])
-    dataset_list['filename'] = bytes_(glob(full_path))
+    dataset_list['filename'] = filenames
 
     logging.info('%s grids available', dataset_list.shape[0])
     mode_attrs = False

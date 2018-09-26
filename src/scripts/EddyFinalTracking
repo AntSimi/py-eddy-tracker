@@ -8,7 +8,6 @@ from py_eddy_tracker.tracking import Correspondances
 from os.path import exists
 from os import mkdir
 import logging
-from numpy import unique
 import datetime as dt
 
 
@@ -24,9 +23,6 @@ def usage():
     parser.add_argument('--path_out',
                         default='./',
                         help='Path, where to write file')
-    parser.add_argument('--filename_model',
-                        default='%(path)s/%(sign_type)s.nc',
-                        help='Model to create file')
     parser.add_argument('--nb_obs_min',
                         type=int,
                         default=28,
@@ -40,7 +36,8 @@ if __name__ == '__main__':
     # Create output directory
     if not exists(CONFIG.path_out):
         mkdir(CONFIG.path_out)
-
+    SAVE_DIR = CONFIG.path_out
+    NB_OBS_MIN = CONFIG.nb_obs_min
     START_TIME = dt.datetime.now()
 
     CORRESPONDANCES = Correspondances.load(CONFIG.nc_file)
@@ -51,18 +48,30 @@ if __name__ == '__main__':
 
     logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
-    CORRESPONDANCES.longer_than(size_min=CONFIG.nb_obs_min)
+
+    CORRESPONDANCES.get_unused_data().write_netcdf(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc')
+
+    SHORT_CORRESPONDANCES = CORRESPONDANCES._copy()
+    SHORT_CORRESPONDANCES.shorter_than(size_max=NB_OBS_MIN)
+
+    CORRESPONDANCES.longer_than(size_min=NB_OBS_MIN)
+
     FINAL_EDDIES = CORRESPONDANCES.merge()
+    SHORT_TRACK = SHORT_CORRESPONDANCES.merge()
 
     # We flag obs
     if CORRESPONDANCES.virtual:
         FINAL_EDDIES['virtual'][:] = FINAL_EDDIES['time'] == 0
         FINAL_EDDIES.filled_by_interpolation(FINAL_EDDIES['virtual'] == 1)
+        SHORT_TRACK['virtual'][:] = SHORT_TRACK['time'] == 0
+        SHORT_TRACK.filled_by_interpolation(SHORT_TRACK['virtual'] == 1)
 
+    # Total running time
     FULL_TIME = dt.datetime.now() - START_TIME
     logging.info('Duration : %s', FULL_TIME)
 
-    logging.info('%d tracks will be saved', len(unique(FINAL_EDDIES['track'])))
+    logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
-    FINAL_EDDIES.write_netcdf(path=CONFIG.path_out, filename=CONFIG.filename_model)
+    FINAL_EDDIES.write_netcdf(path=SAVE_DIR)
+    SHORT_TRACK.write_netcdf(filename='%(path)s/%(sign_type)s_track_too_short.nc', path=SAVE_DIR)

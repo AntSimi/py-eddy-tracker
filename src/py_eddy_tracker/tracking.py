@@ -260,12 +260,6 @@ class Correspondances(list):
 
         # Save previous state to count virtual obs
         self.previous_virtual_obs = self.virtual_obs
-        # Creation of an virtual step for dead one
-        self.virtual_obs = VirtualEddiesObservations(
-            size=nb_dead + nb_virtual_extend,
-            track_extra_variables=self.previous_obs.track_extra_variables,
-            track_array_variables=self.previous_obs.track_array_variables,
-            array_variables=self.previous_obs.array_variables)
 
         # Find mask/index on previous correspondance to extrapolate
         # position
@@ -275,33 +269,13 @@ class Correspondances(list):
         # Selection of observations on N-2 and N-1
         obs_a = self.previous2_obs.obs[self[-2][i_dead_id]['in']]
         obs_b = self.previous_obs.obs[self[-2][i_dead_id]['out']]
-        # Position N-2 : A
-        # Position N-1 : B
-        # Virtual Position : C
-        # New position C = B + AB
-        for key in self.previous_obs.elements:
-            if key in ['lon', 'lat', 'time'] or 'contour_' in key:
-                continue
-            self.virtual_obs[key][:nb_dead] = obs_b[key]
-        self.virtual_obs['dlon'][:nb_dead] = obs_b['lon'] - obs_a['lon']
-        self.virtual_obs['dlat'][:nb_dead] = obs_b['lat'] - obs_a['lat']
-        self.virtual_obs['lon'][:nb_dead] = obs_b['lon'] + self.virtual_obs['dlon'][:nb_dead]
-        self.virtual_obs['lat'][:nb_dead] = obs_b['lat'] + self.virtual_obs['dlat'][:nb_dead]
-        # Id which are extended
-        self.virtual_obs['track'][:nb_dead] = dead_id
-        # Add previous virtual
-        if nb_virtual_extend > 0:
-            obs_to_extend = self.previous_virtual_obs.obs[i_virtual_dead_id][alive_virtual_obs]
-            for key in self.virtual_obs.elements:
-                if key in ['lon', 'lat', 'time', 'track', 'segment_size'] or 'contour_' in key:
-                    continue
-                self.virtual_obs[key][nb_dead:] = obs_to_extend[key]
-            self.virtual_obs['lon'][nb_dead:] = obs_to_extend['lon'] + obs_to_extend['dlon']
-            self.virtual_obs['lat'][nb_dead:] = obs_to_extend['lat'] + obs_to_extend['dlat']
-            self.virtual_obs['track'][nb_dead:] = obs_to_extend['track']
-            self.virtual_obs['segment_size'][nb_dead:] = obs_to_extend['segment_size']
-        # Count
-        self.virtual_obs['segment_size'][:] += 1
+
+        self.virtual_obs = self.previous_obs.propagate(
+            obs_a, obs_b,
+            self.previous_virtual_obs.obs[i_virtual_dead_id][alive_virtual_obs] if nb_virtual_extend > 0 else None,
+            dead_track=dead_id,
+            nb_next=nb_dead + nb_virtual_extend,
+            model=self.previous_obs)
 
     def load_state(self):
         # If we have a previous file of correspondance, we will replay only recent part
@@ -616,20 +590,18 @@ class Correspondances(list):
         has_virtual = 'virtual' in self[0].dtype.names
         for i, filename in enumerate(self.datasets):
             last_dataset = i == (nb_dataset - 1)
-            first_dataset = i == 0
-            if has_virtual:
-                if not last_dataset:
-                    m_in = ~self[i]['virtual']
-                if not first_dataset:
-                    m_out = ~self[i - 1]['virtual']
+            if has_virtual and not last_dataset:
+                m_in = ~self[i]['virtual']
             else:
-                m_in, m_out = slice(None), slice(None)
+                m_in = slice(None)
             if i == 0:
-                eddies_used = self[i]['in'][m_in]
+                eddies_used = self[i]['in']
             elif last_dataset:
-                eddies_used = self[i - 1]['out'][m_out]
+                eddies_used = self[i - 1]['out']
             else:
-                eddies_used = unique(concatenate((self[i - 1]['out'][m_out], self[i]['in'][m_in])))
+                eddies_used = unique(concatenate((self[i - 1]['out'], self[i]['in'][m_in])))
+            if not isinstance(filename, str):
+                filename = filename.astype(str)
             with Dataset(filename) as h:
                 nb_obs_day = len(h.dimensions['Nobs'])
             m = ones(nb_obs_day, dtype='bool')
@@ -645,7 +617,7 @@ class Correspondances(list):
         j = 0
         for i, dataset in enumerate(self.datasets):
             current_obs = self.class_method.load_from_netcdf(dataset)
-            if i ==0:
+            if i == 0:
                 eddies.sign_type = current_obs.sign_type
             unused_obs = current_obs.observations[list_mask[i]]
             nb = unused_obs.shape[0]

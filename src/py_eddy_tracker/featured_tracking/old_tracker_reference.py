@@ -18,19 +18,20 @@ class CheltonTracker(Model):
         """We mask link with ellips and ratio
         """
         # Compute Parameter of ellips
+        minor, major = 1.05, 1.5
         y = self.basic_formula_ellips_major_axis(
             self.obs['lat'],
             degrees=True,
-            c0=1.05,
-            cmin=1.05,
-            cmax=1.5,
+            c0=minor,
+            cmin=minor,
+            cmax=major,
             lat1=23,
             lat2=5,
         )
         # mask from ellips
         mask = self.shifted_ellipsoid_degrees_mask(
             other,
-            minor=1.5,
+            minor=minor, # Minor can be bigger than major??
             major=y)
 
         # We check ratio

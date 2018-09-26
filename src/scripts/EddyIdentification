@@ -22,7 +22,6 @@ Email: emason@imedea.uib-csic.es
 """
 
 import logging
-from glob import glob
 from yaml import load as yaml_load
 from datetime import datetime
 import datetime as dt
@@ -31,7 +30,7 @@ from matplotlib.dates import date2num, num2julian
 from matplotlib.figure import Figure
 from os.path import exists
 from os import mkdir
-from numpy import array, arange, atleast_1d, unique, round, int, interp, pi, \
+from numpy import arange, atleast_1d, round, int, interp, pi, \
     float_, errstate, ma
 
 from py_eddy_tracker import EddyParser

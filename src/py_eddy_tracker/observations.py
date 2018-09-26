@@ -27,9 +27,9 @@ Version 3.0.0
 ===========================================================================
 
 """
-from numpy import zeros, empty, nan, arange, interp, where, unique, \
+from numpy import zeros, empty, nan, arange, where, unique, \
     ma, concatenate, cos, radians, isnan, ones, ndarray, meshgrid, \
-    bincount, bool_, array, interp, int_, int32, round, maximum, floor
+    array, interp, int_, int32, round, maximum, floor
 from scipy.interpolate  import interp1d
 from netCDF4 import Dataset
 from py_eddy_tracker.tools import distance_matrix, distance_vector
@@ -38,7 +38,6 @@ from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
 import logging
 from datetime import datetime
-from scipy.interpolate  import RectBivariateSpline
 
 
 class GridDataset(object):
@@ -186,6 +185,10 @@ class EddiesObservations(object):
         self.sign_type = None
 
     @property
+    def sign_legend(self):
+        return 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
+
+    @property
     def shape(self):
         return self.observations.shape
 
@@ -222,7 +225,7 @@ class EddiesObservations(object):
 
         if len(self.track_extra_variables):
             elements += self.track_extra_variables
-        return elements
+        return list(set(elements))
 
     def coherence(self, other):
         """Check coherence between two dataset
@@ -341,6 +344,8 @@ class EddiesObservations(object):
     @classmethod
     def load_from_netcdf(cls, filename):
         array_dim = 'NbSample'
+        if not isinstance(filename, str):
+            filename = filename.astype(str)
         with Dataset(filename) as h_nc:
             nb_obs = len(h_nc.dimensions['Nobs'])
             kwargs = dict()
@@ -385,6 +390,53 @@ class EddiesObservations(object):
         for variable in handler.variables:
             eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
         return eddies
+
+    @staticmethod
+    def propagate(previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model):
+        """
+        Filled virtual obs (C)
+        Args:
+            previous_obs: previous obs from current (A)
+            current_obs: previous obs from virtual (B)
+            obs_to_extend:
+            dead_track:
+            nb_next:
+            model: 
+
+        Returns:
+            New position C = B + AB
+        """
+        next_obs = VirtualEddiesObservations(
+            size=nb_next,
+            track_extra_variables=model.track_extra_variables,
+            track_array_variables=model.track_array_variables,
+            array_variables=model.array_variables)
+        nb_dead = len(previous_obs)
+        nb_virtual_extend = nb_next - nb_dead
+
+        for key in model.elements:
+            if key in ['lon', 'lat', 'time'] or 'contour_' in key:
+                continue
+            next_obs[key][:nb_dead] = current_obs[key]
+        next_obs['dlon'][:nb_dead] = current_obs['lon'] - previous_obs['lon']
+        next_obs['dlat'][:nb_dead] = current_obs['lat'] - previous_obs['lat']
+        next_obs['lon'][:nb_dead] = current_obs['lon'] + next_obs['dlon'][:nb_dead]
+        next_obs['lat'][:nb_dead] = current_obs['lat'] + next_obs['dlat'][:nb_dead]
+        # Id which are extended
+        next_obs['track'][:nb_dead] = dead_track
+        # Add previous virtual
+        if nb_virtual_extend > 0:
+            for key in next_obs.elements:
+                if key in ['lon', 'lat', 'time', 'track', 'segment_size'] or 'contour_' in key:
+                    continue
+                next_obs[key][nb_dead:] = obs_to_extend[key]
+            next_obs['lon'][nb_dead:] = obs_to_extend['lon'] + obs_to_extend['dlon']
+            next_obs['lat'][nb_dead:] = obs_to_extend['lat'] + obs_to_extend['dlat']
+            next_obs['track'][nb_dead:] = obs_to_extend['track']
+            next_obs['segment_size'][nb_dead:] = obs_to_extend['segment_size']
+        # Count
+        next_obs['segment_size'][:] += 1
+        return next_obs
 
     @staticmethod
     def cost_function2(records_in, records_out, distance):
@@ -715,8 +767,7 @@ class EddiesObservations(object):
         """Write a netcdf with eddy obs
         """
         eddy_size = len(self.observations)
-        sign_type = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        filename = filename % dict(path=path, sign_type=sign_type, prod_time=datetime.now().strftime('%Y%m%d'))
+        filename = filename % dict(path=path, sign_type=self.sign_legend, prod_time=datetime.now().strftime('%Y%m%d'))
         logging.info('Store in %s', filename)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create file %s', filename)
@@ -763,7 +814,7 @@ class VirtualEddiesObservations(EddiesObservations):
     def elements(self):
         elements = super(VirtualEddiesObservations, self).elements
         elements.extend(['track', 'segment_size', 'dlon', 'dlat'])
-        return elements
+        return list(set(elements))
 
 
 class TrackEddiesObservations(EddiesObservations):
@@ -783,8 +834,16 @@ class TrackEddiesObservations(EddiesObservations):
             var = field[0]
             if var in ['n', 'virtual', 'track'] or var in self.array_variables:
                 continue
-            self.obs[var][mask] = interp(index[mask], index[~mask],
-                                         self.obs[var][~mask])
+            # to normalize longitude before interpolation
+            if var== 'lon':
+                lon = self.obs[var]
+                first = where(self.obs['n'] == 0)[0]
+                nb_obs = empty(first.shape, dtype='u4')
+                nb_obs[:-1] = first[1:] - first[:-1]
+                nb_obs[-1] = lon.shape[0] - first[-1]
+                lon0 = (lon[first] - 180).repeat(nb_obs)
+                self.obs[var] = (lon - lon0) % 360 + lon0
+            self.obs[var][mask] = interp(index[mask], index[~mask], self.obs[var][~mask])
 
     def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
         """Select eddies which are longer than nb_min

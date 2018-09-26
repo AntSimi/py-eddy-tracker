@@ -7,11 +7,11 @@ from py_eddy_tracker import EddyParser
 from glob import glob
 from yaml import load as yaml_load
 from py_eddy_tracker.tracking import Correspondances
-from os.path import exists
+from os.path import exists, dirname, basename
 from os import mkdir
 import logging
-from numpy import unique
 import datetime as dt
+from py_eddy_tracker.grid import browse_dataset_in
 
 
 def usage():
@@ -70,34 +70,34 @@ if __name__ == '__main__':
 
     NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG.get('VIRTUAL_LENGTH_MAX', 0))
 
-    PATTERN = CONFIG['PATHS']['FILES_PATTERN']
-    FILENAMES = list()
-    if isinstance(PATTERN, list):
-        for pattern in PATTERN:
-            FILENAMES += glob(pattern)
-    else:
-        FILENAMES += glob(PATTERN)
-    FILENAMES.sort()
+    DATASET_LIST = browse_dataset_in(
+        data_dir=dirname(CONFIG['PATHS']['FILES_PATTERN']),
+        files_model=basename(CONFIG['PATHS']['FILES_PATTERN']),
+        date_regexp='.*c_([0-9]*?).nc',
+        date_model='%Y%m%d',
+    )
 
     if BLANK_PERIOD > 0:
-        FILENAMES = FILENAMES[:-BLANK_PERIOD]
+        DATASET_LIST = DATASET_LIST[:-BLANK_PERIOD]
         logging.info('Last %d files will be pop', BLANK_PERIOD)
 
     START_TIME = dt.datetime.now()
-    logging.info('Start tracking on %d files', len(FILENAMES))
+    logging.info('Start tracking on %d files', len(DATASET_LIST))
 
     CORRESPONDANCES = Correspondances(
-        datasets=FILENAMES,
+        datasets=DATASET_LIST['filename'],
         virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT,
         class_method=CLASS,
         previous_correspondance=CORRESPONDANCES_IN)
 
-    DATE_START, DATE_STOP = CORRESPONDANCES.period
-    DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME, path=SAVE_DIR, sign_type='c')
-
     CORRESPONDANCES.track()
     logging.info('Track finish')
     logging.info('Start merging')
+
+    DATE_START, DATE_STOP = CORRESPONDANCES.period
+    DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME,
+                           path=SAVE_DIR, sign_type=CORRESPONDANCES.current_obs.sign_legend)
+
 
     CORRESPONDANCES.save(CORRESPONDANCES_OUT, DICT_COMPLETION)
     if SAVE_STOP:
@@ -128,11 +128,10 @@ if __name__ == '__main__':
         SHORT_TRACK.filled_by_interpolation(SHORT_TRACK['virtual'] == 1)
 
 
-
     # Total running time
     FULL_TIME = dt.datetime.now() - START_TIME
     logging.info('Mean duration by loop : %s',
-                 FULL_TIME / (len(FILENAMES) - 1))
+                 FULL_TIME / (len(DATASET_LIST) - 1))
     logging.info('Duration : %s', FULL_TIME)
 
     logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
