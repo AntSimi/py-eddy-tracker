@@ -4,7 +4,9 @@
 import logging
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
-    linspace, errstate, int_, column_stack, interp, meshgrid, unique, nan
+    linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64
+from scipy.special import j1
+from scipy.signal import convolve2d
 from netCDF4 import Dataset
 from scipy.ndimage import gaussian_filter, convolve
 from scipy.interpolate import RectBivariateSpline
@@ -12,13 +14,16 @@ from scipy.spatial import cKDTree
 from matplotlib.path import Path as BasePath
 from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
-from ..tools import fit_circle_c, distance_vector
+from ..tools import fit_circle_c, distance_vector, winding_number_poly, poly_contain_poly, \
+    distance, distance_point_vector
 from ..observations import EddiesObservations
-from ..eddy_feature import Amplitude, get_uavg, Contours
+from ..eddy_feature import Amplitude, Contours
 
 
 def raw_resample(datas, fixed_size):
     nb_value = datas.shape[0]
+    if nb_value == 1:
+        raise Exception()
     return interp(arange(fixed_size), arange(nb_value) * (fixed_size - 1) / (nb_value - 1) , datas)
 
 
@@ -26,15 +31,8 @@ def contour_iter(self, anticyclonic_search):
     for coll in self.collections[::1 if anticyclonic_search else -1]:
         yield coll
 
+
 BaseQuadContourSet.iter_ = contour_iter
-
-@property
-def isvalid(self):
-    return False not in (self.vertices[0] == self.vertices[-1]
-                         ) and len(self.vertices) > 2
-
-
-BasePath.isvalid = isvalid
 
 
 @property
@@ -117,7 +115,9 @@ def _fit_circle_path(self):
         self._circle_params = centlon_e, centlat_e, eddy_radius_e, aerr
     except ZeroDivisionError:
         # Some time, edge is only a dot of few coordinates
-        if len(unique(self.lon)) == 1 and len(unique(self.lat)) == 1:
+        d_lon = self.lon.max() - self.lon.min()
+        d_lat = self.lat.max() - self.lat.min()
+        if d_lon < 1e-7 and d_lat < 1e-7:
             logging.warning('An edge is only define in one position')
             logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
                           self.lat)
@@ -351,11 +351,11 @@ class GridDataset(object):
         """
         return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
 
-    def eddy_identification(self, grid_height, uname, vname,
-                            step=0.005, shape_error=55, array_sampling=50, pixel_limit=None):
+    def eddy_identification(self, grid_height, uname, vname, step=0.005, shape_error=55,
+                            array_sampling=50, pixel_limit=None, bbox_surface_min_degree=.125**2):
         # The inf limit must be in pixel and  sup limit in surface
         if pixel_limit is None:
-            pixel_limit = (8, 1000)
+            pixel_limit = (4, 1000)
 
         # Compute an interpolator for eke
         self.init_speed_coef(uname, vname)
@@ -371,7 +371,7 @@ class GridDataset(object):
         x, y = self.vars[self.coordinates[0]], self.vars[self.coordinates[1]]
 
         # Compute ssh contour
-        contours = Contours(x, y, data, levels)
+        contours = Contours(x, y, data, levels, bbox_surface_min_degree=bbox_surface_min_degree)
 
         # Compute cyclonic and anticylonic research:
         a_and_c = list()
@@ -397,10 +397,6 @@ class GridDataset(object):
                 for current_contour in contour_paths:
                     if current_contour.used:
                         continue
-                    # Filter for closed contours
-                    if not current_contour.isvalid:
-                        continue
-
                     centlon_e, centlat_e, eddy_radius_e, aerr = current_contour.fit_circle()
                     # Filter for shape
                     if aerr < 0 or aerr > shape_error:
@@ -446,7 +442,7 @@ class GridDataset(object):
 
                     # centlat_e and centlon_e must be index of maximum, we will loose some inner contour, if it's not
                     max_average_speed, speed_contour, inner_contour, speed_array, i_max_speed, i_inner = \
-                        get_uavg(self, contours, centlon_e, centlat_e, current_contour, anticyclonic_search, corrected_coll_index)
+                        self.get_uavg(contours, centlon_e, centlat_e, current_contour, anticyclonic_search, corrected_coll_index)
 
                     # Use azimuth equal projection for radius
                     proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0={1} +lon_0={0}'.format(*inner_contour.mean_coordinates))
@@ -474,17 +470,10 @@ class GridDataset(object):
                     properties.obs['height_inner_contour'] = contours.cvalues[i_inner]
                     array_size = speed_array.shape[0]
                     properties.obs['nb_contour_selected'] = array_size
-                    properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling)
-                    # from matplotlib import pyplot as plt
-                    # if array_size > 10:
-                    #     plt.figure()
-                    #     plt.plot(linspace(properties.obs['height_external_contour'],properties.obs['height_inner_contour'], speed_array.shape[0]), speed_array, 'b')
-                    #     plt.axvline(properties.obs['height_inner_contour'], color='g')
-                    #     plt.axvline(properties.obs['height_max_speed_contour'], color='r')
-                    #     plt.axvline(properties.obs['height_external_contour'], color='k')
-                    #     plt.title('%d' % array_size)
-                    #     plt.ylim(0,None)
-                    #     plt.show()
+                    if speed_array.shape[0] == 1:
+                        properties.obs['uavg_profile'][:] = speed_array[0]
+                    else:
+                        properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling)
                     properties.obs['amplitude'] = amp.amplitude
                     properties.obs['radius_s'] = eddy_radius_s / 1000
                     properties.obs['speed_radius'] = max_average_speed
@@ -505,6 +494,56 @@ class GridDataset(object):
                     data.mask[i_x_in, i_y_in] = True
             a_and_c.append(EddiesObservations.concatenate(eddies))
         return a_and_c
+
+    def get_uavg(self, all_contours, centlon_e, centlat_e, original_contour, anticyclonic_search, level_start,
+                 pixel_min=3):
+        """
+        Calculate geostrophic speed around successive contours
+        Returns the average
+        """
+        max_average_speed = self.speed_coef(original_contour).mean()
+        speed_array = [max_average_speed]
+        pixel_min = 1
+
+        eddy_contours = [original_contour]
+        inner_contour = selected_contour = original_contour
+        # Must start only on upper or lower contour, no need to test the two part
+        step = 1 if anticyclonic_search else -1
+        i_inner = i_max_speed = -1
+
+        for i, coll in enumerate(all_contours.iter(start=level_start + step, step=step)):
+            level_contour = coll.get_nearest_path_bbox_contain_pt(centlon_e, centlat_e)
+            # Leave loop if no contours at level
+            if level_contour is None:
+                break
+            # 1. Ensure polygon_i contains point centlon_e, centlat_e (Maybe we loose some inner contour if eddy
+            #        core are not centered)
+            # if winding_number_poly(centlon_e, centlat_e, level_contour.vertices) == 0:
+            #     break
+            # 2. Ensure polygon_i is within polygon_e
+            if not poly_contain_poly(original_contour.vertices, level_contour.vertices):
+                break
+            # 3. Respect size range
+            # nb_pixel properties need call of pixels_in before with a grid of pixel
+            level_contour.pixels_in(self)
+            if pixel_min > level_contour.nb_pixel:
+                break
+
+            # Interpolate uspd to seglon, seglat, then get mean
+            level_average_speed = self.speed_coef(level_contour).mean()
+            speed_array.append(level_average_speed)
+            if level_average_speed >= max_average_speed:
+                max_average_speed = level_average_speed
+                i_max_speed = i
+                selected_contour = level_contour
+            inner_contour = level_contour
+            eddy_contours.append(level_contour)
+            i_inner = i
+        for contour in eddy_contours:
+            contour.used = True
+        i_max_speed = level_start + step + step * i_max_speed
+        i_inner = level_start + step + step * i_inner
+        return max_average_speed, selected_contour, inner_contour, array(speed_array), i_max_speed, i_inner
 
     @staticmethod
     def _gaussian_filter(data, sigma, mode='reflect'):
@@ -770,6 +809,115 @@ class RegularGridDataset(GridDataset):
         """
         return abs((self.x_bounds[0] % 360) - (self.x_bounds[-1] % 360)) < 0.0001
 
+    def kernel_lanczos(self, lat, wave_length, order=1):
+        # Not really operational
+        # wave_length in km
+        # order must be int
+        if order < 1:
+            logging.warning('order must be superior to 0')
+        order= ceil(order).astype(int)
+        # Estimate size of kernel
+        step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
+        step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
+        # half size will be multiply with by order
+        half_x_pt, half_y_pt = ceil(wave_length / step_x_km).astype(int), ceil(wave_length / step_y_km).astype(int)
+
+        y = arange(
+            lat - self.ystep * half_y_pt * order,
+            lat + self.ystep * half_y_pt * order + 0.01 * self.ystep,
+            self.ystep)
+        x = arange(
+            -self.xstep * half_x_pt * order,
+            self.xstep * half_x_pt * order + 0.01 * self.xstep,
+            self.xstep)
+
+        y, x = meshgrid(y, x)
+        out_shape = x.shape
+        dist = empty(out_shape, dtype=float64).flatten()
+        distance_point_vector(0, lat, x.astype(float64).flatten(), y.astype(float64).flatten(), dist)
+        dist_norm = dist.reshape(out_shape) / 1000. / wave_length
+
+        # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
+        kernel = sinc(dist_norm/order) * sinc(dist_norm)
+        kernel[dist_norm > order] = 0
+        return kernel
+
+    def kernel_bessel(self, lat, wave_length, order=1):
+        # wave_length in km
+        # order must be int
+        if order < 1:
+            logging.warning('order must be superior to 0')
+        order= ceil(order).astype(int)
+        # Estimate size of kernel
+        step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
+        step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
+        # half size will be multiply with by order
+        half_x_pt, half_y_pt = ceil(wave_length / step_x_km).astype(int), ceil(wave_length / step_y_km).astype(int)
+
+        y = arange(
+            lat - self.ystep * half_y_pt * order,
+            lat + self.ystep * half_y_pt * order + 0.01 * self.ystep,
+            self.ystep)
+        x = arange(
+            -self.xstep * half_x_pt * order,
+            self.xstep * half_x_pt * order + 0.01 * self.xstep,
+            self.xstep)
+
+        y, x = meshgrid(y, x)
+        out_shape = x.shape
+        dist = empty(out_shape, dtype=float64).flatten()
+        distance_point_vector(0, lat, x.astype(float64).flatten(), y.astype(float64).flatten(), dist)
+        dist_norm = dist.reshape(out_shape) / 1000. / wave_length
+
+        # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
+        with errstate(invalid='ignore'):
+            kernel = sinc(dist_norm/order) * j1(2 * pi * dist_norm) / dist_norm
+        kernel[half_x_pt * order,half_y_pt * order] = pi
+        kernel[dist_norm > order] = 0
+        return kernel
+
+    def convolve_filter_with_dynamic_kernel(self, grid_name, kernel_func, lat_max, **kwargs_func):
+        logging.warning('No filtering above %f degrees of latitude', lat_max)
+        data = self.grid(grid_name).copy()
+        # Matrix for result
+        data_out = ma.zeros(data.shape)
+        data_out.mask = ones(data_out.shape, dtype=bool)
+        for i, lat in enumerate(self.y_c):
+            if abs(lat) > lat_max:
+                data_out.mask[:, i] = True
+                continue
+            # Get kernel
+            kernel = kernel_func(lat, **kwargs_func)
+            # Kernel shape
+            k_shape = kernel.shape
+            # Half size, k_shape must be always impair
+            d_lat = int((k_shape[1] - 1) / 2)
+            d_lon = int((k_shape[0] - 1) / 2)
+            # Temporary matrix to have exact shape at outuput
+            tmp_matrix = ma.zeros((2 * d_lon + data.shape[0], k_shape[1]))
+            tmp_matrix.mask = ones(tmp_matrix.shape, dtype=bool)
+            # Slice to apply on input data
+            sl_lat_data = slice(max(0, i - d_lat), min(i + d_lat, data.shape[1]))
+            # slice to apply on temporary matrix to store input data
+            sl_lat_in = slice(d_lat - (i - sl_lat_data.start), d_lat + (sl_lat_data.stop - i))
+            # If global => manual wrapping
+            if self.is_circular():
+                tmp_matrix[:d_lon, sl_lat_in] = data[-d_lon:, sl_lat_data]
+                tmp_matrix[-d_lon:, sl_lat_in] = data[:d_lon, sl_lat_data]
+            # Copy data
+            tmp_matrix[d_lon:-d_lon, sl_lat_in] = data[:, sl_lat_data]
+            # Convolution
+            m = ~tmp_matrix.mask
+            tmp_matrix[~m] = 0
+            values_sum = convolve2d(tmp_matrix, kernel, mode='valid')[:,0]
+
+            kernel_sum = convolve2d((m).astype(float), kernel, mode='valid')[:,0]
+            with errstate(invalid='ignore'):
+                data_out[:, i] = values_sum / kernel_sum
+        data_out = ma.array(data_out, mask=data.mask + data_out.mask)
+
+        return data_out
+
     def _low_filter(self, grid_name, x_cut, y_cut):
         """low filtering
         """
@@ -784,6 +932,26 @@ class RegularGridDataset(GridDataset):
             data,
             (i_x, i_y),
             mode='wrap' if self.is_circular() else 'reflect')
+
+    def lanczos_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
+        data_out = self.convolve_filter_with_dynamic_kernel(
+            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order)
+        self.vars[grid_name] -= data_out
+
+    def lanczos_low_filter(self, grid_name, wave_length, order=1, lat_max=85):
+        data_out = self.convolve_filter_with_dynamic_kernel(
+            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order)
+        self.vars[grid_name] = data_out
+
+    def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
+        data_out = self.convolve_filter_with_dynamic_kernel(
+            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
+        self.vars[grid_name] -= data_out
+
+    def bessel_low_filter(self, grid_name, wave_length, order=1, lat_max=85):
+        data_out = self.convolve_filter_with_dynamic_kernel(
+            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
+        self.vars[grid_name] = data_out
 
     def add_uv(self, grid_height):
         """Compute a u and v grid

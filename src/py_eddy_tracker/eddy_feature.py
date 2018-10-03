@@ -31,8 +31,7 @@ from numpy import ones, where, empty, array
 from scipy.ndimage import minimum_filter
 from scipy.ndimage import binary_erosion
 from matplotlib.figure import Figure
-from .tools import winding_number_poly, poly_contain_poly, index_from_nearest_path, \
-    index_from_nearest_path_with_pt_in_bbox
+from .tools import index_from_nearest_path, index_from_nearest_path_with_pt_in_bbox
 
 
 class Amplitude(object):
@@ -219,7 +218,7 @@ class Contours(object):
         'nb_contour_per_level',
     )
 
-    def __init__(self, x, y, z, levels):
+    def __init__(self, x, y, z, levels, bbox_surface_min_degree):
         """
         c_i : index to contours
         l_i : index to levels
@@ -236,15 +235,45 @@ class Contours(object):
         nb_level = 0
         nb_contour = 0
         nb_pt = 0
+        almost_closed_contours = 0
+        closed_contours = 0
         # Count level and contour
         for i, collection in enumerate(self.contours.collections):
             collection.get_nearest_path_bbox_contain_pt = \
                 lambda x, y, i=i: self.get_index_nearest_path_bbox_contain_pt(i, x, y)
             nb_level += 1
+
+            keep_path = list()
+
+            for contour in collection.get_paths():
+                # Contour with less vertices than 4 are popped
+                if contour.vertices.shape[0] < 4:
+                    continue
+                # Check if side of bbox is greater than ... => Avoid tiny shape
+                x_min, y_min = contour.vertices.min(axis=0)
+                x_max, y_max = contour.vertices.max(axis=0)
+                d_x, d_y = x_max - x_min, y_max - y_min
+                square_root = bbox_surface_min_degree ** .5
+                if d_x <= square_root or d_y <= square_root:
+                    continue
+                # Remove unclosed path
+                d_closed = ((contour.vertices[0, 0] - contour.vertices[-1, 0]) **2 + (contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2) ** .5
+                if d_closed > (1e-2):
+                    continue
+                elif d_closed != 0:
+                    # Repair almost closed contour
+                    if d_closed > (1e-10):
+                        almost_closed_contours += 1
+                    else:
+                        closed_contours += 1
+                    contour.vertices[-1] = contour.vertices[0]
+                keep_path.append(contour)
+            collection._paths = keep_path
             for contour in collection.get_paths():
                 contour.used = False
                 nb_contour += 1
                 nb_pt += contour.vertices.shape[0]
+        logging.info('Repair %d closed contours and %d almost closed contours / %d contours', closed_contours, almost_closed_contours, nb_contour)
         # Type for coordinates
         coord_dtype = contour.vertices.dtype
 
@@ -275,10 +304,8 @@ class Contours(object):
                 self.y_value[i_pt:i_pt + nb_pt] = contour.vertices[:, 1]
 
                 # Set bbox
-                self.x_min_per_contour[i_c], self.y_min_per_contour[i_c] = \
-                    contour.vertices.min(axis=0)
-                self.x_max_per_contour[i_c], self.y_max_per_contour[i_c] = \
-                    contour.vertices.max(axis=0)
+                self.x_min_per_contour[i_c], self.y_min_per_contour[i_c] = contour.vertices.min(axis=0)
+                self.x_max_per_contour[i_c], self.y_max_per_contour[i_c] = contour.vertices.max(axis=0)
 
                 # Count pt
                 self.nb_pt_per_contour[i_c] = nb_pt
@@ -330,49 +357,3 @@ class Contours(object):
             return self.contours.collections[level]._paths[index]
 
 
-def get_uavg(grid, all_contours, centlon_e, centlat_e, original_contour, anticyclonic_search, level_start):
-    """
-    Calculate geostrophic speed around successive contours
-    Returns the average
-    """
-    max_average_speed = grid.speed_coef(original_contour).mean()
-    speed_array = [max_average_speed]
-    pixel_min = 1
-
-    eddy_contours = [original_contour]
-    inner_contour = selected_contour = original_contour
-    # Must start only on upper or lower contour, no need to test the two part
-    step = 1 if anticyclonic_search else -1
-    i_inner = i_max_speed = -1
-
-    for i, coll in enumerate(all_contours.iter(start=level_start + step, step=step)):
-        level_contour = coll.get_nearest_path_bbox_contain_pt(centlon_e, centlat_e)
-        # Leave loop if no contours at level
-        if level_contour is None:
-            break
-        # 1. Ensure polygon_i contains point centlon_e, centlat_e (Maybe we loose some inner contour if eddy
-        #        core are not centered)
-        # if winding_number_poly(centlon_e, centlat_e, level_contour.vertices) == 0:
-        #     break
-        # 2. Ensure polygon_i is within polygon_e
-        if not poly_contain_poly(original_contour.vertices, level_contour.vertices):
-            break
-        # 3. Respect size range
-        # if not (pixel_min <= level_contour.nb_pixel<= eddy.pixel_threshold[1]):
-        #     break
-
-        # Interpolate uspd to seglon, seglat, then get mean
-        level_average_speed = grid.speed_coef(level_contour).mean()
-        speed_array.append(level_average_speed)
-        if level_average_speed >= max_average_speed:
-            max_average_speed = level_average_speed
-            i_max_speed = i
-            selected_contour = level_contour
-        inner_contour = level_contour
-        eddy_contours.append(level_contour)
-        i_inner = i
-    for contour in eddy_contours:
-        contour.used = True
-    i_max_speed = level_start + step + step * i_max_speed
-    i_inner = level_start + step + step * i_inner
-    return max_average_speed, selected_contour, inner_contour, array(speed_array), i_max_speed, i_inner
