@@ -4,20 +4,23 @@
 import logging
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
-    linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64
+    linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64, isnan
+from datetime import datetime
 from scipy.special import j1
-from scipy.signal import convolve2d
 from netCDF4 import Dataset
 from scipy.ndimage import gaussian_filter, convolve
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.spatial import cKDTree
+from scipy.signal import welch, convolve2d
 from matplotlib.path import Path as BasePath
 from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
+from pint import UnitRegistry
 from ..tools import fit_circle_c, distance_vector, winding_number_poly, poly_contain_poly, \
     distance, distance_point_vector
 from ..observations import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
+from .. import VAR_DESCR
 
 
 def raw_resample(datas, fixed_size):
@@ -314,6 +317,12 @@ class GridDataset(object):
         """
         return False
 
+    def units(self, varname):
+        with Dataset(self.filename) as h:
+            var = h.variables[varname]
+            if hasattr(var, 'units'):
+                return var.units
+
     def grid(self, varname):
         """give grid required
         """
@@ -351,8 +360,10 @@ class GridDataset(object):
         """
         return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
 
-    def eddy_identification(self, grid_height, uname, vname, step=0.005, shape_error=55,
+    def eddy_identification(self, grid_height, uname, vname, date, step=0.005, shape_error=55,
                             array_sampling=50, pixel_limit=None, bbox_surface_min_degree=.125**2):
+        if not isinstance(date, datetime):
+            raise Exception('Date argument be a datetime object')
         # The inf limit must be in pixel and  sup limit in surface
         if pixel_limit is None:
             pixel_limit = (4, 1000)
@@ -459,8 +470,7 @@ class GridDataset(object):
                     # Instantiate new EddyObservation object
                     properties = EddiesObservations(
                         size=1,
-                        track_extra_variables=['shape_error_e', 'shape_error_s', 'height_max_speed_contour',
-                                               'height_external_contour', 'height_inner_contour', 'nb_contour_selected'],
+                        track_extra_variables=[ 'height_max_speed_contour', 'height_external_contour', 'height_inner_contour'],
                         track_array_variables=array_sampling,
                         array_variables=['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s', 'uavg_profile']
                     )
@@ -492,7 +502,23 @@ class GridDataset(object):
                     eddies.append(properties)
                     # To reserve definitively the area
                     data.mask[i_x_in, i_y_in] = True
-            a_and_c.append(EddiesObservations.concatenate(eddies))
+            if len(eddies) == 0:
+                eddies_collection = EddiesObservations()
+            else:
+                eddies_collection = EddiesObservations.concatenate(eddies)
+            eddies_collection.sign_type = 1 if anticyclonic_search else -1
+            eddies_collection.obs['time'] = (date - datetime(1950, 1, 1)).total_seconds() / 86400.
+
+            a_and_c.append(eddies_collection)
+        h_units = self.units(grid_height)
+        units = UnitRegistry()
+        in_unit = units.parse_expression(h_units)
+        if in_unit is not None:
+            for name in ['amplitude', 'height_max_speed_contour', 'height_external_contour', 'height_inner_contour']:
+                out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
+                factor, _ = in_unit.to(out_unit).to_tuple()
+                a_and_c[0].obs[name] *= factor
+                a_and_c[1].obs[name] *= factor
         return a_and_c
 
     def get_uavg(self, all_contours, centlon_e, centlat_e, original_contour, anticyclonic_search, level_start,
@@ -528,7 +554,6 @@ class GridDataset(object):
             level_contour.pixels_in(self)
             if pixel_min > level_contour.nb_pixel:
                 break
-
             # Interpolate uspd to seglon, seglat, then get mean
             level_average_speed = self.speed_coef(level_contour).mean()
             speed_array.append(level_average_speed)
@@ -851,6 +876,10 @@ class RegularGridDataset(GridDataset):
         # Estimate size of kernel
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
+        min_wave_length = max(step_x_km * 2, step_y_km * 2)
+        if wave_length < min_wave_length:
+            logging.error('Wave_length to short for resolution, must be > %d km', ceil(min_wave_length))
+            raise Exception()
         # half size will be multiply with by order
         half_x_pt, half_y_pt = ceil(wave_length / step_x_km).astype(int), ceil(wave_length / step_y_km).astype(int)
 
@@ -876,7 +905,7 @@ class RegularGridDataset(GridDataset):
         kernel[dist_norm > order] = 0
         return kernel
 
-    def convolve_filter_with_dynamic_kernel(self, grid_name, kernel_func, lat_max, **kwargs_func):
+    def convolve_filter_with_dynamic_kernel(self, grid_name, kernel_func, lat_max=85, **kwargs_func):
         logging.warning('No filtering above %f degrees of latitude', lat_max)
         data = self.grid(grid_name).copy()
         # Matrix for result
@@ -943,6 +972,14 @@ class RegularGridDataset(GridDataset):
             grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order)
         self.vars[grid_name] = data_out
 
+    def bessel_band_filter(self, grid_name, wave_length_inf, wave_length_sup, **kwargs):
+        data_out = self.convolve_filter_with_dynamic_kernel(
+            grid_name, self.kernel_bessel, wave_length=wave_length_inf, **kwargs)
+        self.vars[grid_name] = data_out
+        data_out = self.convolve_filter_with_dynamic_kernel(
+            grid_name, self.kernel_bessel, wave_length=wave_length_sup, **kwargs)
+        self.vars[grid_name] -= data_out
+
     def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
         data_out = self.convolve_filter_with_dynamic_kernel(
             grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
@@ -952,6 +989,62 @@ class RegularGridDataset(GridDataset):
         data_out = self.convolve_filter_with_dynamic_kernel(
             grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
         self.vars[grid_name] = data_out
+
+    def spectrum_lonlat(self, grid_name, area=None, ref=None, **kwargs):
+        if area is None:
+            area = dict(llcrnrlon=190, urcrnrlon=280, llcrnrlat=-62, urcrnrlat=8)
+        scaling = kwargs.pop('scaling', 'density')
+        x0, y0 = self.nearest_grd_indice(area['llcrnrlon'], area['llcrnrlat'])
+        x1, y1 = self.nearest_grd_indice(area['urcrnrlon'], area['urcrnrlat'])
+
+        data = self.grid(grid_name)[x0:x1,y0:y1]
+
+        # Lat spectrum
+        pws = list()
+        step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
+        nb_invalid = 0
+        for i, _ in enumerate(self.x_c[x0:x1]):
+            f, pw = welch(data[i,:],  1 / step_y_km, scaling=scaling, **kwargs)
+            if isnan(pw).any():
+                nb_invalid += 1
+                continue
+            pws.append(pw)
+        if nb_invalid:
+            logging.warning('%d/%d columns invalid', nb_invalid, i + 1)
+        lat_content = 1 / f, array(pws).mean(axis=0)
+
+        # Lon spectrum
+        fs, pws = list(), list()
+        f_min, f_max = None, None
+        nb_invalid = 0
+        for i, lat in enumerate(self.y_c[y0:y1]):
+            step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
+            f, pw = welch(data[:,i], 1 / step_x_km, scaling=scaling, **kwargs)
+            if isnan(pw).any():
+                nb_invalid += 1
+                continue
+            if f_min is None:
+                f_min = f.min()
+                f_max = f.max()
+            else:
+                f_min = max(f_min, f.min())
+                f_max = min(f_max, f.max())
+            fs.append(f)
+            pws.append(pw)
+        if nb_invalid:
+            logging.warning('%d/%d lines invalid', nb_invalid, i + 1)
+        f_interp = linspace(f_min, f_max, f.shape[0])
+        pw_m = array(
+            [interp1d(f, pw, fill_value=0., bounds_error=False)(f_interp) for f, pw in zip(fs, pws)]).mean(axis=0)
+        lon_content = 1 / f_interp, pw_m
+        if ref is None:
+            return lon_content, lat_content
+        else:
+            ref_lon_content, ref_lat_content = ref.spectrum_lonlat(grid_name, area, **kwargs)
+            return (lon_content[0], lon_content[1] / ref_lon_content[1]), \
+                   (lat_content[0], lat_content[1] / ref_lat_content[1])
+
+
 
     def add_uv(self, grid_height):
         """Compute a u and v grid

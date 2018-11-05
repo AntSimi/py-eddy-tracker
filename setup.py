@@ -16,6 +16,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     scripts=[
+        'src/scripts/EddyId',
         'src/scripts/EddyIdentification',
         'src/scripts/EddyTracking',
         'src/scripts/EddyFinalTracking',
@@ -44,5 +45,6 @@ setup(
         'shapely',
         'pyyaml',
         'pyproj',
+        'pint'
         ],
     )

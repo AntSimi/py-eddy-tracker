@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from argparse import ArgumentParser
+from py_eddy_tracker.dataset.grid import RegularGridDataset
+from datetime import datetime
+from netCDF4 import Dataset
+
+
+def id_parser():
+    parser = ArgumentParser('Eddy Identification')
+    parser.add_argument('filename')
+    parser.add_argument('datetime')
+    parser.add_argument('h')
+    parser.add_argument('u')
+    parser.add_argument('v')
+    parser.add_argument('longitude')
+    parser.add_argument('latitude')
+    parser.add_argument('path_out')
+    return parser
+
+
+if __name__ == '__main__':
+    args = id_parser().parse_args()
+
+    h = RegularGridDataset(args.filename, args.longitude, args.latitude)
+    h.bessel_high_filter(args.h, 500, order=3)
+
+    date = datetime.strptime(args.datetime, '%Y%m%d')
+    a, c = h.eddy_identification(
+        args.h, args.u, args.v, date, 0.002, pixel_limit=(5, 2000), shape_error=55, bbox_surface_min_degree=.125**2)
+    with Dataset(args.path_out + date.strftime('/Anticyclonic_%Y%m%d.nc'), 'w') as h:
+        a.to_netcdf(h)
+    with Dataset(args.path_out + date.strftime('/Cyclonic_%Y%m%d.nc'), 'w') as h:
+        c.to_netcdf(h)

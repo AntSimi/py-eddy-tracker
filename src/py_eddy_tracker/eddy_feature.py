@@ -49,7 +49,6 @@ class Amplitude(object):
         'iy',
         'interval',
         'amplitude',
-        'local_extrema',
         'local_extrema_inds',
         'mle',
         )
@@ -68,9 +67,10 @@ class Amplitude(object):
         self.iy -= self.slice_y.start
         # Link on original grid (local view)
         self.data = data[self.slice_x, self.slice_y]
+        # => maybe replace pixel out of contour by nan?
+
         # Amplitude which will be provide
         self.amplitude = 0
-        self.local_extrema = None
         self.local_extrema_inds = None
         # Maximum local extrema accepted
         self.mle = 1
@@ -101,23 +101,16 @@ class Amplitude(object):
             return False
         else:
             self._set_local_extrema(1)
-            if 0 < self.local_extrema <= self.mle:
-                self._set_cyc_amplitude()
+            lmi_i, lmi_j = where(self.local_extrema_inds)
+            nb_real_extrema = ((level - self.data[lmi_i, lmi_j]) >= 2 * self.interval).sum()
+            if nb_real_extrema > self.mle:
                 return False
-            elif self.local_extrema > self.mle:
-                lmi_i, lmi_j = where(self.local_extrema_inds)
-                levnm2 = level - (2 * self.interval)
-                slamin = 1e5
-                for i, j in zip(lmi_i, lmi_j):
-                    if slamin >= self.data[i, j]:
-                        slamin = self.data[i, j]
-                        imin, jmin = i, j
-                    if self.data[i, j] >= levnm2:
-                        self._set_cyc_amplitude()
-                        # Prevent further calls to_set_cyc_amplitude
-                        levnm2 = 1e5
-                return imin + self.slice_x.start, jmin + self.slice_y.start
-        return False
+            amp_min = level - (2 * self.interval)
+            index = self.data[lmi_i, lmi_j].argmin()
+            jmin_, imin_ = lmi_j[index], lmi_i[index]
+            if self.data[imin_, jmin_] <= amp_min:
+                self._set_cyc_amplitude()
+            return imin_ + self.slice_x.start, jmin_ + self.slice_y.start
 
     def all_pixels_above_h0(self, level):
         """
@@ -130,30 +123,16 @@ class Amplitude(object):
             return False
         else:
             self._set_local_extrema(-1)
-            # If we have a number of extrema avoid, we compute amplitude
-            if 0 < self.local_extrema <= self.mle:
-                self._set_acyc_amplitude()
+            lmi_i, lmi_j = where(self.local_extrema_inds)
+            nb_real_extrema = ((self.data[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
+            if nb_real_extrema > self.mle:
                 return False
-
-            # More than avoid
-            elif self.local_extrema > self.mle:
-                # index of extrema
-                lmi_i, lmi_j = where(self.local_extrema_inds)
-                levnp2 = level + (2 * self.interval)
-                slamax = -1e5
-                # Iteration on extrema
-                for i, j in zip(lmi_i, lmi_j):
-                    # We iterate on max and search the first sup of slamax
-                    if slamax <= self.data[i, j]:
-                        slamax = self.data[i, j]
-                        imax, jmax = i, j
-
-                    if self.data[i, j] <= levnp2:
-                        self._set_acyc_amplitude()
-                        # Prevent further calls to_set_acyc_amplitude
-                        levnp2 = -1e5
-                return imax + self.slice_x.start, jmax + self.slice_y.start
-        return False
+            amp_min = level + (2 * self.interval)
+            index = self.data[lmi_i, lmi_j].argmax()
+            jmin_, imin_ = lmi_j[index], lmi_i[index]
+            if self.data[imin_, jmin_] >= amp_min:
+                self._set_cyc_amplitude()
+            return imin_ + self.slice_x.start, jmin_ + self.slice_y.start
 
     def _set_local_extrema(self, sign):
         """
@@ -161,8 +140,6 @@ class Amplitude(object):
         """
         # mask of minima
         self.local_extrema_inds = self.detect_local_minima(self.data * sign)
-        # nb of minima
-        self.local_extrema = self.local_extrema_inds.sum()
 
     @staticmethod
     def detect_local_minima(grid):
@@ -174,8 +151,8 @@ class Amplitude(object):
         """
         # Equivalent
         neighborhood = ones((3, 3), dtype='bool')
-        # ~ neighborhood = generate_binary_structure(grid.ndim, 2)
-
+        if hasattr(grid, 'mask'):
+            grid[grid.mask] = 2e10
         # Get local mimima
         detected_minima = minimum_filter(
             grid, footprint=neighborhood) == grid

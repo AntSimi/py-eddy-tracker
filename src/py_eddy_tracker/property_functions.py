@@ -478,7 +478,7 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                 properties.obs['radius_s'] = eddy_radius_s / 1000
                 properties.obs['speed_radius'] = uavg
                 properties.obs['radius_e'] = eddy_radius_e / 1000
-                properties.obs['eke'] = teke
+                # properties.obs['eke'] = teke
                 if 'shape_error_e' in eddy.track_extra_variables:
                     properties.obs['shape_error_e'] = aerr
                 if 'shape_error_s' in eddy.track_extra_variables:

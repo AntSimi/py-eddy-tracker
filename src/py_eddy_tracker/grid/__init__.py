@@ -43,12 +43,17 @@ from glob import glob
 
 
 def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
-                      start_date=None, end_date=None, sub_sampling_step=1):
-    pattern_regexp = re_compile('.*/' + date_regexp)
-    full_path = join_path(data_dir, files_model)
-    logging.info('Search files : %s', full_path)
+                      start_date=None, end_date=None, sub_sampling_step=1,
+                      files=None):
+    if files is not None:
+        pattern_regexp = re_compile('.*/' + date_regexp)
+        filenames = bytes_(files)
+    else:
+        pattern_regexp = re_compile('.*/' + date_regexp)
+        full_path = join_path(data_dir, files_model)
+        logging.info('Search files : %s', full_path)
+        filenames = bytes_(glob(full_path))
 
-    filenames = bytes_(glob(full_path))
     dataset_list = empty(len(filenames),
                          dtype=[('filename', 'S500'),
                                 ('date', 'datetime64[D]'),

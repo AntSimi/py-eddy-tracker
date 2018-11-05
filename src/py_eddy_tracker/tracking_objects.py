@@ -32,14 +32,8 @@ Version 3.0.0
 
 """
 from netCDF4 import Dataset
-from matplotlib.path import Path
-from matplotlib.patches import Ellipse
-from scipy.spatial import cKDTree
-from scipy.interpolate import RectBivariateSpline
 from . import VAR_DESCR
-from numpy import arange, int_, interp, float64, array, genfromtxt, ones, \
-    zeros, unique, loadtxt, diff, ma, vstack, hstack, average, append, cos, \
-    radians
+from numpy import arange, int_, interp, float64, array
 import logging
 from .observations import EddiesObservations
 
@@ -118,13 +112,6 @@ class IdentificationList(object):
 
         self.index = 0  # counter
         self.pad = 2
-        # Check for a correct configuration
-        #~ assert self.product in (
-            #~ 'AVISO'), 'Unknown string in *product* parameter'
-
-    #~ @property
-    #~ def product(self):
-        #~ return self._grd.product
 
     @property
     def fillval(self):

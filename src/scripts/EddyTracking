@@ -4,7 +4,6 @@
 Track eddy with Identification file produce with EddyIdentification
 """
 from py_eddy_tracker import EddyParser
-from glob import glob
 from yaml import load as yaml_load
 from py_eddy_tracker.tracking import Correspondances
 from os.path import exists, dirname, basename
@@ -23,7 +22,7 @@ def usage():
     parser.add_argument('yaml_file',
                         help='Yaml file to configure py-eddy-tracker')
     parser.add_argument('--correspondance_in',
-                        help='Filename to save correspondance')
+                        help='Filename of saved correspondance')
     parser.add_argument('--correspondance_out',
                         help='Filename to save correspondance')
     parser.add_argument('--save_correspondance_and_stop',
@@ -70,12 +69,19 @@ if __name__ == '__main__':
 
     NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG.get('VIRTUAL_LENGTH_MAX', 0))
 
-    DATASET_LIST = browse_dataset_in(
-        data_dir=dirname(CONFIG['PATHS']['FILES_PATTERN']),
-        files_model=basename(CONFIG['PATHS']['FILES_PATTERN']),
-        date_regexp='.*c_([0-9]*?).nc',
-        date_model='%Y%m%d',
-    )
+    if len(CONFIG['PATHS']['FILES_PATTERN']) > 0:
+        DATASET_LIST = browse_dataset_in(
+            data_dir=None,
+            files_model=None,
+            files=CONFIG['PATHS']['FILES_PATTERN'],
+            date_regexp='.*c_([0-9]*?).nc',
+            date_model='%Y%m%d')
+    else:
+        DATASET_LIST = browse_dataset_in(
+            data_dir=dirname(CONFIG['PATHS']['FILES_PATTERN']),
+            files_model=basename(CONFIG['PATHS']['FILES_PATTERN']),
+            date_regexp='.*c_([0-9]*?).nc',
+            date_model='%Y%m%d')
 
     if BLANK_PERIOD > 0:
         DATASET_LIST = DATASET_LIST[:-BLANK_PERIOD]
@@ -103,8 +109,8 @@ if __name__ == '__main__':
     if SAVE_STOP:
         exit()
 
-    # Merge correspondanc, only do if we stop and store just after compute of correspondance
-    NB_OBS_MIN = int(CONFIG['TRACK_DURATION_MIN'])
+    # Merge correspondance, only do if we stop and store just after compute of correspondance
+    NB_OBS_MIN = int(CONFIG.get('TRACK_DURATION_MIN', 14))
     CORRESPONDANCES.prepare_merging()
 
     logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())

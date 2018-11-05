@@ -101,6 +101,20 @@ VAR_DESCR = dict(
             reference_description="Julian date on Jan 1, 1992",
             )
         ),
+    time_jj=dict(
+        attr_name='time',
+        nc_name='time',
+        nc_type='int32',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            standard_name='time',
+            units='days since 1950-01-01 00:00:00',
+            calendar='proleptic_gregorian',
+            axis='T',
+            long_name='time of gridded file',
+            description='date of this observation',
+            )
+        ),
     ocean_time=dict(
         attr_name=None,
         nc_name='ocean_time',
@@ -186,20 +200,6 @@ VAR_DESCR = dict(
                         'around the contour defining the eddy perimeter',
             )
         ),
-    #~ radius=dict(
-        #~ attr_name=None,
-        #~ nc_name='L',
-        #~ nc_type='float32',
-        #~ nc_dims=('Nobs',),
-        #~ scale_factor=1e-3,
-        #~ nc_attr=dict(
-            #~ long_name='speed radius scale',
-            #~ units='km',
-            #~ description='radius of a circle whose area is equal to that '
-                        #~ 'enclosed by the contour of maximum circum-average'
-                        #~ ' speed',
-            #~ )
-        #~ ),
     speed_radius=dict(
         attr_name='speed_radius',
         scale_factor=100,

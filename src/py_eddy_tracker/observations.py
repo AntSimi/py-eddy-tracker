@@ -160,15 +160,11 @@ class EddiesObservations(object):
 
     """
     
-    ELEMENTS = [
-        'lon',  # 'centlon'
-        'lat',  # 'centlat'
-        'radius_s',  # 'eddy_radius_s'
-        'radius_e',  # 'eddy_radius_e'
-        'amplitude',  # 'amplitude'
-        'speed_radius',  # 'uavg'
-        'eke',  # 'teke'
-        'time']  # 'rtime'
+    DELTA_JJ_JE = 2448623 - (datetime(1992, 1, 1) - datetime(1950, 1, 1)).days 
+    
+    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time', 'eke',
+                'shape_error_e', 'shape_error_s', 'nb_contour_selected',
+                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour']
 
     def __init__(self, size=0, track_extra_variables=None,
                  track_array_variables=0, array_variables=None):
@@ -362,18 +358,29 @@ class EddiesObservations(object):
                     continue
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv not in cls.ELEMENTS and var_inv not in kwargs.get('array_variables', list()):
+                    # Patch
+                    if var_inv == 'time_jj':
+                        continue
+                    #
                     kwargs['track_extra_variables'].append(var_inv)
 
             eddies = cls(size=nb_obs, ** kwargs)
             for variable in h_nc.variables:
                 if variable == 'cyc':
                     continue
-                eddies.obs[VAR_DESCR_inv[variable]
-                           ] = h_nc.variables[variable][:]
+                # Patch
+                var_inv = VAR_DESCR_inv[variable]
+                if var_inv == 'time_jj':
+                    var_inv = 'time'
+                    eddies.obs[var_inv] = h_nc.variables[variable][:] + cls.DELTA_JJ_JE 
+                #
+                else:
+                    eddies.obs[var_inv] = h_nc.variables[variable][:]
             eddies.sign_type = h_nc.variables['cyc'][0]
             if eddies.sign_type == 0:
                 logging.debug('File come from another algorithm of identification')
                 eddies.sign_type = -1
+
         return eddies
 
     @classmethod
@@ -383,12 +390,18 @@ class EddiesObservations(object):
         if hasattr(handler, 'track_array_variables'):
             kwargs['track_array_variables'] = handler.track_array_variables
             kwargs['array_variables'] = handler.array_variables.split(',')
-        kwargs['track_extra_variables'] = handler.track_extra_variables.split(',')
+        if len(handler.track_extra_variables) > 1:
+            kwargs['track_extra_variables'] = handler.track_extra_variables.split(',')
         for variable in handler.variables:
             var_inv = VAR_DESCR_inv[variable]
         eddies = cls(size=nb_obs, **kwargs)
         for variable in handler.variables:
-            eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
+            # Patch
+            if variable == 'time':
+                eddies.obs[variable] = handler.variables[variable][:] + cls.DELTA_JJ_JE
+            else:
+                #
+                eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
         return eddies
 
     @staticmethod
@@ -439,7 +452,7 @@ class EddiesObservations(object):
         return next_obs
 
     @staticmethod
-    def cost_function2(records_in, records_out, distance):
+    def cost_function_common_area(records_in, records_out, distance):
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
         for i_record in range(nb_records):
@@ -724,8 +737,12 @@ class EddiesObservations(object):
             handler.track_array_variables = self.track_array_variables
             handler.array_variables = ','.join(self.array_variables)
         # Iter on variables to create:
-        for field in self.observations.dtype.descr:
-            name = field[0]
+        fields = [field[0] for field in self.observations.dtype.descr]
+        fields.sort()
+        for ori_name in fields:
+            # Patch for a transition
+            name = 'time_jj' if ori_name == 'time' else ori_name
+            #
             logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
             self.create_variable(
                 handler,
@@ -733,10 +750,19 @@ class EddiesObservations(object):
                      datatype=VAR_DESCR[name]['output_type'],
                      dimensions=VAR_DESCR[name]['nc_dims']),
                 VAR_DESCR[name]['nc_attr'],
-                self.observations[name],
+                self.observations[ori_name],
                 scale_factor=VAR_DESCR[name].get('scale_factor', None),
                 add_offset=VAR_DESCR[name].get('add_offset', None)
             )
+        # Add cyclonic information
+        if self.sign_type is not None:
+            self.create_variable(
+                handler,
+                dict(varname=VAR_DESCR['type_cyc']['nc_name'],
+                     datatype=VAR_DESCR['type_cyc']['nc_type'],
+                     dimensions=VAR_DESCR['type_cyc']['nc_dims']),
+                VAR_DESCR['type_cyc']['nc_attr'],
+                self.sign_type)
 
     @staticmethod
     def create_variable(handler_nc, kwargs_variable, attr_variable,
@@ -883,26 +909,3 @@ class TrackEddiesObservations(EddiesObservations):
             h_nc.title = 'Cyclonic'
         else:
             h_nc.title = 'Anticyclonic' + ' eddy tracks'
-        #~ h_nc.grid_filename = self.grd.grid_filename
-        #~ h_nc.grid_date = str(self.grd.grid_date)
-        #~ h_nc.product = self.product
-
-        #~ h_nc.contour_parameter = self.contour_parameter
-        #~ h_nc.shape_error = self.shape_error
-        #~ h_nc.pixel_threshold = self.pixel_threshold
-
-        #~ if self.smoothing in locals():
-            #~ h_nc.smoothing = self.smoothing
-            #~ h_nc.SMOOTH_FAC = self.SMOOTH_FAC
-        #~ else:
-            #~ h_nc.smoothing = 'None'
-
-        #~ h_nc.evolve_amp_min = self.evolve_amp_min
-        #~ h_nc.evolve_amp_max = self.evolve_amp_max
-        #~ h_nc.evolve_area_min = self.evolve_area_min
-        #~ h_nc.evolve_area_max = self.evolve_area_max
-
-        #~ h_nc.llcrnrlon = self.grd.lonmin
-        #~ h_nc.urcrnrlon = self.grd.lonmax
-        #~ h_nc.llcrnrlat = self.grd.latmin
-        #~ h_nc.urcrnrlat = self.grd.latmax

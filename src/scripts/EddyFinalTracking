@@ -23,6 +23,11 @@ def usage():
     parser.add_argument('--path_out',
                         default='./',
                         help='Path, where to write file')
+                        
+    parser.add_argument('--eddies_long_model', default=None)
+    parser.add_argument('--eddies_short_model', default=None)
+    parser.add_argument('--eddies_untracked_model', default=None)
+
     parser.add_argument('--nb_obs_min',
                         type=int,
                         default=28,
@@ -49,7 +54,9 @@ if __name__ == '__main__':
     logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
-    CORRESPONDANCES.get_unused_data().write_netcdf(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc')
+    if CONFIG.eddies_untracked_model is None:
+        CONFIG.eddies_untracked_model = '%(path)s/%(sign_type)s_%(prod_time)s_untracked.nc'
+    CORRESPONDANCES.get_unused_data().write_netcdf(path=SAVE_DIR, filename=CONFIG.eddies_untracked_model)
 
     SHORT_CORRESPONDANCES = CORRESPONDANCES._copy()
     SHORT_CORRESPONDANCES.shorter_than(size_max=NB_OBS_MIN)
@@ -73,5 +80,9 @@ if __name__ == '__main__':
     logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
-    FINAL_EDDIES.write_netcdf(path=SAVE_DIR)
-    SHORT_TRACK.write_netcdf(filename='%(path)s/%(sign_type)s_track_too_short.nc', path=SAVE_DIR)
+    if CONFIG.eddies_long_model is None:
+        CONFIG.eddies_long_model = '%(path)s/%(sign_type)s_%(prod_time)s.nc'
+    if CONFIG.eddies_short_model is None:
+        CONFIG.eddies_short_model = '%(path)s/%(sign_type)s_%(prod_time)s_track_too_short.nc'
+    FINAL_EDDIES.write_netcdf(filename=CONFIG.eddies_long_model,path=SAVE_DIR)
+    SHORT_TRACK.write_netcdf(filename=CONFIG.eddies_short_model, path=SAVE_DIR)
