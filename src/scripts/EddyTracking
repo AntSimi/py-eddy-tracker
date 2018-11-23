@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG.get('VIRTUAL_LENGTH_MAX', 0))
 
-    if len(CONFIG['PATHS']['FILES_PATTERN']) > 0:
+    if isinstance(CONFIG['PATHS']['FILES_PATTERN'], list):
         DATASET_LIST = browse_dataset_in(
             data_dir=None,
             files_model=None,
@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
     START_TIME = dt.datetime.now()
     logging.info('Start tracking on %d files', len(DATASET_LIST))
-
+    
     CORRESPONDANCES = Correspondances(
         datasets=DATASET_LIST['filename'],
         virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT,
