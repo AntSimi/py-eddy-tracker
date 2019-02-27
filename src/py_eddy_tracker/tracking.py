@@ -33,6 +33,7 @@ from py_eddy_tracker.observations import EddiesObservations, VirtualEddiesObserv
 from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate, ma
 from netCDF4 import Dataset
 import logging
+import platform
 
 
 class Correspondances(list):
@@ -387,6 +388,7 @@ class Correspondances(list):
                 self.previous_virtual_obs.to_netcdf(group)
             h_nc.module = self.class_method.__module__
             h_nc.classname = self.class_method.__qualname__
+            h_nc.node = platform.node()
         logging.info('Create correspondance file done')
 
     def load_compatible(self, filename):
@@ -415,6 +417,7 @@ class Correspondances(list):
                 class_method= getattr(__import__(h_nc.module, globals(), locals(), h_nc.classname), h_nc.classname)
             else:
                 class_method= None
+            logging.info('File %s load with class %s', filename, class_method)
             obj = cls(datasets, h_nc.virtual_max_segment, class_method=class_method)
 
             id_max = 0

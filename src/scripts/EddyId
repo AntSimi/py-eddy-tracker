@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from argparse import ArgumentParser
+from py_eddy_tracker import EddyParser
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from datetime import datetime
 from netCDF4 import Dataset
 
 
 def id_parser():
-    parser = ArgumentParser('Eddy Identification')
+    parser = EddyParser('Eddy Identification')
     parser.add_argument('filename')
     parser.add_argument('datetime')
     parser.add_argument('h')
