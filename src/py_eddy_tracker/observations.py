@@ -164,7 +164,7 @@ class EddiesObservations(object):
     
     ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time', 'eke',
                 'shape_error_e', 'shape_error_s', 'nb_contour_selected',
-                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour']
+                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour', 'cost_association']
 
     def __init__(self, size=0, track_extra_variables=None,
                  track_array_variables=0, array_variables=None):
@@ -452,22 +452,34 @@ class EddiesObservations(object):
         return next_obs
 
     @staticmethod
-    def cost_function_common_area(records_in, records_out, distance):
+    def cost_function_common_area(records_in, records_out, distance, intern=False):
+        x_name, y_name = ('contour_lon_s', 'contour_lat_s') if intern else ('contour_lon_e', 'contour_lat_e')
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
+        tolerance = 0.025
         for i_record in range(nb_records):
             poly_in = Polygon(
                 concatenate((
-                    (records_in[i_record]['contour_lon_e'],),
-                    (records_in[i_record]['contour_lat_e'],))
+                    (records_in[i_record][x_name],),
+                    (records_in[i_record][y_name],))
                     ).T
                 )
             poly_out = Polygon(
                 concatenate((
-                    (records_out[i_record]['contour_lon_e'],),
-                    (records_out[i_record]['contour_lat_e'],))
+                    (records_out[i_record][x_name],),
+                    (records_out[i_record][y_name],))
                     ).T
                 )
+            if not poly_in.is_valid:
+                poly_in = poly_in.simplify(tolerance=tolerance)
+                if not poly_in.is_valid:
+                    logging.warning('Need to simplify polygon in for a second time')
+                    poly_in = poly_in.buffer(0)
+            if not poly_out.is_valid:
+                poly_out = poly_out.simplify(tolerance=tolerance)
+                if not poly_out.is_valid:
+                    logging.warning('Need to simplify polygon out for a second time')
+                    poly_out = poly_out.buffer(0)
             try:
                 costs[i_record] = 1 - poly_in.intersection(poly_out).area / poly_in.area
             except TopologicalError:
@@ -725,7 +737,7 @@ class EddiesObservations(object):
 
         logging.debug('%d matched with previous', i_self.shape[0])
 
-        return i_self, i_other
+        return i_self, i_other, cost_mat[i_self, i_other]
 
     def to_netcdf(self, handler):
         eddy_size = len(self)
@@ -858,7 +870,7 @@ class TrackEddiesObservations(EddiesObservations):
 
         for field in self.obs.dtype.descr:
             var = field[0]
-            if var in ['n', 'virtual', 'track'] or var in self.array_variables:
+            if var in ['n', 'virtual', 'track', 'cost_association'] or var in self.array_variables:
                 continue
             # to normalize longitude before interpolation
             if var== 'lon':

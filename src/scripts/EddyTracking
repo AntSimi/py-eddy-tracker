@@ -104,7 +104,6 @@ if __name__ == '__main__':
     DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME,
                            path=SAVE_DIR, sign_type=CORRESPONDANCES.current_obs.sign_legend)
 
-
     CORRESPONDANCES.save(CORRESPONDANCES_OUT, DICT_COMPLETION)
     if SAVE_STOP:
         exit()

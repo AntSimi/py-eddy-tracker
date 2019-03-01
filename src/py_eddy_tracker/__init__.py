@@ -167,6 +167,16 @@ VAR_DESCR = dict(
             description='Virtual observation: 0 for real',
             )
         ),
+    cost_association=dict(
+        attr_name=None,
+        nc_name='cost_association',
+        nc_type='float32',
+        nc_dims=('Nobs',),
+        nc_attr=dict(
+            long_name='cost_value_to_associate_with_next_observation',
+            description='Cost value to associate with the next observation',
+            )
+        ),
     lon=dict(
         attr_name='lon',
         compute_type='float64',

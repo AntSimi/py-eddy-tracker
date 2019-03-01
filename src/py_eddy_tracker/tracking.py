@@ -30,8 +30,9 @@ Version 3.0.0
 from matplotlib.dates import julian2num, num2date
 
 from py_eddy_tracker.observations import EddiesObservations, VirtualEddiesObservations, TrackEddiesObservations
-from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate, ma
-from netCDF4 import Dataset
+from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate, \
+    ma
+from netCDF4 import Dataset, default_fillvals
 import logging
 import platform
 
@@ -55,7 +56,9 @@ class Correspondances(list):
         # Correspondance dtype
         self.correspondance_dtype = [('in', 'u2'),
                                      ('out', 'u2'),
-                                     ('id', self.ID_DTYPE)]
+                                     ('id', self.ID_DTYPE),
+                                     ('cost_value', 'f4')
+                                     ]
         if class_method is None:
             self.class_method = EddiesObservations
         else:
@@ -168,7 +171,7 @@ class Correspondances(list):
         # We set new id available
         self.current_id = translate[-1] + 1
 
-    def store_correspondance(self, i_previous, i_current, nb_real_obs):
+    def store_correspondance(self, i_previous, i_current, nb_real_obs, association_cost):
         """Storing correspondance in an array
         """
         # Create array to store correspondance data
@@ -177,6 +180,7 @@ class Correspondances(list):
             correspondance['virtual_length'][:] = 255
         # index from current_obs
         correspondance['out'] = i_current
+        correspondance['cost_value'] = association_cost
 
         if self.virtual:
             # if index in previous dataset is bigger than real obs number
@@ -314,10 +318,10 @@ class Correspondances(list):
             if flg_virtual:
                 logging.debug('%d virtual obs will be add to previous', len(self.virtual_obs))
                 self.previous_obs = self.previous_obs.merge(self.virtual_obs)
-            i_previous, i_current = self.previous_obs.tracking(self.current_obs)
+            i_previous, i_current, association_cost = self.previous_obs.tracking(self.current_obs)
 
             # return true if the first time (previous2obs is none)
-            if self.store_correspondance(i_previous, i_current, nb_real_obs):
+            if self.store_correspondance(i_previous, i_current, nb_real_obs, association_cost):
                 continue
 
             self.recense_dead_id_to_extend()
@@ -376,7 +380,11 @@ class Correspondances(list):
                 for name, _ in self.correspondance_dtype:
                     datas[name][i, :nb_elt] = correspondance[name]
             for name, data in datas.items():
-                h_nc.variables[name][:] = data
+                h_v = h_nc.variables[name]
+                h_v[:] = data
+                if 'File' not in name:
+                    h_v.min = h_v[:].min()
+                    h_v.max = h_v[:].max()
 
             h_nc.virtual_use = str(self.virtual)
             h_nc.virtual_max_segment = self.nb_virtual
@@ -512,6 +520,8 @@ class Correspondances(list):
             track_array_variables=self.current_obs.track_array_variables,
             array_variables=self.current_obs.array_variables)
 
+        # All the value put at nan, necessary only for all end of track
+        eddies['cost_association'][:] = default_fillvals['f4']
         # Calculate the index in each tracks, we compute in u4 and translate
         # in u2 (which are limited to 65535)
         logging.debug('Compute global index array (N)')
@@ -547,6 +557,8 @@ class Correspondances(list):
                 # Copy all variable
                 for field in fields:
                     var = field[0]
+                    if var == 'cost_association':
+                        continue
                     eddies[var][index_final[m_first_obs]] = self.previous_obs[var][index_in]
                 # Increment
                 self.i_current_by_tracks[i_id[m_first_obs]] += 1
@@ -570,7 +582,10 @@ class Correspondances(list):
             # Copy all variable
             for field in fields:
                 var = field[0]
-                eddies[var][index_final] = self.current_obs[var][index_current]
+                if var == 'cost_association':
+                    eddies[var][index_final-1] = self[i]['cost_value']
+                else:
+                    eddies[var][index_final] = self.current_obs[var][index_current]
 
             # Add increment for each index used
             self.i_current_by_tracks[i_id] += 1
