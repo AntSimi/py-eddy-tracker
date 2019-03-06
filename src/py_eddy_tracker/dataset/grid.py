@@ -744,7 +744,7 @@ class RegularGridDataset(GridDataset):
         Returns:
 
         """
-        return round(interp(x, self.x_bounds, self.xinterp)), round(interp(y, self.y_bounds, self.yinterp))
+        return round(interp(x, self.x_bounds, self.xinterp)).astype(int), round(interp(y, self.y_bounds, self.yinterp).astype(int))
 
     @property
     def xstep(self):
