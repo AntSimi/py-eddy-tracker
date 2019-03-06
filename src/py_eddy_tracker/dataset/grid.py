@@ -618,7 +618,7 @@ class UnRegularGridDataset(GridDataset):
         dist, idx = self.index_interp.query(vertices, k=1)
         i_y = idx % self.x_c.shape[1]
         i_x = int_((idx - i_y) / self.x_c.shape[1])
-        return slice(i_x.min() - self.N, i_x.max() + self.N + 1), slice(i_y.min() - self.N, i_y.max() + self.N + 1)
+        return slice(int(i_x.min() - self.N), int(i_x.max() + self.N + 1)), slice(int(i_y.min() - self.N), int(i_y.max() + self.N + 1))
 
     def get_pixels_in(self, contour):
         slice_x, slice_y = self.bbox_indice(contour.vertices)
@@ -628,13 +628,13 @@ class UnRegularGridDataset(GridDataset):
         i_x, i_y = where(mask)
         i_x += slice_x.start
         i_y += slice_y.start
-        return i_x, i_y
+        return int(i_x), int(i_y)
 
     def nearest_grd_indice(self, x, y):
         dist, idx = self.index_interp.query((x, y), k=1)
         i_y = idx % self.x_c.shape[1]
         i_x = int_((idx - i_y) / self.x_c.shape[1])
-        return i_x, i_y
+        return int(i_x), int(i_y)
 
     def compute_pixel_path(self, x0, y0, x1, y1):
         pass
@@ -719,8 +719,8 @@ class RegularGridDataset(GridDataset):
         lat_min, lat_max = lat.min(), lat.max()
         i_x0, i_y0 = self.nearest_grd_indice(lon_min, lat_min)
         i_x1, i_y1 = self.nearest_grd_indice(lon_max, lat_max)
-        slice_x = slice(i_x0 - self.N, i_x1 + self.N + 1)
-        slice_y = slice(i_y0 - self.N, i_y1 + self.N + 1)
+        slice_x = slice(int(i_x0 - self.N), int(i_x1 + self.N + 1))
+        slice_y = slice(int(i_y0 - self.N), int(i_y1 + self.N + 1))
         return slice_x, slice_y
 
     def get_pixels_in(self, contour):
