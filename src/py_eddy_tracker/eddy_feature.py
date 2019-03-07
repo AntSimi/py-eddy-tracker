@@ -27,7 +27,7 @@ Version 2.0.3
 """
 
 import logging
-from numpy import ones, where, empty, array
+from numpy import ones, where, empty, array, concatenate, ma
 from scipy.ndimage import minimum_filter
 from scipy.ndimage import binary_erosion
 from matplotlib.figure import Figure
@@ -42,33 +42,32 @@ class Amplitude(object):
     
     __slots__ = (
         'h_0',
-        'data',
-        'ix',
-        'slice_x',
-        'slice_y',
-        'iy',
+        'grid_extract',
+        'sla',
+        'contour',
         'interval',
         'amplitude',
         'local_extrema_inds',
         'mle',
         )
 
-    def __init__(self, i_contour_x, i_contour_y, contour_height, data, interval):
+    def __init__(self, contour, contour_height, data, interval):
         # Height of the contour
         self.h_0 = contour_height
         # Step between two level
         self.interval = interval
         # Indices of all pixels in contour
-        self.ix = i_contour_x.copy()
-        self.slice_x = slice(self.ix.min(), self.ix.max() + 1)
-        self.ix -= self.slice_x.start
-        self.iy = i_contour_y.copy()
-        self.slice_y = slice(self.iy.min(), self.iy.max() + 1)
-        self.iy -= self.slice_y.start
-        # Link on original grid (local view)
-        self.data = data[self.slice_x, self.slice_y]
+        self.contour = contour
+        # Link on original grid (local view) or copy if it's on bound
+        slice_x, slice_y = contour.bbox_slice
+        if slice_x.start > slice_x.stop:
+            self.grid_extract = ma.concatenate((data[slice_x.start:, slice_y], data[:slice_x.stop, slice_y]))
+        else:
+            self.grid_extract = data[slice_x, slice_y]
         # => maybe replace pixel out of contour by nan?
 
+        # Only pixel in contour
+        self.sla = data[contour.pixels_index]
         # Amplitude which will be provide
         self.amplitude = 0
         self.local_extrema_inds = None
@@ -76,7 +75,7 @@ class Amplitude(object):
         self.mle = 1
 
     def within_amplitude_limits(self):
-        """
+        """Need update
         """
         return True
         return self.eddy.ampmin <= self.amplitude <= self.eddy.ampmax
@@ -84,62 +83,62 @@ class Amplitude(object):
     def _set_cyc_amplitude(self):
         """Get amplitude for cyclone
         """
-        self.amplitude = self.h_0 - self.data.min()
+        self.amplitude = self.h_0 - self.grid_extract.min()
 
     def _set_acyc_amplitude(self):
         """Get amplitude for anticyclone
         """
-        self.amplitude = self.data.max() - self.h_0
+        self.amplitude = self.grid_extract.max() - self.h_0
 
     def all_pixels_below_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are below a given SSH threshold for cyclonic eddies.
         """
-        sla = self.data[self.ix, self.iy]
-        if (sla > self.h_0).any() or (hasattr(sla, 'mask') and sla.mask.any()):
+        if (self.sla > self.h_0).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
             return False
         else:
             self._set_local_extrema(1)
             lmi_i, lmi_j = where(self.local_extrema_inds)
-            nb_real_extrema = ((level - self.data[lmi_i, lmi_j]) >= 2 * self.interval).sum()
+            nb_real_extrema = ((level - self.grid_extract[lmi_i, lmi_j]) >= 2 * self.interval).sum()
             if nb_real_extrema > self.mle:
                 return False
             amp_min = level - (2 * self.interval)
-            index = self.data[lmi_i, lmi_j].argmin()
+            index = self.grid_extract[lmi_i, lmi_j].argmin()
             jmin_, imin_ = lmi_j[index], lmi_i[index]
-            if self.data[imin_, jmin_] <= amp_min:
+            if self.grid_extract[imin_, jmin_] <= amp_min:
                 self._set_cyc_amplitude()
-            return imin_ + self.slice_x.start, jmin_ + self.slice_y.start
+            slice_x, slice_y = self.contour.bbox_slice
+            return imin_ + slice_x.start, jmin_ + slice_y.start
 
     def all_pixels_above_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are above a given SSH threshold for anticyclonic eddies.
         """
-        sla = self.data[self.ix, self.iy]
-        if (sla < self.h_0).any() or (hasattr(sla, 'mask') and sla.mask.any()):
+        if (self.sla < self.h_0).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
             # i.e.,with self.amplitude == 0
             return False
         else:
             self._set_local_extrema(-1)
             lmi_i, lmi_j = where(self.local_extrema_inds)
-            nb_real_extrema = ((self.data[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
+            nb_real_extrema = ((self.grid_extract[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
             if nb_real_extrema > self.mle:
                 return False
             amp_min = level + (2 * self.interval)
-            index = self.data[lmi_i, lmi_j].argmax()
+            index = self.grid_extract[lmi_i, lmi_j].argmax()
             jmin_, imin_ = lmi_j[index], lmi_i[index]
-            if self.data[imin_, jmin_] >= amp_min:
+            if self.grid_extract[imin_, jmin_] >= amp_min:
                 self._set_cyc_amplitude()
-            return imin_ + self.slice_x.start, jmin_ + self.slice_y.start
+            slice_x, slice_y = self.contour.bbox_slice
+            return imin_ + slice_x.start, jmin_ + slice_y.start
 
     def _set_local_extrema(self, sign):
         """
         Set count of local SLA maxima/minima within eddy
         """
         # mask of minima
-        self.local_extrema_inds = self.detect_local_minima(self.data * sign)
+        self.local_extrema_inds = self.detect_local_minima(self.grid_extract * sign)
 
     @staticmethod
     def detect_local_minima(grid):
@@ -195,7 +194,74 @@ class Contours(object):
         'nb_contour_per_level',
     )
 
-    def __init__(self, x, y, z, levels, bbox_surface_min_degree):
+    DELTA_PREC = 1e-10
+    DELTA_SUP= 1e-2
+
+    def get_next(self, origin, paths_left, paths_right):
+        for i, path in enumerate(paths_right):
+            if abs(origin.vertices[-1, 1] - path.vertices[0, 1]) < self.DELTA_PREC:
+                if (path.vertices[0, 0] - origin.vertices[-1, 0]) > 1:
+                    path.vertices[:, 0] -= 360
+                origin.vertices = concatenate((origin.vertices, path.vertices))
+                paths_right.pop(i)
+                if self.check_closing(origin):
+                    origin.vertices[-1] = origin.vertices[0]
+                    return True
+                return self.get_next(origin, paths_right, paths_left)
+        return False
+
+    def check_closing(self, path):
+        return abs(path.vertices[0, 1] - path.vertices[-1, 1]) < self.DELTA_PREC
+
+    def find_wrapcut_path_and_join(self, x0, x1):
+        poly_solve = 0
+        for collection in self.contours.collections:
+            paths = collection.get_paths()
+            paths_left = []
+            paths_right = []
+            paths_solve = []
+            paths_out = list()
+            # All path near meridian bounds
+            for path in paths:
+                x_start, x_end = path.vertices[0, 0], path.vertices[-1, 0]
+                if abs(x_start - x0) < self.DELTA_PREC and abs(x_end - x0) < self.DELTA_PREC:
+                    paths_left.append(path)
+                elif abs(x_start - x1) < self.DELTA_PREC and abs(x_end - x1) < self.DELTA_PREC:
+                    paths_right.append(path)
+                else:
+                    paths_out.append(path)
+            if paths_left and paths_right:
+                polys_to_pop_left = list()
+                # Solve simple close (2 segment)
+                for i_left, path_left in enumerate(paths_left):
+                    for i_right, path_right in enumerate(paths_right):
+                        if abs(path_left.vertices[0, 1] - path_right.vertices[-1, 1]) < self.DELTA_PREC and abs(
+                                path_left.vertices[-1, 1] - path_right.vertices[0, 1]) < self.DELTA_PREC:
+                            polys_to_pop_left.append(i_left)
+                            path_right.vertices[:, 0] -= 360
+                            path_left.vertices = concatenate((path_left.vertices, path_right.vertices))
+                            path_left.vertices[-1] = path_left.vertices[0]
+                            paths_solve.append(path_left)
+                            paths_right.pop(i_right)
+                            break
+                for i in polys_to_pop_left[::-1]:
+                    paths_left.pop(i)
+                # Solve multiple segment:
+                if paths_left and paths_right:
+                    while len(paths_left):
+                        origin = paths_left.pop(0)
+                        if self.get_next(origin, paths_left, paths_right):
+                            paths_solve.append(origin)
+
+                poly_solve += len(paths_solve)
+
+                paths_out.extend(paths_solve)
+                paths_out.extend(paths_left)
+                paths_out.extend(paths_right)
+                collection._paths = paths_out
+        logging.info('%d contours close over the bounds', poly_solve)
+
+    def __init__(self, x, y, z, levels, bbox_surface_min_degree, wrap_x=False):
         """
         c_i : index to contours
         l_i : index to levels
@@ -203,10 +269,16 @@ class Contours(object):
         logging.info('Start computing iso lines')
         fig = Figure()
         ax = fig.add_subplot(111)
+        if wrap_x:
+            logging.debug('wrapping activate to compute contour')
+            x = concatenate((x, x[:1] + 360))
+            z = ma.concatenate((z, z[:1]))
         logging.debug('X shape : %s', x.shape)
         logging.debug('Y shape : %s', y.shape)
         logging.debug('Z shape : %s', z.shape)
         self.contours = ax.contour(x, y, z.T, levels)
+        if wrap_x:
+            self.find_wrapcut_path_and_join(x[0], x[-1])
         logging.info('Finish computing iso lines')
 
         nb_level = 0
@@ -235,11 +307,11 @@ class Contours(object):
                     continue
                 # Remove unclosed path
                 d_closed = ((contour.vertices[0, 0] - contour.vertices[-1, 0]) **2 + (contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2) ** .5
-                if d_closed > (1e-2):
+                if d_closed > self.DELTA_SUP:
                     continue
                 elif d_closed != 0:
                     # Repair almost closed contour
-                    if d_closed > (1e-10):
+                    if d_closed > self.DELTA_PREC:
                         almost_closed_contours += 1
                     else:
                         closed_contours += 1

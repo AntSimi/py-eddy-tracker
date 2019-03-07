@@ -4,7 +4,8 @@
 import logging
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
-    linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64, isnan
+    linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64, isnan, \
+    floor
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -12,6 +13,7 @@ from scipy.ndimage import gaussian_filter, convolve
 from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.spatial import cKDTree
 from scipy.signal import welch, convolve2d
+from numba import jit
 from matplotlib.path import Path as BasePath
 from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
@@ -132,8 +134,24 @@ BasePath._fit_circle_path = _fit_circle_path
 
 
 def pixels_in(self, grid):
+    if not hasattr(self, '_slice'):
+        self._slice = grid.bbox_indice(self.vertices)
     if not hasattr(self, '_pixels_in'):
         self._pixels_in = grid.get_pixels_in(self)
+    return self._pixels_in
+
+
+@property
+def bbox_slice(self):
+    if not hasattr(self, '_slice'):
+        raise Exception('No pixels_in call before!')
+    return self._slice
+
+
+@property
+def pixels_index(self):
+    if not hasattr(self, '_slice'):
+        raise Exception('No pixels_in call before!')
     return self._pixels_in
 
 
@@ -145,6 +163,8 @@ def nb_pixel(self):
 
     
 BasePath.pixels_in = pixels_in
+BasePath.pixels_index = pixels_index
+BasePath.bbox_slice = bbox_slice
 BasePath.nb_pixel = nb_pixel
 
 
@@ -379,10 +399,10 @@ class GridDataset(object):
         levels = arange(z_min - z_min % step, z_max - z_max % step + 2 * step, step)
 
         # Get x and y values
-        x, y = self.vars[self.coordinates[0]], self.vars[self.coordinates[1]]
+        x, y = self.x_c, self.y_c
 
         # Compute ssh contour
-        contours = Contours(x, y, data, levels, bbox_surface_min_degree=bbox_surface_min_degree)
+        contours = Contours(x, y, data, levels, bbox_surface_min_degree=bbox_surface_min_degree, wrap_x=self.is_circular())
 
         # Compute cyclonic and anticylonic research:
         a_and_c = list()
@@ -432,7 +452,7 @@ class GridDataset(object):
                         continue
 
                     # Compute amplitude
-                    reset_centroid, amp = self.get_amplitude(i_x_in, i_y_in, cvalues, data,
+                    reset_centroid, amp = self.get_amplitude(current_contour, cvalues, data,
                                                              anticyclonic_search=anticyclonic_search,
                                                              level=contours.levels[corrected_coll_index], step=step)
 
@@ -441,7 +461,10 @@ class GridDataset(object):
                         continue
 
                     if reset_centroid:
-                        centi = reset_centroid[0]
+                        if self.is_circular():
+                            centi = self.normalize_x_indice(reset_centroid[0])
+                        else:
+                            centi = reset_centroid[0]
                         centj = reset_centroid[1]
                         # To move in regular and unregular grid
                         if len(x.shape) == 1:
@@ -584,12 +607,11 @@ class GridDataset(object):
             return ma.array(v / w, mask=w == 0)
 
     @staticmethod
-    def get_amplitude(i_x_in, i_y_in, contour_height, data, anticyclonic_search=True, level=None, step=None):
+    def get_amplitude(contour, contour_height, data, anticyclonic_search=True, level=None, step=None):
         # Instantiate Amplitude object
         amp = Amplitude(
             # Indices of all pixels in contour
-            i_contour_x=i_x_in,
-            i_contour_y=i_y_in,
+            contour=contour,
             # Height of level
             contour_height=contour_height,
             # All grid
@@ -621,7 +643,7 @@ class UnRegularGridDataset(GridDataset):
         return slice(i_x.min() - self.N, i_x.max() + self.N + 1), slice(i_y.min() - self.N, i_y.max() + self.N + 1)
 
     def get_pixels_in(self, contour):
-        slice_x, slice_y = self.bbox_indice(contour.vertices)
+        slice_x, slice_y = contour.bbox_slice
         pts = array((self.x_c[slice_x, slice_y].reshape(-1),
                      self.y_c[slice_x, slice_y].reshape(-1))).T
         mask = contour.contains_points(pts).reshape((slice_x.stop - slice_x.start, -1))
@@ -629,6 +651,10 @@ class UnRegularGridDataset(GridDataset):
         i_x += slice_x.start
         i_y += slice_y.start
         return i_x, i_y
+
+    def normalize_x_indice(self, indices):
+        """Not do"""
+        return indices
 
     def nearest_grd_indice(self, x, y):
         dist, idx = self.index_interp.query((x, y), k=1)
@@ -705,7 +731,14 @@ class RegularGridDataset(GridDataset):
 
     __slots__ = (
         '_speed_ev',
+        '_is_circular',
+        'x_size',
         )
+
+    def __init__(self, *args, **kwargs):
+        super(RegularGridDataset, self).__init__(*args, **kwargs)
+        self._is_circular = None
+        self.x_size = self.x_c.shape[0]
 
     def init_pos_interpolator(self):
         """Create function to have a quick index interpolator
@@ -724,27 +757,28 @@ class RegularGridDataset(GridDataset):
         return slice_x, slice_y
 
     def get_pixels_in(self, contour):
-        slice_x, slice_y = self.bbox_indice(contour.vertices)
-        x, y = meshgrid(self.x_c[slice_x], self.y_c[slice_y])
+        slice_x, slice_y = contour.bbox_slice
+        if slice_x.stop < slice_x.start:
+            x_ref = contour.vertices[0, 0]
+            x_array = (concatenate((self.x_c[slice_x.start:], self.x_c[:slice_x.stop])) - x_ref + 180) % 360 + x_ref -180
+        else:
+            x_array = self.x_c[slice_x]
+        x, y = meshgrid(x_array, self.y_c[slice_y])
         pts = array((x.reshape(-1), y.reshape(-1))).T
         mask = contour.contains_points(pts).reshape(x.shape)
         i_x, i_y = where(mask.T)
         i_x += slice_x.start
         i_y += slice_y.start
+        if slice_x.stop < slice_x.start:
+            i_x %= self.x_size
         return i_x, i_y
 
+    def normalize_x_indice(self, indices):
+        return indices % self.x_size
+
     def nearest_grd_indice(self, x, y):
-        """
-        Can use this version, which are faster without check
-        from numpy.core.multiarray import interp
-        Args:
-            x:
-            y:
-
-        Returns:
-
-        """
-        return round(interp(x, self.x_bounds, self.xinterp)), round(interp(y, self.y_bounds, self.yinterp))
+        return int32(floor(((x - self.x_c[0] + self.xstep) % 360) // self.xstep)), \
+               int32(floor(((y - self.y_c[0] + self.ystep) % 360) // self.ystep))
 
     @property
     def xstep(self):
@@ -764,6 +798,7 @@ class RegularGridDataset(GridDataset):
         # First x of grid
         x_ori = self.x_var[0]
         # Float index
+        # ?? Normaly not callable
         f_x0 = self.xinterp((x0 - x_ori) % 360 + x_ori)
         f_x1 = self.xinterp((x1 - x_ori) % 360 + x_ori)
         f_y0 = self.yinterp(y0)
@@ -832,7 +867,9 @@ class RegularGridDataset(GridDataset):
     def is_circular(self):
         """Check if grid is circular
         """
-        return abs((self.x_bounds[0] % 360) - (self.x_bounds[-1] % 360)) < 0.0001
+        if self._is_circular is None:
+            self._is_circular = abs((self.x_bounds[0] % 360) - (self.x_bounds[-1] % 360)) < 0.0001
+        return self._is_circular
 
     def kernel_lanczos(self, lat, wave_length, order=1):
         # Not really operational
@@ -1044,8 +1081,6 @@ class RegularGridDataset(GridDataset):
             return (lon_content[0], lon_content[1] / ref_lon_content[1]), \
                    (lat_content[0], lat_content[1] / ref_lat_content[1])
 
-
-
     def add_uv(self, grid_height):
         """Compute a u and v grid
         """
@@ -1107,3 +1142,44 @@ class RegularGridDataset(GridDataset):
         # Evaluation near masked value will be smoothed to 0 !!!, not perfect
         speed[speed.mask] = 0
         self._speed_ev = RectBivariateSpline(self.x_c, self.y_c, speed, kx=1, ky=1).ev
+
+    def interp(self, grid_name, lons, lats):
+        """
+        Compute z over lons, lats
+        Args:
+            grid_name: Grid which will be interp
+            lons: new x
+            lats: new y
+
+        Returns:
+            new z
+        """
+        z = empty(lons.shape, dtype='f4').reshape(-1)
+        interp_numba(
+            self.x_c.astype('f4'),
+            self.y_c.astype('f4'),
+            self.grid(grid_name).astype('f4'),
+            lons.reshape(-1).astype('f4'),
+            lats.reshape(-1).astype('f4'),
+            z,
+        )
+        return z
+
+
+@jit("void(f4[:], f4[:], f4[:,:], f4[:], f4[:], f4[:])", nopython=True)
+def interp_numba(x_g, y_g, z, x, y, dest_z):
+    x_ref = x_g[0]
+    y_ref = y_g[0]
+    x_step = x_g[1] - x_ref
+    y_step = y_g[1] - y_ref
+    for i in range(x.size):
+        x_ = (x[i] - x_ref) / x_step
+        y_ = (y[i] - y_ref) / y_step
+        i0 = int(floor(x_))
+        i1 = i0 + 1
+        j0 = int(floor(y_))
+        j1 = j0 + 1
+        xd = (x_ - i0)
+        yd = (y_ - j0)
+        dest_z[i] = (z[i0, j0] * (1 - xd) + (z[i1, j0] * xd)) * (1 - yd) + (z[i0, j1] * (1 - xd) + z[i1, j1] * xd) * yd
+

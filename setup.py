@@ -45,6 +45,7 @@ setup(
         'shapely',
         'pyyaml',
         'pyproj',
-        'pint'
+        'pint',
+        'numba',
         ],
     )
