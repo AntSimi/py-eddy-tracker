@@ -178,8 +178,8 @@ fig.savefig('share/png/eddies.png')
 
 Save identification datas
 ```python
-with Dataset(date.strftime('Anticyclonic_%Y%m%d.nc'), 'w') as h:
+with Dataset(date.strftime('share/Anticyclonic_%Y%m%d.nc'), 'w') as h:
     a.to_netcdf(h)
-with Dataset(date.strftime('Cyclonic_%Y%m%d.nc'), 'w') as h:
+with Dataset(date.strftime('share/Cyclonic_%Y%m%d.nc'), 'w') as h:
     c.to_netcdf(h)
 ```
