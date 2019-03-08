@@ -61,6 +61,11 @@ Filtering
 h.bessel_high_filter('adt', 500, order=3)
 ```
 
+Save grid
+```python
+h.write('/tmp/grid.nc')
+```
+
 Add second plot
 ```python
 ax = fig.add_axes([.03, .02, .9, .45])
@@ -103,8 +108,8 @@ for name_area, area in areas.items():
     ax.loglog(*lon_spec, label='lon %s raw' % name_area, color=mappable.get_color(), linestyle='--')
 
     lon_spec, lat_spec = filtered.spectrum_lonlat('adt', area=area)
-    mappable = plt.loglog(*lat_spec, label='lat %s high' % name_area)[0]
-    plt.loglog(*lon_spec, label='lon %s high' % name_area, color=mappable.get_color(), linestyle='--')
+    mappable = ax.loglog(*lat_spec, label='lat %s high' % name_area)[0]
+    ax.loglog(*lon_spec, label='lon %s high' % name_area, color=mappable.get_color(), linestyle='--')
 
 ax.set_xscale('log')
 ax.legend()
@@ -130,4 +135,51 @@ ax.legend()
 ax.grid()
 fig.savefig('share/png/spectrum_ratio.png')
 ```
-![spectrum](share/png/spectrum_ratio.png)
+![spectrum ratio](share/png/spectrum_ratio.png)
+
+#### Run an identification on a grid ####
+
+Activate verbose
+```python
+import logging
+logging.getLogger().setLevel('DEBUG') # Values: ERROR, WARNING, INFO, DEBUG
+```
+
+Run identification
+```python
+from datetime import datetime
+h = RegularGridDataset(grid_name, lon_name, lat_name)
+h.bessel_high_filter('adt', 500, order=3)
+date = datetime(2019, 2, 23)
+a, c = h.eddy_identification(
+    'adt', 'ugosa', 'vgosa', # Variable to use for identification
+    date, # Date of identification
+    0.002, # step between two isolines of detection (m)
+    pixel_limit=(5, 2000), # Min and max of pixel can be include in contour
+    shape_error=55, # Error maximal of circle fitting over contour to be accepted
+    bbox_surface_min_degree=.125 ** 2, # degrees surface minimal to take in account contour
+    )
+```
+
+Plot identification
+```python
+fig = plt.figure(figsize=(14,8))
+ax = fig.add_axes([.03,.03,.94,.94])
+ax.set_title('Eddies detected -- Cyclonic(red) and Anticyclonic(blue)')
+ax.set_ylim(-75,75)
+ax.plot(a.obs['contour_lon_s'].T, a.obs['contour_lat_s'].T, 'b', linewidth=.5)
+ax.plot(c.obs['contour_lon_s'].T, c.obs['contour_lat_s'].T, 'r', linewidth=.5)
+ax.legend()
+ax.grid()
+fig.savefig('share/png/eddies.png')
+```
+
+![eddies detected](share/png/eddies.png)
+
+Save identification datas
+```python
+with Dataset(date.strftime('Anticyclonic_%Y%m%d.nc'), 'w') as h:
+    a.to_netcdf(h)
+with Dataset(date.strftime('Cyclonic_%Y%m%d.nc'), 'w') as h:
+    c.to_netcdf(h)
+```
