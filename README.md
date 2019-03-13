@@ -163,10 +163,11 @@ a, c = h.eddy_identification(
 
 Plot identification
 ```python
-fig = plt.figure(figsize=(14,7))
+fig = plt.figure(figsize=(15,7))
 ax = fig.add_axes([.03,.03,.94,.94])
 ax.set_title('Eddies detected -- Cyclonic(red) and Anticyclonic(blue)')
 ax.set_ylim(-75,75)
+ax.set_xlim(0,360)
 ax.set_aspect('equal')
 ax.plot(a.obs['contour_lon_s'].T, a.obs['contour_lat_s'].T, 'b', linewidth=.5)
 ax.plot(c.obs['contour_lon_s'].T, c.obs['contour_lat_s'].T, 'r', linewidth=.5)
