@@ -5,7 +5,7 @@ import logging
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64, isnan, \
-    floor
+    floor, percentile
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -13,6 +13,7 @@ from scipy.ndimage import gaussian_filter, convolve
 from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.spatial import cKDTree
 from scipy.signal import welch, convolve2d
+from cv2 import filter2D
 from numba import jit
 from matplotlib.path import Path as BasePath
 from matplotlib.contour import QuadContourSet as BaseQuadContourSet
@@ -396,6 +397,16 @@ class GridDataset(object):
 
         # Compute levels for ssh
         z_min, z_max = data.min(), data.max()
+        d_z = z_max -z_min
+        data_tmp = data[~data.mask]
+        epsilon = 0.001  # in %
+        z_min_p, z_max_p = percentile(data_tmp, epsilon), percentile(data_tmp,100-epsilon)
+        d_zp = z_max_p - z_min_p
+        if d_z / d_zp > 2:
+            logging.warning('Maybe some extrema are present zmin %f (m) and zmax %f (m) will be replace by %f and %f',
+                            z_min, z_max, z_min_p, z_max_p)
+            z_min, z_max = z_min_p, z_max_p
+
         levels = arange(z_min - z_min % step, z_max - z_max % step + 2 * step, step)
 
         # Get x and y values
@@ -531,6 +542,12 @@ class GridDataset(object):
                 eddies_collection = EddiesObservations.concatenate(eddies)
             eddies_collection.sign_type = 1 if anticyclonic_search else -1
             eddies_collection.obs['time'] = (date - datetime(1950, 1, 1)).total_seconds() / 86400.
+
+            # normalization longitude between 0 - 360, because storage have an offset on 180
+            eddies_collection.obs['lon'] %= 360
+            ref = eddies_collection.obs['lon'] - 180
+            eddies_collection.obs['contour_lon_e'] = ((eddies_collection.obs['contour_lon_e'].T - ref) % 360 + ref).T
+            eddies_collection.obs['contour_lon_s'] = ((eddies_collection.obs['contour_lon_s'].T - ref) % 360 + ref).T
 
             a_and_c.append(eddies_collection)
         h_units = self.units(grid_height)
@@ -733,12 +750,16 @@ class RegularGridDataset(GridDataset):
         '_speed_ev',
         '_is_circular',
         'x_size',
+        '_x_step',
+        '_y_step',
         )
 
     def __init__(self, *args, **kwargs):
         super(RegularGridDataset, self).__init__(*args, **kwargs)
         self._is_circular = None
         self.x_size = self.x_c.shape[0]
+        self._x_step = (self.x_c[1:] - self.x_c[:-1]).mean()
+        self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
 
     def init_pos_interpolator(self):
         """Create function to have a quick index interpolator
@@ -777,20 +798,20 @@ class RegularGridDataset(GridDataset):
         return indices % self.x_size
 
     def nearest_grd_indice(self, x, y):
-        return int32(floor(((x - self.x_c[0] + self.xstep) % 360) // self.xstep)), \
-               int32(floor(((y - self.y_c[0] + self.ystep) % 360) // self.ystep))
+        return int32(((x - self.x_bounds[0]) % 360) // self.xstep), \
+               int32(((y - self.y_bounds[0]) % 360) // self.ystep)
 
     @property
     def xstep(self):
         """Only for regular grid with no step variation
         """
-        return self.x_c[1] - self.x_c[0]
+        return self._x_step
 
     @property
     def ystep(self):
         """Only for regular grid with no step variation
         """
-        return self.y_c[1] - self.y_c[0]
+        return self._y_step
 
     def compute_pixel_path(self, x0, y0, x1, y1):
         """Give a series of index which describe the path between to position
@@ -949,7 +970,7 @@ class RegularGridDataset(GridDataset):
         data_out = ma.zeros(data.shape)
         data_out.mask = ones(data_out.shape, dtype=bool)
         for i, lat in enumerate(self.y_c):
-            if abs(lat) > lat_max:
+            if abs(lat) > lat_max or data[:, i].mask.all():
                 data_out.mask[:, i] = True
                 continue
             # Get kernel
@@ -975,9 +996,10 @@ class RegularGridDataset(GridDataset):
             # Convolution
             m = ~tmp_matrix.mask
             tmp_matrix[~m] = 0
-            values_sum = convolve2d(tmp_matrix, kernel, mode='valid')[:,0]
 
-            kernel_sum = convolve2d((m).astype(float), kernel, mode='valid')[:,0]
+            demi_x, demi_y = k_shape[0] // 2, k_shape[1] // 2
+            values_sum = filter2D(tmp_matrix, -1, kernel)[demi_x:-demi_x, demi_y]
+            kernel_sum = filter2D(m.astype(float), -1, kernel)[demi_x:-demi_x, demi_y]
             with errstate(invalid='ignore'):
                 data_out[:, i] = values_sum / kernel_sum
         data_out = ma.array(data_out, mask=data.mask + data_out.mask)
@@ -1018,8 +1040,11 @@ class RegularGridDataset(GridDataset):
         self.vars[grid_name] -= data_out
 
     def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
+        logging.debug('Run filtering with wave of %(wave_length)s km and order of %(order)s ...',
+                      dict(wave_length=wave_length, order=order))
         data_out = self.convolve_filter_with_dynamic_kernel(
             grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
+        logging.debug('Filtering done')
         self.vars[grid_name] -= data_out
 
     def bessel_low_filter(self, grid_name, wave_length, order=1, lat_max=85):
@@ -1155,19 +1180,21 @@ class RegularGridDataset(GridDataset):
             new z
         """
         z = empty(lons.shape, dtype='f4').reshape(-1)
+        g = self.grid(grid_name).astype('f4')
         interp_numba(
             self.x_c.astype('f4'),
             self.y_c.astype('f4'),
-            self.grid(grid_name).astype('f4'),
+            g,
             lons.reshape(-1).astype('f4'),
             lats.reshape(-1).astype('f4'),
             z,
+            g.fill_value
         )
         return z
 
 
-@jit("void(f4[:], f4[:], f4[:,:], f4[:], f4[:], f4[:])", nopython=True)
-def interp_numba(x_g, y_g, z, x, y, dest_z):
+@jit("void(f4[:], f4[:], f4[:,:], f4[:], f4[:], f4[:], f4)", nopython=True)
+def interp_numba(x_g, y_g, z, x, y, dest_z, fill_value):
     x_ref = x_g[0]
     y_ref = y_g[0]
     x_step = x_g[1] - x_ref
@@ -1181,5 +1208,18 @@ def interp_numba(x_g, y_g, z, x, y, dest_z):
         j1 = j0 + 1
         xd = (x_ - i0)
         yd = (y_ - j0)
-        dest_z[i] = (z[i0, j0] * (1 - xd) + (z[i1, j0] * xd)) * (1 - yd) + (z[i0, j1] * (1 - xd) + z[i1, j1] * xd) * yd
+        z00 = z[i0, j0]
+        z01 = z[i0, j1]
+        z10 = z[i1, j0]
+        z11 = z[i1, j1]
+        if z00 == fill_value:
+            dest_z[i] = nan
+        elif z01 == fill_value:
+            dest_z[i] = nan
+        elif z10 == fill_value:
+            dest_z[i] = nan
+        elif z11 == fill_value:
+            dest_z[i] = nan
+        else:
+            dest_z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (z01 * (1 - xd) + z11 * xd) * yd
 

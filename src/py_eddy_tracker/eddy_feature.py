@@ -261,7 +261,7 @@ class Contours(object):
                 collection._paths = paths_out
         logging.info('%d contours close over the bounds', poly_solve)
 
-    def __init__(self, x, y, z, levels, bbox_surface_min_degree, wrap_x=False):
+    def __init__(self, x, y, z, levels, bbox_surface_min_degree, wrap_x=False, keep_unclose=False):
         """
         c_i : index to contours
         l_i : index to levels
@@ -276,6 +276,7 @@ class Contours(object):
         logging.debug('X shape : %s', x.shape)
         logging.debug('Y shape : %s', y.shape)
         logging.debug('Z shape : %s', z.shape)
+        logging.info('Start computing iso lines with %d levels from %f to %f ...', len(levels), levels[0], levels[-1])
         self.contours = ax.contour(x, y, z.T, levels)
         if wrap_x:
             self.find_wrapcut_path_and_join(x[0], x[-1])
@@ -304,6 +305,9 @@ class Contours(object):
                 d_x, d_y = x_max - x_min, y_max - y_min
                 square_root = bbox_surface_min_degree ** .5
                 if d_x <= square_root or d_y <= square_root:
+                    continue
+                if keep_unclose:
+                    keep_path.append(contour)
                     continue
                 # Remove unclosed path
                 d_closed = ((contour.vertices[0, 0] - contour.vertices[-1, 0]) **2 + (contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2) ** .5
@@ -405,4 +409,9 @@ class Contours(object):
         else:
             return self.contours.collections[level]._paths[index]
 
+    def display(self, ax, **kwargs):
+        for collection in self.contours.collections:
+            for path in collection.get_paths():
+                x, y= path.vertices[:, 0], path.vertices[:, 1]
+                ax.plot(x, y, **kwargs)
 

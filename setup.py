@@ -42,6 +42,7 @@ setup(
         'matplotlib>=2.0.0',
         'scipy>=0.15.1',
         'netCDF4>=1.1.0',
+        'opencv-python',
         'shapely',
         'pyyaml',
         'pyproj',

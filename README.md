@@ -68,7 +68,7 @@ h.write('/tmp/grid.nc')
 
 Add second plot
 ```python
-ax = fig.add_axes([.03, .02, .9, .45])
+ax = fig.add_axes([.02, .02, .9, .45])
 ax.set_title('ADT Filtered (m)')
 ax.set_aspect('equal')
 ax.set_ylim(-75, 75)
@@ -163,13 +163,13 @@ a, c = h.eddy_identification(
 
 Plot identification
 ```python
-fig = plt.figure(figsize=(14,8))
+fig = plt.figure(figsize=(14,7))
 ax = fig.add_axes([.03,.03,.94,.94])
 ax.set_title('Eddies detected -- Cyclonic(red) and Anticyclonic(blue)')
 ax.set_ylim(-75,75)
+ax.set_aspect('equal')
 ax.plot(a.obs['contour_lon_s'].T, a.obs['contour_lat_s'].T, 'b', linewidth=.5)
 ax.plot(c.obs['contour_lon_s'].T, c.obs['contour_lat_s'].T, 'r', linewidth=.5)
-ax.legend()
 ax.grid()
 fig.savefig('share/png/eddies.png')
 ```
