@@ -843,6 +843,10 @@ class EddiesObservations(object):
     def set_global_attr_netcdf(self, h_nc):
         pass
 
+    def display(self, ax, ref=0, **kwargs):
+        ax.plot((self.obs['contour_lon_s'].T - ref) % 360 + ref, self.obs['contour_lat_s'].T, ** kwargs)
+        ax.plot((self.obs['contour_lon_e'].T - ref) % 360 + ref, self.obs['contour_lat_e'].T, linestyle='-.', ** kwargs)
+
 
 class VirtualEddiesObservations(EddiesObservations):
     """Class to work with virtual obs

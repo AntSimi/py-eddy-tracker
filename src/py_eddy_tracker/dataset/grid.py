@@ -194,6 +194,7 @@ class GridDataset(object):
         'vars',
         'interpolators',
         'speed_coef',
+        'contours',
     )
 
     GRAVITY = 9.807
@@ -211,6 +212,7 @@ class GridDataset(object):
         self.x_dim = None
         self.y_dim = None
         self.centered = centered
+        self.contours = None
         self.xinterp = None
         self.yinterp = None
         self.filename = filename
@@ -413,8 +415,10 @@ class GridDataset(object):
         x, y = self.x_c, self.y_c
 
         # Compute ssh contour
-        contours = Contours(x, y, data, levels, bbox_surface_min_degree=bbox_surface_min_degree, wrap_x=self.is_circular())
+        self.contours = Contours(x, y, data, levels, bbox_surface_min_degree=bbox_surface_min_degree, wrap_x=self.is_circular())
 
+        track_extra_variables = ['height_max_speed_contour', 'height_external_contour', 'height_inner_contour']
+        array_variables = ['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s', 'uavg_profile']
         # Compute cyclonic and anticylonic research:
         a_and_c = list()
         for anticyclonic_search in [True, False]:
@@ -422,7 +426,7 @@ class GridDataset(object):
             iterator = 1 if anticyclonic_search else -1
 
             # Loop over each collection
-            for coll_ind, coll in enumerate(contours.iter(step=iterator)):
+            for coll_ind, coll in enumerate(self.contours.iter(step=iterator)):
                 corrected_coll_index = coll_ind
                 if iterator == -1:
                     corrected_coll_index = - coll_ind - 1
@@ -431,7 +435,7 @@ class GridDataset(object):
                 nb_paths = len(contour_paths)
                 if nb_paths == 0:
                     continue
-                cvalues = contours.cvalues[corrected_coll_index]
+                cvalues = self.contours.cvalues[corrected_coll_index]
                 logging.debug('doing collection %s, contour value %.4f, %d paths',
                               corrected_coll_index, cvalues, nb_paths)
 
@@ -440,6 +444,7 @@ class GridDataset(object):
                     if current_contour.used:
                         continue
                     centlon_e, centlat_e, eddy_radius_e, aerr = current_contour.fit_circle()
+
                     # Filter for shape
                     if aerr < 0 or aerr > shape_error:
                         continue
@@ -465,13 +470,14 @@ class GridDataset(object):
                     # Compute amplitude
                     reset_centroid, amp = self.get_amplitude(current_contour, cvalues, data,
                                                              anticyclonic_search=anticyclonic_search,
-                                                             level=contours.levels[corrected_coll_index], step=step)
-
+                                                             level=self.contours.levels[corrected_coll_index], step=step)
+                    print(reset_centroid, amp.amplitude)
                     # If we have a valid amplitude
                     if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
                         continue
 
                     if reset_centroid:
+
                         if self.is_circular():
                             centi = self.normalize_x_indice(reset_centroid[0])
                         else:
@@ -487,7 +493,8 @@ class GridDataset(object):
 
                     # centlat_e and centlon_e must be index of maximum, we will loose some inner contour, if it's not
                     max_average_speed, speed_contour, inner_contour, speed_array, i_max_speed, i_inner = \
-                        self.get_uavg(contours, centlon_e, centlat_e, current_contour, anticyclonic_search, corrected_coll_index)
+                        self.get_uavg(self.contours, centlon_e, centlat_e, current_contour, anticyclonic_search,
+                                      corrected_coll_index)
 
                     # Use azimuth equal projection for radius
                     proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0={1} +lon_0={0}'.format(*inner_contour.mean_coordinates))
@@ -502,16 +509,13 @@ class GridDataset(object):
                     _, _, eddy_radius_s, aerr_s = fit_circle_c(c_x, c_y)
 
                     # Instantiate new EddyObservation object
-                    properties = EddiesObservations(
-                        size=1,
-                        track_extra_variables=[ 'height_max_speed_contour', 'height_external_contour', 'height_inner_contour'],
-                        track_array_variables=array_sampling,
-                        array_variables=['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s', 'uavg_profile']
-                    )
+                    properties = EddiesObservations(size=1, track_extra_variables=track_extra_variables,
+                                                    track_array_variables=array_sampling,
+                                                    array_variables=array_variables)
 
-                    properties.obs['height_max_speed_contour'] = contours.cvalues[i_max_speed]
+                    properties.obs['height_max_speed_contour'] = self.contours.cvalues[i_max_speed]
                     properties.obs['height_external_contour'] = cvalues
-                    properties.obs['height_inner_contour'] = contours.cvalues[i_inner]
+                    properties.obs['height_inner_contour'] = self.contours.cvalues[i_inner]
                     array_size = speed_array.shape[0]
                     properties.obs['nb_contour_selected'] = array_size
                     if speed_array.shape[0] == 1:
@@ -537,7 +541,9 @@ class GridDataset(object):
                     # To reserve definitively the area
                     data.mask[i_x_in, i_y_in] = True
             if len(eddies) == 0:
-                eddies_collection = EddiesObservations()
+                eddies_collection = EddiesObservations(track_extra_variables=track_extra_variables,
+                                                       track_array_variables=array_sampling,
+                                                       array_variables=array_variables)
             else:
                 eddies_collection = EddiesObservations.concatenate(eddies)
             eddies_collection.sign_type = 1 if anticyclonic_search else -1
@@ -1167,6 +1173,11 @@ class RegularGridDataset(GridDataset):
         # Evaluation near masked value will be smoothed to 0 !!!, not perfect
         speed[speed.mask] = 0
         self._speed_ev = RectBivariateSpline(self.x_c, self.y_c, speed, kx=1, ky=1).ev
+
+    def display(self, ax, name, **kwargs):
+        if 'cmap' not in kwargs:
+            kwargs['cmap'] = 'coolwarm'
+        return ax.pcolormesh(self.x_bounds, self.y_bounds, self.grid(name).T, **kwargs)
 
     def interp(self, grid_name, lons, lats):
         """

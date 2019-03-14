@@ -27,7 +27,7 @@ Version 2.0.3
 """
 
 import logging
-from numpy import ones, where, empty, array, concatenate, ma
+from numpy import ones, where, empty, array, concatenate, ma, zeros
 from scipy.ndimage import minimum_filter
 from scipy.ndimage import binary_erosion
 from matplotlib.figure import Figure
@@ -43,6 +43,7 @@ class Amplitude(object):
     __slots__ = (
         'h_0',
         'grid_extract',
+        'mask',
         'sla',
         'contour',
         'interval',
@@ -65,6 +66,8 @@ class Amplitude(object):
         else:
             self.grid_extract = data[slice_x, slice_y]
         # => maybe replace pixel out of contour by nan?
+        self.mask = zeros(self.grid_extract.shape, dtype='bool')
+        self.mask[contour.pixels_index[0] - slice_x.start, contour.pixels_index[1] - slice_y.start] = True
 
         # Only pixel in contour
         self.sla = data[contour.pixels_index]
@@ -83,12 +86,12 @@ class Amplitude(object):
     def _set_cyc_amplitude(self):
         """Get amplitude for cyclone
         """
-        self.amplitude = self.h_0 - self.grid_extract.min()
+        self.amplitude = self.h_0 - self.sla.min()
 
     def _set_acyc_amplitude(self):
         """Get amplitude for anticyclone
         """
-        self.amplitude = self.grid_extract.max() - self.h_0
+        self.amplitude = self.sla.max() - self.h_0
 
     def all_pixels_below_h0(self, level):
         """
@@ -100,6 +103,8 @@ class Amplitude(object):
         else:
             self._set_local_extrema(1)
             lmi_i, lmi_j = where(self.local_extrema_inds)
+            m = self.mask[lmi_i, lmi_j]
+            lmi_i, lmi_j = lmi_i[m], lmi_j[m]
             nb_real_extrema = ((level - self.grid_extract[lmi_i, lmi_j]) >= 2 * self.interval).sum()
             if nb_real_extrema > self.mle:
                 return False
@@ -122,6 +127,8 @@ class Amplitude(object):
         else:
             self._set_local_extrema(-1)
             lmi_i, lmi_j = where(self.local_extrema_inds)
+            m = self.mask[lmi_i, lmi_j]
+            lmi_i, lmi_j = lmi_i[m], lmi_j[m]
             nb_real_extrema = ((self.grid_extract[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
             if nb_real_extrema > self.mle:
                 return False
@@ -277,7 +284,7 @@ class Contours(object):
         logging.debug('Y shape : %s', y.shape)
         logging.debug('Z shape : %s', z.shape)
         logging.info('Start computing iso lines with %d levels from %f to %f ...', len(levels), levels[0], levels[-1])
-        self.contours = ax.contour(x, y, z.T, levels)
+        self.contours = ax.contour(x, y, z.T, levels, cmap='Spectral_r')
         if wrap_x:
             self.find_wrapcut_path_and_join(x[0], x[-1])
         logging.info('Finish computing iso lines')
@@ -410,8 +417,12 @@ class Contours(object):
             return self.contours.collections[level]._paths[index]
 
     def display(self, ax, **kwargs):
+        from matplotlib.collections import LineCollection
         for collection in self.contours.collections:
-            for path in collection.get_paths():
-                x, y= path.vertices[:, 0], path.vertices[:, 1]
-                ax.plot(x, y, **kwargs)
-
+            ax.add_collection(LineCollection(
+                (i.vertices for i in collection.get_paths()),
+                color=collection.get_color(),
+                **kwargs
+            ))
+        ax.update_datalim([self.contours._mins, self.contours._maxs])
+        ax.autoscale_view()
