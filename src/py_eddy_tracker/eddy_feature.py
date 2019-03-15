@@ -27,9 +27,8 @@ Version 2.0.3
 """
 
 import logging
-from numpy import ones, where, empty, array, concatenate, ma, zeros
+from numpy import where, empty, array, concatenate, ma, zeros, unique, round
 from scipy.ndimage import minimum_filter
-from scipy.ndimage import binary_erosion
 from matplotlib.figure import Figure
 from .tools import index_from_nearest_path, index_from_nearest_path_with_pt_in_bbox
 
@@ -39,7 +38,7 @@ class Amplitude(object):
     Class to calculate *amplitude* and counts of *local maxima/minima*
     within a closed region of a sea level anomaly field.
     """
-    
+    EPSILON = 1e-8
     __slots__ = (
         'h_0',
         'grid_extract',
@@ -48,7 +47,6 @@ class Amplitude(object):
         'contour',
         'interval',
         'amplitude',
-        'local_extrema_inds',
         'mle',
         )
 
@@ -73,7 +71,6 @@ class Amplitude(object):
         self.sla = data[contour.pixels_index]
         # Amplitude which will be provide
         self.amplitude = 0
-        self.local_extrema_inds = None
         # Maximum local extrema accepted
         self.mle = 1
 
@@ -98,54 +95,96 @@ class Amplitude(object):
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are below a given SSH threshold for cyclonic eddies.
         """
-        if (self.sla > self.h_0).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
+        # In some case pixel value must be very near of contour bounds
+        if ((self.sla - self.h_0) > self.EPSILON).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
             return False
         else:
-            self._set_local_extrema(1)
-            lmi_i, lmi_j = where(self.local_extrema_inds)
-            m = self.mask[lmi_i, lmi_j]
-            lmi_i, lmi_j = lmi_i[m], lmi_j[m]
-            nb_real_extrema = ((level - self.grid_extract[lmi_i, lmi_j]) >= 2 * self.interval).sum()
-            if nb_real_extrema > self.mle:
-                return False
-            amp_min = level - (2 * self.interval)
-            index = self.grid_extract[lmi_i, lmi_j].argmin()
-            jmin_, imin_ = lmi_j[index], lmi_i[index]
-            if self.grid_extract[imin_, jmin_] <= amp_min:
-                self._set_cyc_amplitude()
+            # All local extrema index on th box
+            lmi_i, lmi_j = self._set_local_extrema(1)
             slice_x, slice_y = self.contour.bbox_slice
-            return imin_ + slice_x.start, jmin_ + slice_y.start
+            if len(lmi_i) == 1:
+                i, j = lmi_i[0] + slice_x.start, lmi_j[0] + slice_y.start
+            else:
+                # Verify if several extrema are seriously below contour
+                nb_real_extrema = ((level - self.grid_extract[lmi_i, lmi_j]) >= 2 * self.interval).sum()
+                if nb_real_extrema > self.mle:
+                    return False
+                index = self.grid_extract[lmi_i, lmi_j].argmin()
+                i, j = lmi_i[index] + slice_x.start, lmi_j[index] + slice_y.start
+            self._set_cyc_amplitude()
+            return i, j
 
     def all_pixels_above_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
         are above a given SSH threshold for anticyclonic eddies.
         """
-        if (self.sla < self.h_0).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
+        # In some case pixel value must be very near of contour bounds
+        if ((self.sla - self.h_0) < - self.EPSILON).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
             # i.e.,with self.amplitude == 0
             return False
         else:
-            self._set_local_extrema(-1)
-            lmi_i, lmi_j = where(self.local_extrema_inds)
-            m = self.mask[lmi_i, lmi_j]
-            lmi_i, lmi_j = lmi_i[m], lmi_j[m]
-            nb_real_extrema = ((self.grid_extract[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
-            if nb_real_extrema > self.mle:
-                return False
-            amp_min = level + (2 * self.interval)
-            index = self.grid_extract[lmi_i, lmi_j].argmax()
-            jmin_, imin_ = lmi_j[index], lmi_i[index]
-            if self.grid_extract[imin_, jmin_] >= amp_min:
-                self._set_cyc_amplitude()
+
+            # All local extrema index on th box
+            lmi_i, lmi_j = self._set_local_extrema(-1)
             slice_x, slice_y = self.contour.bbox_slice
-            return imin_ + slice_x.start, jmin_ + slice_y.start
+            if len(lmi_i) == 1:
+                i, j = lmi_i[0] + slice_x.start, lmi_j[0] + slice_y.start
+            else:
+                # Verify if several extrema are seriously above contour
+                nb_real_extrema = ((self.grid_extract[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
+                if nb_real_extrema > self.mle:
+                    return False
+                index = self.grid_extract[lmi_i, lmi_j].argmax()
+                i, j = lmi_i[index] + slice_x.start, lmi_j[index] + slice_y.start
+            self._set_cyc_amplitude()
+            return i, j
 
     def _set_local_extrema(self, sign):
         """
         Set count of local SLA maxima/minima within eddy
         """
-        # mask of minima
-        self.local_extrema_inds = self.detect_local_minima(self.grid_extract * sign)
+        # index of minima on whole grid extract
+        i_x, i_y = self.detect_local_minima(self.grid_extract * sign)
+        # Only index in contour
+        m = self.mask[i_x, i_y]
+        i_x, i_y = i_x[m], i_y[m]
+        # Verify if some extramum is contigus
+        nb_extrema = len(i_x)
+        if nb_extrema > 1:
+            # Group
+            nb_group = 1
+            gr = zeros(nb_extrema, dtype='u2')
+            for i1, (i, j) in enumerate(zip(i_x[:-1], i_y[:-1])):
+                for i2, (k, l) in enumerate(zip(i_x[i1 + 1:], i_y[i1 + 1:])):
+                    if (abs(i - k) + abs(j - l)) == 1:
+                        i2_ = i2 + i1 + 1
+                        if gr[i1] == 0 and gr[i2_] == 0:
+                            # Nobody was link with a know group
+                            gr[i1] = nb_group
+                            gr[i2_] = nb_group
+                            nb_group += 1
+                        elif gr[i1] == 0 and gr[i2_] != 0:
+                            # i2 is link not i1
+                            gr[i1] = gr[i2_]
+                        elif gr[i2_] == 0 and gr[i1] != 0:
+                            # i1 is link not i2
+                            gr[i2_] = gr[i1]
+                        else:
+                            # there already linked in two different group
+                            # we replace group from i1 with group from i2
+                            gr[gr == gr[i1]] = gr[i2_]
+            m = gr != 0
+            grs = unique(gr[m])
+            # all non grouped extremum
+            i_x_new, i_y_new = list(i_x[~m]), list(i_y[~m])
+            for gr_ in grs:
+                m = gr_ == gr
+                # Choose barycentre of group
+                i_x_new.append(round(i_x[m].mean(axis=0)).astype('i2'))
+                i_y_new.append(round(i_y[m].mean(axis=0)).astype('i2'))
+            return i_x_new, i_y_new
+        return i_x, i_y
 
     @staticmethod
     def detect_local_minima(grid):
@@ -155,20 +194,13 @@ class Amplitude(object):
         the pixel's value is the neighborhood maximum, 0 otherwise)
         http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
         """
-        # Equivalent
-        neighborhood = ones((3, 3), dtype='bool')
+        # To don't perturbate filter
         if hasattr(grid, 'mask'):
             grid[grid.mask] = 2e10
         # Get local mimima
-        detected_minima = minimum_filter(
-            grid, footprint=neighborhood) == grid
-        background = (grid == 0)
-        # Aims ?
-        eroded_background = binary_erosion(
-            background, structure=neighborhood, border_value=1)
-        detected_minima ^= eroded_background
-        # mask of minima
-        return detected_minima
+        detected_minima = minimum_filter(grid, size=3) == grid
+        # index of minima
+        return where(detected_minima)
 
 
 class Contours(object):

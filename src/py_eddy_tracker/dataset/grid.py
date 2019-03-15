@@ -12,7 +12,7 @@ from netCDF4 import Dataset
 from scipy.ndimage import gaussian_filter, convolve
 from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.spatial import cKDTree
-from scipy.signal import welch, convolve2d
+from scipy.signal import welch
 from cv2 import filter2D
 from numba import jit
 from matplotlib.path import Path as BasePath
@@ -471,7 +471,6 @@ class GridDataset(object):
                     reset_centroid, amp = self.get_amplitude(current_contour, cvalues, data,
                                                              anticyclonic_search=anticyclonic_search,
                                                              level=self.contours.levels[corrected_coll_index], step=step)
-                    print(reset_centroid, amp.amplitude)
                     # If we have a valid amplitude
                     if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
                         continue
