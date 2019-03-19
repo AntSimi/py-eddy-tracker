@@ -6,6 +6,7 @@ from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64, isnan, \
     floor, percentile, zeros
+from numpy.linalg import lstsq
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -14,13 +15,12 @@ from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.spatial import cKDTree
 from scipy.signal import welch
 from cv2 import filter2D
-from numba import jit
+from numba import njit, prange
 from matplotlib.path import Path as BasePath
 from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
 from pint import UnitRegistry
-from ..tools import fit_circle_c, distance_vector, winding_number_poly, poly_contain_poly, \
-    distance, distance_point_vector
+from ..tools import distance_vector, winding_number_poly, poly_contain_poly, distance, distance_point_vector
 from ..observations import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
 from .. import VAR_DESCR
@@ -115,7 +115,7 @@ def _fit_circle_path(self):
 
     c_x, c_y = proj(self.lon, self.lat)
     try:
-        centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c(c_x, c_y)
+        centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c_numba(c_x, c_y)
         centlon_e, centlat_e = proj(centlon_e, centlat_e, inverse=True)
         centlon_e = (centlon_e - lon_mean + 180) % 360 + lon_mean - 180
         self._circle_params = centlon_e, centlat_e, eddy_radius_e, aerr
@@ -128,6 +128,74 @@ def _fit_circle_path(self):
             logging.debug('%d coordinates %s,%s', len(self.lon), self.lon,
                           self.lat)
             self._circle_params = 0, -90, nan, nan
+
+
+@njit(cache=True)
+def fit_circle_c_numba(x_vec, y_vec):
+    nb_elt = x_vec.shape[0]
+    p_inon_x = empty(nb_elt)
+    p_inon_y = empty(nb_elt)
+
+    x_mean = x_vec.mean()
+    y_mean = y_vec.mean()
+
+    norme = (x_vec - x_mean) ** 2 + (y_vec - y_mean) ** 2
+    norme_max = norme.max()
+    scale = norme_max ** .5
+
+    # Form matrix equation and solve it
+    # Maybe put f4
+    datas = ones((nb_elt, 3))
+    datas[:, 0] = 2. * (x_vec - x_mean) / scale
+    datas[:, 1] = 2. * (y_vec - y_mean) / scale
+
+    (center_x, center_y, radius), residuals, rank, s = lstsq(datas, norme / norme_max)
+
+    # Unscale data and get circle variables
+    radius += center_x ** 2 + center_y ** 2
+    radius **= .5
+    center_x *= scale
+    center_y *= scale
+    # radius of fitted circle
+    radius *= scale
+    # center X-position of fitted circle
+    center_x += x_mean
+    # center Y-position of fitted circle
+    center_y += y_mean
+
+    # area of fitted circle
+    c_area = (radius ** 2) * pi
+
+    # Find distance between circle center and contour points_inside_poly
+    for i_elt in range(nb_elt):
+        # Find distance between circle center and contour points_inside_poly
+        dist_poly = ((x_vec[i_elt] - center_x) ** 2 + (y_vec[i_elt] - center_y) ** 2) ** .5
+        # Indices of polygon points outside circle
+        # p_inon_? : polygon x or y points inside & on the circle
+        if dist_poly > radius:
+            p_inon_y[i_elt] = center_y + radius * (y_vec[i_elt] - center_y) / dist_poly
+            p_inon_x[i_elt] = center_x - (center_x - x_vec[i_elt]) * (center_y - p_inon_y[i_elt]) / (
+                        center_y - y_vec[i_elt])
+        else:
+            p_inon_x[i_elt] = x_vec[i_elt]
+            p_inon_y[i_elt] = y_vec[i_elt]
+
+    # Area of closed contour/polygon enclosed by the circle
+    p_area_incirc = 0
+    p_area = 0
+    for i_elt in range(nb_elt - 1):
+        # Indices of polygon points outside circle
+        # p_inon_? : polygon x or y points inside & on the circle
+        p_area_incirc += p_inon_x[i_elt] * p_inon_y[1 + i_elt] - p_inon_x[i_elt + 1] * p_inon_y[i_elt]
+        # Shape test
+        # Area and centroid of closed contour/polygon
+        p_area += x_vec[i_elt] * y_vec[1 + i_elt] - x_vec[1 + i_elt] * y_vec[i_elt]
+    p_area = abs(p_area) * .5
+
+    p_area_incirc = abs(p_area_incirc) * .5
+
+    a_err = (c_area - 2 * p_area_incirc + p_area) * 100. / c_area
+    return center_x, center_y, radius, a_err
 
 
 BasePath.fit_circle = fit_circle_path
@@ -502,12 +570,12 @@ class GridDataset(object):
                     # First, get position based on innermost
                     # contour
                     c_x, c_y = proj(inner_contour.lon, inner_contour.lat)
-                    centx_s, centy_s, _, _ = fit_circle_c(c_x, c_y)
+                    centx_s, centy_s, _, _ = fit_circle_c_numba(c_x, c_y)
                     centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
                     # Second, get speed-based radius based on
                     # contour of max uavg
                     c_x, c_y = proj(speed_contour.lon, speed_contour.lat)
-                    _, _, eddy_radius_s, aerr_s = fit_circle_c(c_x, c_y)
+                    _, _, eddy_radius_s, aerr_s = fit_circle_c_numba(c_x, c_y)
 
                     # Instantiate new EddyObservation object
                     properties = EddiesObservations(size=1, track_extra_variables=track_extra_variables,
@@ -1192,26 +1260,26 @@ class RegularGridDataset(GridDataset):
             new z
         """
         z = empty(lons.shape, dtype='f4').reshape(-1)
-        g = self.grid(grid_name).astype('f4')
+        g = self.grid(grid_name)
         interp_numba(
-            self.x_c.astype('f4'),
-            self.y_c.astype('f4'),
+            self.x_c,
+            self.y_c,
             g,
-            lons.reshape(-1).astype('f4'),
-            lats.reshape(-1).astype('f4'),
+            lons.reshape(-1),
+            lats.reshape(-1),
             z,
             g.fill_value
         )
         return z
 
 
-@jit("void(f4[:], f4[:], f4[:,:], f4[:], f4[:], f4[:], f4)", nopython=True)
+@njit(parralel=True, cache=True)
 def interp_numba(x_g, y_g, z, x, y, dest_z, fill_value):
     x_ref = x_g[0]
     y_ref = y_g[0]
     x_step = x_g[1] - x_ref
     y_step = y_g[1] - y_ref
-    for i in range(x.size):
+    for i in prange(x.size):
         x_ = (x[i] - x_ref) / x_step
         y_ = (y[i] - y_ref) / y_step
         i0 = int(floor(x_))
