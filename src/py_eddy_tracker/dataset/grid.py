@@ -5,7 +5,7 @@ import logging
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64, isnan, \
-    floor, percentile
+    floor, percentile, zeros
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -363,6 +363,8 @@ class GridDataset(object):
                     if i_x > i_y:
                         self.variables_description[varname]['infos']['transpose'] = True
                         self.vars[varname] = self.vars[varname].T
+            if not hasattr(self.vars[varname], 'mask'):
+                self.vars[varname] = ma.array(self.vars[varname], mask=zeros(self.vars[varname].shape, dtype='bool'))
         return self.vars[varname]
 
     def high_filter(self, grid_name, x_cut, y_cut):
@@ -402,7 +404,7 @@ class GridDataset(object):
         d_z = z_max -z_min
         data_tmp = data[~data.mask]
         epsilon = 0.001  # in %
-        z_min_p, z_max_p = percentile(data_tmp, epsilon), percentile(data_tmp,100-epsilon)
+        z_min_p, z_max_p = percentile(data_tmp, epsilon), percentile(data_tmp, 100 - epsilon)
         d_zp = z_max_p - z_min_p
         if d_z / d_zp > 2:
             logging.warning('Maybe some extrema are present zmin %f (m) and zmax %f (m) will be replace by %f and %f',

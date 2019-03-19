@@ -59,13 +59,18 @@ class Amplitude(object):
         self.contour = contour
         # Link on original grid (local view) or copy if it's on bound
         slice_x, slice_y = contour.bbox_slice
-        if slice_x.start > slice_x.stop:
+        on_bounds = slice_x.start > slice_x.stop
+        if on_bounds:
             self.grid_extract = ma.concatenate((data[slice_x.start:, slice_y], data[:slice_x.stop, slice_y]))
         else:
             self.grid_extract = data[slice_x, slice_y]
         # => maybe replace pixel out of contour by nan?
         self.mask = zeros(self.grid_extract.shape, dtype='bool')
-        self.mask[contour.pixels_index[0] - slice_x.start, contour.pixels_index[1] - slice_y.start] = True
+        if on_bounds:
+            i_x = (contour.pixels_index[0] - slice_x.start) % data.shape[0]
+        else:
+            i_x = contour.pixels_index[0] - slice_x.start
+        self.mask[i_x, contour.pixels_index[1] - slice_y.start] = True
 
         # Only pixel in contour
         self.sla = data[contour.pixels_index]
@@ -77,18 +82,8 @@ class Amplitude(object):
     def within_amplitude_limits(self):
         """Need update
         """
-        return True
+        return (self.interval * 2) <= self.amplitude
         return self.eddy.ampmin <= self.amplitude <= self.eddy.ampmax
-
-    def _set_cyc_amplitude(self):
-        """Get amplitude for cyclone
-        """
-        self.amplitude = self.h_0 - self.sla.min()
-
-    def _set_acyc_amplitude(self):
-        """Get amplitude for anticyclone
-        """
-        self.amplitude = self.sla.max() - self.h_0
 
     def all_pixels_below_h0(self, level):
         """
@@ -101,17 +96,23 @@ class Amplitude(object):
         else:
             # All local extrema index on th box
             lmi_i, lmi_j = self._set_local_extrema(1)
+            nb = len(lmi_i)
             slice_x, slice_y = self.contour.bbox_slice
-            if len(lmi_i) == 1:
-                i, j = lmi_i[0] + slice_x.start, lmi_j[0] + slice_y.start
+            if nb == 0:
+                logging.warning('No extrema found in contour in level %f', level)
+                return False
+            elif nb == 1:
+                i, j = lmi_i[0], lmi_j[0]
             else:
                 # Verify if several extrema are seriously below contour
                 nb_real_extrema = ((level - self.grid_extract[lmi_i, lmi_j]) >= 2 * self.interval).sum()
                 if nb_real_extrema > self.mle:
                     return False
                 index = self.grid_extract[lmi_i, lmi_j].argmin()
-                i, j = lmi_i[index] + slice_x.start, lmi_j[index] + slice_y.start
-            self._set_cyc_amplitude()
+                i, j = lmi_i[index], lmi_j[index]
+            self.amplitude = abs(self.grid_extract[i, j] - self.h_0)
+            i += slice_x.start
+            j += slice_y.start
             return i, j
 
     def all_pixels_above_h0(self, level):
@@ -121,23 +122,27 @@ class Amplitude(object):
         """
         # In some case pixel value must be very near of contour bounds
         if ((self.sla - self.h_0) < - self.EPSILON).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
-            # i.e.,with self.amplitude == 0
             return False
         else:
-
             # All local extrema index on th box
             lmi_i, lmi_j = self._set_local_extrema(-1)
+            nb = len(lmi_i)
             slice_x, slice_y = self.contour.bbox_slice
-            if len(lmi_i) == 1:
-                i, j = lmi_i[0] + slice_x.start, lmi_j[0] + slice_y.start
+            if nb == 0:
+                logging.warning('No extrema found in contour in level %f', level)
+                return False
+            elif nb == 1:
+                i, j = lmi_i[0], lmi_j[0]
             else:
                 # Verify if several extrema are seriously above contour
                 nb_real_extrema = ((self.grid_extract[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
                 if nb_real_extrema > self.mle:
                     return False
                 index = self.grid_extract[lmi_i, lmi_j].argmax()
-                i, j = lmi_i[index] + slice_x.start, lmi_j[index] + slice_y.start
-            self._set_cyc_amplitude()
+                i, j = lmi_i[index], lmi_j[index]
+            self.amplitude = abs(self.grid_extract[i, j] - self.h_0)
+            i += slice_x.start
+            j += slice_y.start
             return i, j
 
     def _set_local_extrema(self, sign):
@@ -149,7 +154,7 @@ class Amplitude(object):
         # Only index in contour
         m = self.mask[i_x, i_y]
         i_x, i_y = i_x[m], i_y[m]
-        # Verify if some extramum is contigus
+        # Verify if some extremum is contigus
         nb_extrema = len(i_x)
         if nb_extrema > 1:
             # Group
@@ -316,7 +321,7 @@ class Contours(object):
         logging.debug('Y shape : %s', y.shape)
         logging.debug('Z shape : %s', z.shape)
         logging.info('Start computing iso lines with %d levels from %f to %f ...', len(levels), levels[0], levels[-1])
-        self.contours = ax.contour(x, y, z.T, levels, cmap='Spectral_r')
+        self.contours = ax.contour(x, y, z.T, levels, cmap='rainbow')
         if wrap_x:
             self.find_wrapcut_path_and_join(x[0], x[-1])
         logging.info('Finish computing iso lines')
