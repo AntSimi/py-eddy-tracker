@@ -12,7 +12,99 @@ ctypedef double DTYPE_coord
 
 
 cdef DTYPE_coord D2R = 0.017453292519943295
+cdef DTYPE_coord PI = 3.141592653589793
 cdef DTYPE_coord EARTH_DIAMETER = 6371.3150 * 2
+
+
+@wraparound(False)
+@boundscheck(False)
+def fit_circle_c(
+    ndarray[DTYPE_coord] x_vec,
+    ndarray[DTYPE_coord] y_vec
+    ):
+    """
+    Fit the circle
+    Adapted from ETRACK (KCCMC11)
+    """
+    cdef DTYPE_ui i_elt, i_start, i_end, nb_elt
+    cdef DTYPE_coord x_mean, y_mean, scale, norme_max, center_x, center_y, radius
+    cdef DTYPE_coord p_area, c_area, a_err, p_area_incirc, dist_poly
+    nb_elt = x_vec.shape[0]
+
+    cdef DTYPE_coord * p_inon_x = <DTYPE_coord * >malloc(nb_elt * sizeof(DTYPE_coord))
+    if not p_inon_x:
+        raise MemoryError()
+    cdef DTYPE_coord * p_inon_y = <DTYPE_coord * >malloc(nb_elt * sizeof(DTYPE_coord))
+    if not p_inon_y:
+        raise MemoryError()
+
+    x_mean = 0
+    y_mean = 0
+    
+    for i_elt from 0 <= i_elt < nb_elt:
+        x_mean += x_vec[i_elt]
+        y_mean += y_vec[i_elt]
+    y_mean /= nb_elt
+    x_mean /= nb_elt
+    
+    norme = (x_vec - x_mean) ** 2 + (y_vec - y_mean) ** 2
+    norme_max = norme.max()
+    scale = norme_max ** .5
+
+    # Form matrix equation and solve it
+    # Maybe put f4
+    datas = ones((nb_elt, 3), dtype='f8')
+    for i_elt from 0 <= i_elt < nb_elt:
+        datas[i_elt, 0] = 2. * (x_vec[i_elt] - x_mean) / scale
+        datas[i_elt, 1] = 2. * (y_vec[i_elt] - y_mean) / scale
+        
+    (center_x, center_y, radius), _, _, _ = lstsq(datas, norme / norme_max, rcond=None)
+
+    # Unscale data and get circle variables
+    radius += center_x ** 2 + center_y ** 2
+    radius **= .5
+    center_x *= scale
+    center_y *= scale
+    # radius of fitted circle
+    radius *= scale
+    # center X-position of fitted circle
+    center_x += x_mean
+    # center Y-position of fitted circle
+    center_y += y_mean
+
+    # area of fitted circle
+    c_area = (radius ** 2) * PI
+    
+    # Find distance between circle center and contour points_inside_poly
+    for i_elt from 0 <= i_elt < nb_elt:
+        # Find distance between circle center and contour points_inside_poly
+        dist_poly = ((x_vec[i_elt] - center_x) ** 2 + (y_vec[i_elt] - center_y) ** 2) ** .5
+        # Indices of polygon points outside circle
+        # p_inon_? : polygon x or y points inside & on the circle
+        if dist_poly > radius:
+            p_inon_y[i_elt] = center_y + radius * (y_vec[i_elt] - center_y) / dist_poly
+            p_inon_x[i_elt] = center_x - (center_x - x_vec[i_elt]) * (center_y - p_inon_y[i_elt]) / (center_y - y_vec[i_elt])
+        else:
+            p_inon_x[i_elt] = x_vec[i_elt]
+            p_inon_y[i_elt] = y_vec[i_elt]
+
+    # Area of closed contour/polygon enclosed by the circle
+    p_area_incirc = 0
+    p_area = 0
+    for i_elt from 0 <= i_elt < (nb_elt - 1):
+        # Indices of polygon points outside circle
+        # p_inon_? : polygon x or y points inside & on the circle
+        p_area_incirc += p_inon_x[i_elt] * p_inon_y[1 + i_elt] - p_inon_x[i_elt + 1] * p_inon_y[i_elt]
+        # Shape test
+        # Area and centroid of closed contour/polygon
+        p_area += x_vec[i_elt] * y_vec[1 + i_elt] - x_vec[1 + i_elt] * y_vec[i_elt]
+    p_area = abs(p_area) * .5
+    free(p_inon_x)
+    free(p_inon_y)
+    p_area_incirc = abs(p_area_incirc) * .5
+    
+    a_err = (c_area - 2 * p_area_incirc + p_area) * 100. / c_area
+    return center_x, center_y, radius, a_err
 
 
 @wraparound(False)

@@ -4,8 +4,8 @@
 import logging
 from numpy import concatenate, int32, empty, maximum, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
-    linspace, errstate, int_, column_stack, interp, meshgrid, nan, ceil, sinc, float64, isnan, \
-    floor, percentile, zeros
+    linspace, errstate, int_, interp, meshgrid, nan, ceil, sinc, isnan, \
+    floor, percentile, zeros, arctan2, arcsin
 from numpy.linalg import lstsq
 from datetime import datetime
 from scipy.special import j1
@@ -20,7 +20,7 @@ from matplotlib.path import Path as BasePath
 from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
 from pint import UnitRegistry
-from ..tools import distance_vector, winding_number_poly, poly_contain_poly, distance, distance_point_vector
+from ..tools import winding_number_poly, poly_contain_poly
 from ..observations import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
 from .. import VAR_DESCR
@@ -65,6 +65,32 @@ def lat(self):
 BasePath.lat = lat
 
 
+@njit(cache=True, fastmath=True)
+def distance(lon0, lat0, lon1, lat1):
+    D2R = pi / 180.
+    sin_dlat = sin((lat1 - lat0) * 0.5 * D2R)
+    sin_dlon = sin((lon1 - lon0) * 0.5 * D2R)
+    cos_lat1 = cos(lat0 * D2R)
+    cos_lat2 = cos(lat1 * D2R)
+    a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
+    return 6370997.0 * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+
+@njit(cache=True)
+def distance_vincenty(lon0, lat0, lon1, lat1):
+    """ better than haversine but buggy ??"""
+    D2R = pi / 180.
+    dlon = (lon1 - lon0) * D2R
+    cos_dlon = cos(dlon)
+    cos_lat1 = cos(lat0 * D2R)
+    cos_lat2 = cos(lat1 * D2R)
+    sin_lat1 = sin(lat0 * D2R)
+    sin_lat2 = sin(lat1 * D2R)
+    return 6370997.0 * arctan2(
+        ((cos_lat2 * sin(dlon) ** 2) + (cos_lat1 * sin_lat2 - sin_lat1 * cos_lat2 * cos_dlon) ** 2) ** .5,
+        sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_dlon)
+
+
+@njit(cache=True, fastmath=True)
 def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     """
     Resample contours to have (nearly) equal spacing
@@ -74,37 +100,86 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     # Get distances
     dist = empty(x_val.shape)
     dist[0] = 0
-    distance_vector(
-        x_val[:-1], y_val[:-1], x_val[1:], y_val[1:], dist[1:])
-    dist.cumsum(out=dist)
+    dist[1:] = distance(x_val[:-1], y_val[:-1], x_val[1:], y_val[1:])
+    # To be still monotonous
+    dist[dist==0] = 1e-10
+    dist = dist.cumsum()
     # Get uniform distances
     if fixed_size is None:
         fixed_size = dist.size * num_fac
-    d_uniform = linspace(0, dist[-1], num=fixed_size)
+    d_uniform = linspace(0, dist[-1], fixed_size)
     x_new = interp(d_uniform, dist, x_val)
     y_new = interp(d_uniform, dist, y_val)
     return x_new, y_new
 
 
-@property
-def regular_coordinates(self):
-    """Give a standard/regular/double sample of contour
-    """
-    if not hasattr(self, '_regular_coordinates'):
-        self._regular_coordinates = column_stack(uniform_resample(self.lon, self.lat))
-    return self._regular_coordinates
-
-
-BasePath.regular_coordinates = regular_coordinates
+@njit(cache=True)
+def uniform_resample_stack(vertices, num_fac=2, fixed_size=None):
+    x_val, y_val = vertices[:, 0], vertices[:, 1]
+    x_new, y_new = uniform_resample(x_val, y_val, num_fac, fixed_size)
+    data = empty((x_new.shape[0], 2))
+    data[:, 0] = x_new
+    data[:, 1] = y_new
+    return data
 
 
 def fit_circle_path(self):
     if not hasattr(self, '_circle_params'):
-        self._fit_circle_path()
+        self._circle_params = _fit_circle_path(self.vertices)
     return self._circle_params
 
 
-def _fit_circle_path(self):
+@njit(cache=True, fastmath=True)
+def _fit_circle_path(vertice):
+    lons, lats = vertice[:, 0], vertice[:, 1]
+    lon0, lat0 = lons.mean(), lats.mean()
+    c_x, c_y = coordinates_to_local(lons, lats, lon0, lat0)
+    # Some time, edge is only a dot of few coordinates
+    d_lon = lons.max() - lons.min()
+    d_lat = lats.max() - lats.min()
+    if d_lon < 1e-7 and d_lat < 1e-7:
+        # logging.warning('An edge is only define in one position')
+        # logging.debug('%d coordinates %s,%s', len(lons),lons,
+                      # lats)
+        return 0, -90, nan, nan
+    centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c_numba(c_x, c_y)
+    centlon_e, centlat_e = local_to_coordinates(centlon_e, centlat_e, lon0, lat0)
+    centlon_e = (centlon_e - lon0 + 180) % 360 + lon0 - 180
+    return centlon_e, centlat_e, eddy_radius_e, aerr
+
+
+@njit(cache=True, fastmath=True)
+def coordinates_to_local(lon, lat, lon0, lat0):
+    D2R = pi / 180.
+    R = 6370997
+    dlon = (lon - lon0) * D2R
+    sin_dlat = sin((lat - lat0) * 0.5 * D2R)
+    sin_dlon = sin(dlon * 0.5)
+    cos_lat0 = cos(lat0 * D2R)
+    cos_lat = cos(lat * D2R)
+    a_val = sin_dlon ** 2 * cos_lat0 * cos_lat + sin_dlat ** 2
+    module = R * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+
+    dx = lon - lon0
+    dy = lat - lat0
+    azimuth = pi /2 - arctan2(
+        cos_lat * sin(dlon),
+        cos_lat0 * sin(lat * D2R) - sin(lat0 * D2R) * cos_lat * cos(dlon))
+    return module * cos(azimuth), module * sin(azimuth)
+
+
+@njit(cache=True, fastmath=True)
+def local_to_coordinates(x, y, lon0, lat0):
+    D2R = pi / 180.
+    R = 6370997
+    d = (x ** 2 + y ** 2) ** .5 / R
+    a = -(arctan2(y, x) -pi / 2)
+    lat = arcsin(sin(lat0 * D2R) * cos(d) + cos(lat0 * D2R) * sin(d) * cos(a))
+    lon = lon0 + arctan2(sin(a) * sin(d) * cos(lat0 * D2R), cos(d) - sin(lat0 * D2R) * sin(lat)) / D2R
+    return lon, lat / D2R
+
+
+def _fit_circle_path_old(self):
     lon_mean, lat_mean = self.mean_coordinates
     # Prepare for shape test and get eddy_radius_e
     # http://www.geo.hunter.cuny.edu/~jochen/gtech201/lectures/
@@ -199,7 +274,6 @@ def fit_circle_c_numba(x_vec, y_vec):
 
 
 BasePath.fit_circle = fit_circle_path
-BasePath._fit_circle_path = _fit_circle_path
 
 
 def pixels_in(self, grid):
@@ -807,7 +881,7 @@ class UnRegularGridDataset(GridDataset):
         return ma.array(z_interp, mask=m_interp.ev(x, y) > 0.00001)
 
     def speed_coef(self, contour):
-        dist, idx = self.index_interp.query(contour.regular_coordinates[1:], k=4)
+        dist, idx = self.index_interp.query(uniform_resample_stack(contour.vertices)[1:], k=4)
         i_y = idx % self.x_c.shape[1]
         i_x = int_((idx - i_y) / self.x_c.shape[1])
         # A simplified solution to be change by a weight mean
@@ -990,10 +1064,7 @@ class RegularGridDataset(GridDataset):
             self.xstep)
 
         y, x = meshgrid(y, x)
-        out_shape = x.shape
-        dist = empty(out_shape, dtype=float64).flatten()
-        distance_point_vector(0, lat, x.astype(float64).flatten(), y.astype(float64).flatten(), dist)
-        dist_norm = dist.reshape(out_shape) / 1000. / wave_length
+        dist_norm = distance(0, lat, x, y) / 1000. / wave_length
 
         # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
         kernel = sinc(dist_norm/order) * sinc(dist_norm)
@@ -1015,28 +1086,25 @@ class RegularGridDataset(GridDataset):
             raise Exception()
         # half size will be multiply with by order
         half_x_pt, half_y_pt = ceil(wave_length / step_x_km).astype(int), ceil(wave_length / step_y_km).astype(int)
-
+        # x size is not good over 60 degrees
         y = arange(
             lat - self.ystep * half_y_pt * order,
             lat + self.ystep * half_y_pt * order + 0.01 * self.ystep,
             self.ystep)
-        x = arange(
-            -self.xstep * half_x_pt * order,
-            self.xstep * half_x_pt * order + 0.01 * self.xstep,
-            self.xstep)
-
+        # We compute half + 1 and the other part will be compute by symetry
+        x = arange(0, self.xstep * half_x_pt * order + 0.01 * self.xstep, self.xstep)
         y, x = meshgrid(y, x)
-        out_shape = x.shape
-        dist = empty(out_shape, dtype=float64).flatten()
-        distance_point_vector(0, lat, x.astype(float64).flatten(), y.astype(float64).flatten(), dist)
-        dist_norm = dist.reshape(out_shape) / 1000. / wave_length
-
+        dist_norm = distance(0, lat, x, y) / 1000. / wave_length
         # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
         with errstate(invalid='ignore'):
             kernel = sinc(dist_norm/order) * j1(2 * pi * dist_norm) / dist_norm
-        kernel[half_x_pt * order,half_y_pt * order] = pi
+        kernel[0, half_y_pt * order] = pi
         kernel[dist_norm > order] = 0
-        return kernel
+        # Symetry
+        kernel_ = empty((half_x_pt * 2 * order + 1, half_y_pt * 2 * order + 1))
+        kernel_[half_x_pt * order:] = kernel
+        kernel_[:half_x_pt * order] = kernel[:0:-1]
+        return kernel_
 
     def convolve_filter_with_dynamic_kernel(self, grid_name, kernel_func, lat_max=85, **kwargs_func):
         logging.warning('No filtering above %f degrees of latitude', lat_max)
@@ -1073,6 +1141,7 @@ class RegularGridDataset(GridDataset):
             tmp_matrix[~m] = 0
 
             demi_x, demi_y = k_shape[0] // 2, k_shape[1] // 2
+            # custom_(tmp_matrix, m.astype('f8'), kernel)
             values_sum = filter2D(tmp_matrix, -1, kernel)[demi_x:-demi_x, demi_y]
             kernel_sum = filter2D(m.astype(float), -1, kernel)[demi_x:-demi_x, demi_y]
             with errstate(invalid='ignore'):
@@ -1232,7 +1301,7 @@ class RegularGridDataset(GridDataset):
         self.vars['v'] = d_hx / d_x * gof
 
     def speed_coef(self, contour):
-        lon, lat = contour.regular_coordinates[1:].T
+        lon, lat = uniform_resample_stack(contour.vertices)[1:].T
         return self._speed_ev(lon, lat)
 
     def init_speed_coef(self, uname='u', vname='v'):
@@ -1271,6 +1340,25 @@ class RegularGridDataset(GridDataset):
             g.fill_value
         )
         return z
+
+
+# @njit(cache=True, fastmath=True, parallel=True)
+@njit(cache=True, fastmath=True)
+def custom_(data, mask, kernel):
+    """do sortin at high lattitude big part of value are masked"""
+    nb_x = kernel.shape[0]
+    demi_x = int((nb_x - 1) / 2)
+    demi_y = int((kernel.shape[1] - 1) / 2)
+    out = empty(data.shape[0] - nb_x + 1)
+    for i in prange(out.shape[0]):
+        if mask[i + demi_x, demi_y] != 0:
+            continue
+        p = (mask[i:i + nb_x] * kernel).sum()
+        if p != 0:
+            out[i] = (data[i:i + nb_x] * kernel).sum() / p
+        else:
+            out[i] = nan
+    return out
 
 
 @njit(parralel=True, cache=True)
