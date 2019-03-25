@@ -27,10 +27,11 @@ Version 2.0.3
 """
 
 import logging
-from numpy import where, empty, array, concatenate, ma, zeros, unique, round
+from numpy import where, empty, array, concatenate, ma, zeros, unique, round, ones
 from scipy.ndimage import minimum_filter
 from matplotlib.figure import Figure
-from .tools import index_from_nearest_path, index_from_nearest_path_with_pt_in_bbox
+from numba import njit, types as numba_types
+from .tools import index_from_nearest_path_with_pt_in_bbox
 
 
 class Amplitude(object):
@@ -42,7 +43,7 @@ class Amplitude(object):
     __slots__ = (
         'h_0',
         'grid_extract',
-        'mask',
+        'pixel_mask',
         'sla',
         'contour',
         'interval',
@@ -58,19 +59,23 @@ class Amplitude(object):
         # Indices of all pixels in contour
         self.contour = contour
         # Link on original grid (local view) or copy if it's on bound
-        slice_x, slice_y = contour.bbox_slice
-        on_bounds = slice_x.start > slice_x.stop
+        (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
+        on_bounds = x_start > x_stop
         if on_bounds:
-            self.grid_extract = ma.concatenate((data[slice_x.start:, slice_y], data[:slice_x.stop, slice_y]))
+            self.grid_extract = ma.concatenate((data[x_start:, y_start:y_stop], data[:x_stop, y_start:y_stop]))
+            if self.grid_extract.mask.size == 1:
+                self.grid_extract = ma.array(
+                    self.grid_extract,
+                    mask=ones(self.grid_extract.shape, dtype='bool') * self.grid_extract.mask)
         else:
-            self.grid_extract = data[slice_x, slice_y]
+            self.grid_extract = data[x_start:x_stop, y_start:y_stop]
         # => maybe replace pixel out of contour by nan?
-        self.mask = zeros(self.grid_extract.shape, dtype='bool')
+        self.pixel_mask = zeros(self.grid_extract.shape, dtype='bool')
         if on_bounds:
-            i_x = (contour.pixels_index[0] - slice_x.start) % data.shape[0]
+            i_x = (contour.pixels_index[0] - x_start) % data.shape[0]
         else:
-            i_x = contour.pixels_index[0] - slice_x.start
-        self.mask[i_x, contour.pixels_index[1] - slice_y.start] = True
+            i_x = contour.pixels_index[0] - x_start
+        self.pixel_mask[i_x, contour.pixels_index[1] - y_start] = True
 
         # Only pixel in contour
         self.sla = data[contour.pixels_index]
@@ -91,13 +96,13 @@ class Amplitude(object):
         are below a given SSH threshold for cyclonic eddies.
         """
         # In some case pixel value must be very near of contour bounds
-        if ((self.sla - self.h_0) > self.EPSILON).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
+        if ((self.sla - self.h_0) > self.EPSILON).any() or self.sla.mask.any():
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = self._set_local_extrema(1)
+            lmi_i, lmi_j = detect_local_minima_(self.grid_extract, self.grid_extract.mask, self.pixel_mask, self.mle, 1)
             nb = len(lmi_i)
-            slice_x, slice_y = self.contour.bbox_slice
+            (x_start, _), (y_start, _) = self.contour.bbox_slice
             if nb == 0:
                 logging.warning('No extrema found in contour in level %f', level)
                 return False
@@ -111,8 +116,8 @@ class Amplitude(object):
                 index = self.grid_extract[lmi_i, lmi_j].argmin()
                 i, j = lmi_i[index], lmi_j[index]
             self.amplitude = abs(self.grid_extract[i, j] - self.h_0)
-            i += slice_x.start
-            j += slice_y.start
+            i += x_start
+            j += y_start
             return i, j
 
     def all_pixels_above_h0(self, level):
@@ -121,13 +126,13 @@ class Amplitude(object):
         are above a given SSH threshold for anticyclonic eddies.
         """
         # In some case pixel value must be very near of contour bounds
-        if ((self.sla - self.h_0) < - self.EPSILON).any() or (hasattr(self.sla, 'mask') and self.sla.mask.any()):
+        if ((self.sla - self.h_0) < - self.EPSILON).any() or self.sla.mask.any():
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = self._set_local_extrema(-1)
+            lmi_i, lmi_j = detect_local_minima_(self.grid_extract, self.grid_extract.mask, self.pixel_mask, self.mle, -1)
             nb = len(lmi_i)
-            slice_x, slice_y = self.contour.bbox_slice
+            (x_start, _), (y_start, _) = self.contour.bbox_slice
             if nb == 0:
                 logging.warning('No extrema found in contour in level %f', level)
                 return False
@@ -141,71 +146,93 @@ class Amplitude(object):
                 index = self.grid_extract[lmi_i, lmi_j].argmax()
                 i, j = lmi_i[index], lmi_j[index]
             self.amplitude = abs(self.grid_extract[i, j] - self.h_0)
-            i += slice_x.start
-            j += slice_y.start
+            i += x_start
+            j += y_start
             return i, j
 
-    def _set_local_extrema(self, sign):
-        """
-        Set count of local SLA maxima/minima within eddy
-        """
-        # index of minima on whole grid extract
-        i_x, i_y = self.detect_local_minima(self.grid_extract * sign)
-        # Only index in contour
-        m = self.mask[i_x, i_y]
-        i_x, i_y = i_x[m], i_y[m]
-        # Verify if some extremum is contigus
-        nb_extrema = len(i_x)
-        if nb_extrema > 1:
-            # Group
-            nb_group = 1
-            gr = zeros(nb_extrema, dtype='u2')
-            for i1, (i, j) in enumerate(zip(i_x[:-1], i_y[:-1])):
-                for i2, (k, l) in enumerate(zip(i_x[i1 + 1:], i_y[i1 + 1:])):
-                    if (abs(i - k) + abs(j - l)) == 1:
-                        i2_ = i2 + i1 + 1
-                        if gr[i1] == 0 and gr[i2_] == 0:
-                            # Nobody was link with a know group
-                            gr[i1] = nb_group
-                            gr[i2_] = nb_group
-                            nb_group += 1
-                        elif gr[i1] == 0 and gr[i2_] != 0:
-                            # i2 is link not i1
-                            gr[i1] = gr[i2_]
-                        elif gr[i2_] == 0 and gr[i1] != 0:
-                            # i1 is link not i2
-                            gr[i2_] = gr[i1]
-                        else:
-                            # there already linked in two different group
-                            # we replace group from i1 with group from i2
-                            gr[gr == gr[i1]] = gr[i2_]
-            m = gr != 0
-            grs = unique(gr[m])
-            # all non grouped extremum
-            i_x_new, i_y_new = list(i_x[~m]), list(i_y[~m])
-            for gr_ in grs:
-                m = gr_ == gr
-                # Choose barycentre of group
-                i_x_new.append(round(i_x[m].mean(axis=0)).astype('i2'))
-                i_y_new.append(round(i_y[m].mean(axis=0)).astype('i2'))
-            return i_x_new, i_y_new
-        return i_x, i_y
 
-    @staticmethod
-    def detect_local_minima(grid):
-        """
-        Take an array and detect the troughs using the local maximum filter.
-        Returns a boolean mask of the troughs (i.e., 1 when
-        the pixel's value is the neighborhood maximum, 0 otherwise)
-        http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
-        """
-        # To don't perturbate filter
-        if hasattr(grid, 'mask'):
-            grid[grid.mask] = 2e10
-        # Get local mimima
-        detected_minima = minimum_filter(grid, size=3) == grid
-        # index of minima
-        return where(detected_minima)
+@njit(cache=True)
+def detect_local_minima_(grid, general_mask, pixel_mask, maximum_local_extremum, sign):
+    """
+    Take an array and detect the troughs using the local maximum filter.
+    Returns a boolean mask of the troughs (i.e., 1 when
+    the pixel's value is the neighborhood maximum, 0 otherwise)
+    http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
+    """
+    nb_x, nb_y = grid.shape
+    # init with fake value because numba need to type data in list
+    xs, ys = [0], [0]
+    xs.pop(0)
+    ys.pop(0)
+    g = empty((3, 3))
+    for i in range(1, nb_x - 1):
+        for j in range(1, nb_y - 1):
+            # Copy footprint
+            for i_ in range(-1, 2):
+                for j_ in range(-1, 2):
+                    if general_mask[i_ + i, j_ + j]:
+                        g[i_ + 1, j_ + 1] = 2e10
+                    else:
+                        g[i_ + 1, j_ + 1] = grid[i_ + i, j_ + j] * sign
+            # if center equal to min
+            if g.min() == (grid[i, j] * sign) and pixel_mask[i,j]:
+                xs.append(i)
+                ys.append(j)
+    nb_extrema = len(xs)
+
+
+    # If several extrema we try to separate them
+    if nb_extrema > maximum_local_extremum:
+        # Group
+        nb_group = 1
+        gr = zeros(nb_extrema, dtype=numba_types.int16)
+        for i0 in range(nb_extrema - 1):
+            for i1 in range(i0 + 1, nb_extrema):
+                if (abs(xs[i0] - xs[i1]) + abs(ys[i0] - ys[i1])) == 1:
+                    if gr[i0] == 0 and gr[i1] == 0:
+                        # Nobody was link with a known group
+                        gr[i0] = nb_group
+                        gr[i1] = nb_group
+                        nb_group += 1
+                    elif gr[i0] == 0 and gr[i1] != 0:
+                        # i1 is link not i0
+                        gr[i0] = gr[i1]
+                    elif gr[i1] == 0 and gr[i0] != 0:
+                        # i0 is link not i1
+                        gr[i1] = gr[i0]
+                    else:
+                        # there already linked in two different group
+                        # we replace group from i0 with group from i1
+                        gr[gr == gr[i0]] = gr[i1]
+
+        m = gr != 0
+        grs = unique(gr[m])
+        # all non grouped extremum
+        # Numba work around
+        xs_new, ys_new = [0], [0]
+        xs_new.pop(0), ys_new.pop(0)
+        for i in range(nb_extrema):
+            if m[i]:
+                continue
+            xs_new.append(xs[i])
+            ys_new.append(ys[i])
+        for gr_ in grs:
+            nb = 0
+            x_mean = 0
+            y_mean = 0
+            # Choose barycentre of group
+            for i in range(nb_extrema):
+                if gr_ == gr[i]:
+                    x_mean += xs[i]
+                    y_mean += ys[i]
+                    nb += 1
+            x_mean /= nb
+            y_mean /= nb
+            
+            xs_new.append(numba_types.int32(round(x_mean)))
+            ys_new.append(numba_types.int32(round(y_mean)))
+        return xs_new, ys_new
+    return xs, ys
 
 
 class Contours(object):
@@ -364,6 +391,11 @@ class Contours(object):
                     else:
                         closed_contours += 1
                     contour.vertices[-1] = contour.vertices[0]
+                # Store to use latter
+                contour.xmin = x_min
+                contour.xmax = x_max
+                contour.ymin = y_min
+                contour.ymax = y_max
                 keep_path.append(contour)
             collection._paths = keep_path
             for contour in collection.get_paths():
@@ -401,8 +433,8 @@ class Contours(object):
                 self.y_value[i_pt:i_pt + nb_pt] = contour.vertices[:, 1]
 
                 # Set bbox
-                self.x_min_per_contour[i_c], self.y_min_per_contour[i_c] = contour.vertices.min(axis=0)
-                self.x_max_per_contour[i_c], self.y_max_per_contour[i_c] = contour.vertices.max(axis=0)
+                self.x_min_per_contour[i_c], self.y_min_per_contour[i_c] = contour.xmin, contour.ymin
+                self.x_max_per_contour[i_c], self.y_max_per_contour[i_c] = contour.xmax, contour.ymax
 
                 # Count pt
                 self.nb_pt_per_contour[i_c] = nb_pt
@@ -432,6 +464,8 @@ class Contours(object):
     def get_index_nearest_path_bbox_contain_pt(self, level, xpt, ypt):
         """Get index from the nearest path in the level, if the bbox of the
         path contain pt
+        
+        overhead of python is huge with numba, cython little bit best??
         """
         index = index_from_nearest_path_with_pt_in_bbox(
             level,
@@ -463,3 +497,64 @@ class Contours(object):
             ))
         ax.update_datalim([self.contours._mins, self.contours._maxs])
         ax.autoscale_view()
+
+
+@njit(cache=True)
+def index_from_nearest_path_with_pt_in_bbox_(
+        level_index,
+        l_i,
+        nb_c_per_l,
+        nb_pt_per_c,
+        indices_of_first_pts,
+        x_value,
+        y_value,
+        x_min_per_c,
+        y_min_per_c,
+        x_max_per_c,
+        y_max_per_c,
+        xpt,
+        ypt,
+        ):
+    """Get index from nearest path in edge bbox contain pt
+    """
+    # Nb contour in level
+    if nb_c_per_l[level_index] == 0:
+        return -1
+    # First contour in level
+    i_start_c = l_i[level_index]
+    # First contour of the next level
+    i_end_c = i_start_c + nb_c_per_l[level_index]
+
+    # Flag to check if we iterate
+    find_contour = 0
+    # We select the first pt of the first contour in the level
+    # to initialize dist
+    i_ref = i_start_c    
+    i_start_pt = indices_of_first_pts[i_start_c]
+    dist_ref = (x_value[i_start_pt] - xpt) ** 2 + (y_value[i_start_pt] - ypt) ** 2
+
+    # We iterate over contour in the same level
+    for i_elt_c in range(i_start_c, i_end_c):
+        # if bbox of contour doesn't contain pt, we skip this contour
+        if y_min_per_c[i_elt_c] > ypt or y_max_per_c[i_elt_c] < ypt or x_min_per_c[i_elt_c] > xpt or x_max_per_c[i_elt_c] < xpt:
+            continue
+        # Indice of first pt of contour
+        i_start_pt = indices_of_first_pts[i_elt_c]
+        # Indice of first pt of the next contour
+        i_end_pt = i_start_pt + nb_pt_per_c[i_elt_c]
+        # We set flag to true, because we check contour
+        find_contour = 1
+        
+        # We do iteration on pt to check dist, if it's inferior we store
+        # index of contour
+        for i_elt_pt in range(i_start_pt, i_end_pt):
+            dist = (x_value[i_elt_pt] - xpt) ** 2 + (y_value[i_elt_pt] - ypt) ** 2
+            if dist < dist_ref:
+                dist_ref = dist
+                i_ref = i_elt_c
+    # No iteration on contour, we return no index of contour
+    if find_contour == 0:
+        return -1
+    # We return index of contour, for the specific level
+    return i_ref - i_start_c
+
