@@ -32,14 +32,6 @@ def raw_resample(datas, fixed_size):
     return interp(arange(fixed_size), arange(nb_value) * (fixed_size - 1) / (nb_value - 1) , datas)
 
 
-def contour_iter(self, anticyclonic_search):
-    for coll in self.collections[::1 if anticyclonic_search else -1]:
-        yield coll
-
-
-BaseQuadContourSet.iter_ = contour_iter
-
-
 @property
 def mean_coordinates(self):
     return self.vertices.mean(axis=0)
@@ -100,8 +92,8 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     dist = empty(x_val.shape)
     dist[0] = 0
     dist[1:] = distance(x_val[:-1], y_val[:-1], x_val[1:], y_val[1:])
-    # To be still monotonous
-    dist[1:][dist[1:]<1e-10] = 1e-10
+    # To be still monotonous (dist is store in m)
+    dist[1:][dist[1:]<1e-3] = 1e-3
     dist = dist.cumsum()
     # Get uniform distances
     if fixed_size is None:
@@ -121,11 +113,19 @@ def uniform_resample_stack(vertices, num_fac=2, fixed_size=None):
     data[:, 1] = y_new
     return data
 
+
 @njit(cache=True)
 def value_on_regular_contour(x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size=None):
     x_val, y_val = vertices[:, 0], vertices[:, 1]
     x_new, y_new = uniform_resample(x_val, y_val, num_fac, fixed_size)
     return interp2d_geo(x_g, y_g, z_g, m_g, x_new[1:], y_new[1:])
+
+
+@njit(cache=True)
+def mean_on_regular_contour(x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size=None):
+    x_val, y_val = vertices[:, 0], vertices[:, 1]
+    x_new, y_new = uniform_resample(x_val, y_val, num_fac, fixed_size)
+    return interp2d_geo(x_g, y_g, z_g, m_g, x_new[1:], y_new[1:]).mean()
 
 
 def fit_circle_path(self):
@@ -715,7 +715,7 @@ class GridDataset(object):
                     c_x, c_y = proj(speed_contour.lon, speed_contour.lat)
                     _, _, eddy_radius_s, aerr_s = fit_circle_c_numba(c_x, c_y)
 
-                    # Instantiate new EddyObservation object
+                    # Instantiate new EddyObservation object (high cost need to be review)
                     properties = EddiesObservations(size=1, track_extra_variables=track_extra_variables,
                                                     track_array_variables=array_sampling,
                                                     array_variables=array_variables)
@@ -780,7 +780,7 @@ class GridDataset(object):
         Calculate geostrophic speed around successive contours
         Returns the average
         """
-        max_average_speed = self.speed_coef(original_contour).mean()
+        max_average_speed = self.speed_coef_mean(original_contour)
         speed_array = [max_average_speed]
         pixel_min = 1
 
@@ -808,7 +808,7 @@ class GridDataset(object):
             if pixel_min > level_contour.nb_pixel:
                 break
             # Interpolate uspd to seglon, seglat, then get mean
-            level_average_speed = self.speed_coef(level_contour).mean()
+            level_average_speed = self.speed_coef_mean(level_contour)
             speed_array.append(level_average_speed)
             if level_average_speed >= max_average_speed:
                 max_average_speed = level_average_speed
@@ -944,12 +944,12 @@ class UnRegularGridDataset(GridDataset):
         z_interp = RectBivariateSpline(x_center, y_center, z_filtered, **opts_interpolation).ev(x, y)
         return ma.array(z_interp, mask=m_interp.ev(x, y) > 0.00001)
 
-    def speed_coef(self, contour):
+    def speed_coef_mean(self, contour):
         dist, idx = self.index_interp.query(uniform_resample_stack(contour.vertices)[1:], k=4)
         i_y = idx % self.x_c.shape[1]
         i_x = int_((idx - i_y) / self.x_c.shape[1])
         # A simplified solution to be change by a weight mean
-        return self._speed_norm[i_x, i_y].mean(axis=1)
+        return self._speed_norm[i_x, i_y].mean(axis=1).mean()
 
     def init_speed_coef(self, uname='u', vname='v'):
         self._speed_norm = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** .5
@@ -1348,11 +1348,11 @@ class RegularGridDataset(GridDataset):
         d_x = self.EARTH_RADIUS * 2 * pi / 360 * d_x_degrees * cos(deg2rad(self.y_c))
         self.vars['v'] = d_hx / d_x * gof
 
-    def speed_coef(self, contour):
+    def speed_coef_mean(self, contour):
         """some nan can be compute over contour if we are near border,
         something to explore
         """
-        return value_on_regular_contour(
+        return mean_on_regular_contour(
             self.x_c, self.y_c,
             self._speed_ev, self._speed_ev.mask,
             contour.vertices)
@@ -1378,18 +1378,8 @@ class RegularGridDataset(GridDataset):
         Returns:
             new z
         """
-        z = empty(lons.shape, dtype='f4').reshape(-1)
         g = self.grid(grid_name)
-        interp_numba(
-            self.x_c,
-            self.y_c,
-            g,
-            lons.reshape(-1),
-            lats.reshape(-1),
-            z,
-            g.fill_value
-        )
-        return z
+        return interp2d_geo(self.x_c, self.y_c, g, g.mask, lons, lats)
 
 
 @njit(cache=True, fastmath=True, parallel=True)

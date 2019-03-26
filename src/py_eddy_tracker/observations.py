@@ -159,6 +159,14 @@ class EddiesObservations(object):
     *local maxima/minima* within a closed region of a sea level anomaly field.
 
     """
+    __slots__ = (
+        'track_extra_variables',
+        'track_array_variables',
+        'array_variables',
+        'observations',
+        'active',
+        'sign_type',
+    )
     
     DELTA_JJ_JE = 2448623 - (datetime(1992, 1, 1) - datetime(1950, 1, 1)).days 
     
@@ -851,6 +859,7 @@ class EddiesObservations(object):
 class VirtualEddiesObservations(EddiesObservations):
     """Class to work with virtual obs
     """
+    __slots__ = ()
 
     @property
     def elements(self):
@@ -862,6 +871,7 @@ class VirtualEddiesObservations(EddiesObservations):
 class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations
     """
+    __slots__ = ()
 
     def filled_by_interpolation(self, mask):
         """Filled selected values by interpolation

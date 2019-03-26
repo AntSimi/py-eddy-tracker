@@ -46,7 +46,7 @@ class Amplitude(object):
         'pixel_mask',
         'sla',
         'contour',
-        'interval',
+        'interval_min',
         'amplitude',
         'mle',
         )
@@ -54,8 +54,8 @@ class Amplitude(object):
     def __init__(self, contour, contour_height, data, interval):
         # Height of the contour
         self.h_0 = contour_height
-        # Step between two level
-        self.interval = interval
+        # Step minimal to consider amplitude
+        self.interval_min = interval * 2
         # Indices of all pixels in contour
         self.contour = contour
         # Link on original grid (local view) or copy if it's on bound
@@ -71,10 +71,10 @@ class Amplitude(object):
             self.grid_extract = data[x_start:x_stop, y_start:y_stop]
         # => maybe replace pixel out of contour by nan?
         self.pixel_mask = zeros(self.grid_extract.shape, dtype='bool')
+        i_x = contour.pixels_index[0] - x_start
         if on_bounds:
-            i_x = (contour.pixels_index[0] - x_start) % data.shape[0]
-        else:
-            i_x = contour.pixels_index[0] - x_start
+            i_x %= data.shape[0]
+
         self.pixel_mask[i_x, contour.pixels_index[1] - y_start] = True
 
         # Only pixel in contour
@@ -87,7 +87,7 @@ class Amplitude(object):
     def within_amplitude_limits(self):
         """Need update
         """
-        return (self.interval * 2) <= self.amplitude
+        return self.interval_min <= self.amplitude
         return self.eddy.ampmin <= self.amplitude <= self.eddy.ampmax
 
     def all_pixels_below_h0(self, level):
@@ -96,13 +96,13 @@ class Amplitude(object):
         are below a given SSH threshold for cyclonic eddies.
         """
         # In some case pixel value must be very near of contour bounds
-        if ((self.sla - self.h_0) > self.EPSILON).any() or self.sla.mask.any():
+        if self.sla.mask.any() or ((self.sla.data - self.h_0) > self.EPSILON).any():
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = detect_local_minima_(self.grid_extract, self.grid_extract.mask, self.pixel_mask, self.mle, 1)
+            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask, self.mle, 1)
+            # After we use grid.data because index are in contour and we check before than no pixel are hide
             nb = len(lmi_i)
-            (x_start, _), (y_start, _) = self.contour.bbox_slice
             if nb == 0:
                 logging.warning('No extrema found in contour in level %f', level)
                 return False
@@ -110,12 +110,13 @@ class Amplitude(object):
                 i, j = lmi_i[0], lmi_j[0]
             else:
                 # Verify if several extrema are seriously below contour
-                nb_real_extrema = ((level - self.grid_extract[lmi_i, lmi_j]) >= 2 * self.interval).sum()
+                nb_real_extrema = ((level - self.grid_extract.data[lmi_i, lmi_j]) >= self.interval_min).sum()
                 if nb_real_extrema > self.mle:
                     return False
-                index = self.grid_extract[lmi_i, lmi_j].argmin()
+                index = self.grid_extract.data[lmi_i, lmi_j].argmin()
                 i, j = lmi_i[index], lmi_j[index]
-            self.amplitude = abs(self.grid_extract[i, j] - self.h_0)
+            self.amplitude = abs(self.grid_extract.data[i, j] - self.h_0)
+            (x_start, _), (y_start, _) = self.contour.bbox_slice
             i += x_start
             j += y_start
             return i, j
@@ -126,13 +127,12 @@ class Amplitude(object):
         are above a given SSH threshold for anticyclonic eddies.
         """
         # In some case pixel value must be very near of contour bounds
-        if ((self.sla - self.h_0) < - self.EPSILON).any() or self.sla.mask.any():
+        if self.sla.mask.any() or ((self.h_0 - self.sla.data) > self.EPSILON).any():
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = detect_local_minima_(self.grid_extract, self.grid_extract.mask, self.pixel_mask, self.mle, -1)
+            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask, self.mle, -1)
             nb = len(lmi_i)
-            (x_start, _), (y_start, _) = self.contour.bbox_slice
             if nb == 0:
                 logging.warning('No extrema found in contour in level %f', level)
                 return False
@@ -140,12 +140,13 @@ class Amplitude(object):
                 i, j = lmi_i[0], lmi_j[0]
             else:
                 # Verify if several extrema are seriously above contour
-                nb_real_extrema = ((self.grid_extract[lmi_i, lmi_j] - level) >= 2 * self.interval).sum()
+                nb_real_extrema = ((self.grid_extract.data[lmi_i, lmi_j] - level) >= self.interval_min).sum()
                 if nb_real_extrema > self.mle:
                     return False
-                index = self.grid_extract[lmi_i, lmi_j].argmax()
+                index = self.grid_extract.data[lmi_i, lmi_j].argmax()
                 i, j = lmi_i[index], lmi_j[index]
-            self.amplitude = abs(self.grid_extract[i, j] - self.h_0)
+            self.amplitude = abs(self.grid_extract.data[i, j] - self.h_0)
+            (x_start, _), (y_start, _) = self.contour.bbox_slice
             i += x_start
             j += y_start
             return i, j
