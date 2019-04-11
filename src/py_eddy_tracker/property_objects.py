@@ -28,12 +28,10 @@ Version 3.0.0
 
 """
 from scipy.interpolate import griddata
-# from scipy.ndimage import generate_binary_structure, binary_erosion
 from scipy.ndimage import binary_erosion
 from scipy.ndimage import minimum_filter
 from numpy import array, isfinite, ma, where, ones, empty
-from .tools import index_from_nearest_path, \
-    index_from_nearest_path_with_pt_in_bbox
+from .tools import index_from_nearest_path_with_pt_in_bbox
 
 
 class Amplitude (object):

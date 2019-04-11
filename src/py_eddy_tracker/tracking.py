@@ -35,6 +35,18 @@ from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, e
 from netCDF4 import Dataset, default_fillvals
 import logging
 import platform
+from numba import njit, types as numba_types
+
+
+@njit(cache=True)
+def index(ar, items):
+    indexs = empty(items.shape[0], dtype=numba_types.int_)
+    for i, item in enumerate(items):
+        for idx, val in enumerate(ar):
+            if val == item:
+                indexs[i] = idx
+                break
+    return indexs
 
 
 class Correspondances(list):
@@ -256,8 +268,7 @@ class Correspondances(list):
         nb_virtual_extend = 0
         if self.virtual_obs is not None:
             virtual_dead_id = setdiff1d(self.virtual_obs['track'], self[-1]['id'])
-            list_previous_virtual_id = self.virtual_obs['track'].tolist()
-            i_virtual_dead_id = [list_previous_virtual_id.index(i) for i in virtual_dead_id]
+            i_virtual_dead_id = index(self.virtual_obs['track'],  virtual_dead_id)
             # Virtual obs which can be prolongate
             alive_virtual_obs = self.virtual_obs['segment_size'][i_virtual_dead_id] < self.nb_virtual
             nb_virtual_extend = alive_virtual_obs.sum()
@@ -268,8 +279,7 @@ class Correspondances(list):
 
         # Find mask/index on previous correspondance to extrapolate
         # position
-        list_previous_id = self[-2]['id'].tolist()
-        i_dead_id = [list_previous_id.index(i) for i in dead_id]
+        i_dead_id = index(self[-2]['id'], dead_id)
 
         # Selection of observations on N-2 and N-1
         obs_a = self.previous2_obs.obs[self[-2][i_dead_id]['in']]

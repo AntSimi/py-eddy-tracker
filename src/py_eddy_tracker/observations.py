@@ -27,130 +27,17 @@ Version 3.0.0
 ===========================================================================
 
 """
-from numpy import zeros, empty, nan, arange, where, unique, \
-    ma, concatenate, cos, radians, isnan, ones, ndarray, meshgrid, \
-    array, interp, int_, int32, round, maximum, floor
-from scipy.interpolate  import interp1d
+from numpy import zeros, empty, absolute, arange, where, unique, \
+    ma, concatenate, cos, radians, isnan, ones, ndarray, \
+    interp, floor
 from netCDF4 import Dataset
-from py_eddy_tracker.tools import distance_matrix, distance_vector
+from .generic import distance_grid, distance
 from shapely.geometry import Polygon
 from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
 import logging
 from datetime import datetime
-
-
-class GridDataset(object):
-    """
-    Class to have basic tool on NetCDF Grid
-    """
-    __slots__ = (
-        'x_var',
-        'y_var',
-        'xinterp',
-        'yinterp',
-        'x_dim',
-        'y_dim',
-        'filename',
-        'vars',
-        'interpolators',
-        )
-    def __init__(self, filename, x_name, y_name):
-        logging.warning('We assume the position of grid is the lower left corner for %s', filename)
-        self.filename = filename
-        self.vars = dict()
-        self.interpolators = dict()
-        self.load(x_name, y_name)
-
-    def load(self, x_name, y_name):
-        with Dataset(self.filename) as h:
-            self.x_var = h.variables[x_name][:]
-            self.x_var = concatenate((self.x_var, (2 * self.x_var[-1] - self.x_var[-2],)))
-            self.y_var = h.variables[y_name][:]
-            self.y_var = concatenate((self.y_var, (2 * self.y_var[-1] - self.y_var[-2],)))
-            self.x_dim = h.variables[x_name].dimensions[0]
-            self.y_dim = h.variables[y_name].dimensions[0]
-        self.init_pos_interpolator()
-
-    def init_pos_interpolator(self):
-        self.xinterp = interp1d(self.x_var, range(self.x_var.shape[0]), assume_sorted=True)
-        self.yinterp = interp1d(self.y_var, range(self.y_var.shape[0]), assume_sorted=True)
-
-    def grid(self, varname):
-        if varname not in self.vars:
-            with Dataset(self.filename) as h:
-                dims = h.variables[varname].dimensions
-                sl = [slice(None) if dim in [self.x_dim, self.y_dim] else 0 for dim in dims]
-                self.vars[varname] = h.variables[varname][sl]
-                i_x = where(array(dims) == self.x_dim)[0][0]
-                i_y = where(array(dims) == self.y_dim)[0][0]
-                if i_x > i_y:
-                    self.vars[varname] = self.vars[varname].T
-        return self.vars[varname]
-
-    def compute_pixel_path(self, x0, y0, x1, y1):
-        # First x of grid
-        x_ori = self.x_var[0]
-        # Float index
-        f_x0 = self.xinterp((x0 - x_ori) % 360 + x_ori)
-        f_x1 = self.xinterp((x1 - x_ori) % 360 + x_ori)
-        f_y0 = self.yinterp(y0)
-        f_y1 = self.yinterp(y1)
-        # Int index
-        i_x0, i_x1 = int32(round(f_x0)), int32(round(f_x1))
-        i_y0, i_y1 = int32(round(f_y0)), int32(round(f_y1))
-
-        # Delta index of x
-        d_x = i_x1 - i_x0
-        nb_x = self.x_var.shape[0] - 1
-        d_x = (d_x + nb_x / 2) % nb_x - nb_x / 2
-        i_x1 = i_x0 + d_x
-
-        # Delta index of y
-        d_y = i_y1 - i_y0
-
-        d_max = int_(maximum(abs(d_x), abs(d_y)))
-
-        # Compute number of pixel which we go trought
-        nb_value = int((abs(d_max) + 1).sum())
-        # Create an empty array to store value of pixel across the travel
-        # Max Index ~65000
-        i_g = empty(nb_value, dtype='u2')
-        j_g = empty(nb_value, dtype='u2')
-
-        # Index to determine the position in the global array
-        ii = 0
-        # Iteration on each travel
-        for i, delta in enumerate(d_max):
-            # If the travel don't cross multiple pixel
-            if delta == 0:
-                i_g[ii: ii + delta + 1] = i_x0[i]
-                j_g[ii: ii + delta + 1] = i_y0[i]
-            # Vertical move
-            elif d_x[i] == 0:
-                sup = -1 if d_y[i] < 0 else 1
-                i_g[ii: ii + delta + 1] = i_x0[i]
-                j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
-            # Horizontal move
-            elif d_y[i] == 0:
-                sup = -1 if d_x[i] < 0 else 1
-                i_g[ii: ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup) % nb_x
-                j_g[ii: ii + delta + 1] = i_y0[i]
-            # In case of multiple direction
-            else:
-                a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
-                if abs(d_x[i]) >= abs(d_y[i]):
-                    sup = -1 if d_x[i] < 0 else 1
-                    value = arange(i_x0[i], i_x1[i] + sup, sup)
-                    i_g[ii: ii + delta + 1] = value % nb_x
-                    j_g[ii: ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
-                else:
-                    sup = -1 if d_y[i] < 0 else 1
-                    j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
-                    i_g[ii: ii + delta + 1] = (int_(j_g[ii: ii + delta + 1]) - i_y0[i]) * a + i_x0[i]
-            ii += delta + 1
-        i_g %= nb_x
-        return i_g, j_g, d_max
+from numba import njit, types as numba_types
 
 
 class EddiesObservations(object):
@@ -166,6 +53,7 @@ class EddiesObservations(object):
         'observations',
         'active',
         'sign_type',
+        'raw_data',
     )
     
     DELTA_JJ_JE = 2448623 - (datetime(1992, 1, 1) - datetime(1950, 1, 1)).days 
@@ -175,7 +63,9 @@ class EddiesObservations(object):
                 'height_max_speed_contour', 'height_external_contour', 'height_inner_contour', 'cost_association']
 
     def __init__(self, size=0, track_extra_variables=None,
-                 track_array_variables=0, array_variables=None):
+                 track_array_variables=0, array_variables=None,
+                 raw_data=False):
+        self.raw_data = raw_data
         self.track_extra_variables = \
             track_extra_variables if track_extra_variables is not None else []
         self.track_array_variables = track_array_variables
@@ -197,7 +87,7 @@ class EddiesObservations(object):
         return self.observations.shape
 
     def __repr__(self):
-        return str(self.observations)
+        return '%d observations' % len(self.observations)
 
     def __getitem__(self, attr):
         if attr in self.elements:
@@ -210,9 +100,7 @@ class EddiesObservations(object):
         """
         dtype = list()
         for elt in self.elements:
-            data_type = VAR_DESCR[elt][
-                'compute_type' if 'compute_type' in VAR_DESCR[elt] else
-                'nc_type']
+            data_type = VAR_DESCR[elt]['compute_type' if 'compute_type' in VAR_DESCR[elt] and not self.raw_data else 'nc_type']
             if elt in self.array_variables:
                 dtype.append((elt, data_type, (self.track_array_variables,)))
             else:
@@ -320,12 +208,7 @@ class EddiesObservations(object):
     def distance(self, other):
         """ Use haversine distance for distance matrix between every self and
         other eddies"""
-        dist_result = empty((len(self), len(other)), dtype='f8') + nan
-        distance_matrix(
-            self.obs['lon'], self.obs['lat'],
-            other.obs['lon'], other.obs['lat'],
-            dist_result)
-        return dist_result
+        return distance_grid(self.obs['lon'], self.obs['lat'], other.obs['lon'], other.obs['lat'])
 
     @staticmethod
     def new_like(eddies, new_size):
@@ -346,7 +229,7 @@ class EddiesObservations(object):
         return eddies
 
     @classmethod
-    def load_from_netcdf(cls, filename):
+    def load_from_netcdf(cls, filename, raw_data=False):
         array_dim = 'NbSample'
         if not isinstance(filename, str):
             filename = filename.astype(str)
@@ -371,7 +254,7 @@ class EddiesObservations(object):
                         continue
                     #
                     kwargs['track_extra_variables'].append(var_inv)
-
+            kwargs['raw_data'] = raw_data
             eddies = cls(size=nb_obs, ** kwargs)
             for variable in h_nc.variables:
                 if variable == 'cyc':
@@ -380,9 +263,9 @@ class EddiesObservations(object):
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == 'time_jj':
                     var_inv = 'time'
-                    eddies.obs[var_inv] = h_nc.variables[variable][:] + cls.DELTA_JJ_JE 
-                #
+                    eddies.obs[var_inv] = h_nc.variables[variable][:] + cls.DELTA_JJ_JE
                 else:
+                    h_nc.variables[variable].set_auto_maskandscale(not raw_data)
                     eddies.obs[var_inv] = h_nc.variables[variable][:]
             eddies.sign_type = h_nc.variables['cyc'][0]
             if eddies.sign_type == 0:
@@ -461,23 +344,37 @@ class EddiesObservations(object):
 
     @staticmethod
     def cost_function_common_area(records_in, records_out, distance, intern=False):
+        """
+        How it's work on x bound ?
+        Args:
+            records_in:
+            records_out:
+            distance:
+            intern:
+
+        Returns:
+
+        """
         x_name, y_name = ('contour_lon_s', 'contour_lat_s') if intern else ('contour_lon_e', 'contour_lat_e')
+        r_name = 'radius_s' if intern else 'radius_e'
         nb_records = records_in.shape[0]
         costs = ma.empty(nb_records,dtype='f4')
         tolerance = 0.025
+        x_in, y_in = records_in[x_name], records_in[y_name]
+        x_out, y_out = records_out[x_name], records_out[y_name]
+        x_in_min, y_in_min = x_in.min(axis=1), y_in.min(axis=1)
+        x_in_max, y_in_max = x_in.max(axis=1), y_in.max(axis=1)
+        x_out_min, y_out_min = x_out.min(axis=1), y_out.min(axis=1)
+        x_out_max, y_out_max = x_out.max(axis=1), y_out.max(axis=1)
         for i_record in range(nb_records):
-            poly_in = Polygon(
-                concatenate((
-                    (records_in[i_record][x_name],),
-                    (records_in[i_record][y_name],))
-                    ).T
-                )
-            poly_out = Polygon(
-                concatenate((
-                    (records_out[i_record][x_name],),
-                    (records_out[i_record][y_name],))
-                    ).T
-                )
+            if x_in_max[i_record] < x_out_min[i_record] or x_in_min[i_record] > x_out_max[i_record]:
+                costs[i_record] = 1
+                continue
+            if y_in_max[i_record] < y_out_min[i_record] or y_in_min[i_record] > y_out_max[i_record]:
+                costs[i_record] = 1
+                continue
+            poly_in = Polygon(concatenate(((x_in[i_record],), (y_in[i_record],))).T)
+            poly_out = Polygon(concatenate(((x_out[i_record],),(y_out[i_record],))).T)
             if not poly_in.is_valid:
                 poly_in = poly_in.simplify(tolerance=tolerance)
                 if not poly_in.is_valid:
@@ -495,8 +392,8 @@ class EddiesObservations(object):
         costs.mask = costs == 1
         return costs
 
-    def mask_function(self, other):
-        return self.circle_mask(other, radius=125)
+    def mask_function(self, other, distance):
+        return distance < 125
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
@@ -512,30 +409,11 @@ class EddiesObservations(object):
         # return ma.array(cost, mask=m)
         return cost
 
-    def circle_mask(self, other, radius=100):
-        """Return a mask of available link"""
-        return (self.distance(other).T < radius).T
-
     def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
-        # c = (major ** 2 - minor ** 2) ** .5 + major
-        c = major
-        major = minor  + .5 * (major - minor)
-        
-      # r=.5*(c-c0)
-      # a=c0+r
-        # Focal
-        f_right = self.obs['lon']
-        f_left = f_right - (c - minor) 
-        # Ellips center
-        x_c = (f_left + f_right) * .5
+        return shifted_ellipsoid_degrees_mask2(
+            self.obs['lon'], self.obs['lat'], other.obs['lon'], other.obs['lat'],
+            minor, major)
 
-        o_lat, s_lat = meshgrid(other.obs['lat'], self.obs['lat'])
-        o_lon, s_lon = meshgrid(other.obs['lon'], x_c)
-        dy = o_lat - s_lat
-        dx = (o_lon - s_lon + 180) % 360 - 180
-        dist_normalize =  (dx.T ** 2) / (major ** 2) + (dy.T ** 2) / minor ** 2
-        return  dist_normalize.T < 1
-        
     def fixed_ellipsoid_mask(self, other, minor=50, major=100, only_east=False, shifted_ellips=False):
         dist = self.distance(other).T
         accepted = dist < minor
@@ -564,17 +442,13 @@ class EddiesObservations(object):
 
             lon_left_f = x_center_ellips - f_degree
             lon_right_f = x_center_ellips + f_degree
-            
-            dist_left_f = empty(nb_case, dtype='f8') + nan
-            distance_vector(
+
+            dist_left_f = distance(
                 lon_left_f, self.obs['lat'][index_self],
-                other.obs['lon'][index_other], other.obs['lat'][index_other],
-                dist_left_f)
-            dist_right_f = empty(nb_case, dtype='f8') + nan
-            distance_vector(
+                other.obs['lon'][index_other], other.obs['lat'][index_other])
+            dist_right_f = distance(
                 lon_right_f, self.obs['lat'][index_self],
-                other.obs['lon'][index_other], other.obs['lat'][index_other],
-                dist_right_f)
+                other.obs['lon'][index_other], other.obs['lat'][index_other])
             dist_2a = (dist_left_f + dist_right_f) / 1000
 
             accepted[index_other, index_self] = dist_2a < (2 * major)
@@ -727,7 +601,7 @@ class EddiesObservations(object):
         """Track obs between self and other
         """
         dist = self.distance(other)
-        mask_accept_dist = self.mask_function(other)
+        mask_accept_dist = self.mask_function(other, dist)
         indexs_closest = where(mask_accept_dist)
         
         cost_values = self.cost_function(
@@ -784,8 +658,7 @@ class EddiesObservations(object):
                 VAR_DESCR['type_cyc']['nc_attr'],
                 self.sign_type)
 
-    @staticmethod
-    def create_variable(handler_nc, kwargs_variable, attr_variable,
+    def create_variable(self, handler_nc, kwargs_variable, attr_variable,
                         data, scale_factor=None, add_offset=None):
         var = handler_nc.createVariable(
             zlib=True,
@@ -796,16 +669,20 @@ class EddiesObservations(object):
         for attr in attrs:
             attr_value = attr_variable[attr]
             var.setncattr(attr, attr_value)
+        if self.raw_data:
+            var[:] = data
         if scale_factor is not None:
             var.scale_factor = scale_factor
             if add_offset is not None:
                 var.add_offset = add_offset
             else:
                 var.add_offset = 0
-        var[:] = data
+        if not self.raw_data:
+            var[:] = data
         try:
-            var.setncattr('min', var[:].min())
-            var.setncattr('max', var[:].max())
+            if len(var.dimensions) == 1:
+                var.setncattr('min', var[:].min())
+                var.setncattr('max', var[:].max())
         except ValueError:
             logging.warning('Data is empty')
 
@@ -854,6 +731,65 @@ class EddiesObservations(object):
     def display(self, ax, ref=0, **kwargs):
         ax.plot((self.obs['contour_lon_s'].T - ref) % 360 + ref, self.obs['contour_lat_s'].T, ** kwargs)
         ax.plot((self.obs['contour_lon_e'].T - ref) % 360 + ref, self.obs['contour_lat_e'].T, linestyle='-.', ** kwargs)
+
+
+@njit(cache=True, fastmath=True)
+def shifted_ellipsoid_degrees_mask(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
+    # c = (major ** 2 - minor ** 2) ** .5 + major
+    c = major
+    major = minor + .5 * (major - minor)
+    # r=.5*(c-c0)
+    # a=c0+r
+    # Focal
+    f_right = lon0
+    f_left = f_right - (c - minor)
+    # Ellips center
+    x_c = (f_left + f_right) * .5
+
+    nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
+    m = empty((nb_1, nb_0), dtype=numba_types.bool_)
+    for i in range(nb_1):
+        dy = lat1[i] - lat0
+        dx = (lon1[i] - x_c + 180) % 360 - 180
+        d_normalize = dx ** 2 / major ** 2 + dy ** 2 / minor ** 2
+        m[i] = d_normalize < 1.
+    return m.T
+
+
+@njit(cache=True, fastmath=True)
+def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
+    """
+    work only if major is an array but faster * 6
+    """
+    # c = (major ** 2 - minor ** 2) ** .5 + major
+    c = major
+    major = minor + .5 * (major - minor)
+    # r=.5*(c-c0)
+    # a=c0+r
+    # Focal
+    f_right = lon0
+    f_left = f_right - (c - minor)
+    # Ellips center
+    x_c = (f_left + f_right) * .5
+
+    nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
+    m = empty((nb_0, nb_1), dtype=numba_types.bool_)
+
+    for j in range(nb_0):
+        for i in range(nb_1):
+            dy = absolute(lat1[i] - lat0[j])
+            if dy > minor:
+                m[j, i] = False
+                continue
+            dx = absolute(lon1[i] - x_c[j])
+            if dx > 180:
+                dx = absolute((dx + 180) % 360 - 180)
+            if dx > major[j]:
+                m[j, i] = False
+                continue
+            d_normalize = dx ** 2 / major[j] ** 2 + dy ** 2 / minor ** 2
+            m[j, i] = d_normalize < 1.
+    return m
 
 
 class VirtualEddiesObservations(EddiesObservations):

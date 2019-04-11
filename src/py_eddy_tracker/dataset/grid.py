@@ -2,11 +2,10 @@
 """
 """
 import logging
-from numpy import concatenate, int32, empty, maximum, where, array, \
+from numpy import concatenate, int32, empty, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, interp, meshgrid, nan, ceil, sinc, isnan, \
-    floor, percentile, zeros, arctan2, arcsin
-from numpy.linalg import lstsq
+    percentile, zeros, arctan2, arcsin, round_
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -15,14 +14,15 @@ from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.spatial import cKDTree
 from scipy.signal import welch
 from cv2 import filter2D
-from numba import njit, prange, types as numba_types
+from numba import njit, types as numba_types
 from matplotlib.path import Path as BasePath
-from matplotlib.contour import QuadContourSet as BaseQuadContourSet
 from pyproj import Proj
 from pint import UnitRegistry
 from ..observations import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
 from .. import VAR_DESCR
+from ..generic import distance, interp2d_geo, fit_circle, uniform_resample
+from ..poly import poly_contain_poly, winding_number_grid_in_poly
 
 
 def raw_resample(datas, fixed_size):
@@ -54,54 +54,6 @@ def lat(self):
 
 
 BasePath.lat = lat
-
-
-@njit(cache=True, fastmath=True)
-def distance(lon0, lat0, lon1, lat1):
-    D2R = pi / 180.
-    sin_dlat = sin((lat1 - lat0) * 0.5 * D2R)
-    sin_dlon = sin((lon1 - lon0) * 0.5 * D2R)
-    cos_lat1 = cos(lat0 * D2R)
-    cos_lat2 = cos(lat1 * D2R)
-    a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
-    return 6370997.0 * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
-
-@njit(cache=True)
-def distance_vincenty(lon0, lat0, lon1, lat1):
-    """ better than haversine but buggy ??"""
-    D2R = pi / 180.
-    dlon = (lon1 - lon0) * D2R
-    cos_dlon = cos(dlon)
-    cos_lat1 = cos(lat0 * D2R)
-    cos_lat2 = cos(lat1 * D2R)
-    sin_lat1 = sin(lat0 * D2R)
-    sin_lat2 = sin(lat1 * D2R)
-    return 6370997.0 * arctan2(
-        ((cos_lat2 * sin(dlon) ** 2) + (cos_lat1 * sin_lat2 - sin_lat1 * cos_lat2 * cos_dlon) ** 2) ** .5,
-        sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_dlon)
-
-
-@njit(cache=True, fastmath=True)
-def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
-    """
-    Resample contours to have (nearly) equal spacing
-       x_val, y_val    : input contour coordinates
-       num_fac : factor to increase lengths of output coordinates
-    """
-    # Get distances
-    dist = empty(x_val.shape)
-    dist[0] = 0
-    dist[1:] = distance(x_val[:-1], y_val[:-1], x_val[1:], y_val[1:])
-    # To be still monotonous (dist is store in m)
-    dist[1:][dist[1:]<1e-3] = 1e-3
-    dist = dist.cumsum()
-    # Get uniform distances
-    if fixed_size is None:
-        fixed_size = dist.size * num_fac
-    d_uniform = linspace(0, dist[-1], fixed_size)
-    x_new = interp(d_uniform, dist, x_val)
-    y_new = interp(d_uniform, dist, y_val)
-    return x_new, y_new
 
 
 @njit(cache=True)
@@ -147,7 +99,7 @@ def _fit_circle_path(vertice):
         # logging.debug('%d coordinates %s,%s', len(lons),lons,
                       # lats)
         return 0, -90, nan, nan
-    centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle_c_numba(c_x, c_y)
+    centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(c_x, c_y)
     centlon_e, centlat_e = local_to_coordinates(centlon_e, centlat_e, lon0, lat0)
     centlon_e = (centlon_e - lon0 + 180) % 360 + lon0 - 180
     return centlon_e, centlat_e, eddy_radius_e, aerr
@@ -184,74 +136,6 @@ def local_to_coordinates(x, y, lon0, lat0):
     return lon, lat / D2R
 
 
-@njit(cache=True)
-def fit_circle_c_numba(x_vec, y_vec):
-    nb_elt = x_vec.shape[0]
-    p_inon_x = empty(nb_elt)
-    p_inon_y = empty(nb_elt)
-
-    x_mean = x_vec.mean()
-    y_mean = y_vec.mean()
-
-    norme = (x_vec - x_mean) ** 2 + (y_vec - y_mean) ** 2
-    norme_max = norme.max()
-    scale = norme_max ** .5
-
-    # Form matrix equation and solve it
-    # Maybe put f4
-    datas = ones((nb_elt, 3))
-    datas[:, 0] = 2. * (x_vec - x_mean) / scale
-    datas[:, 1] = 2. * (y_vec - y_mean) / scale
-
-    (center_x, center_y, radius), residuals, rank, s = lstsq(datas, norme / norme_max)
-
-    # Unscale data and get circle variables
-    radius += center_x ** 2 + center_y ** 2
-    radius **= .5
-    center_x *= scale
-    center_y *= scale
-    # radius of fitted circle
-    radius *= scale
-    # center X-position of fitted circle
-    center_x += x_mean
-    # center Y-position of fitted circle
-    center_y += y_mean
-
-    # area of fitted circle
-    c_area = (radius ** 2) * pi
-
-    # Find distance between circle center and contour points_inside_poly
-    for i_elt in range(nb_elt):
-        # Find distance between circle center and contour points_inside_poly
-        dist_poly = ((x_vec[i_elt] - center_x) ** 2 + (y_vec[i_elt] - center_y) ** 2) ** .5
-        # Indices of polygon points outside circle
-        # p_inon_? : polygon x or y points inside & on the circle
-        if dist_poly > radius:
-            p_inon_y[i_elt] = center_y + radius * (y_vec[i_elt] - center_y) / dist_poly
-            p_inon_x[i_elt] = center_x - (center_x - x_vec[i_elt]) * (center_y - p_inon_y[i_elt]) / (
-                        center_y - y_vec[i_elt])
-        else:
-            p_inon_x[i_elt] = x_vec[i_elt]
-            p_inon_y[i_elt] = y_vec[i_elt]
-
-    # Area of closed contour/polygon enclosed by the circle
-    p_area_incirc = 0
-    p_area = 0
-    for i_elt in range(nb_elt - 1):
-        # Indices of polygon points outside circle
-        # p_inon_? : polygon x or y points inside & on the circle
-        p_area_incirc += p_inon_x[i_elt] * p_inon_y[1 + i_elt] - p_inon_x[i_elt + 1] * p_inon_y[i_elt]
-        # Shape test
-        # Area and centroid of closed contour/polygon
-        p_area += x_vec[i_elt] * y_vec[1 + i_elt] - x_vec[1 + i_elt] * y_vec[i_elt]
-    p_area = abs(p_area) * .5
-
-    p_area_incirc = abs(p_area_incirc) * .5
-
-    a_err = (c_area - 2 * p_area_incirc + p_area) * 100. / c_area
-    return center_x, center_y, radius, a_err
-
-
 BasePath.fit_circle = fit_circle_path
 
 
@@ -282,91 +166,6 @@ def nb_pixel(self):
     if not hasattr(self, '_pixels_in'):
         raise Exception('No pixels_in call before!')
     return self._pixels_in[0].shape[0]
-
-
-@njit(cache=True)
-def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
-    """
-    http://geomalgorithms.com/a03-_inclusion.html
-    isLeft(): tests if a point is Left|On|Right of an infinite line.
-    Input:  three points P0, P1, and P2
-    Return: >0 for P2 left of the line through P0 and P1
-            =0 for P2  on the line
-            <0 for P2  right of the line
-    See: Algorithm 1 "Area of Triangles and Polygons"
-    """
-    # Vector product
-    product = (x_line_1 - x_line_0) * (y_test - y_line_0) - (x_test - x_line_0) * (y_line_1 - y_line_0)
-    return product > 0
-
-
-@njit(cache=True)
-def poly_contain_poly(xy_poly_out, xy_poly_in):
-    nb_elt = xy_poly_in.shape[0]
-    for i_elt in prange(nb_elt):
-        wn = winding_number_poly(xy_poly_in[i_elt, 0], xy_poly_in[i_elt, 1], xy_poly_out)
-        if wn == 0:
-            return False
-    return True
-
-
-@njit(cache=True)
-def winding_number_poly(x, y, xy_poly):
-    nb_elt = xy_poly.shape[0]
-    wn = 0
-    # loop through all edges of the polygon
-    for i_elt in range(nb_elt):
-        if i_elt + 1 == nb_elt:
-            x_next = xy_poly[0, 0]
-            y_next = xy_poly[0, 1]
-        else:
-            x_next = xy_poly[i_elt + 1, 0]
-            y_next = xy_poly[i_elt + 1, 1]
-        if xy_poly[i_elt, 1] <= y:
-            if y_next > y:
-                if is_left(xy_poly[i_elt, 0],
-                           xy_poly[i_elt, 1],
-                           x_next,
-                           y_next,
-                           x, y
-                           ):
-                    wn += 1
-        else:
-            if y_next <= y:
-                if not is_left(xy_poly[i_elt, 0],
-                               xy_poly[i_elt, 1],
-                               x_next,
-                               y_next,
-                               x, y
-                               ):
-                    wn -= 1
-    return wn
-
-
-@njit(cache=True)
-def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
-    """
-    http://geomalgorithms.com/a03-_inclusion.html
-    wn_PnPoly(): winding number test for a point in a polygon
-          Input:   P = a point,
-                   V[] = vertex points of a polygon V[n+1] with V[n]=V[0]
-          Return:  wn = the winding number (=0 only when P is outside)
-    """
-    # the  winding number counter
-    nb_x, nb_y = len(x_1d), len(y_1d)
-    wn = empty((nb_x, nb_y), dtype=numba_types.bool_)
-    for i in range(nb_x):
-        x_pt = x_1d[i]
-        for j in range(nb_y):
-            y_pt = y_1d[j]
-            wn[i, j] = winding_number_poly(x_pt, y_pt, xy_poly)
-    i_x, i_y = where(wn)
-    i_x += i_x0
-    i_y += i_y0
-    if i_x1 < i_x0:
-        i_x %= x_size
-    return i_x, i_y
-
 
 
 BasePath.pixels_in = pixels_in
@@ -404,7 +203,7 @@ class GridDataset(object):
     )
 
     GRAVITY = 9.807
-    EARTH_RADIUS = 6378136.3
+    EARTH_RADIUS = 6370997.
     N = 1
 
     def __init__(self, filename, x_name, y_name, centered=None):
@@ -425,8 +224,9 @@ class GridDataset(object):
         self.coordinates = x_name, y_name
         self.vars = dict()
         self.interpolators = dict()
-        logging.warning('We assume the position of grid is the center'
-                        ' corner for %s', filename)
+        if centered is None:
+            logging.warning('We assume the position of grid is the center'
+                            ' corner for %s', filename)
         self.load_general_features()
         self.load()
 
@@ -533,9 +333,14 @@ class GridDataset(object):
                 self.y_bounds = self.vars[y_name]
 
                 if len(self.x_dim) == 1:
-                    raise Exception('not test')
-                    self.x_c = (self.x_bounds[1:] + self.x_bounds[:-1]) / 2
-                    self.y_c = (self.y_bounds[1:] + self.y_bounds[:-1]) / 2
+                    self.x_c = self.x_bounds.copy()
+                    dx2 = (self.x_bounds[1:] - self.x_bounds[:-1]) / 2
+                    self.x_c[:-1] += dx2
+                    self.x_c[-1] += dx2[-1]
+                    self.y_c = self.y_bounds.copy()
+                    dy2 = (self.y_bounds[1:] - self.y_bounds[:-1]) / 2
+                    self.y_c[:-1] += dy2
+                    self.y_c[-1] += dy2[-1]
                 else:
                     raise Exception('not write')
 
@@ -551,6 +356,26 @@ class GridDataset(object):
             var = h.variables[varname]
             if hasattr(var, 'units'):
                 return var.units
+
+    def copy(self, grid_in, grid_out):
+        """
+        Duplicate a variable
+        Args:
+            grid_in:
+            grid_out:
+
+        Returns:
+
+        """
+        h_dict = self.variables_description[grid_in]
+        self.variables_description[grid_out] = dict(
+            infos=h_dict['infos'].copy(),
+            attrs=h_dict['attrs'].copy(),
+            args=tuple((grid_out, *h_dict['args'][1:])),
+            kwargs=h_dict['kwargs'].copy(),
+        )
+        self.vars[grid_out] = self.grid(grid_in).copy()
+
 
     def grid(self, varname):
         """give grid required
@@ -659,6 +484,7 @@ class GridDataset(object):
                     # Get indices of centroid
                     # Give only 1D array of lon and lat not 2D data
                     i_x, i_y = self.nearest_grd_indice(centlon_e, centlat_e)
+                    i_x = self.normalize_x_indice(i_x)
 
                     # Check if centroid is on define value
                     if data.mask[i_x, i_y]:
@@ -708,12 +534,12 @@ class GridDataset(object):
                     # First, get position based on innermost
                     # contour
                     c_x, c_y = proj(inner_contour.lon, inner_contour.lat)
-                    centx_s, centy_s, _, _ = fit_circle_c_numba(c_x, c_y)
+                    centx_s, centy_s, _, _ = fit_circle(c_x, c_y)
                     centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
                     # Second, get speed-based radius based on
                     # contour of max uavg
                     c_x, c_y = proj(speed_contour.lon, speed_contour.lat)
-                    _, _, eddy_radius_s, aerr_s = fit_circle_c_numba(c_x, c_y)
+                    _, _, eddy_radius_s, aerr_s = fit_circle(c_x, c_y)
 
                     # Instantiate new EddyObservation object (high cost need to be review)
                     properties = EddiesObservations(size=1, track_extra_variables=track_extra_variables,
@@ -898,7 +724,7 @@ class UnRegularGridDataset(GridDataset):
     def init_pos_interpolator(self):
         logging.debug('Create a KdTree could be long ...')
         self.index_interp = cKDTree(
-            column_stack((
+            uniform_resample_stack((
                 self.x_c.reshape(-1),
                 self.y_c.reshape(-1)
             )))
@@ -981,24 +807,24 @@ class RegularGridDataset(GridDataset):
         self.yinterp = arange(self.y_bounds.shape[0])
 
     def bbox_indice(self, vertices):
-        return bbox_indice_regular(vertices, self.x_bounds[0], self.y_bounds[0], self.xstep, self.ystep, self.N)
+        return bbox_indice_regular(vertices, self.x_bounds[0], self.y_bounds[0], self.xstep, self.ystep,
+                                   self.N, self.is_circular(), self.x_size)
 
     def get_pixels_in(self, contour):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
         if x_stop < x_start:
             x_ref = contour.vertices[0, 0]
-            x_array = (concatenate((self.x_c[x_start:], self.x_c[:x_stop])) - x_ref + 180) % 360 + x_ref -180
+            x_array = (concatenate((self.x_c[x_start:], self.x_c[:x_stop])) - x_ref + 180) % 360 + x_ref - 180
         else:
             x_array = self.x_c[x_start:x_stop]
         return winding_number_grid_in_poly(x_array, self.y_c[y_start:y_stop], x_start, x_stop, self.x_size, y_start, contour.vertices)
-
 
     def normalize_x_indice(self, indices):
         return indices % self.x_size
 
     def nearest_grd_indice(self, x, y):
-        return int32(((x - self.x_bounds[0]) % 360) // self.xstep), \
-               int32((y - self.y_bounds[0]) // self.ystep)
+        return int32(round_(((x - self.x_bounds[0]) % 360) / self.xstep)), \
+               int32(round_((y - self.y_bounds[0]) / self.ystep))
 
     @property
     def xstep(self):
@@ -1015,69 +841,9 @@ class RegularGridDataset(GridDataset):
     def compute_pixel_path(self, x0, y0, x1, y1):
         """Give a series of index which describe the path between to position
         """
-        # First x of grid
-        x_ori = self.x_var[0]
-        # Float index
-        # ?? Normaly not callable
-        f_x0 = self.xinterp((x0 - x_ori) % 360 + x_ori)
-        f_x1 = self.xinterp((x1 - x_ori) % 360 + x_ori)
-        f_y0 = self.yinterp(y0)
-        f_y1 = self.yinterp(y1)
-        # Int index
-        i_x0, i_x1 = int32(round(f_x0)), int32(round(f_x1))
-        i_y0, i_y1 = int32(round(f_y0)), int32(round(f_y1))
-
-        # Delta index of x
-        d_x = i_x1 - i_x0
-        nb_x = self.x_var.shape[0] - 1
-        d_x = (d_x + nb_x / 2) % nb_x - nb_x / 2
-        i_x1 = i_x0 + d_x
-
-        # Delta index of y
-        d_y = i_y1 - i_y0
-
-        d_max = maximum(abs(d_x), abs(d_y))
-
-        # Compute number of pixel which we go trought
-        nb_value = (abs(d_max) + 1).sum()
-        # Create an empty array to store value of pixel across the travel
-        # Max Index ~65000
-        i_g = empty(nb_value, dtype='u2')
-        j_g = empty(nb_value, dtype='u2')
-
-        # Index to determine the position in the global array
-        ii = 0
-        # Iteration on each travel
-        for i, delta in enumerate(d_max):
-            # If the travel don't cross multiple pixel
-            if delta == 0:
-                i_g[ii: ii + delta + 1] = i_x0[i]
-                j_g[ii: ii + delta + 1] = i_y0[i]
-            # Vertical move
-            elif d_x[i] == 0:
-                sup = -1 if d_y[i] < 0 else 1
-                i_g[ii: ii + delta + 1] = i_x0[i]
-                j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
-            # Horizontal move
-            elif d_y[i] == 0:
-                sup = -1 if d_x[i] < 0 else 1
-                i_g[ii: ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup) % nb_x
-                j_g[ii: ii + delta + 1] = i_y0[i]
-            # In case of multiple direction
-            else:
-                a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
-                if abs(d_x[i]) >= abs(d_y[i]):
-                    sup = -1 if d_x[i] < 0 else 1
-                    value = arange(i_x0[i], i_x1[i] + sup, sup)
-                    i_g[ii: ii + delta + 1] = value % nb_x
-                    j_g[ii: ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
-                else:
-                    sup = -1 if d_y[i] < 0 else 1
-                    j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
-                    i_g[ii: ii + delta + 1] = (int_(j_g[ii: ii + delta + 1]) - i_y0[i]) * a + i_x0[i]
-            ii += delta + 1
-        i_g %= nb_x
-        return i_g, j_g, d_max
+        return compute_pixel_path(
+            x0, y0, x1, y1,
+            self.x_bounds[0], self.y_bounds[0], self.xstep, self.ystep, self.x_size)
 
     def clean_land(self):
         """Function to remove all land pixel
@@ -1248,6 +1014,7 @@ class RegularGridDataset(GridDataset):
         if area is None:
             area = dict(llcrnrlon=190, urcrnrlon=280, llcrnrlat=-62, urcrnrlat=8)
         scaling = kwargs.pop('scaling', 'density')
+        ref_grid_name = kwargs.pop('ref_grid_name', None)
         x0, y0 = self.nearest_grd_indice(area['llcrnrlon'], area['llcrnrlat'])
         x1, y1 = self.nearest_grd_indice(area['urcrnrlon'], area['urcrnrlat'])
 
@@ -1294,6 +1061,8 @@ class RegularGridDataset(GridDataset):
         if ref is None:
             return lon_content, lat_content
         else:
+            if ref_grid_name is not None:
+                grid_name = ref_grid_name
             ref_lon_content, ref_lat_content = ref.spectrum_lonlat(grid_name, area, **kwargs)
             return (lon_content[0], lon_content[1] / ref_lon_content[1]), \
                    (lat_content[0], lat_content[1] / ref_lat_content[1])
@@ -1382,67 +1151,85 @@ class RegularGridDataset(GridDataset):
         return interp2d_geo(self.x_c, self.y_c, g, g.mask, lons, lats)
 
 
-@njit(cache=True, fastmath=True, parallel=True)
-def custom_convolution(data, mask, kernel):
-    """do sortin at high lattitude big part of value are masked"""
-    nb_x = kernel.shape[0]
-    demi_x = int((nb_x - 1) / 2)
-    demi_y = int((kernel.shape[1] - 1) / 2)
-    out = empty(data.shape[0] - nb_x + 1)
-    for i in prange(out.shape[0]):
-        if mask[i + demi_x, demi_y] == 1:
-            w = (mask[i:i + nb_x] * kernel).sum()
-            if w != 0:
-                out[i] = (data[i:i + nb_x] * kernel).sum() / w
-            else:
-                out[i] = nan
-        else:
-            out[i] = nan
-    return out
-
-
 @njit(cache=True, fastmath=True)
-def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
-    """For geographic grid, test of cicularity
-    Maybe test if we are out of bounds
-    """
-    x_ref = x_g[0]
-    y_ref = y_g[0]
-    x_step = x_g[1] - x_ref
-    y_step = y_g[1] - y_ref
-    nb_x = x_g.shape[0]
-    is_circular = (x_g[-1] + x_step) % 360 == x_g[0] % 360
-    z = empty(x.shape)
-    for i in prange(x.size):
-        x_ = (x[i] - x_ref) / x_step
-        y_ = (y[i] - y_ref) / y_step
-        i0 = int(floor(x_))
-        i1 = i0 + 1
-        if is_circular:
-            xd = (x_ - i0)
-            i0 %= nb_x
-            i1 %= nb_x
-        j0 = int(floor(y_))
-        j1 = j0 + 1
-        yd = (y_ - j0)
-        z00 = z_g[i0, j0]
-        z01 = z_g[i0, j1]
-        z10 = z_g[i1, j0]
-        z11 = z_g[i1, j1]
-        if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
-            z[i] = nan
-        else:
-            z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (z01 * (1 - xd) + z11 * xd) * yd
-    return z
+def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
+        """Give a series of index which describe the path between to position
+        """
+        # index
+        nx = x0.shape[0]
+        i_x0 = empty(nx, dtype=numba_types.int_)
+        i_x1 = empty(nx, dtype=numba_types.int_)
+        i_y0 = empty(nx, dtype=numba_types.int_)
+        i_y1 = empty(nx, dtype=numba_types.int_)
+        # Because round_ is not accepted with array in numba
+        for i in range(nx):
+            i_x0[i] = round_(((x0[i] - x_ori) % 360) / x_step)
+            i_x1[i] = round_(((x1[i] - x_ori) % 360) / x_step)
+            i_y0[i] = round_((y0[i] - y_ori) / y_step)
+            i_y1[i] = round_((y1[i] - y_ori) / y_step)
+        # Delta index of x
+        d_x = i_x1 - i_x0
+        d_x = (d_x + nb_x // 2) % nb_x - (nb_x // 2)
+        i_x1 = i_x0 + d_x
+        # Delta index of y
+        d_y = i_y1 - i_y0
+        # max and abs sum doesn't work on array?
+        d_max = empty(nx, dtype=numba_types.int32)
+        nb_value = 0
+        for i in range(nx):
+            d_max[i] = max(abs(d_x[i]), abs(d_y[i]))
+            # Compute number of pixel which we go trought
+            nb_value += d_max[i] + 1
+
+        # Create an empty array to store value of pixel across the travel
+        i_g = empty(nb_value, dtype=numba_types.int32)
+        j_g = empty(nb_value, dtype=numba_types.int32)
+
+        # Index to determine the position in the global array
+        ii = 0
+        # Iteration on each travel
+        for i, delta in enumerate(d_max):
+            # If the travel don't cross multiple pixel
+            if delta == 0:
+                i_g[ii: ii + delta + 1] = i_x0[i]
+                j_g[ii: ii + delta + 1] = i_y0[i]
+            # Vertical move
+            elif d_x[i] == 0:
+                sup = -1 if d_y[i] < 0 else 1
+                i_g[ii: ii + delta + 1] = i_x0[i]
+                j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
+            # Horizontal move
+            elif d_y[i] == 0:
+                sup = -1 if d_x[i] < 0 else 1
+                i_g[ii: ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup)
+                j_g[ii: ii + delta + 1] = i_y0[i]
+            # In case of multiple direction
+            else:
+                a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
+                if abs(d_x[i]) >= abs(d_y[i]):
+                    sup = -1 if d_x[i] < 0 else 1
+                    value = arange(i_x0[i], i_x1[i] + sup, sup)
+                    i_g[ii: ii + delta + 1] = value
+                    j_g[ii: ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
+                else:
+                    sup = -1 if d_y[i] < 0 else 1
+                    value = arange(i_y0[i], i_y1[i] + sup, sup)
+                    j_g[ii: ii + delta + 1] = value
+                    i_g[ii: ii + delta + 1] = (value - i_y0[i]) * a + i_x0[i]
+            ii += delta + 1
+        i_g %= nb_x
+        return i_g, j_g, d_max
 
 
 @njit(cache=True)
-def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N):
+def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
     lon, lat = vertices[:,0], vertices[:,1]
     lon_min, lon_max = lon.min(), lon.max()
     lat_min, lat_max = lat.min(), lat.max()
     i_x0, i_y0 = int32(((lon_min - x0) % 360) // xstep), int32((lat_min - y0) // ystep)
     i_x1, i_y1 = int32(((lon_max - x0) % 360) // xstep), int32((lat_max - y0) // ystep)
-    slice_x = i_x0 - N, i_x1 + N + 1
+
+    if circular:
+        slice_x = (i_x0 - N) % x_size, (i_x1 + N + 1) % x_size
     slice_y = i_y0 - N, i_y1 + N + 1
     return slice_x, slice_y

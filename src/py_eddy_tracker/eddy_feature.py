@@ -27,11 +27,9 @@ Version 2.0.3
 """
 
 import logging
-from numpy import where, empty, array, concatenate, ma, zeros, unique, round, ones
-from scipy.ndimage import minimum_filter
+from numpy import empty, array, concatenate, ma, zeros, unique, round, ones, int_
 from matplotlib.figure import Figure
 from numba import njit, types as numba_types
-from .tools import index_from_nearest_path_with_pt_in_bbox
 
 
 class Amplitude(object):
@@ -468,7 +466,7 @@ class Contours(object):
         
         overhead of python is huge with numba, cython little bit best??
         """
-        index = index_from_nearest_path_with_pt_in_bbox(
+        index = index_from_nearest_path_with_pt_in_bbox_(
             level,
             self.level_index,
             self.nb_contour_per_level,
@@ -483,7 +481,7 @@ class Contours(object):
             xpt,
             ypt
             )
-        if index is None:
+        if index == -1:
             return None
         else:
             return self.contours.collections[level]._paths[index]
@@ -500,7 +498,7 @@ class Contours(object):
         ax.autoscale_view()
 
 
-@njit(cache=True)
+@njit(cache=True, fastmath=True)
 def index_from_nearest_path_with_pt_in_bbox_(
         level_index,
         l_i,
@@ -537,7 +535,15 @@ def index_from_nearest_path_with_pt_in_bbox_(
     # We iterate over contour in the same level
     for i_elt_c in range(i_start_c, i_end_c):
         # if bbox of contour doesn't contain pt, we skip this contour
-        if y_min_per_c[i_elt_c] > ypt or y_max_per_c[i_elt_c] < ypt or x_min_per_c[i_elt_c] > xpt or x_max_per_c[i_elt_c] < xpt:
+        if y_min_per_c[i_elt_c] > ypt:
+            continue
+        if y_max_per_c[i_elt_c] < ypt:
+            continue
+        x_min = x_min_per_c[i_elt_c]
+        xpt_ = (xpt - x_min) % 360 + x_min
+        if x_min > xpt_:
+            continue
+        if x_max_per_c[i_elt_c] < xpt_:
             continue
         # Indice of first pt of contour
         i_start_pt = indices_of_first_pts[i_elt_c]
@@ -549,13 +555,15 @@ def index_from_nearest_path_with_pt_in_bbox_(
         # We do iteration on pt to check dist, if it's inferior we store
         # index of contour
         for i_elt_pt in range(i_start_pt, i_end_pt):
-            dist = (x_value[i_elt_pt] - xpt) ** 2 + (y_value[i_elt_pt] - ypt) ** 2
+            d_x = x_value[i_elt_pt] - xpt_
+            if abs(d_x) > 180:
+                d_x = (d_x + 180) % 360 - 180
+            dist = d_x ** 2 + (y_value[i_elt_pt] - ypt) ** 2
             if dist < dist_ref:
                 dist_ref = dist
                 i_ref = i_elt_c
     # No iteration on contour, we return no index of contour
     if find_contour == 0:
-        return -1
+        return int_(-1)
     # We return index of contour, for the specific level
-    return i_ref - i_start_c
-
+    return int_(i_ref - i_start_c)

@@ -31,17 +31,16 @@ Version 3.0.0
 # External modules
 import logging
 from numpy import empty, linspace, interp, isscalar, floor, int16, array, \
-    gradient, zeros, isfinite, unique, nan, ma, int_, arange
+    isfinite, unique, nan, ma, int_, arange
 from datetime import datetime
 from pyproj import Proj
 from .tracking_objects import nearest
 from .observations import EddiesObservations
 from .property_objects import Amplitude
-from .tools import distance, winding_number_poly, fit_circle_c, \
-    poly_contain_poly
+from .tools import winding_number_poly, fit_circle_c, poly_contain_poly
 from matplotlib.path import Path as BasePath
 from scipy.interpolate import griddata
-from .tools import distance_vector
+from .generic import distance
 from scipy.interpolate import Akima1DInterpolator
 
 
@@ -58,8 +57,7 @@ def uniform_resample(x_val, y_val, method='interp1d', extrapolate=None,
     # Get distances
     dist = empty(x_val.shape)
     dist[0] = 0
-    distance_vector(
-        x_val[:-1], y_val[:-1], x_val[1:], y_val[1:], dist[1:])
+    dist[1:] = distance(x_val[:-1], y_val[:-1], x_val[1:], y_val[1:])
     dist.cumsum(out=dist)
     # Get uniform distances
     if fixed_size is None:

@@ -1,12 +1,12 @@
 from ..observations import EddiesObservations as Model
-from ..observations import GridDataset
+from ..dataset.grid import RegularGridDataset
 from numpy import where, meshgrid, bincount, ones, unique, bool_, arange
-import logging
+from numba import njit
 from os import path
 
 
 class CheltonTracker(Model):
-    GROUND = GridDataset(path.join(path.dirname(__file__), '/data/adelepoulle/Test/Test_eddy/20180220_high_res_mask/mask_1_60.nc'), 'lon', 'lat')
+    GROUND = RegularGridDataset(path.join(path.dirname(__file__), '/data/adelepoulle/Test/Test_eddy/20180220_high_res_mask/mask_1_60.nc'), 'lon', 'lat')
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
@@ -14,7 +14,7 @@ class CheltonTracker(Model):
         """
         return distance
 
-    def mask_function(self, other):
+    def mask_function(self, other, distance):
         """We mask link with ellips and ratio
         """
         # Compute Parameter of ellips
@@ -34,18 +34,8 @@ class CheltonTracker(Model):
             minor=minor, # Minor can be bigger than major??
             major=y)
 
-        # We check ratio
-        other_amplitude, self_amplitude = meshgrid(
-            other.obs['amplitude'], self.obs['amplitude'])
-        other_radius, self_radius = meshgrid(
-            other.obs['radius_e'], self.obs['radius_e'])
-        ratio_amplitude = other_amplitude / self_amplitude
-        ratio_radius = other_radius / self_radius
-        mask *= \
-            (ratio_amplitude < 2.5) * \
-            (ratio_amplitude > 1 / 2.5) * \
-            (ratio_radius < 2.5) * \
-            (ratio_radius > 1 / 2.5)
+        # We check ratio (maybe not usefull)
+        check_ratio(mask, self.obs['amplitude'], other.obs['amplitude'], self.obs['radius_e'], other.obs['radius_e'])
         indexs_closest = where(mask)
         mask[indexs_closest] = self.across_ground(self.obs[indexs_closest[0]], other.obs[indexs_closest[1]])
         return mask
@@ -87,3 +77,29 @@ class CheltonTracker(Model):
             i_self = i_self[mask]
             i_other = i_other[mask]
         return i_self, i_other
+
+
+@njit(cache=True)
+def check_ratio(current_mask, self_amplitude, other_amplitude, self_radius, other_radius):
+    """
+    Only very few case are remove with selection
+    :param current_mask:
+    :param self_amplitude:
+    :param other_amplitude:
+    :param self_radius:
+    :param other_radius:
+    :return:
+    """
+    self_shape, other_shape = current_mask.shape
+    r_min = 1 / 2.5
+    r_max = 2.5
+    for i in range(self_shape):
+        for j in range(other_shape):
+            if current_mask[i, j]:
+                r_amplitude = other_amplitude[j] / self_amplitude[i]
+                if r_amplitude >= r_max or r_amplitude <= r_min:
+                    current_mask[i, j] = False
+                    continue
+                r_radius = other_radius[j] / self_radius[i]
+                if r_radius >= r_max or r_radius <= r_min:
+                    current_mask[i, j] = False

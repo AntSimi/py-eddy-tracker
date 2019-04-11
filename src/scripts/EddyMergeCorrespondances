@@ -8,7 +8,6 @@ from py_eddy_tracker.tracking import Correspondances
 from os.path import exists, dirname
 from os import mkdir
 import logging
-from numpy import unique
 import datetime as dt
 
 
