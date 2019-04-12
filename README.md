@@ -153,7 +153,7 @@ h = RegularGridDataset(grid_name, lon_name, lat_name)
 h.bessel_high_filter('adt', 500, order=3)
 date = datetime(2019, 2, 23)
 a, c = h.eddy_identification(
-    'adt', 'ugosa', 'vgosa', # Variable to use for identification
+    'adt', 'ugos', 'vgos', # Variable to use for identification
     date, # Date of identification
     0.002, # step between two isolines of detection (m)
     pixel_limit=(5, 2000), # Min and max of pixel can be include in contour
