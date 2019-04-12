@@ -309,7 +309,7 @@ class Contours(object):
                                 path_left.vertices[-1, 1] - path_right.vertices[0, 1]) < self.DELTA_PREC:
                             polys_to_pop_left.append(i_left)
                             path_right.vertices[:, 0] -= 360
-                            path_left.vertices = concatenate((path_left.vertices, path_right.vertices))
+                            path_left.vertices = concatenate((path_left.vertices, path_right.vertices[1:]))
                             path_left.vertices[-1] = path_left.vertices[0]
                             paths_solve.append(path_left)
                             paths_right.pop(i_right)

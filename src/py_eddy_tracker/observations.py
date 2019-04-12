@@ -728,9 +728,13 @@ class EddiesObservations(object):
     def set_global_attr_netcdf(self, h_nc):
         pass
 
-    def display(self, ax, ref=0, **kwargs):
-        ax.plot((self.obs['contour_lon_s'].T - ref) % 360 + ref, self.obs['contour_lat_s'].T, ** kwargs)
-        ax.plot((self.obs['contour_lon_e'].T - ref) % 360 + ref, self.obs['contour_lat_e'].T, linestyle='-.', ** kwargs)
+    def display(self, ax, ref=None, **kwargs):
+        if ref is None:
+            ax.plot(self.obs['contour_lon_s'].T, self.obs['contour_lat_s'].T, ** kwargs)
+            ax.plot(self.obs['contour_lon_e'].T, self.obs['contour_lat_e'].T, linestyle='-.', ** kwargs)
+        else:
+            ax.plot((self.obs['contour_lon_s'].T - ref) % 360 + ref, self.obs['contour_lat_s'].T, ** kwargs)
+            ax.plot((self.obs['contour_lon_e'].T - ref) % 360 + ref, self.obs['contour_lat_e'].T, linestyle='-.', ** kwargs)
 
 
 @njit(cache=True, fastmath=True)

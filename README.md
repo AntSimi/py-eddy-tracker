@@ -40,7 +40,8 @@ for tracking.
 Loading grid
 ```python
 from py_eddy_tracker.dataset.grid import RegularGridDataset
-h = RegularGridDataset('share/nrt_global_allsat_phy_l4_20190223_20190226.nc', 'longitude', 'latitude')
+grid_name, lon_name, lat_name = 'share/nrt_global_allsat_phy_l4_20190223_20190226.nc', 'longitude', 'latitude'
+h = RegularGridDataset(grid_name, lon_name, lat_name)
 ```
 
 Plotting grid
@@ -51,13 +52,14 @@ ax = fig.add_axes([.02, .51, .9, .45])
 ax.set_title('ADT (m)')
 ax.set_ylim(-75, 75)
 ax.set_aspect('equal')
-m=ax.pcolormesh(h.x_bounds, h.y_bounds, h.grid('adt').T.copy(), vmin=-1, vmax=1, cmap='coolwarm')
+m = h.display(ax, name='adt', vmin=-1, vmax=1)
 ax.grid(True)
 plt.colorbar(m, cax=fig.add_axes([.94, .51, .01, .45]))
 ```
 
 Filtering
 ```python
+h = RegularGridDataset(grid_name, lon_name, lat_name)
 h.bessel_high_filter('adt', 500, order=3)
 ```
 
@@ -72,7 +74,7 @@ ax = fig.add_axes([.02, .02, .9, .45])
 ax.set_title('ADT Filtered (m)')
 ax.set_aspect('equal')
 ax.set_ylim(-75, 75)
-m=ax.pcolormesh(h.x_bounds, h.y_bounds, h.grid('adt').T, vmin=-.1, vmax=.1, cmap='coolwarm')
+m = h.display(ax, name='adt', vmin=-.1, vmax=.1)
 ax.grid(True)
 plt.colorbar(m, cax=fig.add_axes([.94, .02, .01, .45]))
 fig.savefig('share/png/filter.png')
@@ -83,7 +85,6 @@ fig.savefig('share/png/filter.png')
 #### Compute spectrum and spectrum ratio on some area ####
 Load data
 ```python
-grid_name, lon_name, lat_name = 'share/nrt_global_allsat_phy_l4_20190223_20190226.nc', 'longitude', 'latitude'
 raw = RegularGridDataset(grid_name, lon_name, lat_name)
 filtered = RegularGridDataset(grid_name, lon_name, lat_name)
 filtered.bessel_low_filter('adt', 150, order=3)
@@ -169,8 +170,8 @@ ax.set_title('Eddies detected -- Cyclonic(red) and Anticyclonic(blue)')
 ax.set_ylim(-75,75)
 ax.set_xlim(0,360)
 ax.set_aspect('equal')
-ax.plot(a.obs['contour_lon_s'].T, a.obs['contour_lat_s'].T, 'b', linewidth=.5)
-ax.plot(c.obs['contour_lon_s'].T, c.obs['contour_lat_s'].T, 'r', linewidth=.5)
+a.display(ax, color='b', linewidth=.5)
+c.display(ax, color='r', linewidth=.5)
 ax.grid()
 fig.savefig('share/png/eddies.png')
 ```

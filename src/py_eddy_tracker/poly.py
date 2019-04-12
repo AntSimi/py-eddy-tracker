@@ -28,7 +28,7 @@ def poly_contain_poly(xy_poly_out, xy_poly_in):
     x_ref = xy_poly_out[0,0]
     d_x = abs(x[0] - x_ref)
     if d_x > 180:
-        x = (x - x_ref + 180) % 360 - 180
+        x = (x - x_ref + 180) % 360 + x_ref - 180
     for i_elt in prange(nb_elt):
         wn = winding_number_poly(x[i_elt], xy_poly_in[i_elt, 1], xy_poly_out)
         if wn == 0:

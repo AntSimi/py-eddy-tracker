@@ -34,10 +34,8 @@ def raw_resample(datas, fixed_size):
 
 @property
 def mean_coordinates(self):
-    return self.vertices.mean(axis=0)
-
-
-BasePath.mean_coordinates = mean_coordinates
+    # last coordinates == first
+    return self.vertices[1:].mean(axis=0)
 
 
 @property
@@ -45,14 +43,13 @@ def lon(self):
     return self.vertices[:, 0]
 
 
-BasePath.lon = lon
-
-
 @property
 def lat(self):
     return self.vertices[:, 1]
 
 
+BasePath.mean_coordinates = mean_coordinates
+BasePath.lon = lon
 BasePath.lat = lat
 
 
@@ -89,7 +86,8 @@ def fit_circle_path(self):
 @njit(cache=True, fastmath=True)
 def _fit_circle_path(vertice):
     lons, lats = vertice[:, 0], vertice[:, 1]
-    lon0, lat0 = lons.mean(), lats.mean()
+    # last coordinates == first
+    lon0, lat0 = lons[1:].mean(), lats[1:].mean()
     c_x, c_y = coordinates_to_local(lons, lats, lon0, lat0)
     # Some time, edge is only a dot of few coordinates
     d_lon = lons.max() - lons.min()

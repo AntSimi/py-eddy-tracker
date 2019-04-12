@@ -128,18 +128,19 @@ def fit_circle(x_vec, y_vec):
     p_inon_x = empty(nb_elt)
     p_inon_y = empty(nb_elt)
 
-    x_mean = x_vec.mean()
-    y_mean = y_vec.mean()
+    # last coordinates == first
+    x_mean = x_vec[1:].mean()
+    y_mean = y_vec[1:].mean()
 
-    norme = (x_vec - x_mean) ** 2 + (y_vec - y_mean) ** 2
+    norme = (x_vec[1:] - x_mean) ** 2 + (y_vec[1:] - y_mean) ** 2
     norme_max = norme.max()
     scale = norme_max ** .5
 
     # Form matrix equation and solve it
     # Maybe put f4
-    datas = ones((nb_elt, 3))
-    datas[:, 0] = 2. * (x_vec - x_mean) / scale
-    datas[:, 1] = 2. * (y_vec - y_mean) / scale
+    datas = ones((nb_elt - 1, 3))
+    datas[:, 0] = 2. * (x_vec[1:] - x_mean) / scale
+    datas[:, 1] = 2. * (y_vec[1:] - y_mean) / scale
 
     (center_x, center_y, radius), residuals, rank, s = lstsq(datas, norme / norme_max)
 
