@@ -202,6 +202,7 @@ class GridDataset(object):
 
     GRAVITY = 9.807
     EARTH_RADIUS = 6370997.
+    # EARTH_RADIUS = 6378136.3
     N = 1
 
     def __init__(self, filename, x_name, y_name, centered=None):
@@ -373,7 +374,6 @@ class GridDataset(object):
             kwargs=h_dict['kwargs'].copy(),
         )
         self.vars[grid_out] = self.grid(grid_in).copy()
-
 
     def grid(self, varname):
         """give grid required
@@ -1068,6 +1068,7 @@ class RegularGridDataset(GridDataset):
     def add_uv(self, grid_height):
         """Compute a u and v grid
         """
+        data = self.grid(grid_height)
         h_dict = self.variables_description[grid_height]
         for variable in ('u', 'v'):
             self.variables_description[variable] = dict(
@@ -1076,44 +1077,67 @@ class RegularGridDataset(GridDataset):
                 args=tuple((variable, *h_dict['args'][1:])),
                 kwargs=h_dict['kwargs'].copy(),
             )
+
             self.variables_description[variable]['attrs']['units'] += '/s'
-        data = self.grid(grid_height)
-        gof = sin(deg2rad(self.y_c)) * ones((self.x_c.shape[0], 1)) * 4. * pi / 86400.
-        # gof = sin(deg2rad(self.y_c))* ones((self.x_c.shape[0], 1))  * 4. * pi / (23 * 3600 + 56 *60 +4.1 )
+        # Divide by sideral day
+        gof = sin(deg2rad(self.y_c)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (23 * 3600 + 56 * 60 + 4.1)
         with errstate(divide='ignore'):
             gof = self.GRAVITY / (gof * ones((self.x_c.shape[0], 1)))
 
-        m_y = array((1, 0, -1))
-        m_x = array((1, 0, -1))
-        d_hy = convolve(
-            data,
-            weights=m_y.reshape((-1, 1)).T
-        )
-        mask = convolve(
-            int8(data.mask),
-            weights=ones(m_y.shape).reshape((1, -1))
-        )
-        d_hy = ma.array(d_hy, mask=mask != 0)
+        w = [
+                array((3, -32, 168, -672, 0, 672, -168, 32, -3)) / 840.,
+                array((-1, 9, -45, 0, 45, -9, 1)) / 60.,
+                array((1, -8, 0, 8, -1)) / 12.,
+                array((-1, 0, 1)) /2.,
+                array((-1, 1)), # array((0, -1, 1))
+                (1, array((-1, 1))), # array((-1, 1, 0))
+                ]
 
-        d_y = self.EARTH_RADIUS * 2 * pi / 360 * convolve(self.y_c, m_y)
-
-        self.vars['u'] = - d_hy / d_y * gof
+        # Compute v
+        self.vars['v'] = None
         mode = 'wrap' if self.is_circular() else 'reflect'
-        d_hx = convolve(
-            data,
-            weights=m_x.reshape((-1, 1)),
-            mode=mode,
-        )
-        mask = convolve(
-            int8(data.mask),
-            weights=ones(m_x.shape).reshape((-1, 1)),
-            mode=mode,
-        )
-        d_hx = ma.array(d_hx, mask=mask != 0)
-        d_x_degrees = convolve(self.x_c, m_x, mode=mode).reshape((-1, 1))
-        d_x_degrees = (d_x_degrees + 180) % 360 - 180
-        d_x = self.EARTH_RADIUS * 2 * pi / 360 * d_x_degrees * cos(deg2rad(self.y_c))
-        self.vars['v'] = d_hx / d_x * gof
+        for m_x in w:
+            if isinstance(m_x, tuple):
+                shift, m_x = m_x
+                data_ = data.copy()
+                data_[shift:] = data[:-shift]
+                data_[:shift] = data[-shift:]
+            else:
+                data_ = data
+            d_hx = convolve(data_, weights=m_x.reshape((-1, 1)), mode=mode)
+            mask = convolve(int8(data_.mask), weights=ones(m_x.shape).reshape((-1, 1)), mode=mode)
+            d_hx = ma.array(d_hx, mask=mask != 0)
+
+            d_x_degrees = convolve(self.x_c, m_x, mode=mode).reshape((-1, 1))
+            d_x_degrees = (d_x_degrees + 180) % 360 - 180
+            d_x = self.EARTH_RADIUS * 2 * pi / 360 * d_x_degrees * cos(deg2rad(self.y_c))
+            v = d_hx / d_x * gof
+            if self.vars['v'] is None:
+                self.vars['v'] = v
+            else:
+                self.vars['v'][self.vars['v'].mask] = v[self.vars['v'].mask]
+
+        # Compute u
+        self.vars['u'] = None
+        for m_y in w:
+            if isinstance(m_y, tuple):
+                shift, m_y = m_y
+                data_ = data.copy()
+                data_[:, shift:] = data[:, :-1]
+            else:
+                data_ = data
+
+            d_hy = convolve(data_, weights=m_y.reshape((-1, 1)).T)
+            mask = convolve(int8(data_.mask), weights=ones(m_y.shape).reshape((1, -1)))
+            d_hy = ma.array(d_hy, mask=mask != 0)
+
+            d_y = self.EARTH_RADIUS * 2 * pi / 360 * convolve(self.y_c, m_y)
+
+            u = - d_hy / d_y * gof
+            if self.vars['u'] is None:
+                self.vars['u'] = u
+            else:
+                self.vars['u'][self.vars['u'].mask] = u[self.vars['u'].mask]
 
     def speed_coef_mean(self, contour):
         """some nan can be compute over contour if we are near border,
@@ -1226,8 +1250,9 @@ def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
     lat_min, lat_max = lat.min(), lat.max()
     i_x0, i_y0 = int32(((lon_min - x0) % 360) // xstep), int32((lat_min - y0) // ystep)
     i_x1, i_y1 = int32(((lon_max - x0) % 360) // xstep), int32((lat_max - y0) // ystep)
-
     if circular:
         slice_x = (i_x0 - N) % x_size, (i_x1 + N + 1) % x_size
+    else:
+        slice_x = min(i_x0 - N, 0), i_x1 + N + 1
     slice_y = i_y0 - N, i_y1 + N + 1
     return slice_x, slice_y
