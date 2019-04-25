@@ -23,11 +23,14 @@ if __name__ == '__main__':
     args = id_parser().parse_args()
 
     h = RegularGridDataset(args.filename, args.longitude, args.latitude)
-    h.bessel_high_filter(args.h, 500, order=3)
-
     date = datetime.strptime(args.datetime, '%Y%m%d')
-    a, c = h.eddy_identification(
-        args.h, args.u, args.v, date, 0.002, pixel_limit=(5, 2000), shape_error=55, bbox_surface_min_degree=.125**2)
+    if args.u == 'None' and args.v == 'None':
+        h.add_uv(args.h)
+        u, v = 'u', 'v'
+    else:
+        u, v = args.u, args.v
+    h.bessel_high_filter(args.h, 500, order=3)
+    a, c = h.eddy_identification(args.h, u, v, date, 0.002, pixel_limit=(5, 2000), shape_error=55)
     with Dataset(args.path_out + date.strftime('/Anticyclonic_%Y%m%d.nc'), 'w') as h:
         a.to_netcdf(h)
     with Dataset(args.path_out + date.strftime('/Cyclonic_%Y%m%d.nc'), 'w') as h:

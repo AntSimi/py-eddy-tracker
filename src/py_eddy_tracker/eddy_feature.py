@@ -331,7 +331,7 @@ class Contours(object):
                 collection._paths = paths_out
         logging.info('%d contours close over the bounds', poly_solve)
 
-    def __init__(self, x, y, z, levels, bbox_surface_min_degree, wrap_x=False, keep_unclose=False):
+    def __init__(self, x, y, z, levels, wrap_x=False, keep_unclose=False):
         """
         c_i : index to contours
         l_i : index to levels
@@ -369,13 +369,6 @@ class Contours(object):
                 # Contour with less vertices than 4 are popped
                 if contour.vertices.shape[0] < 4:
                     continue
-                # Check if side of bbox is greater than ... => Avoid tiny shape
-                x_min, y_min = contour.vertices.min(axis=0)
-                x_max, y_max = contour.vertices.max(axis=0)
-                d_x, d_y = x_max - x_min, y_max - y_min
-                square_root = bbox_surface_min_degree ** .5
-                if d_x <= square_root or d_y <= square_root:
-                    continue
                 if keep_unclose:
                     keep_path.append(contour)
                     continue
@@ -391,6 +384,8 @@ class Contours(object):
                         closed_contours += 1
                     contour.vertices[-1] = contour.vertices[0]
                 # Store to use latter
+                x_min, y_min = contour.vertices.min(axis=0)
+                x_max, y_max = contour.vertices.max(axis=0)
                 contour.xmin = x_min
                 contour.xmax = x_max
                 contour.ymin = y_min
@@ -486,15 +481,17 @@ class Contours(object):
         else:
             return self.contours.collections[level]._paths[index]
 
-    def display(self, ax, **kwargs):
+    def display(self, ax, step=1, **kwargs):
         from matplotlib.collections import LineCollection
-        for collection in self.contours.collections:
+        for collection in self.contours.collections[::step]:
             ax.add_collection(LineCollection(
                 (i.vertices for i in collection.get_paths()),
                 color=collection.get_color(),
                 **kwargs
             ))
-        ax.update_datalim([self.contours._mins, self.contours._maxs])
+
+        if hasattr(self.contours, '_mins'):
+            ax.update_datalim([self.contours._mins, self.contours._maxs])
         ax.autoscale_view()
 
 
