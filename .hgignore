@@ -6,6 +6,7 @@ syntax: glob
 *.eclipse.*
 *.idea*
 *.project*
+doc/.*
 syntax: regexp
 ^build$
 syntax: regexp

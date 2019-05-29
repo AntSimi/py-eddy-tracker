@@ -6,11 +6,23 @@
 Welcome to py-eddy-tracker's documentation!
 ===========================================
 
-Contents:
+.. toctree::
+   :maxdepth: 2
+   :caption: Grid manipulation
+
+   grid_load_display
+   spectrum
+   grid_identification
 
 .. toctree::
    :maxdepth: 2
+   :caption: code
 
+   autodoc/grid
+   autodoc/observations
+   autodoc/eddy_feature
+   autodoc/featured_tracking
+   autodoc/poly
 
 
 Indices and tables
