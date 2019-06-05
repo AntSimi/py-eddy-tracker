@@ -32,12 +32,23 @@ from numpy import zeros, empty, absolute, arange, where, unique, \
     interp, floor
 from netCDF4 import Dataset
 from .generic import distance_grid, distance
-from shapely.geometry import Polygon
-from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
 import logging
 from datetime import datetime
 from numba import njit, types as numba_types
+from Polygon import Polygon as Polygon
+
+
+@njit(cache=True, fastmath=True)
+def custom_concat(x, y):
+    '''
+    '''
+    nb = x.shape[0]
+    a = empty((nb,2))
+    for i in range(nb):
+        a[i,0] = x[i]
+        a[i,1] = y[i]
+    return a
 
 
 class EddiesObservations(object):
@@ -342,58 +353,58 @@ class EddiesObservations(object):
         next_obs['segment_size'][:] += 1
         return next_obs
 
+
+
+
+
     @staticmethod
-    def cost_function_common_area(records_in, records_out, distance, intern=False):
-        """
-        How it's work on x bound ?
+    def cost_function_common_area(xy_in, xy_out, distance, intern=False):
+        """ How does it work on x bound ?
         Args:
-            records_in:
-            records_out:
+            xy_in:
+            xy_out:
             distance:
             intern:
-
         Returns:
 
         """
-        x_name, y_name = ('contour_lon_s', 'contour_lat_s') if intern else ('contour_lon_e', 'contour_lat_e')
+        x_name, y_name = (('contour_lon_s', 'contour_lat_s') if intern
+                     else ('contour_lon_e', 'contour_lat_e'))
         r_name = 'radius_s' if intern else 'radius_e'
-        nb_records = records_in.shape[0]
-        costs = ma.empty(nb_records,dtype='f4')
-        tolerance = 0.025
-        x_in, y_in = records_in[x_name], records_in[y_name]
-        x_out, y_out = records_out[x_name], records_out[y_name]
+        nb_records = xy_in.shape[0]
+        x_in, y_in = xy_in[x_name], xy_in[y_name]
+        x_out, y_out = xy_out[x_name], xy_out[y_name]
         x_in_min, y_in_min = x_in.min(axis=1), y_in.min(axis=1)
         x_in_max, y_in_max = x_in.max(axis=1), y_in.max(axis=1)
         x_out_min, y_out_min = x_out.min(axis=1), y_out.min(axis=1)
         x_out_max, y_out_max = x_out.max(axis=1), y_out.max(axis=1)
-        for i_record in range(nb_records):
-            if x_in_max[i_record] < x_out_min[i_record] or x_in_min[i_record] > x_out_max[i_record]:
-                costs[i_record] = 1
+        costs = ma.empty(nb_records, dtype='f4')
+        
+        for i in range(nb_records):
+            if (x_in_max[i] < x_out_min[i] or
+                x_in_min[i] > x_out_max[i]):
+                costs[i] = 1
                 continue
-            if y_in_max[i_record] < y_out_min[i_record] or y_in_min[i_record] > y_out_max[i_record]:
-                costs[i_record] = 1
+            if (y_in_max[i] < y_out_min[i] or
+                y_in_min[i] > y_out_max[i]):
+                costs[i] = 1
                 continue
-            poly_in = Polygon(concatenate(((x_in[i_record],), (y_in[i_record],))).T)
-            poly_out = Polygon(concatenate(((x_out[i_record],),(y_out[i_record],))).T)
-            if not poly_in.is_valid:
-                poly_in = poly_in.simplify(tolerance=tolerance)
-                if not poly_in.is_valid:
-                    logging.warning('Need to simplify polygon in for a second time')
-                    poly_in = poly_in.buffer(0)
-            if not poly_out.is_valid:
-                poly_out = poly_out.simplify(tolerance=tolerance)
-                if not poly_out.is_valid:
-                    logging.warning('Need to simplify polygon out for a second time')
-                    poly_out = poly_out.buffer(0)
-            try:
-                costs[i_record] = 1 - poly_in.intersection(poly_out).area / poly_in.area
-            except TopologicalError:
-                costs[i_record] = 1
+            
+            x_in_, x_out_ = x_in[i], x_out[i]
+            p_in = Polygon(custom_concat(x_in_, y_in[i]))
+            if abs(x_in_[0] - x_out_[0]) > 180:
+                x_out_ = (x_out[i] - (x_in_[0] - 180)) % 360 + x_in_[0] - 180
+            p_out = Polygon(custom_concat(x_out_, y_out[i]))
+            costs[i] = 1 - (p_in & p_out).area() / min(p_in.area(), p_out.area())
         costs.mask = costs == 1
         return costs
 
+
+
+
     def mask_function(self, other, distance):
         return distance < 125
+
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
@@ -577,13 +588,13 @@ class EddiesObservations(object):
                 if hasattr(cost_reduce[i,j], 'mask'):
                     continue
                 links_resolve += 1
-                # Set to False all link
+                # Set all links to False
                 mask[i_self_keep[i]] = False
                 cost_reduce.mask[i] = True
                 if not multiple_link:
                     mask[:, i_other_keep[j]] = False
                     cost_reduce.mask[:, j] = True
-                # we active only this link
+                # We activate this link only
                 mask[i_self_keep[i], i_other_keep[j]] = True
 
             logging.debug('%d links resolve', links_resolve)
@@ -747,7 +758,7 @@ def shifted_ellipsoid_degrees_mask(lon0, lat0, lon1, lat1, minor=1.5, major=1.5)
     # Focal
     f_right = lon0
     f_left = f_right - (c - minor)
-    # Ellips center
+    # Ellipse center
     x_c = (f_left + f_right) * .5
 
     nb_0, nb_1 = lat0.shape[0], lat1.shape[0]

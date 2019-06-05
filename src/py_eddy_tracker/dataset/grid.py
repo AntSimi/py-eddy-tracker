@@ -424,7 +424,8 @@ class GridDataset(object):
             raise Exception('Date argument be a datetime object')
         # The inf limit must be in pixel and  sup limit in surface
         if pixel_limit is None:
-            pixel_limit = (4, 1000)
+            #pixel_limit = (4, 1000)
+            pixel_limit = (10, 1018)
 
         # Compute an interpolator for eke
         self.init_speed_coef(uname, vname)
