@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/py-eddy-tracker/badge/?version=latest)](https://py-eddy-tracker.readthedocs.io/en/latest/?badge=latest)
+
 # README #
 
 ### How do I get set up? ###
