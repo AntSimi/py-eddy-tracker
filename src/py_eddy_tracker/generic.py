@@ -86,8 +86,8 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
         y_ = (y[i] - y_ref) / y_step
         i0 = int(floor(x_))
         i1 = i0 + 1
+        xd = (x_ - i0)
         if is_circular:
-            xd = (x_ - i0)
             i0 %= nb_x
             i1 %= nb_x
         j0 = int(floor(y_))

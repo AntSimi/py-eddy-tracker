@@ -6,7 +6,7 @@ from os import path
 
 
 class CheltonTracker(Model):
-    GROUND = RegularGridDataset(path.join(path.dirname(__file__), '/data/adelepoulle/Test/Test_eddy/20180220_high_res_mask/mask_1_60.nc'), 'lon', 'lat')
+    GROUND = RegularGridDataset(path.join(path.dirname(__file__), '../data/mask_1_60.nc'), 'lon', 'lat')
 
     @staticmethod
     def cost_function(records_in, records_out, distance):

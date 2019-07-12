@@ -55,12 +55,10 @@ class EddiesObservations(object):
         'sign_type',
         'raw_data',
     )
-    
-    DELTA_JJ_JE = 2448623 - (datetime(1992, 1, 1) - datetime(1950, 1, 1)).days 
-    
-    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time', 'eke',
+
+    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time',
                 'shape_error_e', 'shape_error_s', 'nb_contour_selected',
-                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour', 'cost_association']
+                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour']
 
     def __init__(self, size=0, track_extra_variables=None,
                  track_array_variables=0, array_variables=None,
@@ -234,40 +232,37 @@ class EddiesObservations(object):
         if not isinstance(filename, str):
             filename = filename.astype(str)
         with Dataset(filename) as h_nc:
-            nb_obs = len(h_nc.dimensions['Nobs'])
+            nb_obs = len(h_nc.dimensions['obs'])
             kwargs = dict()
             if array_dim in h_nc.dimensions:
                 kwargs['track_array_variables'] = len(
                     h_nc.dimensions[array_dim])
-                kwargs['array_variables'] = []
+                kwargs['array_variables'] = list()
                 for variable in h_nc.variables:
                     if array_dim in h_nc.variables[variable].dimensions:
-                        kwargs['array_variables'].append(str(variable))
+                        var_inv = VAR_DESCR_inv[variable]
+                        kwargs['array_variables'].append(var_inv)
+            array_variables = kwargs.get('array_variables', list())
             kwargs['track_extra_variables'] = []
             for variable in h_nc.variables:
-                if variable == 'cyc':
-                    continue
                 var_inv = VAR_DESCR_inv[variable]
-                if var_inv not in cls.ELEMENTS and var_inv not in kwargs.get('array_variables', list()):
-                    # Patch
-                    if var_inv == 'time_jj':
-                        continue
-                    #
+                if var_inv == 'type_cyc':
+                    continue
+                if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                     kwargs['track_extra_variables'].append(var_inv)
             kwargs['raw_data'] = raw_data
             eddies = cls(size=nb_obs, ** kwargs)
             for variable in h_nc.variables:
-                if variable == 'cyc':
+                var_inv = VAR_DESCR_inv[variable]
+                if var_inv == 'type_cyc':
                     continue
                 # Patch
+                h_nc.variables[variable].set_auto_maskandscale(not raw_data)
+                eddies.obs[var_inv] = h_nc.variables[variable][:]
+            for variable in h_nc.variables:
                 var_inv = VAR_DESCR_inv[variable]
-                if var_inv == 'time_jj':
-                    var_inv = 'time'
-                    eddies.obs[var_inv] = h_nc.variables[variable][:] + cls.DELTA_JJ_JE
-                else:
-                    h_nc.variables[variable].set_auto_maskandscale(not raw_data)
-                    eddies.obs[var_inv] = h_nc.variables[variable][:]
-            eddies.sign_type = h_nc.variables['cyc'][0]
+                if var_inv == 'type_cyc':
+                    eddies.sign_type = h_nc.variables[variable][0]
             if eddies.sign_type == 0:
                 logging.debug('File come from another algorithm of identification')
                 eddies.sign_type = -1
@@ -276,7 +271,7 @@ class EddiesObservations(object):
 
     @classmethod
     def from_netcdf(cls, handler):
-        nb_obs = len(handler.dimensions['Nobs'])
+        nb_obs = len(handler.dimensions['obs'])
         kwargs = dict()
         if hasattr(handler, 'track_array_variables'):
             kwargs['track_array_variables'] = handler.track_array_variables
@@ -289,7 +284,7 @@ class EddiesObservations(object):
         for variable in handler.variables:
             # Patch
             if variable == 'time':
-                eddies.obs[variable] = handler.variables[variable][:] + cls.DELTA_JJ_JE
+                eddies.obs[variable] = handler.variables[variable][:]
             else:
                 #
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
@@ -623,8 +618,8 @@ class EddiesObservations(object):
 
     def to_netcdf(self, handler):
         eddy_size = len(self)
-        logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
-        handler.createDimension('Nobs', eddy_size)
+        logging.debug('Create Dimensions "obs" : %d', eddy_size)
+        handler.createDimension('obs', eddy_size)
         handler.track_extra_variables = ','.join(self.track_extra_variables)
         if self.track_array_variables != 0:
             handler.createDimension('NbSample', self.track_array_variables)
@@ -635,7 +630,7 @@ class EddiesObservations(object):
         fields.sort()
         for ori_name in fields:
             # Patch for a transition
-            name = 'time_jj' if ori_name == 'time' else ori_name
+            name = ori_name
             #
             logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
             self.create_variable(
@@ -657,6 +652,11 @@ class EddiesObservations(object):
                      dimensions=VAR_DESCR['type_cyc']['nc_dims']),
                 VAR_DESCR['type_cyc']['nc_attr'],
                 self.sign_type)
+
+        handler.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
+        handler.comment = 'Surface product; mesoscale eddies'
+        handler.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
+        handler.standard_name_vocabulary ='NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
 
     def create_variable(self, handler_nc, kwargs_variable, attr_variable,
                         data, scale_factor=None, add_offset=None):
@@ -680,7 +680,7 @@ class EddiesObservations(object):
         if not self.raw_data:
             var[:] = data
         try:
-            if len(var.dimensions) == 1:
+            if len(var.dimensions) == 1 or var.size < 1e7:
                 var.setncattr('min', var[:].min())
                 var.setncattr('max', var[:].max())
         except ValueError:
@@ -695,8 +695,8 @@ class EddiesObservations(object):
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create file %s', filename)
             # Create dimensions
-            logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
-            h_nc.createDimension('Nobs', eddy_size)
+            logging.debug('Create Dimensions "obs" : %d', eddy_size)
+            h_nc.createDimension('obs', eddy_size)
             if self.track_array_variables != 0:
                 h_nc.createDimension('NbSample', self.track_array_variables)
             # Iter on variables to create:
@@ -812,6 +812,10 @@ class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations
     """
     __slots__ = ()
+
+    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time',
+                'shape_error_e', 'shape_error_s', 'nb_contour_selected',
+                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour', 'cost_association']
 
     def filled_by_interpolation(self, mask):
         """Filled selected values by interpolation

@@ -429,7 +429,7 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                         centlat_e = grd.lat[centj, centi]
 
                     if amp.within_amplitude_limits():
-                        properties.obs['amplitude'] = amp.amplitude
+                        properties.obs['amplitude'] = amp.amplitude / 100
 
             if properties.obs['amplitude'][0]:
                 # Get sum of eke within Ceff
@@ -473,9 +473,9 @@ def collection_loop(contours, grd, eddy, x_i=None, c_s_xi=None):
                     c_x, c_y = proj(contlon_s, contlat_s)
                     _, _, eddy_radius_s, aerr_s = fit_circle_c(c_x, c_y)
 
-                properties.obs['radius_s'] = eddy_radius_s / 1000
+                properties.obs['radius_s'] = eddy_radius_s
                 properties.obs['speed_radius'] = uavg
-                properties.obs['radius_e'] = eddy_radius_e / 1000
+                properties.obs['radius_e'] = eddy_radius_e
                 # properties.obs['eke'] = teke
                 if 'shape_error_e' in eddy.track_extra_variables:
                     properties.obs['shape_error_e'] = aerr
