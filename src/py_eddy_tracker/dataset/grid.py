@@ -438,6 +438,21 @@ class GridDataset(object):
 
     def eddy_identification(self, grid_height, uname, vname, date, step=0.005, shape_error=55,
                             array_sampling=50, pixel_limit=None):
+        """
+
+        Args:
+            grid_height:
+            uname:
+            vname:
+            date:
+            step: must be in meter (m)
+            shape_error: must be in percent (%)
+            array_sampling:
+            pixel_limit:
+
+        Returns:
+
+        """
         if not isinstance(date, datetime):
             raise Exception('Date argument be a datetime object')
         # The inf limit must be in pixel and  sup limit in surface
@@ -446,6 +461,14 @@ class GridDataset(object):
 
         # Compute an interpolator for eke
         self.init_speed_coef(uname, vname)
+
+        # Get unit of h grid
+        h_units = self.units(grid_height)
+        units = UnitRegistry()
+        in_h_unit = units.parse_expression(h_units)
+        if in_h_unit is not None:
+            factor, _ = in_h_unit.to('m').to_tuple()
+            step /= factor
 
         # Get h grid
         data = self.grid(grid_height)
@@ -614,13 +637,11 @@ class GridDataset(object):
             eddies_collection.obs['contour_lon_s'] = ((eddies_collection.obs['contour_lon_s'].T - ref) % 360 + ref).T
 
             a_and_c.append(eddies_collection)
-        h_units = self.units(grid_height)
-        units = UnitRegistry()
-        in_unit = units.parse_expression(h_units)
-        if in_unit is not None:
+
+        if in_h_unit is not None:
             for name in ['amplitude', 'height_max_speed_contour', 'height_external_contour', 'height_inner_contour']:
                 out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
-                factor, _ = in_unit.to(out_unit).to_tuple()
+                factor, _ = in_h_unit.to(out_unit).to_tuple()
                 a_and_c[0].obs[name] *= factor
                 a_and_c[1].obs[name] *= factor
         return a_and_c
