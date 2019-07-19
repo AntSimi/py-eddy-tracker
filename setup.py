@@ -7,8 +7,8 @@ setup(
     name="pyEddyTracker",
     version='3.0.0',
     description="Py-Eddy-Tracker libraries",
-    classifiers=['Development Status :: Alpha',
-                 'Topic :: Eddy',
+    classifiers=['Development Status :: 3 - Alpha',
+                 'Topic :: Scientific/Engineering :: Physics',
                  'Programming Language :: Python'],
     keywords='eddy science',
     author='emason',
@@ -16,6 +16,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     scripts=[
+        'src/scripts/GridFiltering',
         'src/scripts/EddyId',
         'src/scripts/EddyIdentification',
         'src/scripts/EddyTracking',
@@ -33,13 +34,16 @@ setup(
     ext_modules=[Extension("py_eddy_tracker.tools",
                            ["src/py_eddy_tracker/tools.pyx"],
                            include_dirs=[numpy.get_include()])],
-    package_data={'py_eddy_tracker.featured_tracking': ['*.nc', ]},
+    package_data={
+        'py_eddy_tracker.featured_tracking': ['*.nc'],
+        'py_eddy_tracker': ['data/*.nc'],
+    },
     setup_requires=[
         'numpy>=1.14'],
     install_requires=[
         'numpy>=1.14',
         # Bug with 1.5.1 (slow memory leak)
-        'matplotlib>=2.0.0',
+        # 'matplotlib>=2.0.0',
         'scipy>=0.15.1',
         'netCDF4>=1.1.0',
         'opencv-python',

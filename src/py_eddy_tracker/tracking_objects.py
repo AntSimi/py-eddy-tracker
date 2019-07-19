@@ -180,8 +180,8 @@ class IdentificationList(object):
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             logging.info('Create intermediary file %s', filename)
             # Create dimensions
-            logging.debug('Create Dimensions "Nobs" : %d', eddy_size)
-            h_nc.createDimension('Nobs', eddy_size)
+            logging.debug('Create Dimensions "obs" : %d', eddy_size)
+            h_nc.createDimension('obs', eddy_size)
             if self.track_array_variables_sampling != 0:
                 h_nc.createDimension('NbSample', self.track_array_variables_sampling)
             # Iter on variables to create:

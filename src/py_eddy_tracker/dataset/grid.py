@@ -5,7 +5,7 @@ import logging
 from numpy import concatenate, int32, empty, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, interp, meshgrid, nan, ceil, sinc, isnan, \
-    percentile, zeros, arctan2, arcsin, round_, nanmean
+    percentile, zeros, arctan2, arcsin, round_, nanmean, exp
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -119,8 +119,6 @@ def coordinates_to_local(lon, lat, lon0, lat0):
     a_val = sin_dlon ** 2 * cos_lat0 * cos_lat + sin_dlat ** 2
     module = R * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
 
-    dx = lon - lon0
-    dy = lat - lat0
     azimuth = pi /2 - arctan2(
         cos_lat * sin(dlon),
         cos_lat0 * sin(lat * D2R) - sin(lat0 * D2R) * cos_lat * cos(dlon))
@@ -132,7 +130,7 @@ def local_to_coordinates(x, y, lon0, lat0):
     D2R = pi / 180.
     R = 6370997
     d = (x ** 2 + y ** 2) ** .5 / R
-    a = -(arctan2(y, x) -pi / 2)
+    a = -(arctan2(y, x) - pi / 2)
     lat = arcsin(sin(lat0 * D2R) * cos(d) + cos(lat0 * D2R) * sin(d) * cos(a))
     lon = lon0 + arctan2(sin(a) * sin(d) * cos(lat0 * D2R), cos(d) - sin(lat0 * D2R) * sin(lat)) / D2R
     return lon, lat / D2R
@@ -355,6 +353,9 @@ class GridDataset(object):
         return False
 
     def units(self, varname):
+        stored_units = self.variables_description[varname]['attrs'].get('units', None)
+        if stored_units is not None:
+            return stored_units
         with Dataset(self.filename) as h:
             var = h.variables[varname]
             if hasattr(var, 'units'):
@@ -400,6 +401,26 @@ class GridDataset(object):
                 self.vars[varname] = ma.array(self.vars[varname], mask=zeros(self.vars[varname].shape, dtype='bool'))
         return self.vars[varname]
 
+    def grid_tiles(self, varname, slice_x, slice_y):
+        """give grid tiles required, without buffer system
+        """
+        coordinates_dims = list(self.x_dim)
+        coordinates_dims.extend(list(self.y_dim))
+        logging.debug('Extract %(varname)s from %(filename)s with slice(x:%(slice_x)s,y:%(slice_y)s)',
+                      dict(varname=varname, filename=self.filename, slice_y=slice_y, slice_x=slice_x))
+        with Dataset(self.filename) as h:
+            dims = h.variables[varname].dimensions
+            sl = [(slice_x if dim in list(self.x_dim) else slice_y) if dim in coordinates_dims else 0 for dim in dims]
+            data = h.variables[varname][sl]
+            if len(self.x_dim) == 1:
+                i_x = where(array(dims) == self.x_dim)[0][0]
+                i_y = where(array(dims) == self.y_dim)[0][0]
+                if i_x > i_y:
+                    data = data.T
+        if not hasattr(data, 'mask'):
+            data = ma.array(data, mask=zeros(data.shape, dtype='bool'))
+        return data
+
     def high_filter(self, grid_name, x_cut, y_cut):
         """create a high filter with a low one
         """
@@ -419,20 +440,47 @@ class GridDataset(object):
         return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
 
     def eddy_identification(self, grid_height, uname, vname, date, step=0.005, shape_error=55,
-                            array_sampling=50, pixel_limit=None):
+                            array_sampling=50, pixel_limit=None, precision=None):
+        """
+
+        Args:
+            grid_height:
+            uname:
+            vname:
+            date:
+            step: must be in meter (m)
+            shape_error: must be in percent (%)
+            array_sampling:
+            pixel_limit:
+            precision: must be in meter(m)
+
+        Returns:
+
+        """
         if not isinstance(date, datetime):
             raise Exception('Date argument be a datetime object')
         # The inf limit must be in pixel and  sup limit in surface
         if pixel_limit is None:
-            #pixel_limit = (4, 1000)
-            pixel_limit = (10, 1018)
+            pixel_limit = (4, 1000)
 
         # Compute an interpolator for eke
         self.init_speed_coef(uname, vname)
 
-        # Get h grid
-        data = self.grid(grid_height)
+        # Get unit of h grid
+        h_units = self.units(grid_height)
+        units = UnitRegistry()
+        in_h_unit = units.parse_expression(h_units)
+        if in_h_unit is not None:
+            factor, _ = in_h_unit.to('m').to_tuple()
+            logging.info('We will apply on step a factor to be coherent with grid : %f', 1 / factor)
+            step /= factor
+            if precision is not None:
+                precision /= factor
 
+        # Get h grid
+        data = self.grid(grid_height).astype('f8')
+        if precision is not None:
+            data = (data / precision).round() * precision
         # Compute levels for ssh
         z_min, z_max = data.min(), data.max()
         d_z = z_max -z_min
@@ -453,7 +501,8 @@ class GridDataset(object):
         # Compute ssh contour
         self.contours = Contours(x, y, data, levels, wrap_x=self.is_circular())
 
-        track_extra_variables = ['height_max_speed_contour', 'height_external_contour', 'height_inner_contour']
+        track_extra_variables = ['height_max_speed_contour', 'height_external_contour', 'height_inner_contour',
+                                 'lon_max', 'lat_max']
         array_variables = ['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s', 'uavg_profile']
         # Compute cyclonic and anticylonic research:
         a_and_c = list()
@@ -482,7 +531,7 @@ class GridDataset(object):
                     centlon_e, centlat_e, eddy_radius_e, aerr = current_contour.fit_circle()
 
                     # Filter for shape
-                    if aerr < 0 or aerr > shape_error:
+                    if aerr < 0 or aerr > shape_error or isnan(aerr):
                         continue
                     # Get indices of centroid
                     # Give only 1D array of lon and lat not 2D data
@@ -537,12 +586,13 @@ class GridDataset(object):
                     # First, get position based on innermost
                     # contour
                     c_x, c_y = proj(inner_contour.lon, inner_contour.lat)
-                    centx_s, centy_s, _, _ = fit_circle(c_x, c_y)
-                    centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
+                    centx_i, centy_i, _, _ = fit_circle(c_x, c_y)
+                    centlon_i, centlat_i = proj(centx_i, centy_i, inverse=True)
                     # Second, get speed-based radius based on
                     # contour of max uavg
                     c_x, c_y = proj(speed_contour.lon, speed_contour.lat)
-                    _, _, eddy_radius_s, aerr_s = fit_circle(c_x, c_y)
+                    centx_s, centy_s, eddy_radius_s, aerr_s = fit_circle(c_x, c_y)
+                    centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
 
                     # Instantiate new EddyObservation object (high cost need to be review)
                     properties = EddiesObservations(size=1, track_extra_variables=track_extra_variables,
@@ -559,13 +609,15 @@ class GridDataset(object):
                     else:
                         properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling)
                     properties.obs['amplitude'] = amp.amplitude
-                    properties.obs['radius_s'] = eddy_radius_s / 1000
+                    properties.obs['radius_s'] = eddy_radius_s
                     properties.obs['speed_radius'] = max_average_speed
-                    properties.obs['radius_e'] = eddy_radius_e / 1000
+                    properties.obs['radius_e'] = eddy_radius_e
                     properties.obs['shape_error_e'] = aerr
                     properties.obs['shape_error_s'] = aerr_s
                     properties.obs['lon'] = centlon_s
                     properties.obs['lat'] = centlat_s
+                    properties.obs['lon_max'] = centlon_i
+                    properties.obs['lat_max'] = centlat_i
                     properties.obs['contour_lon_e'], properties.obs['contour_lat_e'] = uniform_resample(
                         current_contour.lon, current_contour.lat, fixed_size=array_sampling)
                     properties.obs['contour_lon_s'], properties.obs['contour_lat_s'] = uniform_resample(
@@ -586,19 +638,25 @@ class GridDataset(object):
             eddies_collection.obs['time'] = (date - datetime(1950, 1, 1)).total_seconds() / 86400.
 
             # normalization longitude between 0 - 360, because storage have an offset on 180
+            eddies_collection.obs['lon_max'] %= 360
             eddies_collection.obs['lon'] %= 360
             ref = eddies_collection.obs['lon'] - 180
             eddies_collection.obs['contour_lon_e'] = ((eddies_collection.obs['contour_lon_e'].T - ref) % 360 + ref).T
             eddies_collection.obs['contour_lon_s'] = ((eddies_collection.obs['contour_lon_s'].T - ref) % 360 + ref).T
 
             a_and_c.append(eddies_collection)
-        h_units = self.units(grid_height)
-        units = UnitRegistry()
-        in_unit = units.parse_expression(h_units)
-        if in_unit is not None:
+
+        if in_h_unit is not None:
             for name in ['amplitude', 'height_max_speed_contour', 'height_external_contour', 'height_inner_contour']:
                 out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
-                factor, _ = in_unit.to(out_unit).to_tuple()
+                factor, _ = in_h_unit.to(out_unit).to_tuple()
+                a_and_c[0].obs[name] *= factor
+                a_and_c[1].obs[name] *= factor
+        in_u_units = units.parse_expression(self.units(uname))
+        if in_u_units is not None:
+            for name in ['speed_radius', 'uavg_profile']:
+                out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
+                factor, _ = in_u_units.to(out_unit).to_tuple()
                 a_and_c[0].obs[name] *= factor
                 a_and_c[1].obs[name] *= factor
         return a_and_c
@@ -609,6 +667,7 @@ class GridDataset(object):
         Calculate geostrophic speed around successive contours
         Returns the average
         """
+        # Init max speed to search maximum
         max_average_speed = self.speed_coef_mean(original_contour)
         speed_array = [max_average_speed]
 
@@ -918,9 +977,27 @@ class RegularGridDataset(GridDataset):
         kernel_[:half_x_pt * order] = kernel[:0:-1]
         return kernel_
 
-    def convolve_filter_with_dynamic_kernel(self, grid_name, kernel_func, lat_max=85, **kwargs_func):
-        logging.warning('No filtering above %f degrees of latitude', lat_max)
+    def _low_filter(self, grid_name, x_cut, y_cut):
+        """low filtering
+        """
+        i_x, i_y = x_cut * 0.125 / self.xstep, y_cut * 0.125 / self.xstep
+        logging.info(
+            'Filtering with this wave : (%s, %s) converted in pixel (%s, %s)',
+            x_cut, y_cut, i_x, i_y
+        )
         data = self.grid(grid_name).copy()
+        data[data.mask] = 0
+        return self._gaussian_filter(
+            data,
+            (i_x, i_y),
+            mode='wrap' if self.is_circular() else 'reflect')
+
+    def convolve_filter_with_dynamic_kernel(self, grid, kernel_func, lat_max=85, extend=False, **kwargs_func):
+        logging.warning('No filtering above %f degrees of latitude', lat_max)
+        if isinstance(grid, str):
+            data = self.grid(grid).copy()
+        else:
+            data = grid.copy()
         # Matrix for result
         data_out = ma.empty(data.shape)
         data_out.mask = ones(data_out.shape, dtype=bool)
@@ -956,24 +1033,14 @@ class RegularGridDataset(GridDataset):
             values_sum = filter2D(tmp_matrix.data, -1, kernel)[demi_x:-demi_x, demi_y]
             kernel_sum = filter2D(m.astype(float), -1, kernel)[demi_x:-demi_x, demi_y]
             with errstate(invalid='ignore'):
-                data_out[:, i] = values_sum / kernel_sum
-        data_out = ma.array(data_out, mask=data.mask + data_out.mask)
-        return data_out
-
-    def _low_filter(self, grid_name, x_cut, y_cut):
-        """low filtering
-        """
-        i_x, i_y = x_cut * 0.125 / self.xstep, y_cut * 0.125 / self.xstep
-        logging.info(
-            'Filtering with this wave : (%s, %s) converted in pixel (%s, %s)',
-            x_cut, y_cut, i_x, i_y
-        )
-        data = self.grid(grid_name).copy()
-        data[data.mask] = 0
-        return self._gaussian_filter(
-            data,
-            (i_x, i_y),
-            mode='wrap' if self.is_circular() else 'reflect')
+                if extend:
+                    data_out[:, i] = ma.array(values_sum / kernel_sum, mask=kernel_sum < (extend* kernel.sum()))
+                else:
+                    data_out[:, i] = values_sum / kernel_sum
+        if extend:
+            return ma.array(data_out, mask=data_out.mask)
+        else:
+            return ma.array(data_out, mask=data.mask + data_out.mask)
 
     def lanczos_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
         data_out = self.convolve_filter_with_dynamic_kernel(
@@ -1063,7 +1130,36 @@ class RegularGridDataset(GridDataset):
             return (lon_content[0], lon_content[1] / ref_lon_content[1]), \
                    (lat_content[0], lat_content[1] / ref_lat_content[1])
 
-    def compute_grad(self, data, stencil_halfwidth=4, mode='reflect', vertical=False):
+    def compute_finite_difference(self, data, schema=1, mode='reflect', vertical=False):
+        if not isinstance(schema, int) and schema < 1:
+            raise Exception('schema must be a positive int')
+
+        data2 = data.copy()
+        data1 = data.copy()
+        if vertical:
+            data1[:, :-schema] = data[:, schema:]
+            data2[:, schema:] = data[:, :-schema]
+            # put nan
+            data1[:, -schema:] = nan
+            data2[:, :schema] = nan
+        else:
+            data1[:-schema] = data[schema:]
+            data2[schema:] = data[:-schema]
+            if mode == 'wrap' :
+                data1[-schema:] = data[:schema]
+                data2[:schema] = data[-schema:]
+            else:
+                # put nan
+                data1[-schema:] = nan
+                data2[:schema] = nan
+
+        if vertical:
+            d = self.EARTH_RADIUS * 2 * pi / 360 * 2 * schema * self.ystep
+        else:
+            d = self.EARTH_RADIUS * 2 * pi / 360 * 2 * schema * self.xstep * cos(deg2rad(self.y_c))
+        return (data1 - data2) / d
+
+    def compute_stencil(self, data, stencil_halfwidth=4, mode='reflect', vertical=False):
         stencil_halfwidth = max(min(int(stencil_halfwidth), 4), 1)
         logging.debug('Stencil half width apply : %d', stencil_halfwidth)
         # output
@@ -1074,9 +1170,10 @@ class RegularGridDataset(GridDataset):
             array((-1, 9, -45, 0, 45, -9, 1)) / 60.,
             array((1, -8, 0, 8, -1)) / 12.,
             array((-1, 0, 1)) / 2.,
-            # like array((0, -1, 1))
+            # uncentered kernel
+            # like array((0, -1, 1)) but left value could be default value
             array((-1, 1)),
-            # like array((-1, 1, 0))
+            # like array((-1, 1, 0)) but right value could be default value
             (1, array((-1, 1))),
             ]
         # reduce to stencil selected
@@ -1086,7 +1183,7 @@ class RegularGridDataset(GridDataset):
         # Iteration from larger stencil to smaller (to fill matrix)
         for weight in weights:
             if isinstance(weight, tuple):
-                # In the cas of unbalanced diff
+                # In the case of unbalanced diff
                 shift, weight = weight
                 data_ = data.copy()
                 data_[shift:] = data[:-shift]
@@ -1111,12 +1208,11 @@ class RegularGridDataset(GridDataset):
                     d_degrees = convolve(x, weight, mode=mode)
                     d_degrees_180 = convolve((x + 180) % 360 - 180, weight, mode=mode)
                     # Arbitrary, to be sure to be far far away of bound
-                    m = (x < 50) + (x > 310)
+                    m = (x < 90) + (x > 270)
                     d_degrees[m] = d_degrees_180[m]
-                    d_degrees = d_degrees.reshape((-1, 1))
                 else:
-                    d_degrees = convolve(self.x_c, weight, mode=mode).reshape((-1, 1))
-                d = self.EARTH_RADIUS * 2 * pi / 360 * d_degrees * cos(deg2rad(self.y_c))
+                    d_degrees = convolve(self.x_c, weight, mode=mode)
+                d = self.EARTH_RADIUS * 2 * pi / 360 * d_degrees.reshape((-1, 1)) * cos(deg2rad(self.y_c))
             if grad is None:
                 # First Gradient
                 grad = d_h / d
@@ -1125,16 +1221,31 @@ class RegularGridDataset(GridDataset):
                 grad[grad.mask] = (d_h / d)[grad.mask]
         return grad
 
-    def add_uv_lagerloef(self, grid_height, uname='u', vname='v', latmax=5):
+    def add_uv_lagerloef(self, grid_height, uname='u', vname='v', schema=15):
         self.add_uv(grid_height, uname, vname)
-        logging.info('Modified u/v with lagerloef 99 method abov %f', latmax)
-        data = self.grid(grid_height)
+        latmax = 5
+        _, (i_start, i_end) = self.nearest_grd_indice((0, 0), (-latmax, latmax))
+        sl = slice(i_start, i_end)
         # Divide by sideral day
-        gof = sin(deg2rad(self.y_c)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (23 * 3600 + 56 * 60 + 4.1)
+        lat = self.y_c[sl]
+        gob = cos(deg2rad(lat)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (23 * 3600 + 56 * 60 + 4.1) / self.EARTH_RADIUS
         with errstate(divide='ignore'):
-            gof = self.GRAVITY / (gof * ones((self.x_c.shape[0], 1)))
+            gob = self.GRAVITY / (gob * ones((self.x_c.shape[0], 1)))
+        mode = 'wrap' if self.is_circular() else 'reflect'
 
-    def add_uv2(self, grid_height, uname='u2', vname='v2'):
+        # fill data to compute a finite difference on all point
+        data = self.convolve_filter_with_dynamic_kernel(grid_height, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=.1)
+        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=.1)
+        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=.1)
+        v_lagerloef = self.compute_finite_difference(
+            self.compute_finite_difference(data, mode=mode, schema=schema), mode=mode, schema=schema)[:, sl] * gob
+        u_lagerloef = - self.compute_finite_difference(
+            self.compute_finite_difference(data, vertical=True, schema=schema), vertical=True, schema=schema)[:, sl] * gob
+        w = 1 - exp(-(lat / 2.2) ** 2)
+        self.vars[vname][:, sl] = self.vars[vname][:, sl] * w + v_lagerloef * (1 - w)
+        self.vars[uname][:, sl] = self.vars[uname][:, sl] * w + u_lagerloef * (1 - w)
+
+    def add_uv(self, grid_height, uname='u', vname='v', stencil_halfwidth=4):
         """Compute a u and v grid
                """
         logging.info('Add u/v variable with stencil method')
@@ -1158,83 +1269,9 @@ class RegularGridDataset(GridDataset):
 
         # Compute v
         mode = 'wrap' if self.is_circular() else 'reflect'
-        self.vars[vname] = self.compute_grad(data, mode=mode) * gof
+        self.vars[vname] = self.compute_stencil(data, mode=mode, stencil_halfwidth=stencil_halfwidth) * gof
         # Compute u
-        self.vars[uname] = -self.compute_grad(data, vertical=True) * gof
-
-    def add_uv(self, grid_height, uname='u', vname='v'):
-        """Compute a u and v grid
-        """
-        logging.info('Add u/v variable with stencil method')
-        data = self.grid(grid_height)
-        h_dict = self.variables_description[grid_height]
-        for variable in (uname, vname):
-            self.variables_description[variable] = dict(
-                infos=h_dict['infos'].copy(),
-                attrs=h_dict['attrs'].copy(),
-                args=tuple((variable, *h_dict['args'][1:])),
-                kwargs=h_dict['kwargs'].copy(),
-            )
-            self.variables_description[variable]['attrs']['units'] += '/s'
-        # Divide by sideral day
-        gof = sin(deg2rad(self.y_c)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (23 * 3600 + 56 * 60 + 4.1)
-        with errstate(divide='ignore'):
-            gof = self.GRAVITY / (gof * ones((self.x_c.shape[0], 1)))
-
-        w = [
-                array((3, -32, 168, -672, 0, 672, -168, 32, -3)) / 840.,
-                array((-1, 9, -45, 0, 45, -9, 1)) / 60.,
-                array((1, -8, 0, 8, -1)) / 12.,
-                array((-1, 0, 1)) /2.,
-                array((-1, 1)), # array((0, -1, 1))
-                (1, array((-1, 1))), # array((-1, 1, 0))
-                ]
-
-        # Compute v
-        self.vars[vname] = None
-        mode = 'wrap' if self.is_circular() else 'reflect'
-        for m_x in w:
-            if isinstance(m_x, tuple):
-                shift, m_x = m_x
-                data_ = data.copy()
-                data_[shift:] = data[:-shift]
-                data_[:shift] = data[-shift:]
-            else:
-                data_ = data
-            d_hx = convolve(data_, weights=m_x.reshape((-1, 1)), mode=mode)
-            mask = convolve(int8(data_.mask), weights=ones(m_x.shape).reshape((-1, 1)), mode=mode)
-            d_hx = ma.array(d_hx, mask=mask != 0)
-
-            d_x_degrees = convolve(self.x_c, m_x, mode=mode).reshape((-1, 1))
-            d_x_degrees = (d_x_degrees + 180) % 360 - 180
-            d_x = self.EARTH_RADIUS * 2 * pi / 360 * d_x_degrees * cos(deg2rad(self.y_c))
-            v = d_hx / d_x * gof
-            if self.vars[vname] is None:
-                self.vars[vname] = v
-            else:
-                self.vars[vname][self.vars[vname].mask] = v[self.vars[vname].mask]
-
-        # Compute u
-        self.vars[uname] = None
-        for m_y in w:
-            if isinstance(m_y, tuple):
-                shift, m_y = m_y
-                data_ = data.copy()
-                data_[:, shift:] = data[:, :-1]
-            else:
-                data_ = data
-
-            d_hy = convolve(data_, weights=m_y.reshape((-1, 1)).T)
-            mask = convolve(int8(data_.mask), weights=ones(m_y.shape).reshape((1, -1)))
-            d_hy = ma.array(d_hy, mask=mask != 0)
-
-            d_y = self.EARTH_RADIUS * 2 * pi / 360 * convolve(self.y_c, m_y)
-
-            u = - d_hy / d_y * gof
-            if self.vars[uname] is None:
-                self.vars[uname] = u
-            else:
-                self.vars[uname][self.vars[uname].mask] = u[self.vars[uname].mask]
+        self.vars[uname] = -self.compute_stencil(data, vertical=True, stencil_halfwidth=stencil_halfwidth) * gof
 
     def speed_coef_mean(self, contour):
         """some nan can be compute over contour if we are near border,

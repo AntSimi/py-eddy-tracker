@@ -27,8 +27,7 @@ Version 3.0.0
 ===========================================================================
 
 """
-from matplotlib.dates import julian2num, num2date
-
+from datetime import timedelta, datetime
 from py_eddy_tracker.observations import EddiesObservations, VirtualEddiesObservations, TrackEddiesObservations
 from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate, \
     ma
@@ -139,8 +138,8 @@ class Correspondances(list):
         Returns: period coverage by obs
 
         """
-        date_start = num2date(julian2num(self.class_method.load_from_netcdf(self.datasets[0]).obs['time'][0] - 0.5))
-        date_stop = num2date(julian2num(self.class_method.load_from_netcdf(self.datasets[-1]).obs['time'][0] - 0.5))
+        date_start = datetime(1950, 1, 1) + timedelta(int(self.class_method.load_from_netcdf(self.datasets[0]).obs['time'][0]))
+        date_stop = datetime(1950, 1, 1) + timedelta(int(self.class_method.load_from_netcdf(self.datasets[-1]).obs['time'][0]))
         return date_start, date_stop
 
     def swap_dataset(self, dataset):
@@ -631,7 +630,7 @@ class Correspondances(list):
             if not isinstance(filename, str):
                 filename = filename.astype(str)
             with Dataset(filename) as h:
-                nb_obs_day = len(h.dimensions['Nobs'])
+                nb_obs_day = len(h.dimensions['obs'])
             m = ones(nb_obs_day, dtype='bool')
             m[eddies_used] = False
             list_mask.append(m)
