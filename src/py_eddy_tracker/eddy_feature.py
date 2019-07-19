@@ -174,6 +174,7 @@ def detect_local_minima_(grid, general_mask, pixel_mask, maximum_local_extremum,
                     else:
                         g[i_ + 1, j_ + 1] = grid[i_ + i, j_ + j] * sign
             # if center equal to min
+            # TODO if center and neigboor have same value we have problem, i don't know how
             if g.min() == (grid[i, j] * sign) and pixel_mask[i,j]:
                 xs.append(i)
                 ys.append(j)
@@ -383,9 +384,12 @@ class Contours(object):
                     else:
                         closed_contours += 1
                     contour.vertices[-1] = contour.vertices[0]
-                # Store to use latter
                 x_min, y_min = contour.vertices.min(axis=0)
                 x_max, y_max = contour.vertices.max(axis=0)
+                ptp_min = self.DELTA_PREC * 100
+                if abs(x_min - x_max) < ptp_min or abs(y_min - y_max) < ptp_min:
+                    continue
+                # Store to use latter
                 contour.xmin = x_min
                 contour.xmax = x_max
                 contour.ymin = y_min
