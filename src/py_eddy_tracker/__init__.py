@@ -99,17 +99,8 @@ VAR_DESCR = dict(
             units='days since 1950-01-01 00:00:00',
             calendar='proleptic_gregorian',
             axis='T',
-            longname='time of gridded file',
-            description='date of this observation',
-            )
-        ),
-    ocean_time=dict(
-        attr_name=None,
-        nc_name='ocean_time',
-        nc_type='float64',
-        nc_dims=('obs',),
-        nc_attr=dict(
-            units='ROMS ocean_time (seconds)',
+            longname='Time',
+            description='Date of this observation',
             )
         ),
     type_cyc=dict(
@@ -121,7 +112,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='cyclonic',
             units='boolean',
-            description='cyclonic -1; anti-cyclonic +1',
+            description='Cyclonic -1; anti-cyclonic +1',
             )
         ),
     segment_size=dict(
@@ -147,13 +138,15 @@ VAR_DESCR = dict(
         ),
     virtual=dict(
         attr_name=None,
-        nc_name='virtual',
+        nc_name='observation_flag',
+        old_nc_name=['virtual'],
         nc_type='byte',
         nc_dims=('obs',),
         nc_attr=dict(
             longname='virtual_position',
             units='boolean',
-            description='Virtual observation: 0 for real',
+            description='Flag indicating if the value is interpolated between two'
+                        ' observations or not (0: observed, 1: interpolated)',
             )
         ),
     cost_association=dict(
@@ -176,7 +169,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             units='degrees_east',
             axis='X',
-            description='observation longitude',
+            description='Observation longitude',
             longname='longitude of measurement',
             standard_name='longitude',
             )
@@ -193,7 +186,7 @@ VAR_DESCR = dict(
             axis='Y',
             longname='latitude of measurement',
             standard_name='latitude',
-            description='observation latitude',
+            description='Observation latitude',
             )
         ),
     lon_max=dict(
@@ -206,7 +199,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             units='degrees_east',
             axis='X',
-            description='observation longitude',
+            description='Observation longitude',
             longname='longitude of amplitude max',
             standard_name='longitude',
             )
@@ -221,7 +214,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             units='degrees_north',
             axis='Y',
-            description='observation latitude',
+            description='Observation latitude',
             longname='latitude of amplitude max',
             standard_name='latitude',
             )
@@ -237,7 +230,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='amplitude',
             units='m',
-            description='magnitude of the height difference between the extremum of ADT within '
+            description='Magnitude of the height difference between the extremum of ADT within '
                         'the eddy and the ADT around the contour defining the eddy perimeter',
             )
         ),
@@ -252,8 +245,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='maximum circum-averaged speed',
             units='m/s',
-            description='average speed of the contour defining the '
-                        'speed radius',
+            description='Average speed of the contour defining the radius scale “speed_radius”',
             )
         ),
     uavg_profile=dict(
@@ -266,7 +258,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='radial profile of uavg',
             units='m/s',
-            description='profile speed average values from effective contour inwards to smallest inner contour',
+            description='Speed average values from effective contour inwards to smallest inner contour',
         )
     ),
     i=dict(
@@ -276,7 +268,7 @@ VAR_DESCR = dict(
         nc_dims=('obs',),
         nc_attr=dict(
             longname='longitude index in the grid of the detection',
-            description='longitude index in the grid of the detection',
+            description='Longitude index in the grid of the detection',
             )
         ),
     j=dict(
@@ -286,7 +278,7 @@ VAR_DESCR = dict(
         nc_dims=('obs',),
         nc_attr=dict(
             longname='latitude index in the grid of the detection',
-            description='latitude index in the grid of the detection',
+            description='Latitude index in the grid of the detection',
             )
         ),
     eke=dict(
@@ -297,7 +289,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='sum EKE within contour Ceff',
             units='m^2/s^2',
-            description='sum of eddy kinetic energy within contour '
+            description='Sum of eddy kinetic energy within contour '
                         'defining the effective radius',
             )
         ),
@@ -312,7 +304,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='effective radius scale',
             units='m',
-            description='radius of a circle whose area is equal to that enclosed by the effective contour',
+            description='Radius of a circle whose area is equal to that enclosed by the effective contour',
             )
         ),
     radius_s=dict(
@@ -326,7 +318,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='speed radius scale',
             units='m',
-            description='radius of a circle whose area is equal to that enclosed by the contour of maximum circum-average speed',
+            description='Radius of a circle whose area is equal to that enclosed by the contour of maximum circum-average speed',
             )
         ),
     track=dict(
@@ -337,7 +329,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='track number',
             units='ordinal',
-            description='eddy identification number',
+            description='Eddy identification number',
             )
         ),
     n=dict(
@@ -349,7 +341,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='observation number',
             units='ordinal',
-            description='observation sequence number, days from eddy start',
+            description='Observation sequence number, days from eddy first detection',
             )
         ),
     contour_lon_e=dict(
@@ -363,7 +355,7 @@ VAR_DESCR = dict(
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
             longname='effective contour longitudes',
-            description='longitudes of effective contour',
+            description='Longitudes of effective contour',
             units='degrees_east',
             axis='X',
             )
@@ -378,7 +370,7 @@ VAR_DESCR = dict(
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
             longname='effective contour latitudes',
-            description='latitudes of effective contour',
+            description='Latitudes of effective contour',
             units='degrees_east',
             axis='X',
             )
@@ -394,7 +386,7 @@ VAR_DESCR = dict(
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
             longname='speed contour longitudes',
-            description='longitudes of speed contour',
+            description='Longitudes of speed contour',
             units='degrees_east',
             axis='X',
             )
@@ -409,7 +401,7 @@ VAR_DESCR = dict(
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
             longname='speed contour latitudes',
-            description='latitudes of speed contour',
+            description='Latitudes of speed contour',
             units='degrees_east',
             axis='X',
             )
@@ -480,11 +472,14 @@ VAR_DESCR = dict(
         ),
     nb_contour_selected=dict(
         attr_name=None,
-        nc_name='nb_contour_selected',
+        nc_name='num_contours',
+        old_nc_name=['nb_contour_selected'],
         nc_type='u2',
         nc_dims=('obs',),
         nc_attr=dict(
-            units='1',
+            longname='number of contour',
+            units='ordinal',
+            description='Number of contour selected for this eddy',
             )
         ),
     )

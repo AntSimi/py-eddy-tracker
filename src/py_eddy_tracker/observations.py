@@ -29,14 +29,14 @@ Version 3.0.0
 """
 from numpy import zeros, empty, absolute, arange, where, unique, \
     ma, concatenate, cos, radians, isnan, ones, ndarray, \
-    interp, floor
+    interp, floor, array
 from netCDF4 import Dataset
 from .generic import distance_grid, distance
 from shapely.geometry import Polygon
 from shapely.geos import TopologicalError
 from . import VAR_DESCR, VAR_DESCR_inv
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from numba import njit, types as numba_types
 
 
@@ -627,8 +627,9 @@ class EddiesObservations(object):
             handler.array_variables = ','.join(self.array_variables)
         # Iter on variables to create:
         fields = [field[0] for field in self.observations.dtype.descr]
-        fields.sort()
-        for ori_name in fields:
+        fields_ = array([VAR_DESCR[field[0]]['nc_name'] for field in self.observations.dtype.descr])
+        i = fields_.argsort()
+        for ori_name in array(fields)[i]:
             # Patch for a transition
             name = ori_name
             #
@@ -643,20 +644,7 @@ class EddiesObservations(object):
                 scale_factor=VAR_DESCR[name].get('scale_factor', None),
                 add_offset=VAR_DESCR[name].get('add_offset', None)
             )
-        # Add cyclonic information
-        if self.sign_type is not None:
-            self.create_variable(
-                handler,
-                dict(varname=VAR_DESCR['type_cyc']['nc_name'],
-                     datatype=VAR_DESCR['type_cyc']['nc_type'],
-                     dimensions=VAR_DESCR['type_cyc']['nc_dims']),
-                VAR_DESCR['type_cyc']['nc_attr'],
-                self.sign_type)
-
-        handler.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
-        handler.comment = 'Surface product; mesoscale eddies'
-        handler.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
-        handler.standard_name_vocabulary ='NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
+        self.set_global_attr_netcdf(handler)
 
     def create_variable(self, handler_nc, kwargs_variable, attr_variable,
                         data, scale_factor=None, add_offset=None):
@@ -692,41 +680,14 @@ class EddiesObservations(object):
         eddy_size = len(self.observations)
         filename = filename % dict(path=path, sign_type=self.sign_legend, prod_time=datetime.now().strftime('%Y%m%d'))
         logging.info('Store in %s', filename)
-        with Dataset(filename, 'w', format='NETCDF4') as h_nc:
-            logging.info('Create file %s', filename)
-            # Create dimensions
-            logging.debug('Create Dimensions "obs" : %d', eddy_size)
-            h_nc.createDimension('obs', eddy_size)
-            if self.track_array_variables != 0:
-                h_nc.createDimension('NbSample', self.track_array_variables)
-            # Iter on variables to create:
-            for field in self.observations.dtype.descr:
-                name = field[0]
-                logging.debug('Create Variable %s', VAR_DESCR[name]['nc_name'])
-                self.create_variable(
-                    h_nc,
-                    dict(varname=VAR_DESCR[name]['nc_name'],
-                         datatype=VAR_DESCR[name]['output_type'],
-                         dimensions=VAR_DESCR[name]['nc_dims']),
-                    VAR_DESCR[name]['nc_attr'],
-                    self.observations[name],
-                    scale_factor=VAR_DESCR[name].get('scale_factor', None),
-                    add_offset=VAR_DESCR[name].get('add_offset', None)
-                    )
-
-            # Add cyclonic information
-            self.create_variable(
-                h_nc,
-                dict(varname=VAR_DESCR['type_cyc']['nc_name'],
-                     datatype=VAR_DESCR['type_cyc']['nc_type'],
-                     dimensions=VAR_DESCR['type_cyc']['nc_dims']),
-                VAR_DESCR['type_cyc']['nc_attr'],
-                self.sign_type)
-            # Global attr
-            self.set_global_attr_netcdf(h_nc)
+        with Dataset(filename, 'w', format='NETCDF4') as handler:
+            self.to_netcdf(handler)
 
     def set_global_attr_netcdf(self, h_nc):
-        pass
+        h_nc.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
+        h_nc.comment = 'Surface product; mesoscale eddies'
+        h_nc.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
+        h_nc.standard_name_vocabulary ='NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
 
     def display(self, ax, ref=None, **kwargs):
         if ref is None:
@@ -875,7 +836,16 @@ class TrackEddiesObservations(EddiesObservations):
     def set_global_attr_netcdf(self, h_nc):
         """Set global attr
         """
-        if self.sign_type == -1:
-            h_nc.title = 'Cyclonic'
-        else:
-            h_nc.title = 'Anticyclonic' + ' eddy tracks'
+        h_nc.title = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
+        h_nc.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
+        h_nc.comment = 'Surface product; mesoscale eddies'
+        h_nc.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
+        h_nc.standard_name_vocabulary = 'NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
+        h_nc.date_created = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        t = h_nc.variables[VAR_DESCR_inv['j1']]
+        delta = t.max - t.min + 1
+        h_nc.time_coverage_duration = 'P%dD' % delta
+        d_start = datetime(1950, 1, 1) + timedelta(int(t.min))
+        d_end = datetime(1950, 1, 1) + timedelta(int(t.max))
+        h_nc.time_coverage_start = d_start.strftime('%Y-%m-%dT00:00:00Z')
+        h_nc.time_coverage_end = d_end.strftime('%Y-%m-%dT00:00:00Z')
