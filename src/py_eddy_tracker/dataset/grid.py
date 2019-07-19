@@ -353,6 +353,9 @@ class GridDataset(object):
         return False
 
     def units(self, varname):
+        stored_units = self.variables_description[varname]['attrs'].get('units', None)
+        if stored_units is not None:
+            return stored_units
         with Dataset(self.filename) as h:
             var = h.variables[varname]
             if hasattr(var, 'units'):
@@ -437,7 +440,7 @@ class GridDataset(object):
         return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
 
     def eddy_identification(self, grid_height, uname, vname, date, step=0.005, shape_error=55,
-                            array_sampling=50, pixel_limit=None):
+                            array_sampling=50, pixel_limit=None, precision=None):
         """
 
         Args:
@@ -449,6 +452,7 @@ class GridDataset(object):
             shape_error: must be in percent (%)
             array_sampling:
             pixel_limit:
+            precision: must be in meter(m)
 
         Returns:
 
@@ -468,11 +472,15 @@ class GridDataset(object):
         in_h_unit = units.parse_expression(h_units)
         if in_h_unit is not None:
             factor, _ = in_h_unit.to('m').to_tuple()
+            logging.info('We will apply on step a factor to be coherent with grid : %f', 1 / factor)
             step /= factor
+            if precision is not None:
+                precision /= factor
 
         # Get h grid
-        data = self.grid(grid_height)
-
+        data = self.grid(grid_height).astype('f8')
+        if precision is not None:
+            data = (data / precision).round() * precision
         # Compute levels for ssh
         z_min, z_max = data.min(), data.max()
         d_z = z_max -z_min
@@ -599,10 +607,10 @@ class GridDataset(object):
                     if speed_array.shape[0] == 1:
                         properties.obs['uavg_profile'][:] = speed_array[0]
                     else:
-                        properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling) * .01
+                        properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling)
                     properties.obs['amplitude'] = amp.amplitude
                     properties.obs['radius_s'] = eddy_radius_s
-                    properties.obs['speed_radius'] = max_average_speed * .01
+                    properties.obs['speed_radius'] = max_average_speed
                     properties.obs['radius_e'] = eddy_radius_e
                     properties.obs['shape_error_e'] = aerr
                     properties.obs['shape_error_s'] = aerr_s
@@ -644,6 +652,13 @@ class GridDataset(object):
                 factor, _ = in_h_unit.to(out_unit).to_tuple()
                 a_and_c[0].obs[name] *= factor
                 a_and_c[1].obs[name] *= factor
+        in_u_units = units.parse_expression(self.units(uname))
+        if in_u_units is not None:
+            for name in ['speed_radius', 'uavg_profile']:
+                out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
+                factor, _ = in_u_units.to(out_unit).to_tuple()
+                a_and_c[0].obs[name] *= factor
+                a_and_c[1].obs[name] *= factor
         return a_and_c
 
     def get_uavg(self, all_contours, centlon_e, centlat_e, original_contour, anticyclonic_search, level_start,
@@ -652,6 +667,7 @@ class GridDataset(object):
         Calculate geostrophic speed around successive contours
         Returns the average
         """
+        # Init max speed to search maximum
         max_average_speed = self.speed_coef_mean(original_contour)
         speed_array = [max_average_speed]
 
