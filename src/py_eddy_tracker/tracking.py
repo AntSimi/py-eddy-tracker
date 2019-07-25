@@ -263,6 +263,7 @@ class Correspondances(list):
         logging.debug('%d death of real obs in this step', nb_dead)
         if not self.virtual:
             return
+
         # get id already dead from few time
         nb_virtual_extend = 0
         if self.virtual_obs is not None:
@@ -305,6 +306,7 @@ class Correspondances(list):
                     # Load last virtual obs
                     self.virtual_obs = VirtualEddiesObservations.from_netcdf(general_handler.groups['LastVirtualObs'])
                     # Load and last previous virtual obs to be merge with current => will be previous2_obs
+                    # TODO : Need to rethink this line ??
                     self.current_obs = self.current_obs.merge(
                         VirtualEddiesObservations.from_netcdf(general_handler.groups['LastPreviousVirtualObs']))
             return first_dataset, flg_virtual

@@ -51,6 +51,7 @@ setup(
         'pyyaml',
         'pyproj',
         'pint',
+        'polygon3',
         'numba',
         ],
     )

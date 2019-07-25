@@ -274,6 +274,7 @@ class EddiesObservations(object):
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == 'type_cyc':
                     eddies.sign_type = h_nc.variables[variable][0]
+            eddies.sign_type = getattr(h_nc, 'rotation_type', 0)
             if eddies.sign_type == 0:
                 logging.debug('File come from another algorithm of identification')
                 eddies.sign_type = -1
@@ -301,8 +302,7 @@ class EddiesObservations(object):
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
         return eddies
 
-    @staticmethod
-    def propagate(previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model):
+    def propagate(self, previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model):
         """
         Filled virtual obs (C)
         Args:
@@ -321,6 +321,7 @@ class EddiesObservations(object):
             track_extra_variables=model.track_extra_variables,
             track_array_variables=model.track_array_variables,
             array_variables=model.array_variables)
+        next_obs.sign_type = self.sign_type
         nb_dead = len(previous_obs)
         nb_virtual_extend = nb_next - nb_dead
 
@@ -347,9 +348,6 @@ class EddiesObservations(object):
         # Count
         next_obs['segment_size'][:] += 1
         return next_obs
-
-
-
 
 
     @staticmethod
@@ -695,6 +693,7 @@ class EddiesObservations(object):
         h_nc.comment = 'Surface product; mesoscale eddies'
         h_nc.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
         h_nc.standard_name_vocabulary ='NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
+        h_nc.rotation_type = self.sign_type
 
     def display(self, ax, ref=None, **kwargs):
         if ref is None:
