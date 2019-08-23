@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-from setuptools import setup, find_packages, Extension
-from Cython.Distutils import build_ext as cython_build_ext
-import numpy
+from setuptools import setup, find_packages
 
 setup(
     name="pyEddyTracker",
@@ -18,22 +16,14 @@ setup(
     scripts=[
         'src/scripts/GridFiltering',
         'src/scripts/EddyId',
-        'src/scripts/EddyIdentification',
         'src/scripts/EddyTracking',
         'src/scripts/EddyFinalTracking',
         'src/scripts/EddyMergeCorrespondances',
-        # 'src/scripts/EddyTrackingFull'
         ],
     zip_safe=False,
-    cmdclass=dict(
-        build_ext=cython_build_ext,
-        ),
     entry_points=dict(console_scripts=[
         'EddyUpdate = py_eddy_tracker.update.__init__:eddy_update',
         ]),
-    ext_modules=[Extension("py_eddy_tracker.tools",
-                           ["src/py_eddy_tracker/tools.pyx"],
-                           include_dirs=[numpy.get_include()])],
     package_data={
         'py_eddy_tracker.featured_tracking': ['*.nc'],
         'py_eddy_tracker': ['data/*.nc'],

@@ -28,7 +28,7 @@ Version 3.0.0
 
 """
 from numpy import zeros, empty, absolute, arange, where, unique, \
-    ma, concatenate, cos, radians, isnan, ones, ndarray, \
+    ma, cos, radians, isnan, ones, ndarray, \
     interp, floor, array
 from netCDF4 import Dataset
 from .generic import distance_grid, distance
