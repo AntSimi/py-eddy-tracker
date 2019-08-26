@@ -38,7 +38,7 @@ class ColoredFormatter(logging.Formatter):
         WARNING="\033[30;47m",
         INFO="\033[36m",
         DEBUG="\033[34m\t",
-        )
+    )
 
     def __init__(self, message):
         super(ColoredFormatter, self).__init__(message)
@@ -59,7 +59,7 @@ class EddyParser(ArgumentParser):
     """
 
     FORMAT_LOG = "%(levelname)-8s %(asctime)s %(module)s." \
-                     "%(funcName)s :\n\t\t\t\t\t%(message)s"
+                 "%(funcName)s :\n\t\t\t\t\t%(message)s"
 
     def __init__(self, *args, **kwargs):
         super(EddyParser, self).__init__(*args, **kwargs)
@@ -72,8 +72,8 @@ class EddyParser(ArgumentParser):
                           dest='logging_level',
                           default='ERROR',
                           help='Levels : DEBUG, INFO, WARNING,'
-                          ' ERROR, CRITICAL')
-        
+                               ' ERROR, CRITICAL')
+
     def parse_args(self, *args, **kwargs):
         # set up logging to CONSOLE
         console = logging.StreamHandler()
@@ -101,8 +101,8 @@ VAR_DESCR = dict(
             axis='T',
             longname='Time',
             description='Date of this observation',
-            )
-        ),
+        )
+    ),
     type_cyc=dict(
         attr_name=None,
         nc_name='cyclonic_type',
@@ -113,29 +113,29 @@ VAR_DESCR = dict(
             longname='cyclonic',
             units='boolean',
             description='Cyclonic -1; anti-cyclonic +1',
-            )
-        ),
+        )
+    ),
     segment_size=dict(
         attr_name=None,
         nc_name='segment_size',
         nc_type='byte',
         nc_dims=('obs',),
         nc_attr=dict()
-        ),
+    ),
     dlon=dict(
         attr_name=None,
         nc_name='dlon',
         nc_type='float64',
         nc_dims=('obs',),
         nc_attr=dict()
-        ),
+    ),
     dlat=dict(
         attr_name=None,
         nc_name='dlat',
         nc_type='float64',
         nc_dims=('obs',),
         nc_attr=dict()
-        ),
+    ),
     virtual=dict(
         attr_name=None,
         nc_name='observation_flag',
@@ -147,8 +147,8 @@ VAR_DESCR = dict(
             units='boolean',
             description='Flag indicating if the value is interpolated between two'
                         ' observations or not (0: observed, 1: interpolated)',
-            )
-        ),
+        )
+    ),
     cost_association=dict(
         attr_name=None,
         nc_name='cost_association',
@@ -157,8 +157,8 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='cost_value_to_associate_with_next_observation',
             description='Cost value to associate with the next observation',
-            )
-        ),
+        )
+    ),
     lon=dict(
         attr_name='lon',
         compute_type='float64',
@@ -172,8 +172,8 @@ VAR_DESCR = dict(
             description='Observation longitude',
             longname='longitude of measurement',
             standard_name='longitude',
-            )
-        ),
+        )
+    ),
     lat=dict(
         attr_name='lat',
         compute_type='float64',
@@ -187,8 +187,8 @@ VAR_DESCR = dict(
             longname='latitude of measurement',
             standard_name='latitude',
             description='Observation latitude',
-            )
-        ),
+        )
+    ),
     lon_max=dict(
         attr_name='lon_max',
         compute_type='float64',
@@ -202,8 +202,8 @@ VAR_DESCR = dict(
             description='Observation longitude',
             longname='longitude of amplitude max',
             standard_name='longitude',
-            )
-        ),
+        )
+    ),
     lat_max=dict(
         attr_name='lat_max',
         compute_type='float64',
@@ -217,8 +217,8 @@ VAR_DESCR = dict(
             description='Observation latitude',
             longname='latitude of amplitude max',
             standard_name='latitude',
-            )
-        ),
+        )
+    ),
     amplitude=dict(
         attr_name='amplitude',
         nc_name='amplitude',
@@ -232,8 +232,8 @@ VAR_DESCR = dict(
             units='m',
             description='Magnitude of the height difference between the extremum of ADT within '
                         'the eddy and the ADT around the contour defining the eddy perimeter',
-            )
-        ),
+        )
+    ),
     speed_radius=dict(
         attr_name='speed_radius',
         scale_factor=.0001,
@@ -246,8 +246,8 @@ VAR_DESCR = dict(
             longname='maximum circum-averaged speed',
             units='m/s',
             description='Average speed of the contour defining the radius scale “speed_radius”',
-            )
-        ),
+        )
+    ),
     uavg_profile=dict(
         attr_name=None,
         nc_name='uavg_profile',
@@ -269,8 +269,8 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='longitude index in the grid of the detection',
             description='Longitude index in the grid of the detection',
-            )
-        ),
+        )
+    ),
     j=dict(
         attr_name='j',
         nc_name='j',
@@ -279,8 +279,8 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname='latitude index in the grid of the detection',
             description='Latitude index in the grid of the detection',
-            )
-        ),
+        )
+    ),
     eke=dict(
         attr_name='eke',
         nc_name='Teke',
@@ -291,8 +291,8 @@ VAR_DESCR = dict(
             units='m^2/s^2',
             description='Sum of eddy kinetic energy within contour '
                         'defining the effective radius',
-            )
-        ),
+        )
+    ),
     radius_e=dict(
         attr_name='radius_e',
         nc_name='effective_radius',
@@ -305,8 +305,8 @@ VAR_DESCR = dict(
             longname='effective radius scale',
             units='m',
             description='Radius of a circle whose area is equal to that enclosed by the effective contour',
-            )
-        ),
+        )
+    ),
     radius_s=dict(
         attr_name='radius_s',
         nc_name='speed_radius',
@@ -319,8 +319,8 @@ VAR_DESCR = dict(
             longname='speed radius scale',
             units='m',
             description='Radius of a circle whose area is equal to that enclosed by the contour of maximum circum-average speed',
-            )
-        ),
+        )
+    ),
     track=dict(
         attr_name=None,
         nc_name='track',
@@ -330,8 +330,8 @@ VAR_DESCR = dict(
             longname='track number',
             units='ordinal',
             description='Eddy identification number',
-            )
-        ),
+        )
+    ),
     n=dict(
         attr_name=None,
         nc_name='observation_number',
@@ -342,8 +342,8 @@ VAR_DESCR = dict(
             longname='observation number',
             units='ordinal',
             description='Observation sequence number, days from eddy first detection',
-            )
-        ),
+        )
+    ),
     contour_lon_e=dict(
         attr_name=None,
         nc_name='effective_contour_longitude',
@@ -358,8 +358,8 @@ VAR_DESCR = dict(
             description='Longitudes of effective contour',
             units='degrees_east',
             axis='X',
-            )
-        ),
+        )
+    ),
     contour_lat_e=dict(
         attr_name=None,
         nc_name='effective_contour_latitude',
@@ -373,8 +373,8 @@ VAR_DESCR = dict(
             description='Latitudes of effective contour',
             units='degrees_east',
             axis='X',
-            )
-        ),
+        )
+    ),
     contour_lon_s=dict(
         attr_name=None,
         nc_name='speed_contour_longitude',
@@ -389,8 +389,8 @@ VAR_DESCR = dict(
             description='Longitudes of speed contour',
             units='degrees_east',
             axis='X',
-            )
-        ),
+        )
+    ),
     contour_lat_s=dict(
         attr_name=None,
         nc_name='speed_contour_latitude',
@@ -404,8 +404,8 @@ VAR_DESCR = dict(
             description='Latitudes of speed contour',
             units='degrees_east',
             axis='X',
-            )
-        ),
+        )
+    ),
     shape_error_e=dict(
         attr_name=None,
         nc_name='effective_contour_shape_error',
@@ -418,8 +418,8 @@ VAR_DESCR = dict(
             units='%',
             description='Error criterion of fit on effective contour',
             longname='effective contour error',
-            )
-        ),
+        )
+    ),
     shape_error_s=dict(
         attr_name=None,
         nc_name='speed_contour_shape_error',
@@ -432,8 +432,8 @@ VAR_DESCR = dict(
             units='%',
             description='Error criterion of fit on speed contour',
             longname='speed contour error',
-            )
-        ),
+        )
+    ),
     height_max_speed_contour=dict(
         attr_name=None,
         nc_name='speed_contour_height',
@@ -444,8 +444,8 @@ VAR_DESCR = dict(
             longname='speed contour height',
             description='ADT filtered height for speed contour',
             units='m',
-            )
-        ),
+        )
+    ),
     height_external_contour=dict(
         attr_name=None,
         nc_name='effective_contour_height',
@@ -456,8 +456,8 @@ VAR_DESCR = dict(
             longname='effective contour height',
             description='ADT filtered height for effective contour',
             units='m',
-            )
-        ),
+        )
+    ),
     height_inner_contour=dict(
         attr_name=None,
         nc_name='inner_contour_height',
@@ -468,8 +468,8 @@ VAR_DESCR = dict(
             longname='inner contour height',
             description='ADT filtered height for inner contour',
             units='m',
-            )
-        ),
+        )
+    ),
     nb_contour_selected=dict(
         attr_name=None,
         nc_name='num_contours',
@@ -480,9 +480,9 @@ VAR_DESCR = dict(
             longname='number of contour',
             units='ordinal',
             description='Number of contour selected for this eddy',
-            )
-        ),
-    )
+        )
+    ),
+)
 
 for key in VAR_DESCR.keys():
     if 'output_type' not in VAR_DESCR[key]:
@@ -493,4 +493,3 @@ for key in VAR_DESCR.keys():
     VAR_DESCR_inv[VAR_DESCR[key]['nc_name']] = key
     for key_old in VAR_DESCR[key].get('old_nc_name', list()):
         VAR_DESCR_inv[key_old] = key
-

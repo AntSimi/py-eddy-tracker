@@ -31,7 +31,7 @@ class CheltonTracker(Model):
         # mask from ellips
         mask = self.shifted_ellipsoid_degrees_mask(
             other,
-            minor=minor, # Minor can be bigger than major??
+            minor=minor,  # Minor can be bigger than major??
             major=y)
 
         # We check ratio (maybe not usefull)

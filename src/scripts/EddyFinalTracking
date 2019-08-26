@@ -23,7 +23,7 @@ def usage():
     parser.add_argument('--path_out',
                         default='./',
                         help='Path, where to write file')
-                        
+
     parser.add_argument('--eddies_long_model', default=None)
     parser.add_argument('--eddies_short_model', default=None)
     parser.add_argument('--eddies_untracked_model', default=None)
@@ -84,5 +84,5 @@ if __name__ == '__main__':
         CONFIG.eddies_long_model = '%(path)s/%(sign_type)s_%(prod_time)s.nc'
     if CONFIG.eddies_short_model is None:
         CONFIG.eddies_short_model = '%(path)s/%(sign_type)s_%(prod_time)s_track_too_short.nc'
-    FINAL_EDDIES.write_netcdf(filename=CONFIG.eddies_long_model,path=SAVE_DIR)
+    FINAL_EDDIES.write_netcdf(filename=CONFIG.eddies_long_model, path=SAVE_DIR)
     SHORT_TRACK.write_netcdf(filename=CONFIG.eddies_short_model, path=SAVE_DIR)

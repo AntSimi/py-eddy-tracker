@@ -47,7 +47,7 @@ class Amplitude(object):
         'interval_min',
         'amplitude',
         'mle',
-        )
+    )
 
     def __init__(self, contour, contour_height, data, interval):
         # Height of the contour
@@ -98,7 +98,8 @@ class Amplitude(object):
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask, self.mle, 1)
+            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask,
+                                                self.mle, 1)
             # After we use grid.data because index are in contour and we check before than no pixel are hide
             nb = len(lmi_i)
             if nb == 0:
@@ -129,7 +130,8 @@ class Amplitude(object):
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask, self.mle, -1)
+            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask,
+                                                self.mle, -1)
             nb = len(lmi_i)
             if nb == 0:
                 logging.warning('No extrema found in contour in level %f', level)
@@ -175,11 +177,10 @@ def detect_local_minima_(grid, general_mask, pixel_mask, maximum_local_extremum,
                         g[i_ + 1, j_ + 1] = grid[i_ + i, j_ + j] * sign
             # if center equal to min
             # TODO if center and neigboor have same value we have problem, i don't know how
-            if g.min() == (grid[i, j] * sign) and pixel_mask[i,j]:
+            if g.min() == (grid[i, j] * sign) and pixel_mask[i, j]:
                 xs.append(i)
                 ys.append(j)
     nb_extrema = len(xs)
-
 
     # If several extrema we try to separate them
     if nb_extrema > maximum_local_extremum:
@@ -228,7 +229,7 @@ def detect_local_minima_(grid, general_mask, pixel_mask, maximum_local_extremum,
                     nb += 1
             x_mean /= nb
             y_mean /= nb
-            
+
             xs_new.append(numba_types.int32(round(x_mean)))
             ys_new.append(numba_types.int32(round(y_mean)))
         return xs_new, ys_new
@@ -266,7 +267,7 @@ class Contours(object):
     )
 
     DELTA_PREC = 1e-10
-    DELTA_SUP= 1e-2
+    DELTA_SUP = 1e-2
 
     def get_next(self, origin, paths_left, paths_right):
         for i, path in enumerate(paths_right):
@@ -374,7 +375,8 @@ class Contours(object):
                     keep_path.append(contour)
                     continue
                 # Remove unclosed path
-                d_closed = ((contour.vertices[0, 0] - contour.vertices[-1, 0]) **2 + (contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2) ** .5
+                d_closed = ((contour.vertices[0, 0] - contour.vertices[-1, 0]) ** 2 + (
+                            contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2) ** .5
                 if d_closed > self.DELTA_SUP:
                     continue
                 elif d_closed != 0:
@@ -400,7 +402,8 @@ class Contours(object):
                 contour.used = False
                 nb_contour += 1
                 nb_pt += contour.vertices.shape[0]
-        logging.info('Repair %d closed contours and %d almost closed contours / %d contours', closed_contours, almost_closed_contours, nb_contour)
+        logging.info('Repair %d closed contours and %d almost closed contours / %d contours', closed_contours,
+                     almost_closed_contours, nb_contour)
         # Type for coordinates
         coord_dtype = contour.vertices.dtype
 
@@ -479,7 +482,7 @@ class Contours(object):
             self.y_max_per_contour,
             xpt,
             ypt
-            )
+        )
         if index == -1:
             return None
         else:
@@ -514,7 +517,7 @@ def index_from_nearest_path_with_pt_in_bbox_(
         y_max_per_c,
         xpt,
         ypt,
-        ):
+):
     """Get index from nearest path in edge bbox contain pt
     """
     # Nb contour in level
@@ -529,7 +532,7 @@ def index_from_nearest_path_with_pt_in_bbox_(
     find_contour = 0
     # We select the first pt of the first contour in the level
     # to initialize dist
-    i_ref = i_start_c    
+    i_ref = i_start_c
     i_start_pt = indices_of_first_pts[i_start_c]
     dist_ref = (x_value[i_start_pt] - xpt) ** 2 + (y_value[i_start_pt] - ypt) ** 2
 
@@ -552,7 +555,7 @@ def index_from_nearest_path_with_pt_in_bbox_(
         i_end_pt = i_start_pt + nb_pt_per_c[i_elt_c]
         # We set flag to true, because we check contour
         find_contour = 1
-        
+
         # We do iteration on pt to check dist, if it's inferior we store
         # index of contour
         for i_elt_pt in range(i_start_pt, i_end_pt):

@@ -25,7 +25,7 @@ def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
 def poly_contain_poly(xy_poly_out, xy_poly_in):
     nb_elt = xy_poly_in.shape[0]
     x = xy_poly_in[:, 0]
-    x_ref = xy_poly_out[0,0]
+    x_ref = xy_poly_out[0, 0]
     d_x = abs(x[0] - x_ref)
     if d_x > 180:
         x = (x - x_ref + 180) % 360 + x_ref - 180
@@ -92,4 +92,3 @@ def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
     if i_x1 < i_x0:
         i_x %= x_size
     return i_x, i_y
-

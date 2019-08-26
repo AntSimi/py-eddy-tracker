@@ -139,8 +139,10 @@ class Correspondances(list):
         Returns: period coverage by obs
 
         """
-        date_start = datetime(1950, 1, 1) + timedelta(int(self.class_method.load_from_netcdf(self.datasets[0]).obs['time'][0]))
-        date_stop = datetime(1950, 1, 1) + timedelta(int(self.class_method.load_from_netcdf(self.datasets[-1]).obs['time'][0]))
+        date_start = datetime(1950, 1, 1) + timedelta(
+            int(self.class_method.load_from_netcdf(self.datasets[0]).obs['time'][0]))
+        date_stop = datetime(1950, 1, 1) + timedelta(
+            int(self.class_method.load_from_netcdf(self.datasets[-1]).obs['time'][0]))
         return date_start, date_stop
 
     def swap_dataset(self, dataset, raw_data=False):
@@ -269,7 +271,7 @@ class Correspondances(list):
         nb_virtual_extend = 0
         if self.virtual_obs is not None:
             virtual_dead_id = setdiff1d(self.virtual_obs['track'], self[-1]['id'])
-            i_virtual_dead_id = index(self.virtual_obs['track'],  virtual_dead_id)
+            i_virtual_dead_id = index(self.virtual_obs['track'], virtual_dead_id)
             # Virtual obs which can be prolongate
             alive_virtual_obs = self.virtual_obs['segment_size'][i_virtual_dead_id] < self.nb_virtual
             nb_virtual_extend = alive_virtual_obs.sum()
@@ -382,7 +384,7 @@ class Correspondances(list):
                                     dimensions=('Nstep', 'Nlink'),
                                     **kwargs_cv
                                     )
-                datas[name] = ma.empty((nb_step, self.nb_link_max),dtype=dtype)
+                datas[name] = ma.empty((nb_step, self.nb_link_max), dtype=dtype)
                 datas[name].mask = datas[name] == datas[name]
 
             for i, correspondance in enumerate(self):
@@ -434,9 +436,9 @@ class Correspondances(list):
             datasets.append(datas['FileOut'][-1])
 
             if hasattr(h_nc, 'module'):
-                class_method= getattr(__import__(h_nc.module, globals(), locals(), h_nc.classname), h_nc.classname)
+                class_method = getattr(__import__(h_nc.module, globals(), locals(), h_nc.classname), h_nc.classname)
             else:
-                class_method= None
+                class_method = None
             logging.info('File %s load with class %s', filename, class_method)
             obj = cls(datasets, h_nc.virtual_max_segment, class_method=class_method)
 
@@ -469,7 +471,7 @@ class Correspondances(list):
                 # When start is virtual, we don't have a previous
                 # correspondance
                 self.nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]
-                    ] += correspondance['virtual_length'][correspondance['virtual']]
+                ] += correspondance['virtual_length'][correspondance['virtual']]
 
         # Compute index of each tracks
         self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
@@ -595,7 +597,7 @@ class Correspondances(list):
             for field in fields:
                 var = field[0]
                 if var == 'cost_association':
-                    eddies[var][index_final-1] = self[i]['cost_value']
+                    eddies[var][index_final - 1] = self[i]['cost_value']
                 else:
                     eddies[var][index_final] = self.current_obs[var][index_current]
 
@@ -616,7 +618,7 @@ class Correspondances(list):
         nb_dataset = len(self.datasets)
         # Get the number of obs unused
         nb_obs = 0
-        list_mask= list()
+        list_mask = list()
         has_virtual = 'virtual' in self[0].dtype.names
         logging.debug('Count unused data ...')
         for i, filename in enumerate(self.datasets):

@@ -29,7 +29,7 @@ def raw_resample(datas, fixed_size):
     nb_value = datas.shape[0]
     if nb_value == 1:
         raise Exception()
-    return interp(arange(fixed_size), arange(nb_value) * (fixed_size - 1) / (nb_value - 1) , datas)
+    return interp(arange(fixed_size), arange(nb_value) * (fixed_size - 1) / (nb_value - 1), datas)
 
 
 @property
@@ -99,7 +99,7 @@ def _fit_circle_path(vertice):
     if d_lon < 1e-7 and d_lat < 1e-7:
         # logging.warning('An edge is only define in one position')
         # logging.debug('%d coordinates %s,%s', len(lons),lons,
-                      # lats)
+        # lats)
         return 0, -90, nan, nan
     centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(c_x, c_y)
     centlon_e, centlat_e = local_to_coordinates(centlon_e, centlat_e, lon0, lat0)
@@ -119,7 +119,7 @@ def coordinates_to_local(lon, lat, lon0, lat0):
     a_val = sin_dlon ** 2 * cos_lat0 * cos_lat + sin_dlat ** 2
     module = R * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
 
-    azimuth = pi /2 - arctan2(
+    azimuth = pi / 2 - arctan2(
         cos_lat * sin(dlon),
         cos_lat0 * sin(lat * D2R) - sin(lat0 * D2R) * cos_lat * cos(dlon))
     return module * cos(azimuth), module * sin(azimuth)
@@ -483,7 +483,7 @@ class GridDataset(object):
             data = (data / precision).round() * precision
         # Compute levels for ssh
         z_min, z_max = data.min(), data.max()
-        d_z = z_max -z_min
+        d_z = z_max - z_min
         data_tmp = data[~data.mask]
         epsilon = 0.001  # in %
         z_min_p, z_max_p = percentile(data_tmp, epsilon), percentile(data_tmp, 100 - epsilon)
@@ -556,7 +556,8 @@ class GridDataset(object):
                     # Compute amplitude
                     reset_centroid, amp = self.get_amplitude(current_contour, cvalues, data,
                                                              anticyclonic_search=anticyclonic_search,
-                                                             level=self.contours.levels[corrected_coll_index], step=step)
+                                                             level=self.contours.levels[corrected_coll_index],
+                                                             step=step)
                     # If we have a valid amplitude
                     if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
                         continue
@@ -621,7 +622,7 @@ class GridDataset(object):
                     properties.obs['contour_lon_e'], properties.obs['contour_lat_e'] = uniform_resample(
                         current_contour.lon, current_contour.lat, fixed_size=array_sampling)
                     properties.obs['contour_lon_s'], properties.obs['contour_lat_s'] = uniform_resample(
-                            speed_contour.lon, speed_contour.lat, fixed_size=array_sampling)
+                        speed_contour.lon, speed_contour.lat, fixed_size=array_sampling)
                     if aerr > 99.9 or aerr_s > 99.9:
                         logging.warning('Strange shape at this step! shape_error : %f, %f', aerr, aerr_s)
 
@@ -745,7 +746,7 @@ class UnRegularGridDataset(GridDataset):
     __slots__ = (
         'index_interp',
         '_speed_norm',
-        )
+    )
 
     def bbox_indice(self, vertices):
         dist, idx = self.index_interp.query(vertices, k=1)
@@ -846,7 +847,7 @@ class RegularGridDataset(GridDataset):
         'x_size',
         '_x_step',
         '_y_step',
-        )
+    )
 
     def __init__(self, *args, **kwargs):
         super(RegularGridDataset, self).__init__(*args, **kwargs)
@@ -872,7 +873,8 @@ class RegularGridDataset(GridDataset):
             x_array = (concatenate((self.x_c[x_start:], self.x_c[:x_stop])) - x_ref + 180) % 360 + x_ref - 180
         else:
             x_array = self.x_c[x_start:x_stop]
-        return winding_number_grid_in_poly(x_array, self.y_c[y_start:y_stop], x_start, x_stop, self.x_size, y_start, contour.vertices)
+        return winding_number_grid_in_poly(x_array, self.y_c[y_start:y_stop], x_start, x_stop, self.x_size, y_start,
+                                           contour.vertices)
 
     def normalize_x_indice(self, indices):
         return indices % self.x_size
@@ -918,7 +920,7 @@ class RegularGridDataset(GridDataset):
         # order must be int
         if order < 1:
             logging.warning('order must be superior to 0')
-        order= ceil(order).astype(int)
+        order = ceil(order).astype(int)
         # Estimate size of kernel
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
@@ -938,7 +940,7 @@ class RegularGridDataset(GridDataset):
         dist_norm = distance(0, lat, x, y) / 1000. / wave_length
 
         # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
-        kernel = sinc(dist_norm/order) * sinc(dist_norm)
+        kernel = sinc(dist_norm / order) * sinc(dist_norm)
         kernel[dist_norm > order] = 0
         return kernel
 
@@ -947,7 +949,7 @@ class RegularGridDataset(GridDataset):
         # order must be int
         if order < 1:
             logging.warning('order must be superior to 0')
-        order= ceil(order).astype(int)
+        order = ceil(order).astype(int)
         # Estimate size of kernel
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
@@ -968,7 +970,7 @@ class RegularGridDataset(GridDataset):
         dist_norm = distance(0, lat, x, y) / 1000. / wave_length
         # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
         with errstate(invalid='ignore'):
-            kernel = sinc(dist_norm/order) * j1(2 * pi * dist_norm) / dist_norm
+            kernel = sinc(dist_norm / order) * j1(2 * pi * dist_norm) / dist_norm
         kernel[0, half_y_pt * order] = pi
         kernel[dist_norm > order] = 0
         # Symetry
@@ -1034,7 +1036,7 @@ class RegularGridDataset(GridDataset):
             kernel_sum = filter2D(m.astype(float), -1, kernel)[demi_x:-demi_x, demi_y]
             with errstate(invalid='ignore'):
                 if extend:
-                    data_out[:, i] = ma.array(values_sum / kernel_sum, mask=kernel_sum < (extend* kernel.sum()))
+                    data_out[:, i] = ma.array(values_sum / kernel_sum, mask=kernel_sum < (extend * kernel.sum()))
                 else:
                     data_out[:, i] = values_sum / kernel_sum
         if extend:
@@ -1081,14 +1083,14 @@ class RegularGridDataset(GridDataset):
         x0, y0 = self.nearest_grd_indice(area['llcrnrlon'], area['llcrnrlat'])
         x1, y1 = self.nearest_grd_indice(area['urcrnrlon'], area['urcrnrlat'])
 
-        data = self.grid(grid_name)[x0:x1,y0:y1]
+        data = self.grid(grid_name)[x0:x1, y0:y1]
 
         # Lat spectrum
         pws = list()
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         nb_invalid = 0
         for i, _ in enumerate(self.x_c[x0:x1]):
-            f, pw = welch(data[i,:],  1 / step_y_km, scaling=scaling, **kwargs)
+            f, pw = welch(data[i, :], 1 / step_y_km, scaling=scaling, **kwargs)
             if isnan(pw).any():
                 nb_invalid += 1
                 continue
@@ -1103,7 +1105,7 @@ class RegularGridDataset(GridDataset):
         nb_invalid = 0
         for i, lat in enumerate(self.y_c[y0:y1]):
             step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
-            f, pw = welch(data[:,i], 1 / step_x_km, scaling=scaling, **kwargs)
+            f, pw = welch(data[:, i], 1 / step_x_km, scaling=scaling, **kwargs)
             if isnan(pw).any():
                 nb_invalid += 1
                 continue
@@ -1145,7 +1147,7 @@ class RegularGridDataset(GridDataset):
         else:
             data1[:-schema] = data[schema:]
             data2[schema:] = data[:-schema]
-            if mode == 'wrap' :
+            if mode == 'wrap':
                 data1[-schema:] = data[:schema]
                 data2[:schema] = data[-schema:]
             else:
@@ -1175,9 +1177,9 @@ class RegularGridDataset(GridDataset):
             array((-1, 1)),
             # like array((-1, 1, 0)) but right value could be default value
             (1, array((-1, 1))),
-            ]
+        ]
         # reduce to stencil selected
-        weights = weights[4-stencil_halfwidth:]
+        weights = weights[4 - stencil_halfwidth:]
         if vertical:
             data = data.T
         # Iteration from larger stencil to smaller (to fill matrix)
@@ -1228,19 +1230,24 @@ class RegularGridDataset(GridDataset):
         sl = slice(i_start, i_end)
         # Divide by sideral day
         lat = self.y_c[sl]
-        gob = cos(deg2rad(lat)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (23 * 3600 + 56 * 60 + 4.1) / self.EARTH_RADIUS
+        gob = cos(deg2rad(lat)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (
+                    23 * 3600 + 56 * 60 + 4.1) / self.EARTH_RADIUS
         with errstate(divide='ignore'):
             gob = self.GRAVITY / (gob * ones((self.x_c.shape[0], 1)))
         mode = 'wrap' if self.is_circular() else 'reflect'
 
         # fill data to compute a finite difference on all point
-        data = self.convolve_filter_with_dynamic_kernel(grid_height, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=.1)
-        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=.1)
-        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=.1)
+        data = self.convolve_filter_with_dynamic_kernel(grid_height, self.kernel_bessel, lat_max=10, wave_length=500,
+                                                        order=1, extend=.1)
+        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1,
+                                                        extend=.1)
+        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1,
+                                                        extend=.1)
         v_lagerloef = self.compute_finite_difference(
             self.compute_finite_difference(data, mode=mode, schema=schema), mode=mode, schema=schema)[:, sl] * gob
         u_lagerloef = - self.compute_finite_difference(
-            self.compute_finite_difference(data, vertical=True, schema=schema), vertical=True, schema=schema)[:, sl] * gob
+            self.compute_finite_difference(data, vertical=True, schema=schema), vertical=True, schema=schema)[:,
+                        sl] * gob
         w = 1 - exp(-(lat / 2.2) ** 2)
         self.vars[vname][:, sl] = self.vars[vname][:, sl] * w + v_lagerloef * (1 - w)
         self.vars[uname][:, sl] = self.vars[uname][:, sl] * w + u_lagerloef * (1 - w)
@@ -1307,77 +1314,77 @@ class RegularGridDataset(GridDataset):
 
 @njit(cache=True, fastmath=True)
 def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
-        """Give a series of index which describe the path between to position
-        """
-        # index
-        nx = x0.shape[0]
-        i_x0 = empty(nx, dtype=numba_types.int_)
-        i_x1 = empty(nx, dtype=numba_types.int_)
-        i_y0 = empty(nx, dtype=numba_types.int_)
-        i_y1 = empty(nx, dtype=numba_types.int_)
-        # Because round_ is not accepted with array in numba
-        for i in range(nx):
-            i_x0[i] = round_(((x0[i] - x_ori) % 360) / x_step)
-            i_x1[i] = round_(((x1[i] - x_ori) % 360) / x_step)
-            i_y0[i] = round_((y0[i] - y_ori) / y_step)
-            i_y1[i] = round_((y1[i] - y_ori) / y_step)
-        # Delta index of x
-        d_x = i_x1 - i_x0
-        d_x = (d_x + nb_x // 2) % nb_x - (nb_x // 2)
-        i_x1 = i_x0 + d_x
-        # Delta index of y
-        d_y = i_y1 - i_y0
-        # max and abs sum doesn't work on array?
-        d_max = empty(nx, dtype=numba_types.int32)
-        nb_value = 0
-        for i in range(nx):
-            d_max[i] = max(abs(d_x[i]), abs(d_y[i]))
-            # Compute number of pixel which we go trought
-            nb_value += d_max[i] + 1
+    """Give a series of index which describe the path between to position
+    """
+    # index
+    nx = x0.shape[0]
+    i_x0 = empty(nx, dtype=numba_types.int_)
+    i_x1 = empty(nx, dtype=numba_types.int_)
+    i_y0 = empty(nx, dtype=numba_types.int_)
+    i_y1 = empty(nx, dtype=numba_types.int_)
+    # Because round_ is not accepted with array in numba
+    for i in range(nx):
+        i_x0[i] = round_(((x0[i] - x_ori) % 360) / x_step)
+        i_x1[i] = round_(((x1[i] - x_ori) % 360) / x_step)
+        i_y0[i] = round_((y0[i] - y_ori) / y_step)
+        i_y1[i] = round_((y1[i] - y_ori) / y_step)
+    # Delta index of x
+    d_x = i_x1 - i_x0
+    d_x = (d_x + nb_x // 2) % nb_x - (nb_x // 2)
+    i_x1 = i_x0 + d_x
+    # Delta index of y
+    d_y = i_y1 - i_y0
+    # max and abs sum doesn't work on array?
+    d_max = empty(nx, dtype=numba_types.int32)
+    nb_value = 0
+    for i in range(nx):
+        d_max[i] = max(abs(d_x[i]), abs(d_y[i]))
+        # Compute number of pixel which we go trought
+        nb_value += d_max[i] + 1
 
-        # Create an empty array to store value of pixel across the travel
-        i_g = empty(nb_value, dtype=numba_types.int32)
-        j_g = empty(nb_value, dtype=numba_types.int32)
+    # Create an empty array to store value of pixel across the travel
+    i_g = empty(nb_value, dtype=numba_types.int32)
+    j_g = empty(nb_value, dtype=numba_types.int32)
 
-        # Index to determine the position in the global array
-        ii = 0
-        # Iteration on each travel
-        for i, delta in enumerate(d_max):
-            # If the travel don't cross multiple pixel
-            if delta == 0:
-                i_g[ii: ii + delta + 1] = i_x0[i]
-                j_g[ii: ii + delta + 1] = i_y0[i]
-            # Vertical move
-            elif d_x[i] == 0:
-                sup = -1 if d_y[i] < 0 else 1
-                i_g[ii: ii + delta + 1] = i_x0[i]
-                j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
-            # Horizontal move
-            elif d_y[i] == 0:
+    # Index to determine the position in the global array
+    ii = 0
+    # Iteration on each travel
+    for i, delta in enumerate(d_max):
+        # If the travel don't cross multiple pixel
+        if delta == 0:
+            i_g[ii: ii + delta + 1] = i_x0[i]
+            j_g[ii: ii + delta + 1] = i_y0[i]
+        # Vertical move
+        elif d_x[i] == 0:
+            sup = -1 if d_y[i] < 0 else 1
+            i_g[ii: ii + delta + 1] = i_x0[i]
+            j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
+        # Horizontal move
+        elif d_y[i] == 0:
+            sup = -1 if d_x[i] < 0 else 1
+            i_g[ii: ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup)
+            j_g[ii: ii + delta + 1] = i_y0[i]
+        # In case of multiple direction
+        else:
+            a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
+            if abs(d_x[i]) >= abs(d_y[i]):
                 sup = -1 if d_x[i] < 0 else 1
-                i_g[ii: ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup)
-                j_g[ii: ii + delta + 1] = i_y0[i]
-            # In case of multiple direction
+                value = arange(i_x0[i], i_x1[i] + sup, sup)
+                i_g[ii: ii + delta + 1] = value
+                j_g[ii: ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
             else:
-                a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
-                if abs(d_x[i]) >= abs(d_y[i]):
-                    sup = -1 if d_x[i] < 0 else 1
-                    value = arange(i_x0[i], i_x1[i] + sup, sup)
-                    i_g[ii: ii + delta + 1] = value
-                    j_g[ii: ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
-                else:
-                    sup = -1 if d_y[i] < 0 else 1
-                    value = arange(i_y0[i], i_y1[i] + sup, sup)
-                    j_g[ii: ii + delta + 1] = value
-                    i_g[ii: ii + delta + 1] = (value - i_y0[i]) * a + i_x0[i]
-            ii += delta + 1
-        i_g %= nb_x
-        return i_g, j_g, d_max
+                sup = -1 if d_y[i] < 0 else 1
+                value = arange(i_y0[i], i_y1[i] + sup, sup)
+                j_g[ii: ii + delta + 1] = value
+                i_g[ii: ii + delta + 1] = (value - i_y0[i]) * a + i_x0[i]
+        ii += delta + 1
+    i_g %= nb_x
+    return i_g, j_g, d_max
 
 
 @njit(cache=True)
 def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
-    lon, lat = vertices[:,0], vertices[:,1]
+    lon, lat = vertices[:, 0], vertices[:, 1]
     lon_min, lon_max = lon.min(), lon.max()
     lat_min, lat_max = lat.min(), lat.max()
     i_x0, i_y0 = int32(((lon_min - x0) % 360) // xstep), int32((lat_min - y0) // ystep)

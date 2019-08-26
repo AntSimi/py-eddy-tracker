@@ -79,7 +79,7 @@ class TrackEddiesObservations(EddiesObservations):
             track_extra_variables=self.track_extra_variables,
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables
-            )
+        )
         eddies.sign_type = self.sign_type
         for field in self.obs.dtype.descr:
             logging.debug('Copy of field %s ...', field)
@@ -128,7 +128,6 @@ class TrackEddiesObservations(EddiesObservations):
         """
         mask = (self.time > period[0]) * (self.time < period[1])
         return self.__extract_with_mask(mask, **kwargs)
-
 
     def __extract_with_mask(self, mask, full_path=False, remove_incomplete=False):
         """

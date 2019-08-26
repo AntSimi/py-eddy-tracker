@@ -38,7 +38,7 @@ def usage():
     # Read yaml configuration file
     with open(args.yaml_file, 'r') as stream:
         config = yaml_load(stream)
-    if args.correspondance_in is not None  and not exists(args.correspondance_in):
+    if args.correspondance_in is not None and not exists(args.correspondance_in):
         args.correspondance_in = None
     return config, args.save_correspondance_and_stop, args.correspondance_in, args.correspondance_out, args.blank_period
 
@@ -131,7 +131,6 @@ if __name__ == '__main__':
         FINAL_EDDIES.filled_by_interpolation(FINAL_EDDIES['virtual'] == 1)
         SHORT_TRACK['virtual'][:] = SHORT_TRACK['time'] == 0
         SHORT_TRACK.filled_by_interpolation(SHORT_TRACK['virtual'] == 1)
-
 
     # Total running time
     FULL_TIME = dt.datetime.now() - START_TIME

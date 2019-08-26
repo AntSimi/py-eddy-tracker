@@ -103,6 +103,7 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
             z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (z01 * (1 - xd) + z11 * xd) * yd
     return z
 
+
 @njit(cache=True, fastmath=True, parallel=True)
 def custom_convolution(data, mask, kernel):
     """do sortin at high lattitude big part of value are masked"""
@@ -167,7 +168,7 @@ def fit_circle(x_vec, y_vec):
         if dist_poly > radius:
             p_inon_y[i_elt] = center_y + radius * (y_vec[i_elt] - center_y) / dist_poly
             p_inon_x[i_elt] = center_x - (center_x - x_vec[i_elt]) * (center_y - p_inon_y[i_elt]) / (
-                        center_y - y_vec[i_elt])
+                    center_y - y_vec[i_elt])
         else:
             p_inon_x[i_elt] = x_vec[i_elt]
             p_inon_y[i_elt] = y_vec[i_elt]
@@ -201,7 +202,7 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     dist[0] = 0
     dist[1:] = distance(x_val[:-1], y_val[:-1], x_val[1:], y_val[1:])
     # To be still monotonous (dist is store in m)
-    dist[1:][dist[1:]<1e-3] = 1e-3
+    dist[1:][dist[1:] < 1e-3] = 1e-3
     dist = dist.cumsum()
     # Get uniform distances
     if fixed_size is None:
