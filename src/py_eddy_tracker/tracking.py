@@ -142,12 +142,12 @@ class Correspondances(list):
         date_stop = datetime(1950, 1, 1) + timedelta(int(self.class_method.load_from_netcdf(self.datasets[-1]).obs['time'][0]))
         return date_start, date_stop
 
-    def swap_dataset(self, dataset):
+    def swap_dataset(self, dataset, raw_data=False):
         """ Swap to next dataset
         """
         self.previous2_obs = self.previous_obs
         self.previous_obs = self.current_obs
-        self.current_obs = self.class_method.load_from_netcdf(dataset)
+        self.current_obs = self.class_method.load_from_netcdf(dataset, raw_data=raw_data)
 
     def merge_correspondance(self, other):
         # Verify compliance of file
@@ -515,7 +515,7 @@ class Correspondances(list):
             self[i]['id'] = translate[self[i]['id']]
         logging.debug('Select shorter than %d done', size_max)
 
-    def merge(self, until=-1):
+    def merge(self, until=-1, raw_data=True):
         """Merge all the correspondance in one array with all fields
         """
         # Start loading identification again to save in the finals tracks
@@ -529,7 +529,7 @@ class Correspondances(list):
             size=self.nb_obs,
             track_extra_variables=self.current_obs.track_extra_variables,
             track_array_variables=self.current_obs.track_array_variables,
-            array_variables=self.current_obs.array_variables)
+            array_variables=self.current_obs.array_variables, raw_data=raw_data)
 
         # All the value put at nan, necessary only for all end of track
         eddies['cost_association'][:] = default_fillvals['f4']
@@ -554,7 +554,7 @@ class Correspondances(list):
                 break
             logging.debug('Merge data from %s', file_name)
             # Load current file (we begin with second one)
-            self.swap_dataset(file_name)
+            self.swap_dataset(file_name, raw_data=raw_data)
             # We select the list of id which are involve in the correspondance
             i_id = self[i]['id']
             # Index where we will write in the final object
@@ -603,20 +603,21 @@ class Correspondances(list):
             self.previous_obs = self.current_obs
         return eddies
 
-    def get_unused_data(self):
+    def get_unused_data(self, raw_data=False):
         """
         Add in track object all the observations which aren't selected
         Returns: Unused Eddies
 
         """
         self.reset_dataset_cache()
-        self.swap_dataset(self.datasets[0])
+        self.swap_dataset(self.datasets[0], raw_data=raw_data)
 
         nb_dataset = len(self.datasets)
         # Get the number of obs unused
         nb_obs = 0
         list_mask= list()
         has_virtual = 'virtual' in self[0].dtype.names
+        logging.debug('Count unused data ...')
         for i, filename in enumerate(self.datasets):
             last_dataset = i == (nb_dataset - 1)
             if has_virtual and not last_dataset:
@@ -637,15 +638,16 @@ class Correspondances(list):
             m[eddies_used] = False
             list_mask.append(m)
             nb_obs += m.sum()
-
+        logging.debug('Count unused data OK')
         eddies = EddiesObservations(
             size=nb_obs,
             track_extra_variables=self.current_obs.track_extra_variables,
             track_array_variables=self.current_obs.track_array_variables,
-            array_variables=self.current_obs.array_variables)
+            array_variables=self.current_obs.array_variables, raw_data=raw_data)
         j = 0
         for i, dataset in enumerate(self.datasets):
-            current_obs = self.class_method.load_from_netcdf(dataset)
+            logging.debug('Loaf file : (%d) %s', i, dataset)
+            current_obs = self.class_method.load_from_netcdf(dataset, raw_data=raw_data)
             if i == 0:
                 eddies.sign_type = current_obs.sign_type
             unused_obs = current_obs.observations[list_mask[i]]

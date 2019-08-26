@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     if CONFIG.eddies_untracked_model is None:
         CONFIG.eddies_untracked_model = '%(path)s/%(sign_type)s_%(prod_time)s_untracked.nc'
-    CORRESPONDANCES.get_unused_data().write_netcdf(path=SAVE_DIR, filename=CONFIG.eddies_untracked_model)
+    CORRESPONDANCES.get_unused_data(raw_data=True).write_netcdf(path=SAVE_DIR, filename=CONFIG.eddies_untracked_model)
 
     SHORT_CORRESPONDANCES = CORRESPONDANCES._copy()
     SHORT_CORRESPONDANCES.shorter_than(size_max=NB_OBS_MIN)
