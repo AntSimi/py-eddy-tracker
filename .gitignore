@@ -1,0 +1,10 @@
+/build
+/dist
+*.pyc
+*.so
+*.c
+*.egg-*
+*.eclipse.*
+*.idea*
+*.project*
+
