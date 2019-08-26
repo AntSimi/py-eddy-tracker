@@ -28,7 +28,8 @@ Version 3.0.0
 
 """
 from datetime import timedelta, datetime
-from py_eddy_tracker.observations import EddiesObservations, VirtualEddiesObservations, TrackEddiesObservations
+from py_eddy_tracker.observations.observation import EddiesObservations, VirtualEddiesObservations
+from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 from numpy import bool_, array, arange, ones, setdiff1d, zeros, uint16, where, empty, isin, unique, concatenate, \
     ma
 from netCDF4 import Dataset, default_fillvals

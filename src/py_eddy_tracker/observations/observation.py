@@ -20,23 +20,82 @@ Copyright (c) 2014-2017 by Evan Mason and Antoine Delepoulle
 Email: emason@imedea.uib-csic.es
 ===========================================================================
 
-observations.py
+observation.py
 
 Version 3.0.0
 
 ===========================================================================
 
 """
-from numpy import zeros, empty, absolute, arange, where, unique, \
+from numpy import zeros, where, unique, \
     ma, cos, radians, isnan, ones, ndarray, \
-    interp, floor, array
+    floor, array, empty
 from netCDF4 import Dataset
-from .generic import distance_grid, distance
-from . import VAR_DESCR, VAR_DESCR_inv
+from ..generic import distance_grid, distance
+from .. import VAR_DESCR, VAR_DESCR_inv
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from numba import njit, types as numba_types
-from Polygon import Polygon as Polygon
+from Polygon import Polygon
+
+
+@njit(cache=True, fastmath=True)
+def shifted_ellipsoid_degrees_mask(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
+    # c = (major ** 2 - minor ** 2) ** .5 + major
+    c = major
+    major = minor + .5 * (major - minor)
+    # r=.5*(c-c0)
+    # a=c0+r
+    # Focal
+    f_right = lon0
+    f_left = f_right - (c - minor)
+    # Ellipse center
+    x_c = (f_left + f_right) * .5
+
+    nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
+    m = empty((nb_1, nb_0), dtype=numba_types.bool_)
+    for i in range(nb_1):
+        dy = lat1[i] - lat0
+        dx = (lon1[i] - x_c + 180) % 360 - 180
+        d_normalize = dx ** 2 / major ** 2 + dy ** 2 / minor ** 2
+        m[i] = d_normalize < 1.
+    return m.T
+
+
+@njit(cache=True, fastmath=True)
+def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
+    """
+    work only if major is an array but faster * 6
+    """
+    # c = (major ** 2 - minor ** 2) ** .5 + major
+    c = major
+    major = minor + .5 * (major - minor)
+    # r=.5*(c-c0)
+    # a=c0+r
+    # Focal
+    f_right = lon0
+    f_left = f_right - (c - minor)
+    # Ellips center
+    x_c = (f_left + f_right) * .5
+
+    nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
+    m = empty((nb_0, nb_1), dtype=numba_types.bool_)
+
+    for j in range(nb_0):
+        for i in range(nb_1):
+            dy = absolute(lat1[i] - lat0[j])
+            if dy > minor:
+                m[j, i] = False
+                continue
+            dx = absolute(lon1[i] - x_c[j])
+            if dx > 180:
+                dx = absolute((dx + 180) % 360 - 180)
+            if dx > major[j]:
+                m[j, i] = False
+                continue
+            d_normalize = dx ** 2 / major[j] ** 2 + dy ** 2 / minor ** 2
+            m[j, i] = d_normalize < 1.
+    return m
 
 
 @njit(cache=True, fastmath=True)
@@ -109,7 +168,8 @@ class EddiesObservations(object):
         """
         dtype = list()
         for elt in self.elements:
-            data_type = VAR_DESCR[elt]['compute_type' if 'compute_type' in VAR_DESCR[elt] and not self.raw_data else 'nc_type']
+            data_type = VAR_DESCR[elt][
+                'compute_type' if 'compute_type' in VAR_DESCR[elt] and not self.raw_data else 'nc_type']
             if elt in self.array_variables:
                 dtype.append((elt, data_type, (self.track_array_variables,)))
             else:
@@ -222,10 +282,10 @@ class EddiesObservations(object):
     @staticmethod
     def new_like(eddies, new_size):
         return eddies.__class__(new_size,
-            track_extra_variables=eddies.track_extra_variables,
-            track_array_variables=eddies.track_array_variables,
-            array_variables=eddies.array_variables
-            )
+                                track_extra_variables=eddies.track_extra_variables,
+                                track_array_variables=eddies.track_array_variables,
+                                array_variables=eddies.array_variables
+                                )
 
     def index(self, index):
         """Return obs from self at the index
@@ -262,7 +322,7 @@ class EddiesObservations(object):
                 if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                     kwargs['track_extra_variables'].append(var_inv)
             kwargs['raw_data'] = raw_data
-            eddies = cls(size=nb_obs, ** kwargs)
+            eddies = cls(size=nb_obs, **kwargs)
             for variable in h_nc.variables:
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == 'type_cyc':
@@ -311,7 +371,7 @@ class EddiesObservations(object):
             obs_to_extend:
             dead_track:
             nb_next:
-            model: 
+            model:
 
         Returns:
             New position C = B + AB
@@ -349,7 +409,6 @@ class EddiesObservations(object):
         next_obs['segment_size'][:] += 1
         return next_obs
 
-
     @staticmethod
     def cost_function_common_area(xy_in, xy_out, distance, intern=False):
         """ How does it work on x bound ?
@@ -362,7 +421,7 @@ class EddiesObservations(object):
 
         """
         x_name, y_name = (('contour_lon_s', 'contour_lat_s') if intern
-                     else ('contour_lon_e', 'contour_lat_e'))
+                          else ('contour_lon_e', 'contour_lat_e'))
         r_name = 'radius_s' if intern else 'radius_e'
         nb_records = xy_in.shape[0]
         x_in, y_in = xy_in[x_name], xy_in[y_name]
@@ -372,17 +431,17 @@ class EddiesObservations(object):
         x_out_min, y_out_min = x_out.min(axis=1), y_out.min(axis=1)
         x_out_max, y_out_max = x_out.max(axis=1), y_out.max(axis=1)
         costs = ma.empty(nb_records, dtype='f4')
-        
+
         for i in range(nb_records):
             if (x_in_max[i] < x_out_min[i] or
-                x_in_min[i] > x_out_max[i]):
+                    x_in_min[i] > x_out_max[i]):
                 costs[i] = 1
                 continue
             if (y_in_max[i] < y_out_min[i] or
-                y_in_min[i] > y_out_max[i]):
+                    y_in_min[i] > y_out_max[i]):
                 costs[i] = 1
                 continue
-            
+
             x_in_, x_out_ = x_in[i], x_out[i]
             p_in = Polygon(custom_concat(x_in_, y_in[i]))
             if abs(x_in_[0] - x_out_[0]) > 180:
@@ -417,14 +476,14 @@ class EddiesObservations(object):
     def fixed_ellipsoid_mask(self, other, minor=50, major=100, only_east=False, shifted_ellips=False):
         dist = self.distance(other).T
         accepted = dist < minor
-        rejected = dist > major 
+        rejected = dist > major
         rejected += isnan(dist)
 
         # All obs we are not in rejected and accepted, there are between
         # two circle
         needs_investigation = - (rejected + accepted)
-        index_other, index_self  = where(needs_investigation)
-        
+        index_other, index_self = where(needs_investigation)
+
         nb_case = index_self.shape[0]
         if nb_case != 0:
             if isinstance(major, ndarray):
@@ -433,7 +492,7 @@ class EddiesObservations(object):
                 minor = minor[index_self]
             # focal distance
             f_degree = ((major ** 2 - minor ** 2) ** .5) / (111.2 * cos(radians(self.obs['lat'][index_self])))
-            
+
             lon_self = self.obs['lon'][index_self]
             if shifted_ellips:
                 x_center_ellips = lon_self - (major - minor) / 2
@@ -499,9 +558,9 @@ class EddiesObservations(object):
         if test:
             # We extract matrix which contains concflict
             obs_linking_to_self = mask[eddies_separation
-                                                   ].any(axis=0)
+            ].any(axis=0)
             obs_linking_to_other = mask[:, eddies_merge
-                                                    ].any(axis=1)
+                                   ].any(axis=1)
             i_self_keep = where(obs_linking_to_other + eddies_separation)[0]
             i_other_keep = where(obs_linking_to_self + eddies_merge)[0]
 
@@ -555,9 +614,9 @@ class EddiesObservations(object):
         if test:
             # We extract matrix which contains concflict
             obs_linking_to_self = mask[eddies_separation
-                                                   ].any(axis=0)
+            ].any(axis=0)
             obs_linking_to_other = mask[:, eddies_merge
-                                                    ].any(axis=1)
+                                   ].any(axis=1)
             i_self_keep = where(obs_linking_to_other + eddies_separation)[0]
             i_other_keep = where(obs_linking_to_self + eddies_merge)[0]
 
@@ -574,7 +633,7 @@ class EddiesObservations(object):
             links_resolve = 0
             for i in range(shape[0]):
                 j = cost_reduce[i].argmin()
-                if hasattr(cost_reduce[i,j], 'mask'):
+                if hasattr(cost_reduce[i, j], 'mask'):
                     continue
                 links_resolve += 1
                 # Set all links to False
@@ -603,7 +662,7 @@ class EddiesObservations(object):
         dist = self.distance(other)
         mask_accept_dist = self.mask_function(other, dist)
         indexs_closest = where(mask_accept_dist)
-        
+
         cost_values = self.cost_function(
             self.obs[indexs_closest[0]],
             other.obs[indexs_closest[1]],
@@ -692,75 +751,17 @@ class EddiesObservations(object):
         h_nc.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
         h_nc.comment = 'Surface product; mesoscale eddies'
         h_nc.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
-        h_nc.standard_name_vocabulary ='NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
+        h_nc.standard_name_vocabulary = 'NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
         h_nc.rotation_type = self.sign_type
 
     def display(self, ax, ref=None, **kwargs):
         if ref is None:
-            ax.plot(self.obs['contour_lon_s'].T, self.obs['contour_lat_s'].T, ** kwargs)
-            ax.plot(self.obs['contour_lon_e'].T, self.obs['contour_lat_e'].T, linestyle='-.', ** kwargs)
+            ax.plot(self.obs['contour_lon_s'].T, self.obs['contour_lat_s'].T, **kwargs)
+            ax.plot(self.obs['contour_lon_e'].T, self.obs['contour_lat_e'].T, linestyle='-.', **kwargs)
         else:
-            ax.plot((self.obs['contour_lon_s'].T - ref) % 360 + ref, self.obs['contour_lat_s'].T, ** kwargs)
-            ax.plot((self.obs['contour_lon_e'].T - ref) % 360 + ref, self.obs['contour_lat_e'].T, linestyle='-.', ** kwargs)
-
-
-@njit(cache=True, fastmath=True)
-def shifted_ellipsoid_degrees_mask(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
-    # c = (major ** 2 - minor ** 2) ** .5 + major
-    c = major
-    major = minor + .5 * (major - minor)
-    # r=.5*(c-c0)
-    # a=c0+r
-    # Focal
-    f_right = lon0
-    f_left = f_right - (c - minor)
-    # Ellipse center
-    x_c = (f_left + f_right) * .5
-
-    nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
-    m = empty((nb_1, nb_0), dtype=numba_types.bool_)
-    for i in range(nb_1):
-        dy = lat1[i] - lat0
-        dx = (lon1[i] - x_c + 180) % 360 - 180
-        d_normalize = dx ** 2 / major ** 2 + dy ** 2 / minor ** 2
-        m[i] = d_normalize < 1.
-    return m.T
-
-
-@njit(cache=True, fastmath=True)
-def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
-    """
-    work only if major is an array but faster * 6
-    """
-    # c = (major ** 2 - minor ** 2) ** .5 + major
-    c = major
-    major = minor + .5 * (major - minor)
-    # r=.5*(c-c0)
-    # a=c0+r
-    # Focal
-    f_right = lon0
-    f_left = f_right - (c - minor)
-    # Ellips center
-    x_c = (f_left + f_right) * .5
-
-    nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
-    m = empty((nb_0, nb_1), dtype=numba_types.bool_)
-
-    for j in range(nb_0):
-        for i in range(nb_1):
-            dy = absolute(lat1[i] - lat0[j])
-            if dy > minor:
-                m[j, i] = False
-                continue
-            dx = absolute(lon1[i] - x_c[j])
-            if dx > 180:
-                dx = absolute((dx + 180) % 360 - 180)
-            if dx > major[j]:
-                m[j, i] = False
-                continue
-            d_normalize = dx ** 2 / major[j] ** 2 + dy ** 2 / minor ** 2
-            m[j, i] = d_normalize < 1.
-    return m
+            ax.plot((self.obs['contour_lon_s'].T - ref) % 360 + ref, self.obs['contour_lat_s'].T, **kwargs)
+            ax.plot((self.obs['contour_lon_e'].T - ref) % 360 + ref, self.obs['contour_lat_e'].T, linestyle='-.',
+                    **kwargs)
 
 
 class VirtualEddiesObservations(EddiesObservations):
@@ -773,85 +774,3 @@ class VirtualEddiesObservations(EddiesObservations):
         elements = super(VirtualEddiesObservations, self).elements
         elements.extend(['track', 'segment_size', 'dlon', 'dlat'])
         return list(set(elements))
-
-
-class TrackEddiesObservations(EddiesObservations):
-    """Class to practice Tracking on observations
-    """
-    __slots__ = ()
-
-    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time',
-                'shape_error_e', 'shape_error_s', 'nb_contour_selected',
-                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour', 'cost_association']
-
-    def filled_by_interpolation(self, mask):
-        """Filled selected values by interpolation
-        """
-        nb_filled = mask.sum()
-        logging.info('%d obs will be filled (unobserved)', nb_filled)
-
-        nb_obs = len(self)
-        index = arange(nb_obs)
-
-        for field in self.obs.dtype.descr:
-            var = field[0]
-            if var in ['n', 'virtual', 'track', 'cost_association'] or var in self.array_variables:
-                continue
-            # to normalize longitude before interpolation
-            if var== 'lon':
-                lon = self.obs[var]
-                first = where(self.obs['n'] == 0)[0]
-                nb_obs = empty(first.shape, dtype='u4')
-                nb_obs[:-1] = first[1:] - first[:-1]
-                nb_obs[-1] = lon.shape[0] - first[-1]
-                lon0 = (lon[first] - 180).repeat(nb_obs)
-                self.obs[var] = (lon - lon0) % 360 + lon0
-            self.obs[var][mask] = interp(index[mask], index[~mask], self.obs[var][~mask])
-
-    def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
-        """Select eddies which are longer than nb_min
-        """
-        mask = nb_obs >= nb_min
-        nb_obs_select = mask.sum()
-        logging.info('Selection of %d observations', nb_obs_select)
-        eddies = TrackEddiesObservations(
-            size=nb_obs_select,
-            track_extra_variables=self.track_extra_variables,
-            track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables
-            )
-        eddies.sign_type = self.sign_type
-        for field in self.obs.dtype.descr:
-            logging.debug('Copy of field %s ...', field)
-            var = field[0]
-            eddies.obs[var] = self.obs[var][mask]
-        if compress_id:
-            list_id = unique(eddies.obs['track'])
-            list_id.sort()
-            id_translate = arange(list_id.max() + 1)
-            id_translate[list_id] = arange(len(list_id)) + 1
-            eddies.obs['track'] = id_translate[eddies.obs['track']]
-        return eddies
-
-    @property
-    def elements(self):
-        elements = super(TrackEddiesObservations, self).elements
-        elements.extend(['track', 'n', 'virtual'])
-        return elements
-
-    def set_global_attr_netcdf(self, h_nc):
-        """Set global attr
-        """
-        h_nc.title = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        h_nc.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
-        h_nc.comment = 'Surface product; mesoscale eddies'
-        h_nc.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
-        h_nc.standard_name_vocabulary = 'NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
-        h_nc.date_created = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-        t = h_nc.variables[VAR_DESCR_inv['j1']]
-        delta = t.max - t.min + 1
-        h_nc.time_coverage_duration = 'P%dD' % delta
-        d_start = datetime(1950, 1, 1) + timedelta(int(t.min))
-        d_end = datetime(1950, 1, 1) + timedelta(int(t.max))
-        h_nc.time_coverage_start = d_start.strftime('%Y-%m-%dT00:00:00Z')
-        h_nc.time_coverage_end = d_end.strftime('%Y-%m-%dT00:00:00Z')
