@@ -116,6 +116,20 @@ class TrackEddiesObservations(EddiesObservations):
         h_nc.time_coverage_start = d_start.strftime('%Y-%m-%dT00:00:00Z')
         h_nc.time_coverage_end = d_end.strftime('%Y-%m-%dT00:00:00Z')
 
+    def extract_with_period(self, period, **kwargs):
+        """
+        Extract with a period
+        Args:
+            period: two date to define period, must be specify from 1/1/1950
+            **kwargs: directly give to __extract_with_mask
+
+        Returns:
+            same object with selected data
+        """
+        mask = (self.time > period[0]) * (self.time < period[1])
+        return self.__extract_with_mask(mask, **kwargs)
+
+
     def __extract_with_mask(self, mask, full_path=False, remove_incomplete=False):
         """
         Extract a subset of observations

@@ -29,7 +29,7 @@ Version 3.0.0
 """
 from numpy import zeros, where, unique, \
     ma, cos, radians, isnan, ones, ndarray, \
-    floor, array, empty
+    floor, array, empty, absolute
 from netCDF4 import Dataset
 from ..generic import distance_grid, distance
 from .. import VAR_DESCR, VAR_DESCR_inv
@@ -100,8 +100,6 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
 
 @njit(cache=True, fastmath=True)
 def custom_concat(x, y):
-    '''
-    '''
     nb = x.shape[0]
     a = empty((nb,2))
     for i in range(nb):
