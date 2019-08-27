@@ -28,21 +28,27 @@ Version 3.0.0
 
 """
 from numpy import empty, arange, where, unique, \
-    interp
+    interp, ones, bool_, zeros
 from .. import VAR_DESCR_inv
 import logging
 from datetime import datetime, timedelta
 from .observation import EddiesObservations
+from numba import njit
 
 
 class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations
     """
-    __slots__ = ()
+    __slots__ = ('__obs_by_track', '__first_index_of_track')
 
-    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time',
-                'shape_error_e', 'shape_error_s', 'nb_contour_selected',
-                'height_max_speed_contour', 'height_external_contour', 'height_inner_contour', 'cost_association']
+    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time', 'shape_error_e',
+                'shape_error_s', 'nb_contour_selected', 'height_max_speed_contour', 'height_external_contour',
+                'height_inner_contour', 'cost_association']
+
+    def __init__(self, *args, **kwargs):
+        super(TrackEddiesObservations, self).__init__(*args, **kwargs)
+        self.__first_index_of_track = None
+        self.__obs_by_track = None
 
     def filled_by_interpolation(self, mask):
         """Filled selected values by interpolation
@@ -97,7 +103,7 @@ class TrackEddiesObservations(EddiesObservations):
     def elements(self):
         elements = super(TrackEddiesObservations, self).elements
         elements.extend(['track', 'n', 'virtual'])
-        return elements
+        return list(set(elements))
 
     def set_global_attr_netcdf(self, h_nc):
         """Set global attr
@@ -126,19 +132,110 @@ class TrackEddiesObservations(EddiesObservations):
         Returns:
             same object with selected data
         """
-        mask = (self.time > period[0]) * (self.time < period[1])
+        dataset_period = self.period
+        p_min, p_max = period
+        if p_min > 0:
+            mask = self.time >= p_min
+        elif p_min < 0:
+            mask = self.time >= (dataset_period[0] - p_min)
+        else:
+            mask = ones(self.time.shape, dtype=bool_)
+        if p_max > 0:
+            mask *= self.time <= p_max
+        elif p_max < 0:
+            mask *= self.time <= (dataset_period[1] + p_max)
         return self.__extract_with_mask(mask, **kwargs)
 
-    def __extract_with_mask(self, mask, full_path=False, remove_incomplete=False):
+    @property
+    def period(self):
+        """
+        Give time coverage
+        Returns: 2 date
+        """
+        return self.time.min(), self.time.max()
+
+    def get_mask_from_id(self, tracks):
+        mask = zeros(self.tracks.shape, dtype=bool_)
+        compute_mask_from_id(tracks, self.index_from_track, self.nb_obs_by_track, mask)
+        return mask
+
+    def compute_index(self):
+        if self.__first_index_of_track is None:
+            s = self.tracks.max()
+            self.__first_index_of_track = -ones(s, self.tracks.dtype)
+            self.__obs_by_track = zeros(s, self.observation_number.dtype)
+            logging.debug('Start computing index ...')
+            compute_index(self.tracks, self.__first_index_of_track, self.__obs_by_track)
+            logging.debug('... OK')
+
+    @property
+    def index_from_track(self):
+        self.compute_index()
+        return self.__first_index_of_track
+
+    @property
+    def nb_obs_by_track(self):
+        self.compute_index()
+        return self.__obs_by_track
+
+    def __extract_with_mask(self, mask, full_path=False, remove_incomplete=False, compress_id=False):
         """
         Extract a subset of observations
         Args:
             mask: mask to select observations
             full_path: extract full path if only one part is selected
-            remove_incomplete: delete path which are not totatly selected
+            remove_incomplete: delete path which are not fully selected
+            compress_id: resample track number to use a little range
 
         Returns:
             same object with selected observations
         """
         if full_path and remove_incomplete:
             logging.warning('Incompatible option, remove_incomplete option will be remove')
+            remove_incomplete = False
+
+        if full_path:
+            tracks = unique(self.tracks[mask])
+            mask = self.get_mask_from_id(tracks)
+        elif remove_incomplete:
+            raise Exception("")
+
+        nb_obs = mask.sum()
+        new = TrackEddiesObservations(
+            size=nb_obs,
+            track_extra_variables=self.track_extra_variables,
+            track_array_variables=self.track_array_variables,
+            array_variables=self.array_variables,
+            raw_data=self.raw_data
+        )
+        new.sign_type = self.sign_type
+        if nb_obs == 0:
+            logging.warning('Empty dataset will be created')
+        else:
+            for field in self.obs.dtype.descr:
+                logging.debug('Copy of field %s ...', field)
+                var = field[0]
+                new.obs[var] = self.obs[var][mask]
+            if compress_id:
+                list_id = unique(new.obs['track'])
+                list_id.sort()
+                id_translate = arange(list_id.max() + 1)
+                id_translate[list_id] = arange(len(list_id)) + 1
+                new.obs['track'] = id_translate[new.obs['track']]
+        return new
+
+
+@njit(cache=True)
+def compute_index(tracks, index, number):
+    previous_track = -1
+    for i, track in enumerate(tracks):
+        if track != previous_track:
+            index[track] = i
+        number[track] += 1
+        previous_track = track
+
+
+@njit(cache=True)
+def compute_mask_from_id(tracks, first_index, number_of_obs, mask):
+    for track in tracks:
+        mask[first_index[track]:first_index[track] + number_of_obs[track]] = True

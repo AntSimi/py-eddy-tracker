@@ -16,6 +16,7 @@ setup(
     scripts=[
         'src/scripts/GridFiltering',
         'src/scripts/EddyId',
+        'src/scripts/EddySubSetter',
         'src/scripts/EddyTracking',
         'src/scripts/EddyFinalTracking',
         'src/scripts/EddyMergeCorrespondances',

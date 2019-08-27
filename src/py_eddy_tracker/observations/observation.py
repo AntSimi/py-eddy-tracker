@@ -175,6 +175,18 @@ class EddiesObservations(object):
         self.sign_type = None
 
     @property
+    def time(self):
+        return self.observations["time"]
+
+    @property
+    def tracks(self):
+        return self.observations["track"]
+
+    @property
+    def observation_number(self):
+        return self.observations["n"]
+
+    @property
     def sign_legend(self):
         return "Cyclonic" if self.sign_type == -1 else "Anticyclonic"
 
