@@ -18,7 +18,7 @@ from numba import njit, types as numba_types
 from matplotlib.path import Path as BasePath
 from pyproj import Proj
 from pint import UnitRegistry
-from ..observations import EddiesObservations
+from ..observations.observation import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
 from .. import VAR_DESCR
 from ..generic import distance, interp2d_geo, fit_circle, uniform_resample
