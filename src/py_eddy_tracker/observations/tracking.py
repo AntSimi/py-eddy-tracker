@@ -198,7 +198,8 @@ class TrackEddiesObservations(EddiesObservations):
             tracks = unique(self.tracks[mask])
             mask = self.get_mask_from_id(tracks)
         elif remove_incomplete:
-            raise Exception("")
+            tracks = unique(self.tracks[~mask])
+            mask = ~self.get_mask_from_id(tracks)
 
         nb_obs = mask.sum()
         new = TrackEddiesObservations(
