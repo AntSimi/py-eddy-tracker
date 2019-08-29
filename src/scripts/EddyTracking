@@ -8,9 +8,78 @@ from yaml import load as yaml_load
 from py_eddy_tracker.tracking import Correspondances
 from os.path import exists, dirname, basename
 from os import mkdir
+from re import compile as re_compile
+from os.path import join as join_path
+from numpy import bytes_, empty, unique
+from netCDF4 import Dataset
+from datetime import datetime
+from glob import glob
 import logging
 import datetime as dt
-from py_eddy_tracker.grid import browse_dataset_in
+
+
+def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
+                      start_date=None, end_date=None, sub_sampling_step=1,
+                      files=None):
+    if files is not None:
+        pattern_regexp = re_compile('.*/' + date_regexp)
+        filenames = bytes_(files)
+    else:
+        pattern_regexp = re_compile('.*/' + date_regexp)
+        full_path = join_path(data_dir, files_model)
+        logging.info('Search files : %s', full_path)
+        filenames = bytes_(glob(full_path))
+
+    dataset_list = empty(len(filenames),
+                         dtype=[('filename', 'S500'),
+                                ('date', 'datetime64[D]'),
+                                ])
+    dataset_list['filename'] = filenames
+
+    logging.info('%s grids available', dataset_list.shape[0])
+    mode_attrs = False
+    if '(' not in date_regexp:
+        logging.debug('Attrs date : %s', date_regexp)
+        mode_attrs = date_regexp.strip().split(':')
+    else:
+        logging.debug('Pattern date : %s', date_regexp)
+
+    for item in dataset_list:
+        str_date = None
+        if mode_attrs:
+            with Dataset(item['filename'].decode("utf-8")) as h:
+                if len(mode_attrs) == 1:
+                    str_date = getattr(h, mode_attrs[0])
+                else:
+                    str_date = getattr(h.variables[mode_attrs[0]], mode_attrs[1])
+        else:
+            result = pattern_regexp.match(str(item['filename']))
+            if result:
+                str_date = result.groups()[0]
+
+        if str_date is not None:
+            item['date'] = datetime.strptime(str_date, date_model).date()
+
+    dataset_list.sort(order=['date', 'filename'])
+
+    steps = unique(dataset_list['date'][1:] - dataset_list['date'][:-1])
+    if len(steps) > 1:
+        raise Exception('Several days steps in grid dataset %s' % steps)
+
+    if sub_sampling_step != 1:
+        logging.info('Grid subsampling %d', sub_sampling_step)
+        dataset_list = dataset_list[::sub_sampling_step]
+
+    if start_date is not None or end_date is not None:
+        logging.info('Available grid from %s to %s',
+                     dataset_list[0]['date'],
+                     dataset_list[-1]['date'])
+        logging.info('Filtering grid by time %s, %s', start_date, end_date)
+        mask = (dataset_list['date'] >= start_date) * (
+            dataset_list['date'] <= end_date)
+
+        dataset_list = dataset_list[mask]
+    return dataset_list
 
 
 def usage():
