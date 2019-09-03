@@ -8,7 +8,7 @@ setup(
     classifiers=['Development Status :: 3 - Alpha',
                  'Topic :: Scientific/Engineering :: Physics',
                  'Programming Language :: Python'],
-    keywords='eddy science',
+    keywords='eddy science, eddy tracking, eddy tracker',
     author='emason',
     author_email='emason@imedea.uib-csic.es',
     packages=find_packages('src'),
