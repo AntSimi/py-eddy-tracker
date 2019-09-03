@@ -122,6 +122,22 @@ class TrackEddiesObservations(EddiesObservations):
         h_nc.time_coverage_start = d_start.strftime('%Y-%m-%dT00:00:00Z')
         h_nc.time_coverage_end = d_end.strftime('%Y-%m-%dT00:00:00Z')
 
+    def extract_with_area(self, area, **kwargs):
+        """
+        Extract with a bounding box
+        Args:
+            area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
+            **kwargs:
+
+        Returns:
+
+        """
+        mask = (self.latitude > area['llcrnrlat']) * (self.latitude < area['urcrnrlat'])
+        lon0 = area['llcrnrlon']
+        lon = (self.longitude - lon0) % 360 + lon0
+        mask *= (lon > lon0) * (lon < area['urcrnrlon'])
+        return self.__extract_with_mask(mask, **kwargs)
+
     def extract_with_period(self, period, **kwargs):
         """
         Extract with a period

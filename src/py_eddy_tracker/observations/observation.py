@@ -175,6 +175,14 @@ class EddiesObservations(object):
         self.sign_type = None
 
     @property
+    def longitude(self):
+        return self.observations["lon"]
+
+    @property
+    def latitude(self):
+        return self.observations["lat"]
+
+    @property
     def time(self):
         return self.observations["time"]
 
@@ -211,7 +219,7 @@ class EddiesObservations(object):
             data_type = VAR_DESCR[elt][
                 "compute_type"
                 if "compute_type" in VAR_DESCR[elt] and not self.raw_data
-                else "nc_type"
+                else "output_type"
             ]
             if elt in self.array_variables:
                 dtype.append((elt, data_type, (self.track_array_variables,)))

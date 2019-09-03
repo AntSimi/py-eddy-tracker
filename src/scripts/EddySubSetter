@@ -18,6 +18,10 @@ def id_parser():
                         help='Extract path, if one obs or more are selected')
     parser.add_argument('-d', '--remove_incomplete', action='store_true',
                         help='Extract path only if all obs are selected')
+    parser.add_argument('-a', '--area', nargs=4, type=float,
+                        metavar=('llcrnrlon', 'llcrnrlat', 'urcrnrlon', 'urcrnrlat'),
+                        help='Coordinates of bounding to extract'
+                        )
     return parser
 
 
@@ -28,6 +32,15 @@ if __name__ == '__main__':
     if args.period is not None:
         dataset = dataset.extract_with_period(args.period, full_path=args.full_path,
                                               remove_incomplete=args.remove_incomplete)
+
+    if args.area is not None:
+        area = dict(llcrnrlon=args.area[0],
+                    llcrnrlat=args.area[1],
+                    urcrnrlon=args.area[2],
+                    urcrnrlat=args.area[3],
+                    )
+        dataset = dataset.extract_with_area(area, full_path=args.full_path,
+                                            remove_incomplete=args.remove_incomplete)
 
     if len(dataset) != 0:
         dataset.write_netcdf(filename=args.filename_out)
