@@ -843,7 +843,7 @@ class EddiesObservations(object):
     def set_global_attr_netcdf(self, h_nc):
         h_nc.Metadata_Conventions = "Unidata Dataset Discovery v1.0"
         h_nc.comment = "Surface product; mesoscale eddies"
-        h_nc.framework_used = "https://bitbucket.org/emason/py-eddy-tracker"
+        h_nc.framework_used = "https://github.com/AntSimi/py-eddy-tracker"
         h_nc.standard_name_vocabulary = (
             "NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table"
         )

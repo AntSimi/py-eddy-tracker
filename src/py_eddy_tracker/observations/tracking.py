@@ -28,7 +28,7 @@ Version 3.0.0
 
 """
 from numpy import empty, arange, where, unique, \
-    interp, ones, bool_, zeros
+    interp, ones, bool_, zeros, array
 from .. import VAR_DESCR_inv
 import logging
 from datetime import datetime, timedelta
@@ -111,7 +111,7 @@ class TrackEddiesObservations(EddiesObservations):
         h_nc.title = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
         h_nc.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
         h_nc.comment = 'Surface product; mesoscale eddies'
-        h_nc.framework_used = 'https://bitbucket.org/emason/py-eddy-tracker'
+        h_nc.framework_used = 'https://github.com/AntSimi/py-eddy-tracker'
         h_nc.standard_name_vocabulary = 'NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
         h_nc.date_created = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
         t = h_nc.variables[VAR_DESCR_inv['j1']]
@@ -193,6 +193,10 @@ class TrackEddiesObservations(EddiesObservations):
     def nb_obs_by_track(self):
         self.compute_index()
         return self.__obs_by_track
+
+    def extract_ids(self, tracks):
+        mask = self.get_mask_from_id(array(tracks))
+        return self.__extract_with_mask(mask)
 
     def __extract_with_mask(self, mask, full_path=False, remove_incomplete=False, compress_id=False):
         """

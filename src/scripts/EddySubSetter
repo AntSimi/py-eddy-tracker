@@ -22,6 +22,7 @@ def id_parser():
                         metavar=('llcrnrlon', 'llcrnrlat', 'urcrnrlon', 'urcrnrlat'),
                         help='Coordinates of bounding to extract'
                         )
+    parser.add_argument('-i', '--ids', nargs='+', type=int, help='List of tracks which will be extract')
     return parser
 
 
@@ -29,6 +30,8 @@ if __name__ == '__main__':
     args = id_parser().parse_args()
 
     dataset = TrackEddiesObservations.load_from_netcdf(args.filename, raw_data=True)
+    if args.ids is not None:
+        dataset = dataset.extract_ids(args.ids)
     if args.period is not None:
         dataset = dataset.extract_with_period(args.period, full_path=args.full_path,
                                               remove_incomplete=args.remove_incomplete)

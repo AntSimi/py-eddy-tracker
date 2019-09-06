@@ -332,6 +332,17 @@ VAR_DESCR = dict(
             description='Eddy identification number',
         )
     ),
+    sub_track=dict(
+        attr_name=None,
+        nc_name='sub_track',
+        nc_type='uint32',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            longname='segment_number',
+            units='ordinal',
+            description='segment number inside a group',
+        )
+    ),
     n=dict(
         attr_name=None,
         nc_name='observation_number',
