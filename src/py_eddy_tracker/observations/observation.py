@@ -216,11 +216,11 @@ class EddiesObservations(object):
         """
         dtype = list()
         for elt in self.elements:
-            data_type = VAR_DESCR[elt][
-                "compute_type"
-                if "compute_type" in VAR_DESCR[elt] and not self.raw_data
-                else "output_type"
-            ]
+            data_type = (
+                VAR_DESCR[elt].get("compute_type", VAR_DESCR[elt].get("nc_type"))
+                if not self.raw_data
+                else VAR_DESCR[elt]["output_type"]
+            )
             if elt in self.array_variables:
                 dtype.append((elt, data_type, (self.track_array_variables,)))
             else:
