@@ -49,6 +49,9 @@ import logging
 from datetime import datetime
 from numba import njit, types as numba_types
 from Polygon import Polygon
+from pint import UnitRegistry
+from pint.errors import UndefinedUnitError
+from pint.compat.tokenize import TokenError
 
 
 @njit(cache=True, fastmath=True)
@@ -210,6 +213,12 @@ class EddiesObservations(object):
             return self.observations[attr]
         raise KeyError("%s unknown" % attr)
 
+    @classmethod
+    def obs_dimension(cls, handler):
+        for candidate in ('obs', 'Nobs', 'observation', 'i'):
+            if candidate in handler.dimensions.keys():
+                return candidate
+
     @property
     def dtype(self):
         """Return dtype to build numpy array
@@ -357,7 +366,8 @@ class EddiesObservations(object):
         if not isinstance(filename, str):
             filename = filename.astype(str)
         with Dataset(filename) as h_nc:
-            nb_obs = len(h_nc.dimensions["obs"])
+            nb_obs = len(h_nc.dimensions[cls.obs_dimension(h_nc)])
+            logging.debug('%d observations will be load', nb_obs)
             kwargs = dict()
             if array_dim in h_nc.dimensions:
                 kwargs["track_array_variables"] = len(h_nc.dimensions[array_dim])
@@ -382,7 +392,32 @@ class EddiesObservations(object):
                     continue
                 # Patch
                 h_nc.variables[variable].set_auto_maskandscale(not raw_data)
-                eddies.obs[var_inv] = h_nc.variables[variable][:]
+                logging.debug('Up load %s variable%s', variable, ', with raw mode' if raw_data else '')
+                # find unit factor
+                factor = 1
+                if not raw_data:
+                    input_unit = getattr(h_nc.variables[variable], 'unit', None)
+                    output_unit = VAR_DESCR[var_inv]['nc_attr'].get('units', None)
+                    if output_unit is not None and input_unit is not None and output_unit != input_unit:
+                        units = UnitRegistry()
+                        try:
+                            input_unit = units.parse_expression(input_unit, case_sensitive=False)
+                            output_unit = units.parse_expression(output_unit, case_sensitive=False)
+                        except UndefinedUnitError:
+                            input_unit = None
+                        except TokenError:
+                            input_unit = None
+                        if input_unit is not None:
+                            factor = input_unit.to(output_unit).to_tuple()[0]
+                            # If we are able to find a conversion
+                            if factor != 1:
+                                logging.info('%s will be multiply by %f to take care of units', variable, factor)
+                if factor != 1:
+                    eddies.obs[var_inv] = h_nc.variables[variable][:] * factor
+                else:
+                    eddies.obs[var_inv] = h_nc.variables[variable][:]
+
+
             for variable in h_nc.variables:
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == "type_cyc":
@@ -396,7 +431,7 @@ class EddiesObservations(object):
 
     @classmethod
     def from_netcdf(cls, handler):
-        nb_obs = len(handler.dimensions["obs"])
+        nb_obs = len(handler.dimensions[cls.obs_dimension(handler)])
         kwargs = dict()
         if hasattr(handler, "track_array_variables"):
             kwargs["track_array_variables"] = handler.track_array_variables

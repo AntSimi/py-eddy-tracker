@@ -163,7 +163,7 @@ VAR_DESCR = dict(
         attr_name='lon',
         compute_type='float64',
         nc_name='longitude',
-        old_nc_name=['lon'],
+        old_nc_name=['lon', 'Lon'],
         nc_type='float32',
         nc_dims=('obs',),
         nc_attr=dict(
@@ -178,7 +178,7 @@ VAR_DESCR = dict(
         attr_name='lat',
         compute_type='float64',
         nc_name='latitude',
-        old_nc_name=['lat'],
+        old_nc_name=['lat', 'Lat'],
         nc_type='float32',
         nc_dims=('obs',),
         nc_attr=dict(
@@ -296,7 +296,7 @@ VAR_DESCR = dict(
     radius_e=dict(
         attr_name='radius_e',
         nc_name='effective_radius',
-        old_nc_name=['radius_e'],
+        old_nc_name=['radius_e', 'Dia'],
         nc_type='float32',
         output_type='u2',
         scale_factor=50.,
@@ -324,6 +324,7 @@ VAR_DESCR = dict(
     track=dict(
         attr_name=None,
         nc_name='track',
+        old_nc_name=['Eddy_id'],
         nc_type='uint32',
         nc_dims=('obs',),
         nc_attr=dict(
@@ -346,7 +347,7 @@ VAR_DESCR = dict(
     n=dict(
         attr_name=None,
         nc_name='observation_number',
-        old_nc_name=['n'],
+        old_nc_name=['n', 'Eddy_tsp'],
         nc_type='uint16',
         nc_dims=('obs',),
         nc_attr=dict(
@@ -479,6 +480,72 @@ VAR_DESCR = dict(
             longname='inner contour height',
             description='ADT filtered height for inner contour',
             units='m',
+        )
+    ),
+    chl=dict(
+        attr_name=None,
+        nc_name='chl',
+        old_nc_name=['Chl'],
+        nc_type='f4',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            longname='Log base 10 chlorophyll',
+            units='Log(Chl/[mg/m^3])',
+        )
+    ),
+    dchl=dict(
+        attr_name=None,
+        nc_name='dchl',
+        old_nc_name=['dChl'],
+        nc_type='f4',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            longname='Log base 10 chlorophyll anomaly (Chl minus Chl_bg)',
+            units='Log(Chl/[mg/m^3])',
+        )
+    ),
+    chl_bg=dict(
+        attr_name=None,
+        nc_name='chl_bg',
+        old_nc_name=['Chl_bg'],
+        nc_type='f4',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            longname='Log base 10 background chlorophyll',
+            units='Log(Chl/[mg/m^3])',
+        )
+    ),
+    year=dict(
+        attr_name=None,
+        nc_name='year',
+        old_nc_name=['Year'],
+        nc_type='u2',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            longname='Year',
+            units='year',
+        )
+    ),
+    month=dict(
+        attr_name=None,
+        nc_name='month',
+        old_nc_name=['Month'],
+        nc_type='u1',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            longname='Month',
+            units='month',
+        )
+    ),
+    day=dict(
+        attr_name=None,
+        nc_name='day',
+        old_nc_name=['Day'],
+        nc_type='u1',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            longname='Day',
+            units='day',
         )
     ),
     nb_contour_selected=dict(

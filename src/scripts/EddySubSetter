@@ -23,13 +23,17 @@ def id_parser():
                         help='Coordinates of bounding to extract'
                         )
     parser.add_argument('-i', '--ids', nargs='+', type=int, help='List of tracks which will be extract')
+    parser.add_argument('-n', '--no_raw_mode', action='store_true',
+                        help='Uncompress all data, could be create a memory error for huge file, but is safer for extern file of py eddy tracker')
     return parser
 
 
 if __name__ == '__main__':
     args = id_parser().parse_args()
 
-    dataset = TrackEddiesObservations.load_from_netcdf(args.filename, raw_data=True)
+    # Original dataset
+    dataset = TrackEddiesObservations.load_from_netcdf(args.filename, raw_data=False if args.no_raw_mode else True)
+
     if args.ids is not None:
         dataset = dataset.extract_ids(args.ids)
     if args.period is not None:
