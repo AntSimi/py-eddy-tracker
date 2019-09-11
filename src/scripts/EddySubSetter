@@ -5,7 +5,7 @@ Subset eddy Dataset
 """
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-from os.path import basename, dirname
+import logging
 
 
 def id_parser():
@@ -14,6 +14,8 @@ def id_parser():
     parser.add_argument('filename_out')
     parser.add_argument('-p', '--period', nargs=2, type=int,
                         help='Start day and end day, if it s negative value we will add to day min and add to day max, if 0 it s not use')
+    parser.add_argument('-l', '--length', nargs=2, type=int,
+                        help='Minimal and maximal quantity of observation for one track, ones bounds could be negative, it will be not use')
     parser.add_argument('-f', '--full_path', action='store_true',
                         help='Extract path, if one obs or more are selected')
     parser.add_argument('-d', '--remove_incomplete', action='store_true',
@@ -34,12 +36,20 @@ if __name__ == '__main__':
     # Original dataset
     dataset = TrackEddiesObservations.load_from_netcdf(args.filename, raw_data=False if args.no_raw_mode else True)
 
+    # Select with id
     if args.ids is not None:
         dataset = dataset.extract_ids(args.ids)
+
+    # Select with length
+    if args.length is not None:
+        dataset = dataset.extract_with_length(args.length)
+
+    # Select with a start date and end date
     if args.period is not None:
         dataset = dataset.extract_with_period(args.period, full_path=args.full_path,
                                               remove_incomplete=args.remove_incomplete)
 
+    # Select track which go through an area
     if args.area is not None:
         area = dict(llcrnrlon=args.area[0],
                     llcrnrlat=args.area[1],
@@ -49,5 +59,8 @@ if __name__ == '__main__':
         dataset = dataset.extract_with_area(area, full_path=args.full_path,
                                             remove_incomplete=args.remove_incomplete)
 
-    if len(dataset) != 0:
+    # if no data, no output will be written
+    if len(dataset) == 0:
+        logging.warning("No data are selected, out file couldn't be create")
+    else:
         dataset.write_netcdf(filename=args.filename_out)

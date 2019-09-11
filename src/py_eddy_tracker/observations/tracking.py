@@ -177,9 +177,12 @@ class TrackEddiesObservations(EddiesObservations):
 
     def compute_index(self):
         if self.__first_index_of_track is None:
-            s = self.tracks.max()
-            self.__first_index_of_track = -ones(s, self.tracks.dtype)
-            self.__obs_by_track = zeros(s, self.observation_number.dtype)
+            s = self.tracks.max() + 1
+            # Doesn't work => core dump with numba, maybe he wait i8 instead of u4
+            # self.__first_index_of_track = -ones(s, self.tracks.dtype)
+            # self.__obs_by_track = zeros(s, self.observation_number.dtype)
+            self.__first_index_of_track = -ones(s, 'i8')
+            self.__obs_by_track = zeros(s, 'i8')
             logging.debug('Start computing index ...')
             compute_index(self.tracks, self.__first_index_of_track, self.__obs_by_track)
             logging.debug('... OK')
@@ -197,6 +200,19 @@ class TrackEddiesObservations(EddiesObservations):
     def extract_ids(self, tracks):
         mask = self.get_mask_from_id(array(tracks))
         return self.__extract_with_mask(mask)
+
+    def extract_with_length(self, bounds):
+        b0, b1 = bounds
+        if b0 >= 0 and b1 >=0:
+            track_mask = (self.nb_obs_by_track >= b0) * (self.nb_obs_by_track <= b1)
+        elif b0 < 0 and b1 >= 0:
+            track_mask = self.nb_obs_by_track <= b1
+        elif b0 >= 0 and b1 < 0:
+            track_mask = self.nb_obs_by_track > b0
+        else:
+            logging.warning('No valid value for bounds')
+            raise Exception('One bounds must be positiv')
+        return self.__extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
 
     def __extract_with_mask(self, mask, full_path=False, remove_incomplete=False, compress_id=False):
         """
