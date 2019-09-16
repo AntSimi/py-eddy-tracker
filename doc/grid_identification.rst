@@ -26,7 +26,6 @@ Run identification
         0.002, # step between two isolines of detection (m)
         pixel_limit=(5, 2000), # Min and max of pixel can be include in contour
         shape_error=55, # Error maximal of circle fitting over contour to be accepted
-        bbox_surface_min_degree=.125 ** 2, # degrees surface minimal to take in account contour
         )
 
 Plot identification
