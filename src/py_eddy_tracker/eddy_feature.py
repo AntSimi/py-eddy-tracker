@@ -30,6 +30,7 @@ import logging
 from numpy import empty, array, concatenate, ma, zeros, unique, round, ones, int_
 from matplotlib.figure import Figure
 from numba import njit, types as numba_types
+from .poly import winding_number_poly
 
 
 class Amplitude(object):
@@ -488,18 +489,57 @@ class Contours(object):
         else:
             return self.contours.collections[level]._paths[index]
 
-    def display(self, ax, step=1, **kwargs):
+    def display(self, ax, step=1, only_used=False, only_unused=False, only_contain_eddies=False, **kwargs):
         from matplotlib.collections import LineCollection
         for collection in self.contours.collections[::step]:
-            ax.add_collection(LineCollection(
-                (i.vertices for i in collection.get_paths()),
-                color=collection.get_color(),
-                **kwargs
-            ))
+            paths = list()
+            for i in collection.get_paths():
+                if only_used and not i.used:
+                    continue
+                elif only_unused and i.used:
+                    continue
+                elif only_contain_eddies and not i.contain_eddies:
+                    continue
+                paths.append(i.vertices)
+            ax.add_collection(LineCollection(paths, color=collection.get_color(), **kwargs))
 
         if hasattr(self.contours, '_mins'):
             ax.update_datalim([self.contours._mins, self.contours._maxs])
         ax.autoscale_view()
+
+    def label_contour_unused_which_contain_eddies(self, eddies):
+        """Select contour which contain several eddies"""
+        if eddies.sign_type == 1:
+            # anticyclonic
+            sl = slice(None,-1)
+            cor = 1
+        else:
+            # cylonic
+            sl = slice(1, None)
+            cor = -1
+
+        # On each level
+        for j, collection in enumerate(self.contours.collections[sl]):
+            # get next height
+            contour_height= self.contours.cvalues[j + cor]
+            # On each contour
+            for i in collection.get_paths():
+                i.contain_eddies = False
+                if i.used:
+                    continue
+                nb = 0
+                # try with each eddy
+                for eddy in eddies:
+                    if abs(eddy['height_external_contour'] - contour_height) > 1e-8:
+                        continue
+                    # If eddy center in contour
+                    wn = winding_number_poly(eddy['lon_max'], eddy['lat_max'], i.vertices)
+                    if wn != 0:
+                        # Count
+                        nb +=1
+
+                if nb > 1:
+                    i.contain_eddies = True
 
 
 @njit(cache=True, fastmath=True)
@@ -517,7 +557,7 @@ def index_from_nearest_path_with_pt_in_bbox_(
         y_max_per_c,
         xpt,
         ypt,
-):
+    ):
     """Get index from nearest path in edge bbox contain pt
     """
     # Nb contour in level
