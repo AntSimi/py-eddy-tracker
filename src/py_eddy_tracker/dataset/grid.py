@@ -977,7 +977,13 @@ class RegularGridDataset(GridDataset):
         kernel_ = empty((half_x_pt * 2 * order + 1, half_y_pt * 2 * order + 1))
         kernel_[half_x_pt * order:] = kernel
         kernel_[:half_x_pt * order] = kernel[:0:-1]
-        return kernel_
+        # remove unused row/column
+        k_valid = kernel_ != 0
+        x_valid = where(k_valid.sum(axis=1))[0]
+        x_slice = slice(x_valid[0], x_valid[-1] + 1)
+        y_valid = where(k_valid.sum(axis=0))[0]
+        y_slice = slice(y_valid[0], y_valid[-1] + 1)
+        return kernel_[x_slice, y_slice]
 
     def _low_filter(self, grid_name, x_cut, y_cut):
         """low filtering
@@ -995,7 +1001,8 @@ class RegularGridDataset(GridDataset):
             mode='wrap' if self.is_circular() else 'reflect')
 
     def convolve_filter_with_dynamic_kernel(self, grid, kernel_func, lat_max=85, extend=False, **kwargs_func):
-        logging.warning('No filtering above %f degrees of latitude', lat_max)
+        if (abs(self.y_c) > lat_max).any():
+            logging.warning('No filtering above %f degrees of latitude', lat_max)
         if isinstance(grid, str):
             data = self.grid(grid).copy()
         else:
