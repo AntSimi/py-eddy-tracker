@@ -839,6 +839,17 @@ class EddiesObservations(object):
         scale_factor=None,
         add_offset=None,
     ):
+        dims = kwargs_variable.get('dimensions', None)
+        # Manage chunk in 2d case
+        if dims is not None and len(dims) > 1:
+            chunk = [1]
+            cum = 1
+            for dim in dims[1:]:
+                nb = len(handler_nc.dimensions[dim])
+                chunk.append(nb)
+                cum *= nb
+            chunk[0] = min(int(400000 / cum), len(handler_nc.dimensions[dims[0]]))
+            kwargs_variable['chunksizes'] = chunk
         var = handler_nc.createVariable(zlib=True, complevel=1, **kwargs_variable)
         attrs = list(attr_variable.keys())
         attrs.sort()
