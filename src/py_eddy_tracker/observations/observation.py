@@ -361,24 +361,30 @@ class EddiesObservations(object):
         return eddies
 
     @classmethod
-    def load_from_netcdf(cls, filename, raw_data=False):
+    def load_from_netcdf(cls, filename, raw_data=False, remove_vars=None):
         array_dim = "NbSample"
         if not isinstance(filename, str):
             filename = filename.astype(str)
         with Dataset(filename) as h_nc:
+            var_list = list(h_nc.variables.keys())
+            if remove_vars is not None:
+                print(var_list)
+                print(remove_vars)
+                var_list = [i for i in var_list if i not in remove_vars]
+
             nb_obs = len(h_nc.dimensions[cls.obs_dimension(h_nc)])
             logging.debug('%d observations will be load', nb_obs)
             kwargs = dict()
             if array_dim in h_nc.dimensions:
                 kwargs["track_array_variables"] = len(h_nc.dimensions[array_dim])
                 kwargs["array_variables"] = list()
-                for variable in h_nc.variables:
+                for variable in var_list:
                     if array_dim in h_nc.variables[variable].dimensions:
                         var_inv = VAR_DESCR_inv[variable]
                         kwargs["array_variables"].append(var_inv)
             array_variables = kwargs.get("array_variables", list())
             kwargs["track_extra_variables"] = []
-            for variable in h_nc.variables:
+            for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == "type_cyc":
                     continue
@@ -386,7 +392,7 @@ class EddiesObservations(object):
                     kwargs["track_extra_variables"].append(var_inv)
             kwargs["raw_data"] = raw_data
             eddies = cls(size=nb_obs, **kwargs)
-            for variable in h_nc.variables:
+            for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == "type_cyc":
                     continue
@@ -397,6 +403,8 @@ class EddiesObservations(object):
                 factor = 1
                 if not raw_data:
                     input_unit = getattr(h_nc.variables[variable], 'unit', None)
+                    if input_unit is None:
+                        input_unit = getattr(h_nc.variables[variable], 'units', None)
                     output_unit = VAR_DESCR[var_inv]['nc_attr'].get('units', None)
                     if output_unit is not None and input_unit is not None and output_unit != input_unit:
                         units = UnitRegistry()
@@ -411,14 +419,14 @@ class EddiesObservations(object):
                             factor = input_unit.to(output_unit).to_tuple()[0]
                             # If we are able to find a conversion
                             if factor != 1:
-                                logging.info('%s will be multiply by %f to take care of units', variable, factor)
+                                logging.info('%s will be multiply by %f to take care of units(%s->%s)',
+                                             variable, factor, input_unit, output_unit)
                 if factor != 1:
                     eddies.obs[var_inv] = h_nc.variables[variable][:] * factor
                 else:
                     eddies.obs[var_inv] = h_nc.variables[variable][:]
 
-
-            for variable in h_nc.variables:
+            for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == "type_cyc":
                     eddies.sign_type = h_nc.variables[variable][0]

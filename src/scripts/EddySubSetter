@@ -24,6 +24,7 @@ def id_parser():
                         metavar=('llcrnrlon', 'llcrnrlat', 'urcrnrlon', 'urcrnrlat'),
                         help='Coordinates of bounding to extract'
                         )
+    parser.add_argument('--remove_var', nargs='+', type=str, help='remove all listed variable')
     parser.add_argument('-i', '--ids', nargs='+', type=int, help='List of tracks which will be extract')
     parser.add_argument('-n', '--no_raw_mode', action='store_true',
                         help='Uncompress all data, could be create a memory error for huge file, but is safer for extern file of py eddy tracker')
@@ -34,7 +35,10 @@ if __name__ == '__main__':
     args = id_parser().parse_args()
 
     # Original dataset
-    dataset = TrackEddiesObservations.load_from_netcdf(args.filename, raw_data=False if args.no_raw_mode else True)
+    dataset = TrackEddiesObservations.load_from_netcdf(
+        args.filename,
+        raw_data=False if args.no_raw_mode else True,
+        remove_vars=args.remove_var)
 
     # Select with id
     if args.ids is not None:
