@@ -41,6 +41,7 @@ from numpy import (
     array,
     empty,
     absolute,
+    concatenate,
 )
 from netCDF4 import Dataset
 from ..generic import distance_grid, distance
@@ -219,6 +220,25 @@ class EddiesObservations(object):
             if candidate in handler.dimensions.keys():
                 return candidate
 
+    def add_fields(self, fields):
+        """
+        Add a new field
+        """
+        nb_obs = self.obs.shape[0]
+        new = self.__class__(
+            size=nb_obs,
+            track_extra_variables=list(concatenate((self.track_extra_variables, fields))),
+            track_array_variables=self.track_array_variables,
+            array_variables=self.array_variables,
+            raw_data=self.raw_data
+        )
+        new.sign_type = self.sign_type
+        for field in self.obs.dtype.descr:
+            logging.debug('Copy of field %s ...', field)
+            var = field[0]
+            new.obs[var] = self.obs[var]
+        return new
+
     @property
     def dtype(self):
         """Return dtype to build numpy array
@@ -368,8 +388,6 @@ class EddiesObservations(object):
         with Dataset(filename) as h_nc:
             var_list = list(h_nc.variables.keys())
             if remove_vars is not None:
-                print(var_list)
-                print(remove_vars)
                 var_list = [i for i in var_list if i not in remove_vars]
 
             nb_obs = len(h_nc.dimensions[cls.obs_dimension(h_nc)])

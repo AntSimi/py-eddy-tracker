@@ -432,6 +432,19 @@ VAR_DESCR = dict(
             longname='effective contour error',
         )
     ),
+    score=dict(
+        attr_name=None,
+        nc_name='score',
+        nc_type='f2',
+        output_type='u1',
+        scale_factor=0.4,
+        nc_dims=('obs',),
+        nc_attr=dict(
+            units='%',
+            description='score',
+            longname='score',
+        )
+    ),
     shape_error_s=dict(
         attr_name=None,
         nc_name='speed_contour_shape_error',
