@@ -27,8 +27,7 @@ Version 3.0.0
 ===========================================================================
 
 """
-from numpy import empty, arange, where, unique, \
-    interp, ones, bool_, zeros, array
+from numpy import empty, arange, where, unique, interp, ones, bool_, zeros, array
 from .. import VAR_DESCR_inv
 import logging
 from datetime import datetime, timedelta
@@ -39,11 +38,25 @@ from numba import njit
 class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations
     """
-    __slots__ = ('__obs_by_track', '__first_index_of_track')
 
-    ELEMENTS = ['lon', 'lat', 'radius_s', 'radius_e', 'amplitude', 'speed_radius', 'time', 'shape_error_e',
-                'shape_error_s', 'nb_contour_selected', 'height_max_speed_contour', 'height_external_contour',
-                'height_inner_contour', 'cost_association']
+    __slots__ = ("__obs_by_track", "__first_index_of_track")
+
+    ELEMENTS = [
+        "lon",
+        "lat",
+        "radius_s",
+        "radius_e",
+        "amplitude",
+        "speed_radius",
+        "time",
+        "shape_error_e",
+        "shape_error_s",
+        "nb_contour_selected",
+        "height_max_speed_contour",
+        "height_external_contour",
+        "height_inner_contour",
+        "cost_association",
+    ]
 
     def __init__(self, *args, **kwargs):
         super(TrackEddiesObservations, self).__init__(*args, **kwargs)
@@ -54,73 +67,80 @@ class TrackEddiesObservations(EddiesObservations):
         """Filled selected values by interpolation
         """
         nb_filled = mask.sum()
-        logging.info('%d obs will be filled (unobserved)', nb_filled)
+        logging.info("%d obs will be filled (unobserved)", nb_filled)
 
         nb_obs = len(self)
         index = arange(nb_obs)
 
         for field in self.obs.dtype.descr:
             var = field[0]
-            if var in ['n', 'virtual', 'track', 'cost_association'] or var in self.array_variables:
+            if (
+                var in ["n", "virtual", "track", "cost_association"]
+                or var in self.array_variables
+            ):
                 continue
             # to normalize longitude before interpolation
-            if var == 'lon':
+            if var == "lon":
                 lon = self.obs[var]
-                first = where(self.obs['n'] == 0)[0]
-                nb_obs = empty(first.shape, dtype='u4')
+                first = where(self.obs["n"] == 0)[0]
+                nb_obs = empty(first.shape, dtype="u4")
                 nb_obs[:-1] = first[1:] - first[:-1]
                 nb_obs[-1] = lon.shape[0] - first[-1]
                 lon0 = (lon[first] - 180).repeat(nb_obs)
                 self.obs[var] = (lon - lon0) % 360 + lon0
-            self.obs[var][mask] = interp(index[mask], index[~mask], self.obs[var][~mask])
+            self.obs[var][mask] = interp(
+                index[mask], index[~mask], self.obs[var][~mask]
+            )
 
     def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
         """Select eddies which are longer than nb_min
         """
         mask = nb_obs >= nb_min
         nb_obs_select = mask.sum()
-        logging.info('Selection of %d observations', nb_obs_select)
+        logging.info("Selection of %d observations", nb_obs_select)
         eddies = TrackEddiesObservations(
             size=nb_obs_select,
             track_extra_variables=self.track_extra_variables,
             track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables
+            array_variables=self.array_variables,
         )
         eddies.sign_type = self.sign_type
         for field in self.obs.dtype.descr:
-            logging.debug('Copy of field %s ...', field)
+            logging.debug("Copy of field %s ...", field)
             var = field[0]
             eddies.obs[var] = self.obs[var][mask]
         if compress_id:
-            list_id = unique(eddies.obs['track'])
+            list_id = unique(eddies.obs["track"])
             list_id.sort()
             id_translate = arange(list_id.max() + 1)
             id_translate[list_id] = arange(len(list_id)) + 1
-            eddies.obs['track'] = id_translate[eddies.obs['track']]
+            eddies.obs["track"] = id_translate[eddies.obs["track"]]
         return eddies
 
     @property
     def elements(self):
         elements = super(TrackEddiesObservations, self).elements
-        elements.extend(['track', 'n', 'virtual'])
+        elements.extend(["track", "n", "virtual"])
         return list(set(elements))
 
     def set_global_attr_netcdf(self, h_nc):
         """Set global attr
         """
-        h_nc.title = 'Cyclonic' if self.sign_type == -1 else 'Anticyclonic'
-        h_nc.Metadata_Conventions = 'Unidata Dataset Discovery v1.0'
-        h_nc.comment = 'Surface product; mesoscale eddies'
-        h_nc.framework_used = 'https://github.com/AntSimi/py-eddy-tracker'
-        h_nc.standard_name_vocabulary = 'NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table'
-        h_nc.date_created = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-        t = h_nc.variables[VAR_DESCR_inv['j1']]
+        h_nc.title = "Cyclonic" if self.sign_type == -1 else "Anticyclonic"
+        h_nc.Metadata_Conventions = "Unidata Dataset Discovery v1.0"
+        h_nc.comment = "Surface product; mesoscale eddies"
+        h_nc.framework_used = "https://github.com/AntSimi/py-eddy-tracker"
+        h_nc.standard_name_vocabulary = (
+            "NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table"
+        )
+        h_nc.date_created = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        t = h_nc.variables[VAR_DESCR_inv["j1"]]
         delta = t.max - t.min + 1
-        h_nc.time_coverage_duration = 'P%dD' % delta
+        h_nc.time_coverage_duration = "P%dD" % delta
         d_start = datetime(1950, 1, 1) + timedelta(int(t.min))
         d_end = datetime(1950, 1, 1) + timedelta(int(t.max))
-        h_nc.time_coverage_start = d_start.strftime('%Y-%m-%dT00:00:00Z')
-        h_nc.time_coverage_end = d_end.strftime('%Y-%m-%dT00:00:00Z')
+        h_nc.time_coverage_start = d_start.strftime("%Y-%m-%dT00:00:00Z")
+        h_nc.time_coverage_end = d_end.strftime("%Y-%m-%dT00:00:00Z")
 
     def extract_with_area(self, area, **kwargs):
         """
@@ -132,10 +152,10 @@ class TrackEddiesObservations(EddiesObservations):
         Returns:
 
         """
-        mask = (self.latitude > area['llcrnrlat']) * (self.latitude < area['urcrnrlat'])
-        lon0 = area['llcrnrlon']
+        mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
+        lon0 = area["llcrnrlon"]
         lon = (self.longitude - lon0) % 360 + lon0
-        mask *= (lon > lon0) * (lon < area['urcrnrlon'])
+        mask *= (lon > lon0) * (lon < area["urcrnrlon"])
         return self.__extract_with_mask(mask, **kwargs)
 
     def extract_with_period(self, period, **kwargs):
@@ -181,11 +201,11 @@ class TrackEddiesObservations(EddiesObservations):
             # Doesn't work => core dump with numba, maybe he wait i8 instead of u4
             # self.__first_index_of_track = -ones(s, self.tracks.dtype)
             # self.__obs_by_track = zeros(s, self.observation_number.dtype)
-            self.__first_index_of_track = -ones(s, 'i8')
-            self.__obs_by_track = zeros(s, 'i8')
-            logging.debug('Start computing index ...')
+            self.__first_index_of_track = -ones(s, "i8")
+            self.__obs_by_track = zeros(s, "i8")
+            logging.debug("Start computing index ...")
             compute_index(self.tracks, self.__first_index_of_track, self.__obs_by_track)
-            logging.debug('... OK')
+            logging.debug("... OK")
 
     @property
     def index_from_track(self):
@@ -227,7 +247,9 @@ class TrackEddiesObservations(EddiesObservations):
             same object with selected observations
         """
         if full_path and remove_incomplete:
-            logging.warning('Incompatible option, remove_incomplete option will be remove')
+            logging.warning(
+                "Incompatible option, remove_incomplete option will be remove"
+            )
             remove_incomplete = False
 
         if full_path:
@@ -243,22 +265,22 @@ class TrackEddiesObservations(EddiesObservations):
             track_extra_variables=self.track_extra_variables,
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables,
-            raw_data=self.raw_data
+            raw_data=self.raw_data,
         )
         new.sign_type = self.sign_type
         if nb_obs == 0:
-            logging.warning('Empty dataset will be created')
+            logging.warning("Empty dataset will be created")
         else:
             for field in self.obs.dtype.descr:
-                logging.debug('Copy of field %s ...', field)
+                logging.debug("Copy of field %s ...", field)
                 var = field[0]
                 new.obs[var] = self.obs[var][mask]
             if compress_id:
-                list_id = unique(new.obs['track'])
+                list_id = unique(new.obs["track"])
                 list_id.sort()
                 id_translate = arange(list_id.max() + 1)
                 id_translate[list_id] = arange(len(list_id)) + 1
-                new.obs['track'] = id_translate[new.obs['track']]
+                new.obs["track"] = id_translate[new.obs["track"]]
         return new
 
 
