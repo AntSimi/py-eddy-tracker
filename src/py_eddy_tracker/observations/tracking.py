@@ -234,12 +234,11 @@ class TrackEddiesObservations(EddiesObservations):
             raise Exception("One bounds must be positiv")
         return self.__extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
 
-    def loess_filter(self, window, xfield, yfield, inplace=True):
+    def loess_filter(self, half_window, xfield, yfield, inplace=True):
         track = self.obs["track"]
         x = self.obs[xfield]
         y = self.obs[yfield]
-        window = window
-        result = track_loess_filter(window, x, y, track)
+        result = track_loess_filter(half_window, x, y, track)
         if inplace:
             self.obs[yfield] = result
 
@@ -312,7 +311,7 @@ def compute_mask_from_id(tracks, first_index, number_of_obs, mask):
 
 
 @njit(cache=True)
-def track_loess_filter(window, x, y, track):
+def track_loess_filter(half_window, x, y, track):
     """
     Apply a loess filter on y field
     Args:
@@ -334,8 +333,8 @@ def track_loess_filter(window, x, y, track):
         if i != 0:
             i_previous = i - 1
             dx = x[i] - x[i_previous]
-            while dx < window and i_previous != 0 and cur_track == track[i_previous]:
-                w = (1 - (dx / window) ** 3) ** 3
+            while dx < half_window and i_previous != 0 and cur_track == track[i_previous]:
+                w = (1 - (dx / half_window) ** 3) ** 3
                 y_sum += y[i_previous] * w
                 w_sum += w
                 i_previous -= 1
@@ -343,8 +342,8 @@ def track_loess_filter(window, x, y, track):
         if i != last:
             i_next = i + 1
             dx = x[i_next] - x[i]
-            while dx < window and i_next != last and cur_track == track[i_next]:
-                w = (1 - (dx / window) ** 3) ** 3
+            while dx < half_window and i_next != last and cur_track == track[i_next]:
+                w = (1 - (dx / half_window) ** 3) ** 3
                 y_sum += y[i_next] * w
                 w_sum += w
                 i_next += 1
