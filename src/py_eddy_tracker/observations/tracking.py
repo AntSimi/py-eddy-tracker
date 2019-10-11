@@ -223,18 +223,29 @@ class TrackEddiesObservations(EddiesObservations):
 
     def extract_with_length(self, bounds):
         b0, b1 = bounds
-        if b0 >= 0 and b1 >=0:
+        if b0 >= 0 and b1 >= 0:
             track_mask = (self.nb_obs_by_track >= b0) * (self.nb_obs_by_track <= b1)
         elif b0 < 0 and b1 >= 0:
             track_mask = self.nb_obs_by_track <= b1
         elif b0 >= 0 and b1 < 0:
             track_mask = self.nb_obs_by_track > b0
         else:
-            logging.warning('No valid value for bounds')
-            raise Exception('One bounds must be positiv')
+            logging.warning("No valid value for bounds")
+            raise Exception("One bounds must be positiv")
         return self.__extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
 
-    def __extract_with_mask(self, mask, full_path=False, remove_incomplete=False, compress_id=False):
+    def loess_filter(self, window, xfield, yfield, inplace=True):
+        track = self.obs["track"]
+        x = self.obs[xfield]
+        y = self.obs[yfield]
+        window = window
+        result = track_loess_filter(window, x, y, track)
+        if inplace:
+            self.obs[yfield] = result
+
+    def __extract_with_mask(
+        self, mask, full_path=False, remove_incomplete=False, compress_id=False
+    ):
         """
         Extract a subset of observations
         Args:
@@ -297,4 +308,46 @@ def compute_index(tracks, index, number):
 @njit(cache=True)
 def compute_mask_from_id(tracks, first_index, number_of_obs, mask):
     for track in tracks:
-        mask[first_index[track]:first_index[track] + number_of_obs[track]] = True
+        mask[first_index[track] : first_index[track] + number_of_obs[track]] = True
+
+
+@njit(cache=True)
+def track_loess_filter(window, x, y, track):
+    """
+    Apply a loess filter on y field
+    Args:
+        window: parameter of smoother
+        x: must be growing for each track but could be irregular
+        y: field to smooth
+        track: field which allow to separate path
+
+    Returns:
+
+    """
+    nb = y.shape[0]
+    last = nb - 1
+    y_new = empty(y.shape, dtype=y.dtype)
+    for i in range(nb):
+        cur_track = track[i]
+        y_sum = y[i]
+        w_sum = 1
+        if i != 0:
+            i_previous = i - 1
+            dx = x[i] - x[i_previous]
+            while dx < window and i_previous != 0 and cur_track == track[i_previous]:
+                w = (1 - (dx / window) ** 3) ** 3
+                y_sum += y[i_previous] * w
+                w_sum += w
+                i_previous -= 1
+                dx = x[i] - x[i_previous]
+        if i != last:
+            i_next = i + 1
+            dx = x[i_next] - x[i]
+            while dx < window and i_next != last and cur_track == track[i_next]:
+                w = (1 - (dx / window) ** 3) ** 3
+                y_sum += y[i_next] * w
+                w_sum += w
+                i_next += 1
+                dx = x[i_next] - x[i]
+        y_new[i] = y_sum / w_sum
+    return y_new
