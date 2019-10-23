@@ -611,7 +611,7 @@ class GridDataset(object):
                         properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling)
                     properties.obs['amplitude'] = amp.amplitude
                     properties.obs['radius_s'] = eddy_radius_s
-                    properties.obs['speed_radius'] = max_average_speed
+                    properties.obs['speed_average'] = max_average_speed
                     properties.obs['radius_e'] = eddy_radius_e
                     properties.obs['shape_error_e'] = aerr
                     properties.obs['shape_error_s'] = aerr_s
@@ -655,7 +655,7 @@ class GridDataset(object):
                 a_and_c[1].obs[name] *= factor
         in_u_units = units.parse_expression(self.units(uname))
         if in_u_units is not None:
-            for name in ['speed_radius', 'uavg_profile']:
+            for name in ['speed_average', 'uavg_profile']:
                 out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
                 factor, _ = in_u_units.to(out_unit).to_tuple()
                 a_and_c[0].obs[name] *= factor

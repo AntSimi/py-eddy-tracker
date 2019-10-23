@@ -147,7 +147,7 @@ class EddiesObservations(object):
         "radius_s",
         "radius_e",
         "amplitude",
-        "speed_radius",
+        "speed_average",
         "time",
         "shape_error_e",
         "shape_error_s",

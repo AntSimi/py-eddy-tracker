@@ -234,8 +234,8 @@ VAR_DESCR = dict(
                         'the eddy and the ADT around the contour defining the eddy perimeter',
         )
     ),
-    speed_radius=dict(
-        attr_name='speed_radius',
+    speed_average=dict(
+        attr_name='speed_average',
         scale_factor=.0001,
         nc_name='speed_average',
         old_nc_name=['U'],
