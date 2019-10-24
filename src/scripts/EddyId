@@ -39,7 +39,8 @@ if __name__ == '__main__':
         u, v = 'u', 'v'
     else:
         u, v = args.u, args.v
-    h.bessel_high_filter(args.h, args.cut_wavelength, order=args.filter_order)
+    if args.cut_wavelength != 0:
+        h.bessel_high_filter(args.h, args.cut_wavelength, order=args.filter_order)
     a, c = h.eddy_identification(args.h, u, v, date, args.isoline_step, pixel_limit=(5, 2000),
                                  shape_error=args.fir_errmax)
     with Dataset(args.path_out + date.strftime('/Anticyclonic_%Y%m%d.nc'), 'w') as h:
