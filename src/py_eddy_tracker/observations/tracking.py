@@ -27,7 +27,7 @@ Version 3.0.0
 ===========================================================================
 
 """
-from numpy import empty, arange, where, unique, interp, ones, bool_, zeros, array
+from numpy import empty, arange, where, unique, interp, ones, bool_, zeros, array, median
 from .. import VAR_DESCR_inv
 import logging
 from datetime import datetime, timedelta
@@ -242,6 +242,14 @@ class TrackEddiesObservations(EddiesObservations):
         if inplace:
             self.obs[yfield] = result
 
+    def median_filter(self, half_window, xfield, yfield, inplace=True):
+        track = self.obs["track"]
+        x = self.obs[xfield]
+        y = self.obs[yfield]
+        result = track_median_filter(half_window, x, y, track)
+        if inplace:
+            self.obs[yfield] = result
+
     def __extract_with_mask(
         self, mask, full_path=False, remove_incomplete=False, compress_id=False
     ):
@@ -349,4 +357,40 @@ def track_loess_filter(half_window, x, y, track):
                 i_next += 1
                 dx = x[i_next] - x[i]
         y_new[i] = y_sum / w_sum
+    return y_new
+
+
+@njit(cache=True)
+def track_median_filter(half_window, x, y, track):
+    """
+    Apply a loess filter on y field
+    Args:
+        window: parameter of smoother
+        x: must be growing for each track but could be irregular
+        y: field to smooth
+        track: field which allow to separate path
+
+    Returns:
+
+    """
+    nb = y.shape[0]
+    last = nb - 1
+    y_new = empty(y.shape, dtype=y.dtype)
+    for i in range(nb):
+        cur_track = track[i]
+        i_previous = i
+        i_next = i
+        dx = 0
+        while dx <= half_window and i_previous != 0 and cur_track == track[i_previous]:
+            i_previous -= 1
+            dx = x[i] - x[i_previous]
+        if dx > half_window or cur_track != track[i_previous]:
+            i_previous += 1
+        dx = 0
+        while dx <= half_window and i_next != last and cur_track == track[i_next]:
+            i_next += 1
+            dx = x[i_next] - x[i]
+        if dx > half_window or cur_track != track[i_next]:
+            i_next -= 1
+        y_new[i] = median(y[i_previous:i_next + 1])
     return y_new
