@@ -29,14 +29,11 @@ setup(
         'py_eddy_tracker.featured_tracking': ['*.nc'],
         'py_eddy_tracker': ['data/*.nc'],
     },
-    setup_requires=[
-        'numpy>=1.14'],
     install_requires=[
         'numpy>=1.14',
-        # Bug with 1.5.1 (slow memory leak)
-        # 'matplotlib>=2.0.0',
         'scipy>=0.15.1',
         'netCDF4>=1.1.0',
+        'matplotlib',
         'opencv-python',
         'shapely',
         'pyyaml',
