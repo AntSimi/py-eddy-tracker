@@ -374,23 +374,13 @@ def track_median_filter(half_window, x, y, track):
 
     """
     nb = y.shape[0]
-    last = nb - 1
     y_new = empty(y.shape, dtype=y.dtype)
+    i_previous, i_next = 0, 0
     for i in range(nb):
         cur_track = track[i]
-        i_previous = i
-        i_next = i
-        dx = 0
-        while dx <= half_window and i_previous != 0 and cur_track == track[i_previous]:
-            i_previous -= 1
-            dx = x[i] - x[i_previous]
-        if dx > half_window or cur_track != track[i_previous]:
+        while x[i] - x[i_previous] > half_window or cur_track != track[i_previous]:
             i_previous += 1
-        dx = 0
-        while dx <= half_window and i_next != last and cur_track == track[i_next]:
+        while i_next < nb and x[i_next] - x[i] <= half_window and cur_track == track[i_next]:
             i_next += 1
-            dx = x[i_next] - x[i]
-        if dx > half_window or cur_track != track[i_next]:
-            i_next -= 1
-        y_new[i] = median(y[i_previous:i_next + 1])
+        y_new[i] = median(y[i_previous:i_next])
     return y_new
