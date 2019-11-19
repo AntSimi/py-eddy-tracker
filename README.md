@@ -21,7 +21,7 @@ To avoid problems with installation, use of the virtualenv Python virtual enviro
 Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, cython, pyproj, Shapely, ...), e.g.:
 
 ```bash
-pip install opencv numpy matplotlib scipy netCDF4 shapely pyproj
+pip install numpy scipy netCDF4 matplotlib opencv-python pyyaml pyproj pint polygon3
 ```
 
 Then run the following to install the eddy tracker:
@@ -35,7 +35,7 @@ Two executables are now available in your PATH: EddyIdentification and EddyTrack
 Edit the corresponding yaml files and then run the code, e.g.:
 
 ```bash
-EddyIdentification eddy_identification.yaml
+EddyId share/nrt_global_allsat_phy_l4_20190223_20190226.nc 20190223 adt ugos vgos longitude latitude ./ -v INFO
 ```
 
 for identification, followed by:
