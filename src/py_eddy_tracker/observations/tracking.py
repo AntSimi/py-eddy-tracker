@@ -251,7 +251,7 @@ class TrackEddiesObservations(EddiesObservations):
             self.obs[yfield] = result
 
     def __extract_with_mask(
-        self, mask, full_path=False, remove_incomplete=False, compress_id=False
+        self, mask, full_path=False, remove_incomplete=False, compress_id=False, reject_virtual=False,
     ):
         """
         Extract a subset of observations
@@ -260,6 +260,7 @@ class TrackEddiesObservations(EddiesObservations):
             full_path: extract full path if only one part is selected
             remove_incomplete: delete path which are not fully selected
             compress_id: resample track number to use a little range
+            reject_virtual: if track are only virtual in selection we remove track
 
         Returns:
             same object with selected observations
@@ -271,6 +272,8 @@ class TrackEddiesObservations(EddiesObservations):
             remove_incomplete = False
 
         if full_path:
+            if reject_virtual:
+                mask *= ~self.obs['virtual'].astype('bool')
             tracks = unique(self.tracks[mask])
             mask = self.get_mask_from_id(tracks)
         elif remove_incomplete:

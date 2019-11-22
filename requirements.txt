@@ -3,8 +3,8 @@ matplotlib
 scipy
 netCDF4
 opencv-python
-shapely
 pyyaml
 pyproj
 pint
 numba
+polygon3

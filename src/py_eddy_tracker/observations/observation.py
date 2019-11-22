@@ -27,6 +27,7 @@ Version 3.0.0
 ===========================================================================
 
 """
+import zarr
 from numpy import (
     zeros,
     where,
@@ -42,6 +43,8 @@ from numpy import (
     empty,
     absolute,
     concatenate,
+    float64,
+    ceil
 )
 from netCDF4 import Dataset
 from ..generic import distance_grid, distance
@@ -135,6 +138,7 @@ class EddiesObservations(object):
         "track_extra_variables",
         "track_array_variables",
         "array_variables",
+        "only_variables",
         "observations",
         "active",
         "sign_type",
@@ -163,8 +167,10 @@ class EddiesObservations(object):
         track_extra_variables=None,
         track_array_variables=0,
         array_variables=None,
+        only_variables=None,
         raw_data=False,
     ):
+        self.only_variables = only_variables
         self.raw_data = raw_data
         self.track_extra_variables = (
             track_extra_variables if track_extra_variables is not None else []
@@ -266,6 +272,8 @@ class EddiesObservations(object):
 
         if len(self.track_extra_variables):
             elements += self.track_extra_variables
+        if self.only_variables is not None:
+            elements = [i for i in elements if i in self.only_variables]
         return list(set(elements))
 
     def coherence(self, other):
@@ -380,14 +388,100 @@ class EddiesObservations(object):
         eddies.obs[:] = self.obs[index]
         return eddies
 
+    @staticmethod
+    def zarr_dimension(filename):
+        h = zarr.open(filename)
+        dims = list()
+        for varname in h:
+            dims.extend(list(getattr(h, varname).shape))
+        return set(dims)
+
     @classmethod
-    def load_from_netcdf(cls, filename, raw_data=False, remove_vars=None):
+    def load_from_zarr(cls, filename, remove_vars=None, include_vars=None):
+        # FIXME must be investigate, in zarr no dimensions name (or could be add in attr)
+        array_dim = 50
+        if not isinstance(filename, str):
+            filename = filename.astype(str)
+        h_zarr = zarr.open(filename)
+        var_list = list(h_zarr.keys())
+        if include_vars is not None:
+            var_list = [i for i in var_list if i in include_vars]
+        elif remove_vars is not None:
+            var_list = [i for i in var_list if i not in remove_vars]
+
+        nb_obs = getattr(h_zarr, var_list[0]).shape[0]
+        logging.debug('%d observations will be load', nb_obs)
+        kwargs = dict()
+        dims = cls.zarr_dimension(filename)
+        if array_dim in dims:
+            kwargs["track_array_variables"] = array_dim
+            kwargs["array_variables"] = list()
+            for variable in var_list:
+                if array_dim in h_zarr[variable].shape:
+                    var_inv = VAR_DESCR_inv[variable]
+                    kwargs["array_variables"].append(var_inv)
+        array_variables = kwargs.get("array_variables", list())
+        kwargs["track_extra_variables"] = []
+        for variable in var_list:
+            var_inv = VAR_DESCR_inv[variable]
+            if var_inv == "type_cyc":
+                continue
+            if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
+                kwargs["track_extra_variables"].append(var_inv)
+        kwargs["raw_data"] = False
+        kwargs["only_variables"] = [VAR_DESCR_inv[i] for i in include_vars]
+        eddies = cls(size=nb_obs, **kwargs)
+        for variable in var_list:
+            var_inv = VAR_DESCR_inv[variable]
+            if var_inv == "type_cyc":
+                continue
+            # find unit factor
+            factor = 1
+            input_unit = h_zarr[variable].attrs.get('unit', None)
+            if input_unit is None:
+                input_unit = h_zarr[variable].attrs.get('units', None)
+            output_unit = VAR_DESCR[var_inv]['nc_attr'].get('units', None)
+            if output_unit is not None and input_unit is not None and output_unit != input_unit:
+                units = UnitRegistry()
+                try:
+                    input_unit = units.parse_expression(input_unit, case_sensitive=False)
+                    output_unit = units.parse_expression(output_unit, case_sensitive=False)
+                except UndefinedUnitError:
+                    input_unit = None
+                except TokenError:
+                    input_unit = None
+                if input_unit is not None:
+                    factor = input_unit.to(output_unit).to_tuple()[0]
+                    # If we are able to find a conversion
+                    if factor != 1:
+                        logging.info('%s will be multiply by %f to take care of units(%s->%s)',
+                                     variable, factor, input_unit, output_unit)
+            if factor != 1:
+                eddies.obs[var_inv] = h_zarr[variable][:] * factor
+            else:
+                eddies.obs[var_inv] = h_zarr[variable][:]
+
+        # for variable in var_list:
+        #     var_inv = VAR_DESCR_inv[variable]
+        #     if var_inv == "type_cyc":
+        #         eddies.sign_type = h_zarr[variable][0]
+        eddies.sign_type = h_zarr.attrs.get("rotation_type", 0)
+        if eddies.sign_type == 0:
+            logging.debug("File come from another algorithm of identification")
+            eddies.sign_type = -1
+
+        return eddies
+
+    @classmethod
+    def load_from_netcdf(cls, filename, raw_data=False, remove_vars=None, include_vars=None):
         array_dim = "NbSample"
         if not isinstance(filename, str):
             filename = filename.astype(str)
         with Dataset(filename) as h_nc:
             var_list = list(h_nc.variables.keys())
-            if remove_vars is not None:
+            if include_vars is not None:
+                var_list = [i for i in var_list if i in include_vars]
+            elif remove_vars is not None:
                 var_list = [i for i in var_list if i not in remove_vars]
 
             nb_obs = len(h_nc.dimensions[cls.obs_dimension(h_nc)])
@@ -409,6 +503,7 @@ class EddiesObservations(object):
                 if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                     kwargs["track_extra_variables"].append(var_inv)
             kwargs["raw_data"] = raw_data
+            kwargs["only_variables"] = [VAR_DESCR_inv[i] for i in include_vars]
             eddies = cls(size=nb_obs, **kwargs)
             for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
@@ -453,6 +548,27 @@ class EddiesObservations(object):
                 logging.debug("File come from another algorithm of identification")
                 eddies.sign_type = -1
 
+        return eddies
+
+    @classmethod
+    def from_zarr(cls, handler):
+        nb_obs = len(handler.dimensions[cls.obs_dimension(handler)])
+        kwargs = dict()
+        if hasattr(handler, "track_array_variables"):
+            kwargs["track_array_variables"] = handler.track_array_variables
+            kwargs["array_variables"] = handler.array_variables.split(",")
+        if len(handler.track_extra_variables) > 1:
+            kwargs["track_extra_variables"] = handler.track_extra_variables.split(",")
+        for variable in handler.variables:
+            var_inv = VAR_DESCR_inv[variable]
+        eddies = cls(size=nb_obs, **kwargs)
+        for variable in handler.variables:
+            # Patch
+            if variable == "time":
+                eddies.obs[variable] = handler.variables[variable][:]
+            else:
+                #
+                eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
         return eddies
 
     @classmethod
@@ -822,13 +938,50 @@ class EddiesObservations(object):
 
         return i_self, i_other, cost_mat[i_self, i_other]
 
+    def to_zarr(self, handler):
+        handler.attrs['track_extra_variables'] = ",".join(self.track_extra_variables)
+        if self.track_array_variables != 0:
+            handler.attrs['track_array_variables'] = self.track_array_variables
+            handler.attrs['array_variables'] = ",".join(self.array_variables)
+        # Iter on variables to create:
+        fields = [field[0] for field in self.observations.dtype.descr]
+        for ori_name in fields:
+            # Patch for a transition
+            name = ori_name
+            #
+            logging.debug("Create Variable %s", VAR_DESCR[name]["nc_name"])
+            self.create_variable_zarr(
+                handler,
+                dict(
+                    name=VAR_DESCR[name]["nc_name"],
+                    store_dtype=VAR_DESCR[name]["output_type"],
+                    dtype=VAR_DESCR[name]["nc_type"],
+                    dimensions=VAR_DESCR[name]["nc_dims"],
+                ),
+                VAR_DESCR[name]["nc_attr"],
+                self.observations[ori_name],
+                scale_factor=VAR_DESCR[name].get("scale_factor", None),
+                add_offset=VAR_DESCR[name].get("add_offset", None),
+                filters=VAR_DESCR[name].get("filters", None),
+            )
+        self.set_global_attr_zarr(handler)
+
+    @staticmethod
+    def netcdf_create_dimensions(handler, dim, nb):
+        if dim not in handler.dimensions:
+            handler.createDimension(dim, nb)
+        else:
+            old_nb = len(handler.dimensions[dim])
+            if nb != old_nb:
+                raise Exception(f'{dim} dimensions previously set to a different size {old_nb} (current value : {nb})')
+
     def to_netcdf(self, handler):
         eddy_size = len(self)
         logging.debug('Create Dimensions "obs" : %d', eddy_size)
-        handler.createDimension("obs", eddy_size)
+        self.netcdf_create_dimensions(handler, "obs", eddy_size)
         handler.track_extra_variables = ",".join(self.track_extra_variables)
         if self.track_array_variables != 0:
-            handler.createDimension("NbSample", self.track_array_variables)
+            self.netcdf_create_dimensions(handler, "NbSample", self.track_array_variables)
             handler.track_array_variables = self.track_array_variables
             handler.array_variables = ",".join(self.array_variables)
         # Iter on variables to create:
@@ -899,6 +1052,64 @@ class EddiesObservations(object):
         except ValueError:
             logging.warning("Data is empty")
 
+    def create_variable_zarr(
+        self,
+        handler_zarr,
+        kwargs_variable,
+        attr_variable,
+        data,
+        scale_factor=None,
+        add_offset=None,
+        filters=None
+    ):
+        kwargs_variable['shape'] = data.shape
+        kwargs_variable['compressor'] = zarr.Blosc(cname='zstd', clevel=5, shuffle=zarr.blosc.BITSHUFFLE)
+        kwargs_variable['filters'] = list()
+        store_dtype = kwargs_variable.pop('store_dtype', None)
+        if scale_factor is not None or add_offset is not None:
+            if add_offset is None:
+                add_offset = 0
+            kwargs_variable['filters'].append(zarr.FixedScaleOffset(
+                offset=float64(add_offset),
+                scale=1 / float64(scale_factor),
+                dtype=kwargs_variable['dtype'],
+                astype=store_dtype
+            ))
+        if filters is not None:
+            kwargs_variable['filters'].extend(filters)
+        dims = kwargs_variable.get('dimensions', None)
+        # Manage chunk in 2d case
+        if len(dims) == 1:
+            kwargs_variable['chunks'] = (2500000,)
+        if len(dims) == 2:
+            second_dim = data.shape[1]
+            kwargs_variable['chunks'] = (200000, second_dim)
+
+        kwargs_variable.pop('dimensions')
+        v = handler_zarr.create_dataset(**kwargs_variable)
+        attrs = list(attr_variable.keys())
+        attrs.sort()
+        for attr in attrs:
+            attr_value = attr_variable[attr]
+            v.attrs[attr] = str(attr_value)
+        if self.raw_data:
+            if scale_factor is not None:
+                s_bloc = kwargs_variable['chunks'][0]
+                nb_bloc = int(ceil(data.shape[0] / s_bloc))
+                for i in range(nb_bloc):
+                    sl = slice(i * s_bloc, (i + 1) * s_bloc)
+                    v[sl] = data[sl] * scale_factor + add_offset
+            else:
+                v[:] = data
+        if not self.raw_data:
+            v[:] = data
+        try:
+            if v.size < 1e8:
+                v.attrs["min"] = str(v[:].min())
+                v.attrs["max"] = str(v[:].max())
+        except ValueError:
+            logging.warning("Data is empty")
+
     def write_netcdf(self, path="./", filename="%(path)s/%(sign_type)s.nc"):
         """Write a netcdf with eddy obs
         """
@@ -912,14 +1123,22 @@ class EddiesObservations(object):
         with Dataset(filename, "w", format="NETCDF4") as handler:
             self.to_netcdf(handler)
 
+    @property
+    def global_attr(self):
+        return dict(
+        Metadata_Conventions="Unidata Dataset Discovery v1.0",
+        comment="Surface product; mesoscale eddies",
+        framework_used="https://github.com/AntSimi/py-eddy-tracker",
+        standard_name_vocabulary="NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table",
+        rotation_type=self.sign_type)
+
+    def set_global_attr_zarr(self, h_zarr):
+        for key, item in self.global_attr.items():
+            h_zarr.attrs[key] = item
+
     def set_global_attr_netcdf(self, h_nc):
-        h_nc.Metadata_Conventions = "Unidata Dataset Discovery v1.0"
-        h_nc.comment = "Surface product; mesoscale eddies"
-        h_nc.framework_used = "https://github.com/AntSimi/py-eddy-tracker"
-        h_nc.standard_name_vocabulary = (
-            "NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table"
-        )
-        h_nc.rotation_type = self.sign_type
+        for key, item in self.global_attr.items():
+            h_nc.setncattr(key, item)
 
     def display(self, ax, ref=None, **kwargs):
         if ref is None:

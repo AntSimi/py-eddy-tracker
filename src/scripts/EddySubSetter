@@ -20,11 +20,14 @@ def id_parser():
                         help='Extract path, if one obs or more are selected')
     parser.add_argument('-d', '--remove_incomplete', action='store_true',
                         help='Extract path only if all obs are selected')
+    parser.add_argument('--reject_virtual', action='store_true',
+                        help="If there are only virtual observation in selection, we don't select track")
     parser.add_argument('-a', '--area', nargs=4, type=float,
                         metavar=('llcrnrlon', 'llcrnrlat', 'urcrnrlon', 'urcrnrlat'),
                         help='Coordinates of bounding to extract'
                         )
     parser.add_argument('--remove_var', nargs='+', type=str, help='remove all listed variable')
+    parser.add_argument('--include_var', nargs='+', type=str, help='use only listed variable, remove_var will be ignored')
     parser.add_argument('-i', '--ids', nargs='+', type=int, help='List of tracks which will be extract')
     parser.add_argument('-n', '--no_raw_mode', action='store_true',
                         help='Uncompress all data, could be create a memory error for huge file, but is safer for extern file of py eddy tracker')
@@ -38,7 +41,9 @@ if __name__ == '__main__':
     dataset = TrackEddiesObservations.load_from_netcdf(
         args.filename,
         raw_data=False if args.no_raw_mode else True,
-        remove_vars=args.remove_var)
+        remove_vars=args.remove_var,
+        include_vars=args.include_var,
+    )
 
     # Select with id
     if args.ids is not None:
@@ -51,7 +56,8 @@ if __name__ == '__main__':
     # Select with a start date and end date
     if args.period is not None:
         dataset = dataset.extract_with_period(args.period, full_path=args.full_path,
-                                              remove_incomplete=args.remove_incomplete)
+                                              remove_incomplete=args.remove_incomplete,
+                                              reject_virtual=args.reject_virtual)
 
     # Select track which go through an area
     if args.area is not None:
@@ -61,7 +67,8 @@ if __name__ == '__main__':
                     urcrnrlat=args.area[3],
                     )
         dataset = dataset.extract_with_area(area, full_path=args.full_path,
-                                            remove_incomplete=args.remove_incomplete)
+                                            remove_incomplete=args.remove_incomplete,
+                                              reject_virtual=args.reject_virtual)
 
     # if no data, no output will be written
     if len(dataset) == 0:

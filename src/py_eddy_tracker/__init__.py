@@ -29,6 +29,8 @@ Version 3.0.0
 """
 from argparse import ArgumentParser
 import logging
+import numpy
+import zarr
 
 
 class ColoredFormatter(logging.Formatter):
@@ -251,9 +253,10 @@ VAR_DESCR = dict(
     uavg_profile=dict(
         attr_name=None,
         nc_name='uavg_profile',
-        output_type='uint16',
+        output_type='u2',
         scale_factor=.0001,
-        nc_type='float32',
+        nc_type='f4',
+        # filters=[zarr.Delta('u2')],
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
             longname='radial profile of uavg',
@@ -361,8 +364,9 @@ VAR_DESCR = dict(
         nc_name='effective_contour_longitude',
         old_nc_name=['contour_lon_e'],
         nc_type='f4',
+        filters=[zarr.Delta('i2')],
         output_type='i2',
-        scale_factor=0.01,
+        scale_factor=numpy.float32(0.01),
         add_offset=180,
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
@@ -377,8 +381,9 @@ VAR_DESCR = dict(
         nc_name='effective_contour_latitude',
         old_nc_name=['contour_lat_e'],
         nc_type='f4',
+        filters=[zarr.Delta('i2')],
         output_type='i2',
-        scale_factor=0.01,
+        scale_factor=numpy.float32(0.01),
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
             longname='effective contour latitudes',
@@ -392,8 +397,9 @@ VAR_DESCR = dict(
         nc_name='speed_contour_longitude',
         old_nc_name=['contour_lon_s'],
         nc_type='f4',
+        filters=[zarr.Delta('i2')],
         output_type='i2',
-        scale_factor=0.01,
+        scale_factor=numpy.float32(0.01),
         add_offset=180,
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
@@ -408,8 +414,9 @@ VAR_DESCR = dict(
         nc_name='speed_contour_latitude',
         old_nc_name=['contour_lat_s'],
         nc_type='f4',
+        filters=[zarr.Delta('i2')],
         output_type='i2',
-        scale_factor=0.01,
+        scale_factor=numpy.float32(0.01),
         nc_dims=('obs', 'NbSample'),
         nc_attr=dict(
             longname='speed contour latitudes',
@@ -443,6 +450,17 @@ VAR_DESCR = dict(
             units='%',
             description='score',
             longname='score',
+        )
+    ),
+    index_other=dict(
+        attr_name=None,
+        nc_name='index_other',
+        nc_type='u4',
+        nc_dims=('obs',),
+        nc_attr=dict(
+            units='ordinal',
+            description='index in the other dataset',
+            longname='index_other',
         )
     ),
     shape_error_s=dict(
