@@ -429,7 +429,7 @@ class EddiesObservations(object):
             if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                 kwargs["track_extra_variables"].append(var_inv)
         kwargs["raw_data"] = False
-        kwargs["only_variables"] = [VAR_DESCR_inv[i] for i in include_vars]
+        kwargs["only_variables"] = None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
         eddies = cls(size=nb_obs, **kwargs)
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
@@ -503,7 +503,7 @@ class EddiesObservations(object):
                 if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                     kwargs["track_extra_variables"].append(var_inv)
             kwargs["raw_data"] = raw_data
-            kwargs["only_variables"] = [VAR_DESCR_inv[i] for i in include_vars]
+            kwargs["only_variables"] = None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
             eddies = cls(size=nb_obs, **kwargs)
             for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
@@ -1134,7 +1134,7 @@ class EddiesObservations(object):
 
     def set_global_attr_zarr(self, h_zarr):
         for key, item in self.global_attr.items():
-            h_zarr.attrs[key] = item
+            h_zarr.attrs[key] = str(item)
 
     def set_global_attr_netcdf(self, h_nc):
         for key, item in self.global_attr.items():
