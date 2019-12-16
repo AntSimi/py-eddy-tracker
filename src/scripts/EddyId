@@ -26,6 +26,10 @@ def id_parser():
                         help='Step between 2 isoline in m')
     parser.add_argument('--fir_errmax', default=55, type=float,
                         help='Error max accepted to fit circle in percent')
+    parser.add_argument('--height_unit', default=None, type=str,
+                        help='Force height unit')
+    parser.add_argument('--speed_unit', default=None, type=str,
+                        help='Force speed unit')
     return parser
 
 
@@ -42,7 +46,8 @@ if __name__ == '__main__':
     if args.cut_wavelength != 0:
         h.bessel_high_filter(args.h, args.cut_wavelength, order=args.filter_order)
     a, c = h.eddy_identification(args.h, u, v, date, args.isoline_step, pixel_limit=(5, 2000),
-                                 shape_error=args.fir_errmax)
+                                 shape_error=args.fir_errmax, force_height_unit=args.height_unit,
+                                 force_speed_unit=args.speed_unit)
     with Dataset(args.path_out + date.strftime('/Anticyclonic_%Y%m%d.nc'), 'w') as h:
         a.to_netcdf(h)
     with Dataset(args.path_out + date.strftime('/Cyclonic_%Y%m%d.nc'), 'w') as h:

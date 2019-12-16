@@ -440,7 +440,8 @@ class GridDataset(object):
         return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
 
     def eddy_identification(self, grid_height, uname, vname, date, step=0.005, shape_error=55,
-                            array_sampling=50, pixel_limit=None, precision=None):
+                            array_sampling=50, pixel_limit=None, precision=None, force_height_unit=None,
+                            force_speed_unit=None):
         """
 
         Args:
@@ -467,7 +468,8 @@ class GridDataset(object):
         self.init_speed_coef(uname, vname)
 
         # Get unit of h grid
-        h_units = self.units(grid_height)
+
+        h_units = self.units(grid_height) if force_height_unit is None else force_height_unit
         units = UnitRegistry()
         in_h_unit = units.parse_expression(h_units)
         if in_h_unit is not None:
@@ -653,7 +655,8 @@ class GridDataset(object):
                 factor, _ = in_h_unit.to(out_unit).to_tuple()
                 a_and_c[0].obs[name] *= factor
                 a_and_c[1].obs[name] *= factor
-        in_u_units = units.parse_expression(self.units(uname))
+        u_units = self.units(uname) if force_speed_unit is None else force_speed_unit
+        in_u_units = units.parse_expression(u_units)
         if in_u_units is not None:
             for name in ['speed_average', 'uavg_profile']:
                 out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
