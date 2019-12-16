@@ -17,6 +17,7 @@ def id_parser():
     parser.add_argument('--cut_wavelength', default=500, type=float,
                         help='Wavelength for mesoscale filter in km')
     parser.add_argument('--filter_order', default=3, type=int)
+    parser.add_argument('--low', action='store_true')
     return parser
 
 
@@ -24,5 +25,8 @@ if __name__ == '__main__':
     args = id_parser().parse_args()
 
     h = RegularGridDataset(args.filename, args.longitude, args.latitude)
-    h.bessel_high_filter(args.grid, args.cut_wavelength, order=args.filter_order)
+    if args.low:
+        h.bessel_low_filter(args.grid, args.cut_wavelength, order=args.filter_order)
+    else:
+        h.bessel_high_filter(args.grid, args.cut_wavelength, order=args.filter_order)
     h.write(args.filename_out)
