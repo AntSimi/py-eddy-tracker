@@ -524,7 +524,7 @@ class Correspondances(list):
         # Start loading identification again to save in the finals tracks
         # Load first file
         self.reset_dataset_cache()
-        self.swap_dataset(self.datasets[0])
+        self.swap_dataset(self.datasets[0], raw_data=raw_data)
 
         # Start create netcdf to agglomerate all eddy
         logging.debug('We will create an array (size %d)', self.nb_obs)
