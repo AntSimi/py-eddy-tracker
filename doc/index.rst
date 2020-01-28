@@ -8,6 +8,12 @@ Welcome to py-eddy-tracker's documentation!
 
 .. toctree::
    :maxdepth: 2
+   :caption: Installation
+
+   installation
+
+.. toctree::
+   :maxdepth: 2
    :caption: Grid manipulation
 
    grid_load_display
