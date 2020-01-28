@@ -5,7 +5,7 @@ import logging
 from numpy import concatenate, int32, empty, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, interp, meshgrid, nan, ceil, sinc, isnan, \
-    percentile, zeros, arctan2, arcsin, round_, nanmean, exp
+    percentile, zeros, arctan2, arcsin, round_, nanmean, exp, mean as np_mean
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -1013,6 +1013,11 @@ class RegularGridDataset(GridDataset):
         # Matrix for result
         data_out = ma.empty(data.shape)
         data_out.mask = ones(data_out.shape, dtype=bool)
+        nb_lines = self.y_c.shape[0]
+        dt = list()
+        
+        debug_active = logging.getLogger().getEffectiveLevel() == logging.DEBUG
+        
         for i, lat in enumerate(self.y_c):
             if abs(lat) > lat_max or data[:, i].mask.all():
                 data_out.mask[:, i] = True
@@ -1021,6 +1026,12 @@ class RegularGridDataset(GridDataset):
             kernel = kernel_func(lat, **kwargs_func)
             # Kernel shape
             k_shape = kernel.shape
+            t0 = datetime.now()
+            if debug_active and len(dt) > 0:
+                dt_mean = np_mean(dt) * (nb_lines - i)
+                print('Remain ', dt_mean, 'ETA ', t0 + dt_mean, 'current kernel size :', k_shape, 'Step : %d/%d' % (i, nb_lines), end="\r")
+            
+            
             # Half size, k_shape must be always impair
             d_lat = int((k_shape[1] - 1) / 2)
             d_lon = int((k_shape[0] - 1) / 2)
@@ -1049,6 +1060,9 @@ class RegularGridDataset(GridDataset):
                     data_out[:, i] = ma.array(values_sum / kernel_sum, mask=kernel_sum < (extend * kernel.sum()))
                 else:
                     data_out[:, i] = values_sum / kernel_sum
+            dt.append(datetime.now() - t0)
+            if len(dt) == 100:
+                dt.pop(0)
         if extend:
             return ma.array(data_out, mask=data_out.mask)
         else:
