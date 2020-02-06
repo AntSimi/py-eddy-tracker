@@ -938,7 +938,7 @@ class EddiesObservations(object):
 
         return i_self, i_other, cost_mat[i_self, i_other]
 
-    def to_zarr(self, handler):
+    def to_zarr(self, handler, **kwargs):
         handler.attrs['track_extra_variables'] = ",".join(self.track_extra_variables)
         if self.track_array_variables != 0:
             handler.attrs['track_array_variables'] = self.track_array_variables
@@ -963,6 +963,7 @@ class EddiesObservations(object):
                 scale_factor=VAR_DESCR[name].get("scale_factor", None),
                 add_offset=VAR_DESCR[name].get("add_offset", None),
                 filters=VAR_DESCR[name].get("filters", None),
+                ** kwargs
             )
         self.set_global_attr_zarr(handler)
 
@@ -1060,10 +1061,12 @@ class EddiesObservations(object):
         data,
         scale_factor=None,
         add_offset=None,
-        filters=None
+        filters=None,
+        compressor=None
     ):
         kwargs_variable['shape'] = data.shape
-        kwargs_variable['compressor'] = zarr.Blosc(cname='zstd', clevel=5, shuffle=zarr.blosc.BITSHUFFLE)
+        kwargs_variable['compressor'] = \
+            zarr.Blosc(cname='zstd', clevel=2) if compressor is None else compressor
         kwargs_variable['filters'] = list()
         store_dtype = kwargs_variable.pop('store_dtype', None)
         if scale_factor is not None or add_offset is not None:
