@@ -1113,18 +1113,25 @@ class EddiesObservations(object):
         except ValueError:
             logging.warning("Data is empty")
 
-    def write_netcdf(self, path="./", filename="%(path)s/%(sign_type)s.nc"):
+    def write_file(self, path="./", filename="%(path)s/%(sign_type)s.nc", zarr_flag=False):
         """Write a netcdf with eddy obs
         """
-        eddy_size = len(self.observations)
         filename = filename % dict(
             path=path,
             sign_type=self.sign_legend,
             prod_time=datetime.now().strftime("%Y%m%d"),
         )
+        if zarr_flag:
+            filename = filename.replace('.nc', '.zarr')
+        if filename.endswith('.zarr'):
+            zarr_flag = True
         logging.info("Store in %s", filename)
-        with Dataset(filename, "w", format="NETCDF4") as handler:
-            self.to_netcdf(handler)
+        if zarr_flag:
+            handler = zarr.open(filename, 'w')
+            self.to_zarr(handler)
+        else:
+            with Dataset(filename, "w", format="NETCDF4") as handler:
+                self.to_netcdf(handler)
 
     @property
     def global_attr(self):

@@ -98,6 +98,9 @@ def usage():
                         action='store_true',
                         help='Stop tracking after correspondance computation,'
                              ' merging can be done with EddyFinalTracking')
+    parser.add_argument('--zarr',
+                        action='store_true',
+                        help='Output will be wrote in zarr')
     parser.add_argument('--blank_period',
                         type=int,
                         default=0,
@@ -109,11 +112,11 @@ def usage():
         config = yaml_load(stream)
     if args.correspondance_in is not None and not exists(args.correspondance_in):
         args.correspondance_in = None
-    return config, args.save_correspondance_and_stop, args.correspondance_in, args.correspondance_out, args.blank_period
+    return config, args.save_correspondance_and_stop, args.correspondance_in, args.correspondance_out, args.blank_period, args.zarr
 
 
 if __name__ == '__main__':
-    CONFIG, SAVE_STOP, CORRESPONDANCES_IN, CORRESPONDANCES_OUT, BLANK_PERIOD = usage()
+    CONFIG, SAVE_STOP, CORRESPONDANCES_IN, CORRESPONDANCES_OUT, BLANK_PERIOD, ZARR = usage()
 
     # Create output directory
     SAVE_DIR = CONFIG['PATHS'].get('SAVE_DIR', None)
@@ -184,7 +187,7 @@ if __name__ == '__main__':
     logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
-    CORRESPONDANCES.get_unused_data().write_netcdf(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc')
+    CORRESPONDANCES.get_unused_data().write_file(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc', zarr_flag=ZARR)
 
     SHORT_CORRESPONDANCES = CORRESPONDANCES._copy()
     SHORT_CORRESPONDANCES.shorter_than(size_max=NB_OBS_MIN)
@@ -210,5 +213,5 @@ if __name__ == '__main__':
     logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
-    FINAL_EDDIES.write_netcdf(path=SAVE_DIR)
-    SHORT_TRACK.write_netcdf(filename='%(path)s/%(sign_type)s_track_too_short.nc', path=SAVE_DIR)
+    FINAL_EDDIES.write_file(path=SAVE_DIR, zarr_flag=ZARR)
+    SHORT_TRACK.write_file(filename='%(path)s/%(sign_type)s_track_too_short.nc', path=SAVE_DIR, zarr_flag=ZARR)

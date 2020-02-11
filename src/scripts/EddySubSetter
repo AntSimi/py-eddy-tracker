@@ -74,4 +74,4 @@ if __name__ == '__main__':
     if len(dataset) == 0:
         logging.warning("No data are selected, out file couldn't be create")
     else:
-        dataset.write_netcdf(filename=args.filename_out)
+        dataset.write_file(filename=args.filename_out)
