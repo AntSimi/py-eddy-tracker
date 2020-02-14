@@ -12,23 +12,29 @@ def id_parser():
     parser = EddyParser('Eddy Identification')
     parser.add_argument('filename')
     parser.add_argument('filename_out')
-    parser.add_argument('-p', '--period', nargs=2, type=int,
-                        help='Start day and end day, if it s negative value we will add to day min and add to day max, if 0 it s not use')
-    parser.add_argument('-l', '--length', nargs=2, type=int,
-                        help='Minimal and maximal quantity of observation for one track, ones bounds could be negative, it will be not use')
-    parser.add_argument('-f', '--full_path', action='store_true',
-                        help='Extract path, if one obs or more are selected')
-    parser.add_argument('-d', '--remove_incomplete', action='store_true',
-                        help='Extract path only if all obs are selected')
-    parser.add_argument('--reject_virtual', action='store_true',
-                        help="If there are only virtual observation in selection, we don't select track")
-    parser.add_argument('-a', '--area', nargs=4, type=float,
-                        metavar=('llcrnrlon', 'llcrnrlat', 'urcrnrlon', 'urcrnrlat'),
-                        help='Coordinates of bounding to extract'
-                        )
-    parser.add_argument('--remove_var', nargs='+', type=str, help='remove all listed variable')
-    parser.add_argument('--include_var', nargs='+', type=str, help='use only listed variable, remove_var will be ignored')
-    parser.add_argument('-i', '--ids', nargs='+', type=int, help='List of tracks which will be extract')
+
+    group = parser.add_argument_group('Extraction options')
+    group.add_argument('-p', '--period', nargs=2, type=int,
+                       help='Start day and end day, if it s negative value we will add to day min and add to day max, if 0 it s not use')
+    group.add_argument('-l', '--length', nargs=2, type=int,
+                       help='Minimal and maximal quantity of observation for one track, ones bounds could be negative, it will be not use')
+    group.add_argument('-f', '--full_path', action='store_true',
+                       help='Extract path, if one obs or more are selected')
+    group.add_argument('-d', '--remove_incomplete', action='store_true',
+                       help='Extract path only if all obs are selected')
+    group.add_argument('--reject_virtual', action='store_true',
+                       help="If there are only virtual observation in selection, we don't select track")
+    group.add_argument('-a', '--area', nargs=4, type=float,
+                       metavar=('llcrnrlon', 'llcrnrlat', 'urcrnrlon', 'urcrnrlat'),
+                       help='Coordinates of bounding to extract'
+                       )
+    group.add_argument('--remove_var', nargs='+', type=str, help='remove all listed variable')
+    group.add_argument('--include_var', nargs='+', type=str, help='use only listed variable, remove_var will be ignored')
+    group.add_argument('-i', '--ids', nargs='+', type=int, help='List of tracks which will be extract')
+
+    group = parser.add_argument_group('Extraction options')
+    group.add_argument('--sort_time', action='store_true', help='sort all observation with time')
+
     parser.add_argument('-n', '--no_raw_mode', action='store_true',
                         help='Uncompress all data, could be create a memory error for huge file, but is safer for extern file of py eddy tracker')
     return parser
@@ -38,7 +44,7 @@ if __name__ == '__main__':
     args = id_parser().parse_args()
 
     # Original dataset
-    dataset = TrackEddiesObservations.load_from_netcdf(
+    dataset = TrackEddiesObservations.load_file(
         args.filename,
         raw_data=False if args.no_raw_mode else True,
         remove_vars=args.remove_var,
@@ -69,6 +75,11 @@ if __name__ == '__main__':
         dataset = dataset.extract_with_area(area, full_path=args.full_path,
                                             remove_incomplete=args.remove_incomplete,
                                               reject_virtual=args.reject_virtual)
+
+    if args.sort_time:
+        logging.debug('start sorting ...')
+        dataset.obs.sort(order=['time', 'lon', 'lat'])
+        logging.debug('end sorting')
 
     # if no data, no output will be written
     if len(dataset) == 0:

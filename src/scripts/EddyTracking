@@ -184,7 +184,7 @@ if __name__ == '__main__':
     NB_OBS_MIN = int(CONFIG.get('TRACK_DURATION_MIN', 14))
     CORRESPONDANCES.prepare_merging()
 
-    logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
+    logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
     logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
     CORRESPONDANCES.get_unused_data().write_file(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc', zarr_flag=ZARR)

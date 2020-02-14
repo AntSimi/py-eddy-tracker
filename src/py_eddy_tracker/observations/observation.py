@@ -397,9 +397,17 @@ class EddiesObservations(object):
         return set(dims)
 
     @classmethod
-    def load_from_zarr(cls, filename, remove_vars=None, include_vars=None):
+    def load_file(cls, filename, **kwargs):
+        if filename.endswith('.zarr'):
+            return cls.load_from_zarr(filename, **kwargs)
+        else:
+            return cls.load_from_netcdf(filename, **kwargs)
+
+    @classmethod
+    def load_from_zarr(cls, filename, raw_data=False, remove_vars=None, include_vars=None):
         # FIXME must be investigate, in zarr no dimensions name (or could be add in attr)
         array_dim = 50
+        BLOC = 5000000
         if not isinstance(filename, str):
             filename = filename.astype(str)
         h_zarr = zarr.open(filename)
@@ -428,13 +436,14 @@ class EddiesObservations(object):
                 continue
             if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                 kwargs["track_extra_variables"].append(var_inv)
-        kwargs["raw_data"] = False
+        kwargs["raw_data"] = raw_data
         kwargs["only_variables"] = None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
         eddies = cls(size=nb_obs, **kwargs)
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
             if var_inv == "type_cyc":
                 continue
+            logging.debug('%s will be loaded', variable)
             # find unit factor
             factor = 1
             input_unit = h_zarr[variable].attrs.get('unit', None)
@@ -456,15 +465,22 @@ class EddiesObservations(object):
                     if factor != 1:
                         logging.info('%s will be multiply by %f to take care of units(%s->%s)',
                                      variable, factor, input_unit, output_unit)
-            if factor != 1:
-                eddies.obs[var_inv] = h_zarr[variable][:] * factor
-            else:
-                eddies.obs[var_inv] = h_zarr[variable][:]
+            nb = h_zarr[variable].shape[0]
 
-        # for variable in var_list:
-        #     var_inv = VAR_DESCR_inv[variable]
-        #     if var_inv == "type_cyc":
-        #         eddies.sign_type = h_zarr[variable][0]
+            scale_factor = VAR_DESCR[var_inv].get('scale_factor', None)
+            add_offset = VAR_DESCR[var_inv].get('add_offset', None)
+            for i in range(0, nb, BLOC):
+                sl = slice(i, i + BLOC)
+                data = h_zarr[variable][sl]
+                if factor != 1:
+                    data *= factor
+                if raw_data:
+                    if add_offset is not None:
+                        data -= add_offset
+                    if scale_factor is not None:
+                        data /= scale_factor
+                eddies.obs[var_inv][sl] = data
+
         eddies.sign_type = h_zarr.attrs.get("rotation_type", 0)
         if eddies.sign_type == 0:
             logging.debug("File come from another algorithm of identification")
