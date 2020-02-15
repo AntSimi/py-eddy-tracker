@@ -1,16 +1,16 @@
-=====================
-Eddies identification
-=====================
+===================
+Eddy identification
+===================
 
-Run an identification on a grid
-*******************************
+Run an identification on a single grid
+**************************************
 
 Activate verbose
 
 .. code-block:: python
 
     import logging
-    logging.getLogger().setLevel('DEBUG') # Values: ERROR, WARNING, INFO, DEBUG
+    logging.getLogger().setLevel('DEBUG') # Available options: ERROR, WARNING, INFO, DEBUG
 
 Run identification
 
@@ -21,14 +21,14 @@ Run identification
     h.bessel_high_filter('adt', 500, order=3)
     date = datetime(2019, 2, 23)
     a, c = h.eddy_identification(
-        'adt', 'ugos', 'vgos', # Variable to use for identification
+        'adt', 'ugos', 'vgos', # Variables used for identification
         date, # Date of identification
         0.002, # step between two isolines of detection (m)
-        pixel_limit=(5, 2000), # Min and max of pixel can be include in contour
-        shape_error=55, # Error maximal of circle fitting over contour to be accepted
+        pixel_limit=(5, 2000), # Min and max pixel count for valid contour
+        shape_error=55, # Error max (%) between ratio of circle fit and contour
         )
 
-Plot identification
+Plot the resulting identification
 
 .. code-block:: python
 
@@ -45,7 +45,7 @@ Plot identification
 
 .. image:: ../share/png/eddies.png
 
-Save identification datas
+Save identification data
 
 .. code-block:: python
 
