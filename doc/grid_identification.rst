@@ -2,8 +2,8 @@
 Eddy identification
 ===================
 
-Run an identification on a single grid
-**************************************
+Run the identification process for a single day
+***********************************************
 
 Activate verbose
 
