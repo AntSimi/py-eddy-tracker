@@ -7,7 +7,7 @@ from datetime import datetime
 from netCDF4 import Dataset
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.dataset.grid import RegularGridDataset
-
+import zarr
 
 def id_parser():
     parser = EddyParser('Eddy Identification')
@@ -30,6 +30,9 @@ def id_parser():
                         help='Force height unit')
     parser.add_argument('--speed_unit', default=None, type=str,
                         help='Force speed unit')
+    parser.add_argument('--zarr',
+                        action='store_true',
+                        help='Output will be wrote in zarr')
     return parser
 
 
@@ -48,7 +51,13 @@ if __name__ == '__main__':
     a, c = h.eddy_identification(args.h, u, v, date, args.isoline_step, pixel_limit=(5, 2000),
                                  shape_error=args.fir_errmax, force_height_unit=args.height_unit,
                                  force_speed_unit=args.speed_unit)
-    with Dataset(args.path_out + date.strftime('/Anticyclonic_%Y%m%d.nc'), 'w') as h:
-        a.to_netcdf(h)
-    with Dataset(args.path_out + date.strftime('/Cyclonic_%Y%m%d.nc'), 'w') as h:
-        c.to_netcdf(h)
+    if args.zarr:
+        h = zarr.open(args.path_out + date.strftime('/Anticyclonic_%Y%m%d.zarr'), 'w')
+        a.to_zarr(h)
+        h = zarr.open(args.path_out + date.strftime('/Cyclonic_%Y%m%d.zarr'), 'w')
+        c.to_zarr(h)
+    else:
+        with Dataset(args.path_out + date.strftime('/Anticyclonic_%Y%m%d.nc'), 'w') as h:
+            a.to_netcdf(h)
+        with Dataset(args.path_out + date.strftime('/Cyclonic_%Y%m%d.nc'), 'w') as h:
+            c.to_netcdf(h)

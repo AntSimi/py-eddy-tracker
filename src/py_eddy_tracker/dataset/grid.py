@@ -588,13 +588,13 @@ class GridDataset(object):
                     proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0={1} +lon_0={0}'.format(*inner_contour.mean_coordinates))
                     # First, get position based on innermost
                     # contour
-                    c_x, c_y = proj(inner_contour.lon, inner_contour.lat)
-                    centx_i, centy_i, _, _ = fit_circle(c_x, c_y)
+                    centx_i, centy_i, _, _ = fit_circle(*proj(inner_contour.lon, inner_contour.lat))
                     centlon_i, centlat_i = proj(centx_i, centy_i, inverse=True)
                     # Second, get speed-based radius based on
                     # contour of max uavg
-                    c_x, c_y = proj(speed_contour.lon, speed_contour.lat)
-                    centx_s, centy_s, eddy_radius_s, aerr_s = fit_circle(c_x, c_y)
+                    centx_s, centy_s, eddy_radius_s, aerr_s = fit_circle(*proj(speed_contour.lon, speed_contour.lat))
+                    # Computed again to be coherent with speed_radius, we will be compute in same reference
+                    _, _, eddy_radius_e, aerr_e = fit_circle(*proj(current_contour.lon, current_contour.lat))
                     centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
 
                     # Instantiate new EddyObservation object (high cost need to be review)
@@ -615,7 +615,7 @@ class GridDataset(object):
                     properties.obs['radius_s'] = eddy_radius_s
                     properties.obs['speed_average'] = max_average_speed
                     properties.obs['radius_e'] = eddy_radius_e
-                    properties.obs['shape_error_e'] = aerr
+                    properties.obs['shape_error_e'] = aerr_e
                     properties.obs['shape_error_s'] = aerr_s
                     properties.obs['lon'] = centlon_s
                     properties.obs['lat'] = centlat_s
