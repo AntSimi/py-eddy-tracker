@@ -3,7 +3,32 @@ Eddy identification
 ===================
 
 Run the identification process for a single day
-***********************************************
+
+
+Shell/bash command
+******************
+
+Bash command will allow to process one grid, it will apply a filter and an identification.
+
+
+.. code-block:: bash
+
+    EddyId share/nrt_global_allsat_phy_l4_20190223_20190226.nc 20190223 \
+        adt ugos vgos longitude latitude \
+        out_directory -v DEBUG
+
+
+Filter could be modify with options *--cut_wavelength* and *--filter_order*. You could also defined height between two isolines with *--isoline_step*, which could
+improve speed profile quality and detect accurately tiny eddies. You could also use *--fit_errmax* to manage acceptable shape of eddies.
+
+An eddy identification will produce two files in the output directory, one for anticyclonic eddies and the other one for cyclonic.
+
+In regional area which are away from the equator, current could be deduce from height, juste write *None None* inplace of *ugos vgos*
+
+Python code
+***********
+
+If we want customize eddies identification, python module is here.
 
 Activate verbose
 

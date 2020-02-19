@@ -18,7 +18,7 @@ Method is used in :
 
 To avoid problems with installation, use of the virtualenv Python virtual environment is recommended.
 
-Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, cython, pyproj, Shapely, ...), e.g.:
+Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, pyproj, ...), e.g.:
 
 ```bash
 pip install numpy scipy netCDF4 matplotlib opencv-python pyyaml pyproj pint polygon3
