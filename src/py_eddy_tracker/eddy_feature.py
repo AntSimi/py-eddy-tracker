@@ -16,11 +16,11 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2015 by Evan Mason
-Email: emason@imedea.uib-csic.es
+Copyright (c) 2014-2020 by Evan Mason
+Email: evanmason@gamil.com
 ===========================================================================
 
-Version 2.0.3
+Version 3.0
 
 ===========================================================================
 
