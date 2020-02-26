@@ -55,8 +55,7 @@ from numba import njit, types as numba_types
 from Polygon import Polygon
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
-from pint.compat.tokenize import TokenError
-
+from tokenize import TokenError
 
 @njit(cache=True, fastmath=True)
 def shifted_ellipsoid_degrees_mask(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
