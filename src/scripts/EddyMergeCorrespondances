@@ -10,6 +10,8 @@ from os import mkdir
 import logging
 import datetime as dt
 
+logger = logging.getLogger("pet")
+
 
 def usage():
     """Usage
@@ -34,7 +36,7 @@ if __name__ == '__main__':
 
     START_TIME = dt.datetime.now()
     CORRESPONDANCES = Correspondances.load(CONFIG.nc_file[0])
-    logging.info('Start merging')
+    logger.info('Start merging')
     for i in CONFIG.nc_file[1:]:
         CORRESPONDANCES.merge_correspondance(Correspondances.load(i))
 

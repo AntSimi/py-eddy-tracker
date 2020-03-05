@@ -7,6 +7,8 @@ from py_eddy_tracker import EddyParser
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import logging
 
+logger = logging.getLogger("pet")
+
 
 def id_parser():
     parser = EddyParser('Eddy Identification')
@@ -77,12 +79,12 @@ if __name__ == '__main__':
                                               reject_virtual=args.reject_virtual)
 
     if args.sort_time:
-        logging.debug('start sorting ...')
+        logger.debug('start sorting ...')
         dataset.obs.sort(order=['time', 'lon', 'lat'])
-        logging.debug('end sorting')
+        logger.debug('end sorting')
 
     # if no data, no output will be written
     if len(dataset) == 0:
-        logging.warning("No data are selected, out file couldn't be create")
+        logger.warning("No data are selected, out file couldn't be create")
     else:
         dataset.write_file(filename=args.filename_out)

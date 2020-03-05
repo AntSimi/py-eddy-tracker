@@ -10,6 +10,8 @@ from os import mkdir
 import logging
 import datetime as dt
 
+logger = logging.getLogger("pet")
+
 
 def usage():
     """Usage
@@ -47,12 +49,12 @@ if __name__ == '__main__':
 
     CORRESPONDANCES = Correspondances.load(CONFIG.nc_file)
 
-    logging.info('Start merging')
+    logger.info('Start merging')
 
     CORRESPONDANCES.prepare_merging()
 
-    logging.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
-    logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
+    logger.info('The longest tracks have %d observations', CORRESPONDANCES.nb_obs_by_tracks.max())
+    logger.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
     if CONFIG.eddies_untracked_model is None:
         CONFIG.eddies_untracked_model = '%(path)s/%(sign_type)s_%(prod_time)s_untracked.nc'
@@ -75,10 +77,10 @@ if __name__ == '__main__':
 
     # Total running time
     FULL_TIME = dt.datetime.now() - START_TIME
-    logging.info('Duration : %s', FULL_TIME)
+    logger.info('Duration : %s', FULL_TIME)
 
-    logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
-    logging.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
+    logger.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
+    logger.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
     if CONFIG.eddies_long_model is None:
         CONFIG.eddies_long_model = '%(path)s/%(sign_type)s_%(prod_time)s.nc'

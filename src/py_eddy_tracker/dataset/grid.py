@@ -24,6 +24,8 @@ from .. import VAR_DESCR
 from ..generic import distance, interp2d_geo, fit_circle, uniform_resample
 from ..poly import poly_contain_poly, winding_number_grid_in_poly
 
+logger = logging.getLogger("pet")
+
 
 def raw_resample(datas, fixed_size):
     nb_value = datas.shape[0]
@@ -97,8 +99,8 @@ def _fit_circle_path(vertice):
     d_lon = lons.max() - lons.min()
     d_lat = lats.max() - lats.min()
     if d_lon < 1e-7 and d_lat < 1e-7:
-        # logging.warning('An edge is only define in one position')
-        # logging.debug('%d coordinates %s,%s', len(lons),lons,
+        # logger.warning('An edge is only define in one position')
+        # logger.debug('%d coordinates %s,%s', len(lons),lons,
         # lats)
         return 0, -90, nan, nan
     centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(c_x, c_y)
@@ -226,7 +228,7 @@ class GridDataset(object):
         self.vars = dict()
         self.interpolators = dict()
         if centered is None:
-            logging.warning('We assume the position of grid is the center'
+            logger.warning('We assume the position of grid is the center'
                             ' corner for %s', filename)
         self.load_general_features()
         self.load()
@@ -244,7 +246,7 @@ class GridDataset(object):
     def load_general_features(self):
         """Load attrs
         """
-        logging.debug('Load general feature from %(filename)s', dict(filename=self.filename))
+        logger.debug('Load general feature from %(filename)s', dict(filename=self.filename))
         with Dataset(self.filename) as h:
             # Load generals
             self.dimensions = {i: len(v) for i, v in h.dimensions.items()}
@@ -314,7 +316,7 @@ class GridDataset(object):
             self.vars[y_name] = h.variables[y_name][:]
 
             if self.is_centered:
-                logging.info('Grid center')
+                logger.info('Grid center')
                 self.x_c = self.vars[x_name]
                 self.y_c = self.vars[y_name]
 
@@ -386,7 +388,7 @@ class GridDataset(object):
         if varname not in self.vars:
             coordinates_dims = list(self.x_dim)
             coordinates_dims.extend(list(self.y_dim))
-            logging.debug('Load %(varname)s from %(filename)s', dict(varname=varname, filename=self.filename))
+            logger.debug('Load %(varname)s from %(filename)s', dict(varname=varname, filename=self.filename))
             with Dataset(self.filename) as h:
                 dims = h.variables[varname].dimensions
                 sl = [slice(None) if dim in coordinates_dims else 0 for dim in dims]
@@ -406,7 +408,7 @@ class GridDataset(object):
         """
         coordinates_dims = list(self.x_dim)
         coordinates_dims.extend(list(self.y_dim))
-        logging.debug('Extract %(varname)s from %(filename)s with slice(x:%(slice_x)s,y:%(slice_y)s)',
+        logger.debug('Extract %(varname)s from %(filename)s with slice(x:%(slice_x)s,y:%(slice_y)s)',
                       dict(varname=varname, filename=self.filename, slice_y=slice_y, slice_x=slice_x))
         with Dataset(self.filename) as h:
             dims = h.variables[varname].dimensions
@@ -474,7 +476,7 @@ class GridDataset(object):
         in_h_unit = units.parse_expression(h_units)
         if in_h_unit is not None:
             factor, _ = in_h_unit.to('m').to_tuple()
-            logging.info('We will apply on step a factor to be coherent with grid : %f', 1 / factor)
+            logger.info('We will apply on step a factor to be coherent with grid : %f', 1 / factor)
             step /= factor
             if precision is not None:
                 precision /= factor
@@ -491,7 +493,7 @@ class GridDataset(object):
         z_min_p, z_max_p = percentile(data_tmp, epsilon), percentile(data_tmp, 100 - epsilon)
         d_zp = z_max_p - z_min_p
         if d_z / d_zp > 2:
-            logging.warning('Maybe some extrema are present zmin %f (m) and zmax %f (m) will be replace by %f and %f',
+            logger.warning('Maybe some extrema are present zmin %f (m) and zmax %f (m) will be replace by %f and %f',
                             z_min, z_max, z_min_p, z_max_p)
             z_min, z_max = z_min_p, z_max_p
 
@@ -523,7 +525,7 @@ class GridDataset(object):
                 if nb_paths == 0:
                     continue
                 cvalues = self.contours.cvalues[corrected_coll_index]
-                logging.debug('doing collection %s, contour value %.4f, %d paths',
+                logger.debug('doing collection %s, contour value %.4f, %d paths',
                               corrected_coll_index, cvalues, nb_paths)
 
                 # Loop over individual c_s contours (i.e., every eddy in field)
@@ -626,7 +628,7 @@ class GridDataset(object):
                     properties.obs['contour_lon_s'], properties.obs['contour_lat_s'] = uniform_resample(
                         speed_contour.lon, speed_contour.lat, fixed_size=array_sampling)
                     if aerr > 99.9 or aerr_s > 99.9:
-                        logging.warning('Strange shape at this step! shape_error : %f, %f', aerr, aerr_s)
+                        logger.warning('Strange shape at this step! shape_error : %f, %f', aerr, aerr_s)
 
                     eddies.append(properties)
                     # To reserve definitively the area
@@ -781,13 +783,13 @@ class UnRegularGridDataset(GridDataset):
         pass
 
     def init_pos_interpolator(self):
-        logging.debug('Create a KdTree could be long ...')
+        logger.debug('Create a KdTree could be long ...')
         self.index_interp = cKDTree(
             uniform_resample_stack((
                 self.x_c.reshape(-1),
                 self.y_c.reshape(-1)
             )))
-        logging.debug('... OK')
+        logger.debug('... OK')
 
     def _low_filter(self, grid_name, x_cut, y_cut, factor=40.):
         data = self.grid(grid_name)
@@ -922,7 +924,7 @@ class RegularGridDataset(GridDataset):
         # wave_length in km
         # order must be int
         if order < 1:
-            logging.warning('order must be superior to 0')
+            logger.warning('order must be superior to 0')
         order = ceil(order).astype(int)
         # Estimate size of kernel
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
@@ -951,14 +953,14 @@ class RegularGridDataset(GridDataset):
         # wave_length in km
         # order must be int
         if order < 1:
-            logging.warning('order must be superior to 0')
+            logger.warning('order must be superior to 0')
         order = ceil(order).astype(int)
         # Estimate size of kernel
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
         min_wave_length = max(step_x_km * 2, step_y_km * 2)
         if wave_length < min_wave_length:
-            logging.error('Wave_length to short for resolution, must be > %d km', ceil(min_wave_length))
+            logger.error('Wave_length to short for resolution, must be > %d km', ceil(min_wave_length))
             raise Exception()
         # half size will be multiply with by order
         half_x_pt, half_y_pt = ceil(wave_length / step_x_km).astype(int), ceil(wave_length / step_y_km).astype(int)
@@ -992,7 +994,7 @@ class RegularGridDataset(GridDataset):
         """low filtering
         """
         i_x, i_y = x_cut * 0.125 / self.xstep, y_cut * 0.125 / self.xstep
-        logging.info(
+        logger.info(
             'Filtering with this wave : (%s, %s) converted in pixel (%s, %s)',
             x_cut, y_cut, i_x, i_y
         )
@@ -1005,7 +1007,7 @@ class RegularGridDataset(GridDataset):
 
     def convolve_filter_with_dynamic_kernel(self, grid, kernel_func, lat_max=85, extend=False, **kwargs_func):
         if (abs(self.y_c) > lat_max).any():
-            logging.warning('No filtering above %f degrees of latitude', lat_max)
+            logger.warning('No filtering above %f degrees of latitude', lat_max)
         if isinstance(grid, str):
             data = self.grid(grid).copy()
         else:
@@ -1016,7 +1018,7 @@ class RegularGridDataset(GridDataset):
         nb_lines = self.y_c.shape[0]
         dt = list()
         
-        debug_active = logging.getLogger().getEffectiveLevel() == logging.DEBUG
+        debug_active = logger.getLogger().getEffectiveLevel() == logging.DEBUG
         
         for i, lat in enumerate(self.y_c):
             if abs(lat) > lat_max or data[:, i].mask.all():
@@ -1087,11 +1089,11 @@ class RegularGridDataset(GridDataset):
         self.vars[grid_name] -= data_out
 
     def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
-        logging.debug('Run filtering with wave of %(wave_length)s km and order of %(order)s ...',
+        logger.debug('Run filtering with wave of %(wave_length)s km and order of %(order)s ...',
                       dict(wave_length=wave_length, order=order))
         data_out = self.convolve_filter_with_dynamic_kernel(
             grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
-        logging.debug('Filtering done')
+        logger.debug('Filtering done')
         self.vars[grid_name] -= data_out
 
     def bessel_low_filter(self, grid_name, wave_length, order=1, lat_max=85):
@@ -1120,7 +1122,7 @@ class RegularGridDataset(GridDataset):
                 continue
             pws.append(pw)
         if nb_invalid:
-            logging.warning('%d/%d columns invalid', nb_invalid, i + 1)
+            logger.warning('%d/%d columns invalid', nb_invalid, i + 1)
         lat_content = 1 / f, array(pws).mean(axis=0)
 
         # Lon spectrum
@@ -1142,7 +1144,7 @@ class RegularGridDataset(GridDataset):
             fs.append(f)
             pws.append(pw)
         if nb_invalid:
-            logging.warning('%d/%d lines invalid', nb_invalid, i + 1)
+            logger.warning('%d/%d lines invalid', nb_invalid, i + 1)
         f_interp = linspace(f_min, f_max, f.shape[0])
         pw_m = array(
             [interp1d(f, pw, fill_value=0., bounds_error=False)(f_interp) for f, pw in zip(fs, pws)]).mean(axis=0)
@@ -1187,7 +1189,7 @@ class RegularGridDataset(GridDataset):
 
     def compute_stencil(self, data, stencil_halfwidth=4, mode='reflect', vertical=False):
         stencil_halfwidth = max(min(int(stencil_halfwidth), 4), 1)
-        logging.debug('Stencil half width apply : %d', stencil_halfwidth)
+        logger.debug('Stencil half width apply : %d', stencil_halfwidth)
         # output
         grad = None
 
@@ -1279,7 +1281,7 @@ class RegularGridDataset(GridDataset):
     def add_uv(self, grid_height, uname='u', vname='v', stencil_halfwidth=4):
         """Compute a u and v grid
                """
-        logging.info('Add u/v variable with stencil method')
+        logger.info('Add u/v variable with stencil method')
         data = self.grid(grid_height)
         h_dict = self.variables_description[grid_height]
         for variable in (uname, vname):

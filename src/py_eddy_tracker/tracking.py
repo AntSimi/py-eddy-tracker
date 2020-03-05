@@ -37,6 +37,8 @@ import logging
 import platform
 from numba import njit, types as numba_types
 
+logger = logging.getLogger("pet")
+
 
 @njit(cache=True)
 def index(ar, items):
@@ -124,7 +126,7 @@ class Correspondances(list):
         new.nb_link_max = self.nb_link_max
         new.nb_obs = self.nb_obs
         new.prepare_merging()
-        logging.debug('Copy done')
+        logger.debug('Copy done')
         return new
 
     def reset_dataset_cache(self):
@@ -222,7 +224,7 @@ class Correspondances(list):
         if self.previous2_obs is not None and self.virtual:
             nb_rebirth = correspondance['virtual'].sum()
             if nb_rebirth != 0:
-                logging.debug('%d re-birth due to prolongation with'
+                logger.debug('%d re-birth due to prolongation with'
                               ' virtual observations', nb_rebirth)
                 ## Set id for virtual
                 # get correspondance mask using virtual obs
@@ -238,7 +240,7 @@ class Correspondances(list):
         # we count the number of new
         mask_new_id = correspondance['id'] == self.UINT32_MAX
         nb_new_tracks = mask_new_id.sum()
-        logging.debug('%d birth in this step', nb_new_tracks)
+        logger.debug('%d birth in this step', nb_new_tracks)
         # Set new id
         correspondance['id'][mask_new_id] = self.id_generator(nb_new_tracks)
 
@@ -263,7 +265,7 @@ class Correspondances(list):
         # List previous id which are not use in the next step
         dead_id = setdiff1d(self[-2]['id'], self[-1]['id'])
         nb_dead = dead_id.shape[0]
-        logging.debug('%d death of real obs in this step', nb_dead)
+        logger.debug('%d death of real obs in this step', nb_dead)
         if not self.virtual:
             return
 
@@ -275,7 +277,7 @@ class Correspondances(list):
             # Virtual obs which can be prolongate
             alive_virtual_obs = self.virtual_obs['segment_size'][i_virtual_dead_id] < self.nb_virtual
             nb_virtual_extend = alive_virtual_obs.sum()
-            logging.debug('%d virtual obs will be prolongate on the next step', nb_virtual_extend)
+            logger.debug('%d virtual obs will be prolongate on the next step', nb_virtual_extend)
 
         # Save previous state to count virtual obs
         self.previous_virtual_obs = self.virtual_obs
@@ -325,12 +327,12 @@ class Correspondances(list):
         # We begin with second file, first one is in previous
         for file_name in self.datasets[first_dataset:]:
             self.swap_dataset(file_name)
-            logging.info('%s match with previous state', file_name)
-            logging.debug('%d obs to match', len(self.current_obs))
+            logger.info('%s match with previous state', file_name)
+            logger.debug('%d obs to match', len(self.current_obs))
 
             nb_real_obs = len(self.previous_obs)
             if flg_virtual:
-                logging.debug('%d virtual obs will be add to previous', len(self.virtual_obs))
+                logger.debug('%d virtual obs will be add to previous', len(self.virtual_obs))
                 self.previous_obs = self.previous_obs.merge(self.virtual_obs)
             i_previous, i_current, association_cost = self.previous_obs.tracking(self.current_obs)
 
@@ -348,13 +350,13 @@ class Correspondances(list):
         nb_step = len(self.datasets) - 1
         if isinstance(dict_completion, dict):
             filename = filename.format(**dict_completion)
-        logging.info('Create correspondance file %s', filename)
+        logger.info('Create correspondance file %s', filename)
         with Dataset(filename, 'w', format='NETCDF4') as h_nc:
             # Create dimensions
-            logging.debug('Create Dimensions "Nlink" : %d', self.nb_link_max)
+            logger.debug('Create Dimensions "Nlink" : %d', self.nb_link_max)
             h_nc.createDimension('Nlink', self.nb_link_max)
 
-            logging.debug('Create Dimensions "Nstep" : %d', nb_step)
+            logger.debug('Create Dimensions "Nstep" : %d', nb_step)
             h_nc.createDimension('Nstep', nb_step)
             var_file_in = h_nc.createVariable(
                 zlib=True, complevel=1,
@@ -388,7 +390,7 @@ class Correspondances(list):
                 datas[name].mask = datas[name] == datas[name]
 
             for i, correspondance in enumerate(self):
-                logging.debug('correspondance %d', i)
+                logger.debug('correspondance %d', i)
                 nb_elt = correspondance.shape[0]
                 var_nb_link[i] = nb_elt
                 for name, _ in self.correspondance_dtype:
@@ -411,7 +413,7 @@ class Correspondances(list):
             h_nc.module = self.class_method.__module__
             h_nc.classname = self.class_method.__qualname__
             h_nc.node = platform.node()
-        logging.info('Create correspondance file done')
+        logger.info('Create correspondance file done')
 
     def load_compatible(self, filename):
         if filename is None:
@@ -428,7 +430,7 @@ class Correspondances(list):
 
     @classmethod
     def load(cls, filename):
-        logging.info('Try load %s', filename)
+        logger.info('Try load %s', filename)
         with Dataset(filename, 'r', format='NETCDF4') as h_nc:
             datas = {varname: data[:] for varname, data in h_nc.variables.items()}
 
@@ -439,12 +441,12 @@ class Correspondances(list):
                 class_method = getattr(__import__(h_nc.module, globals(), locals(), h_nc.classname), h_nc.classname)
             else:
                 class_method = None
-            logging.info('File %s load with class %s', filename, class_method)
+            logger.info('File %s load with class %s', filename, class_method)
             obj = cls(datasets, h_nc.virtual_max_segment, class_method=class_method)
 
             id_max = 0
             for i, nb_elt in enumerate(datas['nb_link'][:]):
-                logging.debug(
+                logger.debug(
                     'Link between %s and %s',
                     datas['FileIn'][i],
                     datas['FileOut'][i])
@@ -477,8 +479,8 @@ class Correspondances(list):
         self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks
         # Number of global obs
         self.nb_obs = self.nb_obs_by_tracks.sum()
-        logging.info('%d tracks identified', self.current_id)
-        logging.info('%d observations will be join', self.nb_obs)
+        logger.info('%d tracks identified', self.current_id)
+        logger.info('%d observations will be join', self.nb_obs)
 
     def longer_than(self, size_min):
         """Remove from correspondance table all association for shorter eddies than size_min
@@ -497,7 +499,7 @@ class Correspondances(list):
             m_keep = isin(correspondance['id'], i_keep_track)
             self[i] = correspondance[m_keep]
             self[i]['id'] = translate[self[i]['id']]
-        logging.debug('Select longer than %d done', size_min)
+        logger.debug('Select longer than %d done', size_min)
 
     def shorter_than(self, size_max):
         """Remove from correspondance table all association for longer eddies than size_max
@@ -516,7 +518,7 @@ class Correspondances(list):
             m_keep = isin(correspondance['id'], i_keep_track)
             self[i] = correspondance[m_keep]
             self[i]['id'] = translate[self[i]['id']]
-        logging.debug('Select shorter than %d done', size_max)
+        logger.debug('Select shorter than %d done', size_max)
 
     def merge(self, until=-1, raw_data=True):
         """Merge all the correspondance in one array with all fields
@@ -527,7 +529,7 @@ class Correspondances(list):
         self.swap_dataset(self.datasets[0], raw_data=raw_data)
 
         # Start create netcdf to agglomerate all eddy
-        logging.debug('We will create an array (size %d)', self.nb_obs)
+        logger.debug('We will create an array (size %d)', self.nb_obs)
         eddies = TrackEddiesObservations(
             size=self.nb_obs,
             track_extra_variables=self.current_obs.track_extra_variables,
@@ -538,10 +540,10 @@ class Correspondances(list):
         eddies['cost_association'][:] = default_fillvals['f4']
         # Calculate the index in each tracks, we compute in u4 and translate
         # in u2 (which are limited to 65535)
-        logging.debug('Compute global index array (N)')
+        logger.debug('Compute global index array (N)')
         eddies['n'][:] = uint16(
             arange(self.nb_obs, dtype='u4') - self.i_current_by_tracks.repeat(self.nb_obs_by_tracks))
-        logging.debug('Compute global track array')
+        logger.debug('Compute global track array')
         eddies['track'][:] = arange(self.current_id).repeat(self.nb_obs_by_tracks)
 
         # Set type of eddy with first file
@@ -555,7 +557,7 @@ class Correspondances(list):
         for i, file_name in enumerate(self.datasets[1:]):
             if until != -1 and i >= until:
                 break
-            logging.debug('Merge data from %s', file_name)
+            logger.debug('Merge data from %s', file_name)
             # Load current file (we begin with second one)
             self.swap_dataset(file_name, raw_data=raw_data)
             # We select the list of id which are involve in the correspondance
@@ -620,7 +622,7 @@ class Correspondances(list):
         nb_obs = 0
         list_mask = list()
         has_virtual = 'virtual' in self[0].dtype.names
-        logging.debug('Count unused data ...')
+        logger.debug('Count unused data ...')
         for i, filename in enumerate(self.datasets):
             last_dataset = i == (nb_dataset - 1)
             if has_virtual and not last_dataset:
@@ -641,7 +643,7 @@ class Correspondances(list):
             m[eddies_used] = False
             list_mask.append(m)
             nb_obs += m.sum()
-        logging.debug('Count unused data OK')
+        logger.debug('Count unused data OK')
         eddies = EddiesObservations(
             size=nb_obs,
             track_extra_variables=self.current_obs.track_extra_variables,
@@ -649,7 +651,7 @@ class Correspondances(list):
             array_variables=self.current_obs.array_variables, raw_data=raw_data)
         j = 0
         for i, dataset in enumerate(self.datasets):
-            logging.debug('Loaf file : (%d) %s', i, dataset)
+            logger.debug('Loaf file : (%d) %s', i, dataset)
             current_obs = self.class_method.load_from_netcdf(dataset, raw_data=raw_data)
             if i == 0:
                 eddies.sign_type = current_obs.sign_type

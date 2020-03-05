@@ -17,6 +17,8 @@ from glob import glob
 import logging
 import datetime as dt
 
+logger = logging.getLogger("pet")
+
 
 def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
                       start_date=None, end_date=None, sub_sampling_step=1,
@@ -27,7 +29,7 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
     else:
         pattern_regexp = re_compile('.*/' + date_regexp)
         full_path = join_path(data_dir, files_model)
-        logging.info('Search files : %s', full_path)
+        logger.info('Search files : %s', full_path)
         filenames = bytes_(glob(full_path))
 
     dataset_list = empty(len(filenames),
@@ -36,13 +38,13 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
                                 ])
     dataset_list['filename'] = filenames
 
-    logging.info('%s grids available', dataset_list.shape[0])
+    logger.info('%s grids available', dataset_list.shape[0])
     mode_attrs = False
     if '(' not in date_regexp:
-        logging.debug('Attrs date : %s', date_regexp)
+        logger.debug('Attrs date : %s', date_regexp)
         mode_attrs = date_regexp.strip().split(':')
     else:
-        logging.debug('Pattern date : %s', date_regexp)
+        logger.debug('Pattern date : %s', date_regexp)
 
     for item in dataset_list:
         str_date = None
@@ -67,14 +69,14 @@ def browse_dataset_in(data_dir, files_model, date_regexp, date_model,
         raise Exception('Several days steps in grid dataset %s' % steps)
 
     if sub_sampling_step != 1:
-        logging.info('Grid subsampling %d', sub_sampling_step)
+        logger.info('Grid subsampling %d', sub_sampling_step)
         dataset_list = dataset_list[::sub_sampling_step]
 
     if start_date is not None or end_date is not None:
-        logging.info('Available grid from %s to %s',
+        logger.info('Available grid from %s to %s',
                      dataset_list[0]['date'],
                      dataset_list[-1]['date'])
-        logging.info('Filtering grid by time %s, %s', start_date, end_date)
+        logger.info('Filtering grid by time %s, %s', start_date, end_date)
         mask = (dataset_list['date'] >= start_date) * (
             dataset_list['date'] <= end_date)
 
@@ -157,10 +159,10 @@ if __name__ == '__main__':
 
     if BLANK_PERIOD > 0:
         DATASET_LIST = DATASET_LIST[:-BLANK_PERIOD]
-        logging.info('Last %d files will be pop', BLANK_PERIOD)
+        logger.info('Last %d files will be pop', BLANK_PERIOD)
 
     START_TIME = dt.datetime.now()
-    logging.info('Start tracking on %d files', len(DATASET_LIST))
+    logger.info('Start tracking on %d files', len(DATASET_LIST))
 
     CORRESPONDANCES = Correspondances(
         datasets=DATASET_LIST['filename'],
@@ -169,8 +171,8 @@ if __name__ == '__main__':
         previous_correspondance=CORRESPONDANCES_IN)
 
     CORRESPONDANCES.track()
-    logging.info('Track finish')
-    logging.info('Start merging')
+    logger.info('Track finish')
+    logger.info('Start merging')
 
     DATE_START, DATE_STOP = CORRESPONDANCES.period
     DICT_COMPLETION = dict(date_start=DATE_START, date_stop=DATE_STOP, date_prod=START_TIME,
@@ -184,8 +186,8 @@ if __name__ == '__main__':
     NB_OBS_MIN = int(CONFIG.get('TRACK_DURATION_MIN', 14))
     CORRESPONDANCES.prepare_merging()
 
-    logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
-    logging.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
+    logger.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
+    logger.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
     CORRESPONDANCES.get_unused_data().write_file(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc', zarr_flag=ZARR)
 
@@ -206,12 +208,12 @@ if __name__ == '__main__':
 
     # Total running time
     FULL_TIME = dt.datetime.now() - START_TIME
-    logging.info('Mean duration by loop : %s',
+    logger.info('Mean duration by loop : %s',
                  FULL_TIME / (len(DATASET_LIST) - 1))
-    logging.info('Duration : %s', FULL_TIME)
+    logger.info('Duration : %s', FULL_TIME)
 
-    logging.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
-    logging.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
+    logger.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
+    logger.info('The mean length is %d observations after filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
     FINAL_EDDIES.write_file(path=SAVE_DIR, zarr_flag=ZARR)
     SHORT_TRACK.write_file(filename='%(path)s/%(sign_type)s_track_too_short.nc', path=SAVE_DIR, zarr_flag=ZARR)

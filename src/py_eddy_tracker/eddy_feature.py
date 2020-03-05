@@ -32,6 +32,8 @@ from matplotlib.figure import Figure
 from numba import njit, types as numba_types
 from .poly import winding_number_poly
 
+logger = logging.getLogger("pet")
+
 
 class Amplitude(object):
     """
@@ -104,7 +106,7 @@ class Amplitude(object):
             # After we use grid.data because index are in contour and we check before than no pixel are hide
             nb = len(lmi_i)
             if nb == 0:
-                logging.warning('No extrema found in contour in level %f', level)
+                logger.warning('No extrema found in contour in level %f', level)
                 return False
             elif nb == 1:
                 i, j = lmi_i[0], lmi_j[0]
@@ -135,7 +137,7 @@ class Amplitude(object):
                                                 self.mle, -1)
             nb = len(lmi_i)
             if nb == 0:
-                logging.warning('No extrema found in contour in level %f', level)
+                logger.warning('No extrema found in contour in level %f', level)
                 return False
             elif nb == 1:
                 i, j = lmi_i[0], lmi_j[0]
@@ -332,28 +334,28 @@ class Contours(object):
                 paths_out.extend(paths_left)
                 paths_out.extend(paths_right)
                 collection._paths = paths_out
-        logging.info('%d contours close over the bounds', poly_solve)
+        logger.info('%d contours close over the bounds', poly_solve)
 
     def __init__(self, x, y, z, levels, wrap_x=False, keep_unclose=False):
         """
         c_i : index to contours
         l_i : index to levels
         """
-        logging.info('Start computing iso lines')
+        logger.info('Start computing iso lines')
         fig = Figure()
         ax = fig.add_subplot(111)
         if wrap_x:
-            logging.debug('wrapping activate to compute contour')
+            logger.debug('wrapping activate to compute contour')
             x = concatenate((x, x[:1] + 360))
             z = ma.concatenate((z, z[:1]))
-        logging.debug('X shape : %s', x.shape)
-        logging.debug('Y shape : %s', y.shape)
-        logging.debug('Z shape : %s', z.shape)
-        logging.info('Start computing iso lines with %d levels from %f to %f ...', len(levels), levels[0], levels[-1])
+        logger.debug('X shape : %s', x.shape)
+        logger.debug('Y shape : %s', y.shape)
+        logger.debug('Z shape : %s', z.shape)
+        logger.info('Start computing iso lines with %d levels from %f to %f ...', len(levels), levels[0], levels[-1])
         self.contours = ax.contour(x, y, z.T, levels, cmap='rainbow')
         if wrap_x:
             self.find_wrapcut_path_and_join(x[0], x[-1])
-        logging.info('Finish computing iso lines')
+        logger.info('Finish computing iso lines')
 
         nb_level = 0
         nb_contour = 0
@@ -403,7 +405,7 @@ class Contours(object):
                 contour.used = False
                 nb_contour += 1
                 nb_pt += contour.vertices.shape[0]
-        logging.info('Repair %d closed contours and %d almost closed contours / %d contours', closed_contours,
+        logger.info('Repair %d closed contours and %d almost closed contours / %d contours', closed_contours,
                      almost_closed_contours, nb_contour)
         # Type for coordinates
         coord_dtype = contour.vertices.dtype

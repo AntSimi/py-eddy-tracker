@@ -80,12 +80,13 @@ class EddyParser(ArgumentParser):
         # set up logging to CONSOLE
         console = logging.StreamHandler()
         console.setFormatter(ColoredFormatter(self.FORMAT_LOG))
+        logger = logging.getLogger('pet')
         # add the handler to the root logger
-        logging.getLogger('').addHandler(console)
+        logger.addHandler(console)
         # Parsing
         opts = super(EddyParser, self).parse_args(*args, **kwargs)
         # set current level
-        logging.getLogger().setLevel(getattr(logging, opts.logging_level.upper()))
+        logger.setLevel(getattr(logging, opts.logging_level.upper()))
         return opts
 
 

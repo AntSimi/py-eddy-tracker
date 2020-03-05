@@ -34,6 +34,8 @@ from datetime import datetime, timedelta
 from .observation import EddiesObservations
 from numba import njit
 
+logger = logging.getLogger("pet")
+
 
 class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations
@@ -67,7 +69,7 @@ class TrackEddiesObservations(EddiesObservations):
         """Filled selected values by interpolation
         """
         nb_filled = mask.sum()
-        logging.info("%d obs will be filled (unobserved)", nb_filled)
+        logger.info("%d obs will be filled (unobserved)", nb_filled)
 
         nb_obs = len(self)
         index = arange(nb_obs)
@@ -97,7 +99,7 @@ class TrackEddiesObservations(EddiesObservations):
         """
         mask = nb_obs >= nb_min
         nb_obs_select = mask.sum()
-        logging.info("Selection of %d observations", nb_obs_select)
+        logger.info("Selection of %d observations", nb_obs_select)
         eddies = TrackEddiesObservations(
             size=nb_obs_select,
             track_extra_variables=self.track_extra_variables,
@@ -106,7 +108,7 @@ class TrackEddiesObservations(EddiesObservations):
         )
         eddies.sign_type = self.sign_type
         for field in self.obs.dtype.descr:
-            logging.debug("Copy of field %s ...", field)
+            logger.debug("Copy of field %s ...", field)
             var = field[0]
             eddies.obs[var] = self.obs[var][mask]
         if compress_id:
@@ -203,9 +205,9 @@ class TrackEddiesObservations(EddiesObservations):
             # self.__obs_by_track = zeros(s, self.observation_number.dtype)
             self.__first_index_of_track = -ones(s, "i8")
             self.__obs_by_track = zeros(s, "i8")
-            logging.debug("Start computing index ...")
+            logger.debug("Start computing index ...")
             compute_index(self.tracks, self.__first_index_of_track, self.__obs_by_track)
-            logging.debug("... OK")
+            logger.debug("... OK")
 
     @property
     def index_from_track(self):
@@ -230,7 +232,7 @@ class TrackEddiesObservations(EddiesObservations):
         elif b0 >= 0 and b1 < 0:
             track_mask = self.nb_obs_by_track > b0
         else:
-            logging.warning("No valid value for bounds")
+            logger.warning("No valid value for bounds")
             raise Exception("One bounds must be positiv")
         return self.__extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
 
@@ -266,7 +268,7 @@ class TrackEddiesObservations(EddiesObservations):
             same object with selected observations
         """
         if full_path and remove_incomplete:
-            logging.warning(
+            logger.warning(
                 "Incompatible option, remove_incomplete option will be remove"
             )
             remove_incomplete = False
@@ -290,10 +292,10 @@ class TrackEddiesObservations(EddiesObservations):
         )
         new.sign_type = self.sign_type
         if nb_obs == 0:
-            logging.warning("Empty dataset will be created")
+            logger.warning("Empty dataset will be created")
         else:
             for field in self.obs.dtype.descr:
-                logging.debug("Copy of field %s ...", field)
+                logger.debug("Copy of field %s ...", field)
                 var = field[0]
                 new.obs[var] = self.obs[var][mask]
             if compress_id:

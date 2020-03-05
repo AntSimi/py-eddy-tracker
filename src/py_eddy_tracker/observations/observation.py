@@ -57,6 +57,9 @@ from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
 from tokenize import TokenError
 
+logger = logging.getLogger("pet")
+
+
 @njit(cache=True, fastmath=True)
 def shifted_ellipsoid_degrees_mask(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
     # c = (major ** 2 - minor ** 2) ** .5 + major
@@ -239,7 +242,7 @@ class EddiesObservations(object):
         )
         new.sign_type = self.sign_type
         for field in self.obs.dtype.descr:
-            logging.debug('Copy of field %s ...', field)
+            logger.debug('Copy of field %s ...', field)
             var = field[0]
             new.obs[var] = self.obs[var]
         return new
@@ -417,7 +420,7 @@ class EddiesObservations(object):
             var_list = [i for i in var_list if i not in remove_vars]
 
         nb_obs = getattr(h_zarr, var_list[0]).shape[0]
-        logging.debug('%d observations will be load', nb_obs)
+        logger.debug('%d observations will be load', nb_obs)
         kwargs = dict()
         dims = cls.zarr_dimension(filename)
         if array_dim in dims:
@@ -442,7 +445,7 @@ class EddiesObservations(object):
             var_inv = VAR_DESCR_inv[variable]
             if var_inv == "type_cyc":
                 continue
-            logging.debug('%s will be loaded', variable)
+            logger.debug('%s will be loaded', variable)
             # find unit factor
             factor = 1
             input_unit = h_zarr[variable].attrs.get('unit', None)
@@ -462,7 +465,7 @@ class EddiesObservations(object):
                     factor = input_unit.to(output_unit).to_tuple()[0]
                     # If we are able to find a conversion
                     if factor != 1:
-                        logging.info('%s will be multiply by %f to take care of units(%s->%s)',
+                        logger.info('%s will be multiply by %f to take care of units(%s->%s)',
                                      variable, factor, input_unit, output_unit)
             nb = h_zarr[variable].shape[0]
 
@@ -482,7 +485,7 @@ class EddiesObservations(object):
 
         eddies.sign_type = h_zarr.attrs.get("rotation_type", 0)
         if eddies.sign_type == 0:
-            logging.debug("File come from another algorithm of identification")
+            logger.debug("File come from another algorithm of identification")
             eddies.sign_type = -1
 
         return eddies
@@ -500,7 +503,7 @@ class EddiesObservations(object):
                 var_list = [i for i in var_list if i not in remove_vars]
 
             nb_obs = len(h_nc.dimensions[cls.obs_dimension(h_nc)])
-            logging.debug('%d observations will be load', nb_obs)
+            logger.debug('%d observations will be load', nb_obs)
             kwargs = dict()
             if array_dim in h_nc.dimensions:
                 kwargs["track_array_variables"] = len(h_nc.dimensions[array_dim])
@@ -526,7 +529,7 @@ class EddiesObservations(object):
                     continue
                 # Patch
                 h_nc.variables[variable].set_auto_maskandscale(not raw_data)
-                logging.debug('Up load %s variable%s', variable, ', with raw mode' if raw_data else '')
+                logger.debug('Up load %s variable%s', variable, ', with raw mode' if raw_data else '')
                 # find unit factor
                 factor = 1
                 if not raw_data:
@@ -547,7 +550,7 @@ class EddiesObservations(object):
                             factor = input_unit.to(output_unit).to_tuple()[0]
                             # If we are able to find a conversion
                             if factor != 1:
-                                logging.info('%s will be multiply by %f to take care of units(%s->%s)',
+                                logger.info('%s will be multiply by %f to take care of units(%s->%s)',
                                              variable, factor, input_unit, output_unit)
                 if factor != 1:
                     eddies.obs[var_inv] = h_nc.variables[variable][:] * factor
@@ -560,7 +563,7 @@ class EddiesObservations(object):
                     eddies.sign_type = h_nc.variables[variable][0]
             eddies.sign_type = getattr(h_nc, "rotation_type", 0)
             if eddies.sign_type == 0:
-                logging.debug("File come from another algorithm of identification")
+                logger.debug("File come from another algorithm of identification")
                 eddies.sign_type = -1
 
         return eddies
@@ -819,7 +822,7 @@ class EddiesObservations(object):
         other_links = mask.sum(axis=0)
         max_links = max(self_links.max(), other_links.max())
         if max_links > 5:
-            logging.warning("One observation have %d links", max_links)
+            logger.warning("One observation have %d links", max_links)
 
         # If some obs have multiple link, we keep only one link by eddy
         eddies_separation = 1 < self_links
@@ -836,12 +839,12 @@ class EddiesObservations(object):
             cost_reduce = cost[i_self_keep][:, i_other_keep]
             shape = cost_reduce.shape
             nb_conflict = (~cost_reduce.mask).sum()
-            logging.debug(
+            logger.debug(
                 "Shape conflict matrix : %s, %d conflicts", shape, nb_conflict
             )
 
             if nb_conflict >= (shape[0] + shape[1]):
-                logging.warning(
+                logger.warning(
                     "High number of conflict : %d (nb_conflict)", shape[0] + shape[1]
                 )
 
@@ -865,7 +868,7 @@ class EddiesObservations(object):
                 # we active only this link
                 mask[i_self_keep[i], i_other_keep[j]] = True
                 links_resolve += 1
-            logging.debug("%d links resolve", links_resolve)
+            logger.debug("%d links resolve", links_resolve)
         return mask
 
     @staticmethod
@@ -876,7 +879,7 @@ class EddiesObservations(object):
         other_links = mask.sum(axis=0)
         max_links = max(self_links.max(), other_links.max())
         if max_links > 5:
-            logging.warning("One observation have %d links", max_links)
+            logger.warning("One observation have %d links", max_links)
 
         # If some obs have multiple link, we keep only one link by eddy
         eddies_separation = 1 < self_links
@@ -893,12 +896,12 @@ class EddiesObservations(object):
             cost_reduce = cost[i_self_keep][:, i_other_keep]
             shape = cost_reduce.shape
             nb_conflict = (~cost_reduce.mask).sum()
-            logging.debug(
+            logger.debug(
                 "Shape conflict matrix : %s, %d conflicts", shape, nb_conflict
             )
 
             if nb_conflict >= (shape[0] + shape[1]):
-                logging.warning(
+                logger.warning(
                     "High number of conflict : %d (nb_conflict)", shape[0] + shape[1]
                 )
 
@@ -917,7 +920,7 @@ class EddiesObservations(object):
                 # We activate this link only
                 mask[i_self_keep[i], i_other_keep[j]] = True
 
-            logging.debug("%d links resolve", links_resolve)
+            logger.debug("%d links resolve", links_resolve)
         return mask
 
     def solve_function(self, cost_matrix):
@@ -949,7 +952,7 @@ class EddiesObservations(object):
 
         i_self, i_other = self.post_process_link(other, i_self, i_other)
 
-        logging.debug("%d matched with previous", i_self.shape[0])
+        logger.debug("%d matched with previous", i_self.shape[0])
 
         return i_self, i_other, cost_mat[i_self, i_other]
 
@@ -964,7 +967,7 @@ class EddiesObservations(object):
             # Patch for a transition
             name = ori_name
             #
-            logging.debug("Create Variable %s", VAR_DESCR[name]["nc_name"])
+            logger.debug("Create Variable %s", VAR_DESCR[name]["nc_name"])
             self.create_variable_zarr(
                 handler,
                 dict(
@@ -993,7 +996,7 @@ class EddiesObservations(object):
 
     def to_netcdf(self, handler):
         eddy_size = len(self)
-        logging.debug('Create Dimensions "obs" : %d', eddy_size)
+        logger.debug('Create Dimensions "obs" : %d', eddy_size)
         self.netcdf_create_dimensions(handler, "obs", eddy_size)
         handler.track_extra_variables = ",".join(self.track_extra_variables)
         if self.track_array_variables != 0:
@@ -1010,7 +1013,7 @@ class EddiesObservations(object):
             # Patch for a transition
             name = ori_name
             #
-            logging.debug("Create Variable %s", VAR_DESCR[name]["nc_name"])
+            logger.debug("Create Variable %s", VAR_DESCR[name]["nc_name"])
             self.create_variable(
                 handler,
                 dict(
@@ -1066,7 +1069,7 @@ class EddiesObservations(object):
                 var.setncattr("min", var[:].min())
                 var.setncattr("max", var[:].max())
         except ValueError:
-            logging.warning("Data is empty")
+            logger.warning("Data is empty")
 
     def create_variable_zarr(
         self,
@@ -1126,7 +1129,7 @@ class EddiesObservations(object):
                 v.attrs["min"] = str(v[:].min())
                 v.attrs["max"] = str(v[:].max())
         except ValueError:
-            logging.warning("Data is empty")
+            logger.warning("Data is empty")
 
     def write_file(self, path="./", filename="%(path)s/%(sign_type)s.nc", zarr_flag=False):
         """Write a netcdf with eddy obs
@@ -1140,7 +1143,7 @@ class EddiesObservations(object):
             filename = filename.replace('.nc', '.zarr')
         if filename.endswith('.zarr'):
             zarr_flag = True
-        logging.info("Store in %s", filename)
+        logger.info("Store in %s", filename)
         if zarr_flag:
             handler = zarr.open(filename, 'w')
             self.to_zarr(handler)
