@@ -47,7 +47,7 @@ from numpy import (
     ceil
 )
 from netCDF4 import Dataset
-from ..generic import distance_grid, distance
+from ..generic import distance_grid, distance, flatten_line_matrix
 from .. import VAR_DESCR, VAR_DESCR_inv
 import logging
 from datetime import datetime
@@ -1169,26 +1169,16 @@ class EddiesObservations(object):
             h_nc.setncattr(key, item)
 
     def display(self, ax, ref=None, **kwargs):
+        lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
+        lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
+        lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
+        lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
         if ref is None:
-            ax.plot(self.obs["contour_lon_s"].T, self.obs["contour_lat_s"].T, **kwargs)
-            ax.plot(
-                self.obs["contour_lon_e"].T,
-                self.obs["contour_lat_e"].T,
-                linestyle="-.",
-                **kwargs
-            )
+            ax.plot(lon_s, lat_s, **kwargs)
+            ax.plot(lon_e, lat_e, linestyle="-.", **kwargs)
         else:
-            ax.plot(
-                (self.obs["contour_lon_s"].T - ref) % 360 + ref,
-                self.obs["contour_lat_s"].T,
-                **kwargs
-            )
-            ax.plot(
-                (self.obs["contour_lon_e"].T - ref) % 360 + ref,
-                self.obs["contour_lat_e"].T,
-                linestyle="-.",
-                **kwargs
-            )
+            ax.plot((lon_s - ref) % 360 + ref, lat_s, **kwargs)
+            ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs)
 
 
 class VirtualEddiesObservations(EddiesObservations):

@@ -211,3 +211,25 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     x_new = interp(d_uniform, dist, x_val)
     y_new = interp(d_uniform, dist, y_val)
     return x_new, y_new
+
+
+@njit(cache=True)
+def flatten_line_matrix(l_matrix):
+    """
+    Flat matrix and add on between each line
+    Args:
+        l_matrix: matrix of position
+
+    Returns: array with nan between line
+    """
+    nb_line, sampling = l_matrix.shape
+    final_size = (nb_line - 1) + nb_line * sampling
+    out = empty(final_size, dtype=l_matrix.dtype)
+    inc = 0
+    for i in range(nb_line):
+        for j in range(sampling):
+            out[inc] = l_matrix[i,j]
+            inc += 1
+        out[inc] = nan
+        inc += 1
+    return out

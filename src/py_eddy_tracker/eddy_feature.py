@@ -493,7 +493,7 @@ class Contours(object):
 
     def display(self, ax, step=1, only_used=False, only_unused=False, only_contain_eddies=False, **kwargs):
         from matplotlib.collections import LineCollection
-        for collection in self.contours.collections[::step]:
+        for j, collection in enumerate(self.contours.collections[::step]):
             paths = list()
             for i in collection.get_paths():
                 if only_used and not i.used:
@@ -503,7 +503,13 @@ class Contours(object):
                 elif only_contain_eddies and not i.contain_eddies:
                     continue
                 paths.append(i.vertices)
-            ax.add_collection(LineCollection(paths, color=collection.get_color(), **kwargs))
+            local_kwargs = kwargs.copy()
+            if 'color' not in kwargs:
+                local_kwargs['color'] = collection.get_color()
+                local_kwargs.pop('label')
+            elif j != 0:
+                local_kwargs.pop('label')
+            ax.add_collection(LineCollection(paths, **local_kwargs))
 
         if hasattr(self.contours, '_mins'):
             ax.update_datalim([self.contours._mins, self.contours._maxs])
@@ -516,7 +522,7 @@ class Contours(object):
             sl = slice(None,-1)
             cor = 1
         else:
-            # cylonic
+            # cyclonic
             sl = slice(1, None)
             cor = -1
 
