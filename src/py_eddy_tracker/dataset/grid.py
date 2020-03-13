@@ -1018,7 +1018,7 @@ class RegularGridDataset(GridDataset):
         nb_lines = self.y_c.shape[0]
         dt = list()
         
-        debug_active = logger.getLogger().getEffectiveLevel() == logging.DEBUG
+        debug_active = logger.getEffectiveLevel() == logging.DEBUG
         
         for i, lat in enumerate(self.y_c):
             if abs(lat) > lat_max or data[:, i].mask.all():
@@ -1066,9 +1066,13 @@ class RegularGridDataset(GridDataset):
             if len(dt) == 100:
                 dt.pop(0)
         if extend:
-            return ma.array(data_out, mask=data_out.mask)
+            out = ma.array(data_out, mask=data_out.mask)
         else:
-            return ma.array(data_out, mask=data.mask + data_out.mask)
+            out = ma.array(data_out, mask=data.mask + data_out.mask)
+        print()
+        if out.dtype != data.dtype:
+            return out.astype(data.dtype)
+        return out
 
     def lanczos_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
         data_out = self.convolve_filter_with_dynamic_kernel(
