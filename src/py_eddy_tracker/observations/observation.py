@@ -208,7 +208,7 @@ class EddiesObservations(object):
 
     @property
     def sign_legend(self):
-        return "Cyclonic" if self.sign_type == -1 else "Anticyclonic"
+        return "Cyclonic" if self.sign_type != 1 else "Anticyclonic"
 
     @property
     def shape(self):
@@ -487,7 +487,6 @@ class EddiesObservations(object):
         if eddies.sign_type == 0:
             logger.debug("File come from another algorithm of identification")
             eddies.sign_type = -1
-
         return eddies
 
     @classmethod
@@ -561,7 +560,8 @@ class EddiesObservations(object):
                 var_inv = VAR_DESCR_inv[variable]
                 if var_inv == "type_cyc":
                     eddies.sign_type = h_nc.variables[variable][0]
-            eddies.sign_type = getattr(h_nc, "rotation_type", 0)
+            if eddies.sign_type is None:
+                eddies.sign_type = getattr(h_nc, "rotation_type", 0)
             if eddies.sign_type == 0:
                 logger.debug("File come from another algorithm of identification")
                 eddies.sign_type = -1
