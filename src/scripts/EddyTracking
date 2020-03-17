@@ -103,6 +103,9 @@ def usage():
     parser.add_argument('--zarr',
                         action='store_true',
                         help='Output will be wrote in zarr')
+    parser.add_argument('--unraw',
+                        action='store_true',
+                        help='Load unraw data')
     parser.add_argument('--blank_period',
                         type=int,
                         default=0,
@@ -114,12 +117,13 @@ def usage():
         config = yaml_load(stream)
     if args.correspondance_in is not None and not exists(args.correspondance_in):
         args.correspondance_in = None
-    return config, args.save_correspondance_and_stop, args.correspondance_in, args.correspondance_out, args.blank_period, args.zarr
+    return config, args.save_correspondance_and_stop, args.correspondance_in, args.correspondance_out,\
+           args.blank_period, args.zarr, not args.unraw
 
 
 if __name__ == '__main__':
-    CONFIG, SAVE_STOP, CORRESPONDANCES_IN, CORRESPONDANCES_OUT, BLANK_PERIOD, ZARR = usage()
-
+    CONFIG, SAVE_STOP, CORRESPONDANCES_IN, CORRESPONDANCES_OUT, BLANK_PERIOD, ZARR, RAW = usage()
+    print(RAW)
     # Create output directory
     SAVE_DIR = CONFIG['PATHS'].get('SAVE_DIR', None)
     if SAVE_DIR is not None and not exists(SAVE_DIR):
@@ -189,15 +193,15 @@ if __name__ == '__main__':
     logger.info('Longer track saved have %d obs', CORRESPONDANCES.nb_obs_by_tracks.max())
     logger.info('The mean length is %d observations before filtering', CORRESPONDANCES.nb_obs_by_tracks.mean())
 
-    CORRESPONDANCES.get_unused_data().write_file(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc', zarr_flag=ZARR)
+    CORRESPONDANCES.get_unused_data(raw_data=RAW).write_file(path=SAVE_DIR, filename='%(path)s/%(sign_type)s_untracked.nc', zarr_flag=ZARR)
 
     SHORT_CORRESPONDANCES = CORRESPONDANCES._copy()
     SHORT_CORRESPONDANCES.shorter_than(size_max=NB_OBS_MIN)
 
     CORRESPONDANCES.longer_than(size_min=NB_OBS_MIN)
 
-    FINAL_EDDIES = CORRESPONDANCES.merge()
-    SHORT_TRACK = SHORT_CORRESPONDANCES.merge()
+    FINAL_EDDIES = CORRESPONDANCES.merge(raw_data=RAW)
+    SHORT_TRACK = SHORT_CORRESPONDANCES.merge(raw_data=RAW)
 
     # We flag obs
     if CORRESPONDANCES.virtual:
