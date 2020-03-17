@@ -24,7 +24,7 @@ setup(
     ],
     zip_safe=False,
     entry_points=dict(console_scripts=[
-        'EddyUpdate = py_eddy_tracker.update.__init__:eddy_update',
+        'MergeEddies = py_eddy_tracker.appli:merge_eddies',
     ]),
     package_data={
         'py_eddy_tracker.featured_tracking': ['*.nc'],

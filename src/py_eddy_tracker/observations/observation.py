@@ -238,6 +238,7 @@ class EddiesObservations(object):
             track_extra_variables=list(concatenate((self.track_extra_variables, fields))),
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables,
+            only_variables=list(concatenate((self.obs.dtype.names, fields))),
             raw_data=self.raw_data
         )
         new.sign_type = self.sign_type
@@ -245,6 +246,11 @@ class EddiesObservations(object):
             logger.debug('Copy of field %s ...', field)
             var = field[0]
             new.obs[var] = self.obs[var]
+        return new
+
+    def add_rotation_type(self):
+        new = self.add_fields(('type_cyc',))
+        new.observations['type_cyc'] = self.sign_type
         return new
 
     @property
@@ -378,6 +384,7 @@ class EddiesObservations(object):
             track_extra_variables=eddies.track_extra_variables,
             track_array_variables=eddies.track_array_variables,
             array_variables=eddies.array_variables,
+            only_variables=eddies.only_variables,
         )
 
     def index(self, index):
