@@ -56,6 +56,14 @@ BasePath.lat = lat
 
 
 @njit(cache=True)
+def prepare_for_kdtree(x_val, y_val):
+    data = empty((x_val.shape[0], 2))
+    data[:, 0] = x_val
+    data[:, 1] = y_val
+    return data
+
+
+@njit(cache=True)
 def uniform_resample_stack(vertices, num_fac=2, fixed_size=None):
     x_val, y_val = vertices[:, 0], vertices[:, 1]
     x_new, y_new = uniform_resample(x_val, y_val, num_fac, fixed_size)
@@ -196,6 +204,7 @@ class GridDataset(object):
         'coordinates',
         'filename',
         'dimensions',
+        'indexs',
         'variables_description',
         'global_attrs',
         'vars',
@@ -209,7 +218,7 @@ class GridDataset(object):
     # EARTH_RADIUS = 6378136.3
     N = 1
 
-    def __init__(self, filename, x_name, y_name, centered=None):
+    def __init__(self, filename, x_name, y_name, centered=None, indexs=None):
         self.dimensions = None
         self.variables_description = None
         self.global_attrs = None
@@ -226,6 +235,7 @@ class GridDataset(object):
         self.filename = filename
         self.coordinates = x_name, y_name
         self.vars = dict()
+        self.indexs = None if indexs is None else indexs
         self.interpolators = dict()
         if centered is None:
             logger.warning('We assume the position of grid is the center'
@@ -312,8 +322,10 @@ class GridDataset(object):
             self.x_dim = h.variables[x_name].dimensions
             self.y_dim = h.variables[y_name].dimensions
 
-            self.vars[x_name] = h.variables[x_name][:]
-            self.vars[y_name] = h.variables[y_name][:]
+            sl_x = [self.indexs.get(dim, slice(None)) for dim in self.x_dim]
+            sl_y = [self.indexs.get(dim, slice(None)) for dim in self.y_dim]
+            self.vars[x_name] = h.variables[x_name][sl_x]
+            self.vars[y_name] = h.variables[y_name][sl_y]
 
             if self.is_centered:
                 logger.info('Grid center')
@@ -382,16 +394,18 @@ class GridDataset(object):
         )
         self.vars[grid_out] = self.grid(grid_in).copy()
 
-    def grid(self, varname):
+    def grid(self, varname, indexs=None):
         """give grid required
         """
+        if indexs is None:
+            indexs = dict()
         if varname not in self.vars:
             coordinates_dims = list(self.x_dim)
             coordinates_dims.extend(list(self.y_dim))
             logger.debug('Load %(varname)s from %(filename)s', dict(varname=varname, filename=self.filename))
             with Dataset(self.filename) as h:
                 dims = h.variables[varname].dimensions
-                sl = [slice(None) if dim in coordinates_dims else 0 for dim in dims]
+                sl = [indexs.get(dim, self.indexs.get(dim, slice(None) if dim in coordinates_dims else 0)) for dim in dims]
                 self.vars[varname] = h.variables[varname][sl]
                 if len(self.x_dim) == 1:
                     i_x = where(array(dims) == self.x_dim)[0][0]
@@ -483,6 +497,10 @@ class GridDataset(object):
 
         # Get h grid
         data = self.grid(grid_height).astype('f8')
+        # In case of a reduce mask
+        if len(data.mask.shape) == 0 and not data.mask:
+            data.mask = zeros(data.shape, dtype='bool')
+        # we remove noisy information
         if precision is not None:
             data = (data / precision).round() * precision
         # Compute levels for ssh
@@ -753,6 +771,24 @@ class UnRegularGridDataset(GridDataset):
         '_speed_norm',
     )
 
+    def load(self):
+        """Load variable (data)
+        """
+        x_name, y_name = self.coordinates
+        with Dataset(self.filename) as h:
+            self.x_dim = h.variables[x_name].dimensions
+            self.y_dim = h.variables[y_name].dimensions
+
+            sl_x = [self.indexs.get(dim, slice(None)) for dim in self.x_dim]
+            sl_y = [self.indexs.get(dim, slice(None)) for dim in self.y_dim]
+            self.vars[x_name] = h.variables[x_name][sl_x]
+            self.vars[y_name] = h.variables[y_name][sl_y]
+
+            self.x_c = self.vars[x_name]
+            self.y_c = self.vars[y_name]
+
+            self.init_pos_interpolator()
+
     def bbox_indice(self, vertices):
         dist, idx = self.index_interp.query(vertices, k=1)
         i_y = idx % self.x_c.shape[1]
@@ -761,8 +797,9 @@ class UnRegularGridDataset(GridDataset):
 
     def get_pixels_in(self, contour):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
-        pts = array((self.x_c[x_start:x_stop, y_start:x_stop].reshape(-1),
-                     self.y_c[x_start:y_stop, y_start:y_stop].reshape(-1))).T
+        pts = array((self.x_c[x_start:x_stop, y_start:y_stop].reshape(-1),
+                     self.y_c[x_start:x_stop, y_start:y_stop].reshape(-1))).T
+        x_stop = min(x_stop, self.x_c.shape[0])
         mask = contour.contains_points(pts).reshape((x_stop - x_start, -1))
         i_x, i_y = where(mask)
         i_x += x_start
@@ -785,10 +822,8 @@ class UnRegularGridDataset(GridDataset):
     def init_pos_interpolator(self):
         logger.debug('Create a KdTree could be long ...')
         self.index_interp = cKDTree(
-            uniform_resample_stack((
-                self.x_c.reshape(-1),
-                self.y_c.reshape(-1)
-            )))
+            prepare_for_kdtree(self.x_c.reshape(-1), self.y_c.reshape(-1)))
+
         logger.debug('... OK')
 
     def _low_filter(self, grid_name, x_cut, y_cut, factor=40.):

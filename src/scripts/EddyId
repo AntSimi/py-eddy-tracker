@@ -6,7 +6,7 @@ Do identification
 from datetime import datetime
 from netCDF4 import Dataset
 from py_eddy_tracker import EddyParser
-from py_eddy_tracker.dataset.grid import RegularGridDataset
+from py_eddy_tracker.dataset.grid import RegularGridDataset, UnRegularGridDataset
 import zarr
 
 def id_parser():
@@ -30,6 +30,7 @@ def id_parser():
                         help='Force height unit')
     parser.add_argument('--speed_unit', default=None, type=str,
                         help='Force speed unit')
+    parser.add_argument('--unregular', action='store_true', help='if grid is unregular')
     parser.add_argument('--zarr',
                         action='store_true',
                         help='Output will be wrote in zarr')
@@ -38,8 +39,8 @@ def id_parser():
 
 if __name__ == '__main__':
     args = id_parser().parse_args()
-
-    h = RegularGridDataset(args.filename, args.longitude, args.latitude)
+    grid_class = (UnRegularGridDataset if args.unregular else RegularGridDataset)
+    h = grid_class(args.filename, args.longitude, args.latitude)
     date = datetime.strptime(args.datetime, '%Y%m%d')
     if args.u == 'None' and args.v == 'None':
         h.add_uv(args.h)

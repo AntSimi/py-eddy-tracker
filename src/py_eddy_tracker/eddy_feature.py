@@ -352,7 +352,7 @@ class Contours(object):
         logger.debug('Y shape : %s', y.shape)
         logger.debug('Z shape : %s', z.shape)
         logger.info('Start computing iso lines with %d levels from %f to %f ...', len(levels), levels[0], levels[-1])
-        self.contours = ax.contour(x, y, z.T, levels, cmap='rainbow')
+        self.contours = ax.contour(x, y, z.T if z.shape != x.shape else z, levels, cmap='rainbow')
         if wrap_x:
             self.find_wrapcut_path_and_join(x[0], x[-1])
         logger.info('Finish computing iso lines')
