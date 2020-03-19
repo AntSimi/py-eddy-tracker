@@ -568,7 +568,11 @@ class EddiesObservations(object):
                 if var_inv == "type_cyc":
                     eddies.sign_type = h_nc.variables[variable][0]
             if eddies.sign_type is None:
-                eddies.sign_type = getattr(h_nc, "rotation_type", 0)
+                title = getattr(h_nc, 'title', None)
+                if title is None:
+                    eddies.sign_type = getattr(h_nc, "rotation_type", 0)
+                else:
+                    eddies.sign_type = -1 if title == 'Cyclonic' else 1
             if eddies.sign_type == 0:
                 logger.debug("File come from another algorithm of identification")
                 eddies.sign_type = -1

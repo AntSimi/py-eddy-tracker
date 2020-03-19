@@ -123,7 +123,6 @@ def usage():
 
 if __name__ == '__main__':
     CONFIG, SAVE_STOP, CORRESPONDANCES_IN, CORRESPONDANCES_OUT, BLANK_PERIOD, ZARR, RAW = usage()
-    print(RAW)
     # Create output directory
     SAVE_DIR = CONFIG['PATHS'].get('SAVE_DIR', None)
     if SAVE_DIR is not None and not exists(SAVE_DIR):

@@ -12,10 +12,12 @@ def merge_eddies():
     args = parser.parse_args()
 
     obs = TrackEddiesObservations.load_file(args.filename[0], raw_data=True, include_vars=args.include_var)
-    obs = obs.add_rotation_type()
+    if args.add_rotation_variable:
+        obs = obs.add_rotation_type()
     for filename in args.filename[1:]:
         other = TrackEddiesObservations.load_file(filename, raw_data=True, include_vars=args.include_var)
-        other = other.add_rotation_type()
+        if args.add_rotation_variable:
+            other = other.add_rotation_type()
         obs = obs.merge(other)
     obs.write_file(filename=args.out)
 
