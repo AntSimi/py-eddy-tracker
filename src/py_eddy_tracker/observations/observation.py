@@ -142,7 +142,6 @@ class EddiesObservations(object):
         "array_variables",
         "only_variables",
         "observations",
-        "active",
         "sign_type",
         "raw_data",
     )
@@ -183,7 +182,6 @@ class EddiesObservations(object):
             if elt not in VAR_DESCR:
                 raise Exception("Unknown element : %s" % elt)
         self.observations = zeros(size, dtype=self.dtype)
-        self.active = True
         self.sign_type = None
 
     @property
@@ -385,6 +383,7 @@ class EddiesObservations(object):
             track_array_variables=eddies.track_array_variables,
             array_variables=eddies.array_variables,
             only_variables=eddies.only_variables,
+            raw_data=eddies.raw_data
         )
 
     def index(self, index):
