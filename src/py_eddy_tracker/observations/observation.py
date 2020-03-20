@@ -319,6 +319,9 @@ class EddiesObservations(object):
             eddies.obs[key][:nb_obs_self] = self.obs[key][:]
             if key in other_keys:
                 eddies.obs[key][nb_obs_self:] = other.obs[key][:]
+        if 'track' in other_keys:
+            last_track = eddies.obs['track'][nb_obs_self - 1] + 1
+            eddies.obs['track'][nb_obs_self:] += last_track
         eddies.sign_type = self.sign_type
         return eddies
 
