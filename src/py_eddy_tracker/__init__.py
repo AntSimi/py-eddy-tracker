@@ -33,6 +33,17 @@ import numpy
 import zarr
 
 
+def start_logger():
+    FORMAT_LOG = "%(levelname)-8s %(asctime)s %(module)s.%(funcName)s :\n\t\t\t\t\t%(message)s"
+    # set up logging to CONSOLE
+    console = logging.StreamHandler()
+    console.setFormatter(ColoredFormatter(FORMAT_LOG))
+    logger = logging.getLogger('pet')
+    # add the handler to the root logger
+    logger.addHandler(console)
+    return logger
+
+
 class ColoredFormatter(logging.Formatter):
     COLOR_LEVEL = dict(
         CRITICAL="\037[37;41m",
@@ -60,9 +71,6 @@ class EddyParser(ArgumentParser):
     """General parser for applications
     """
 
-    FORMAT_LOG = "%(levelname)-8s %(asctime)s %(module)s." \
-                 "%(funcName)s :\n\t\t\t\t\t%(message)s"
-
     def __init__(self, *args, **kwargs):
         super(EddyParser, self).__init__(*args, **kwargs)
         self.add_base_argument()
@@ -77,12 +85,7 @@ class EddyParser(ArgumentParser):
                                ' ERROR, CRITICAL')
 
     def parse_args(self, *args, **kwargs):
-        # set up logging to CONSOLE
-        console = logging.StreamHandler()
-        console.setFormatter(ColoredFormatter(self.FORMAT_LOG))
-        logger = logging.getLogger('pet')
-        # add the handler to the root logger
-        logger.addHandler(console)
+        logger = start_logger()
         # Parsing
         opts = super(EddyParser, self).parse_args(*args, **kwargs)
         # set current level

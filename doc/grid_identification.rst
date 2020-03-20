@@ -34,8 +34,8 @@ Activate verbose
 
 .. code-block:: python
 
-    import logging
-    logging.getLogger().setLevel('DEBUG') # Available options: ERROR, WARNING, INFO, DEBUG
+    from py_eddy_tracker import start_logger
+    start_logger().setLevel('DEBUG') # Available options: ERROR, WARNING, INFO, DEBUG
 
 Run identification
 
@@ -74,6 +74,7 @@ Save identification data
 
 .. code-block:: python
 
+    from netCDF import Dataset
     with Dataset(date.strftime('share/Anticyclonic_%Y%m%d.nc'), 'w') as h:
         a.to_netcdf(h)
     with Dataset(date.strftime('share/Cyclonic_%Y%m%d.nc'), 'w') as h:
