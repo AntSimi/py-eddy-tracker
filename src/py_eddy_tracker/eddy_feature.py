@@ -45,6 +45,7 @@ class Amplitude(object):
         'h_0',
         'grid_extract',
         'pixel_mask',
+        'nb_pixel',
         'sla',
         'contour',
         'interval_min',
@@ -77,6 +78,7 @@ class Amplitude(object):
             i_x %= data.shape[0]
 
         self.pixel_mask[i_x, contour.pixels_index[1] - y_start] = True
+        self.nb_pixel = i_x.shape[0]
 
         # Only pixel in contour
         self.sla = data[contour.pixels_index]
@@ -106,7 +108,7 @@ class Amplitude(object):
             # After we use grid.data because index are in contour and we check before than no pixel are hide
             nb = len(lmi_i)
             if nb == 0:
-                logger.warning('No extrema found in contour in level %f', level)
+                logger.warning('No extrema found in contour of %d pixels in level %f', self.nb_pixel,level)
                 return False
             elif nb == 1:
                 i, j = lmi_i[0], lmi_j[0]
@@ -137,7 +139,7 @@ class Amplitude(object):
                                                 self.mle, -1)
             nb = len(lmi_i)
             if nb == 0:
-                logger.warning('No extrema found in contour in level %f', level)
+                logger.warning('No extrema found in contour of %d pixels in level %f', self.nb_pixel,level)
                 return False
             elif nb == 1:
                 i, j = lmi_i[0], lmi_j[0]

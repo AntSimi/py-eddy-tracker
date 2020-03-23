@@ -22,7 +22,7 @@ from ..observations.observation import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
 from .. import VAR_DESCR
 from ..generic import distance, interp2d_geo, fit_circle, uniform_resample
-from ..poly import poly_contain_poly, winding_number_grid_in_poly
+from ..poly import poly_contain_poly, winding_number_grid_in_poly, winding_number_poly
 
 logger = logging.getLogger("pet")
 
@@ -115,6 +115,33 @@ def _fit_circle_path(vertice):
     centlon_e, centlat_e = local_to_coordinates(centlon_e, centlat_e, lon0, lat0)
     centlon_e = (centlon_e - lon0 + 180) % 360 + lon0 - 180
     return centlon_e, centlat_e, eddy_radius_e, aerr
+
+
+@njit(cache=True, fastmath=True)
+def _get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
+    if x_stop < x_start:
+        x_ref = vertices[0, 0]
+        x_array = (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360 + x_ref - 180
+        return winding_number_grid_in_poly(x_array, y_c[y_start:y_stop], x_start, x_stop, x_c.shape[0], y_start,
+                                           vertices)
+    else:
+        return winding_number_grid_in_poly(x_c[x_start:x_stop], y_c[y_start:y_stop], x_start, x_stop, x_c.shape[0],
+                                           y_start, vertices)
+
+
+@njit(cache=True, fastmath=True)
+def _get_pixel_in_unregular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
+    nb_x, nb_y = x_stop - x_start, y_stop -y_start
+    wn = empty((nb_x, nb_y), dtype=numba_types.bool_)
+    for i in range(nb_x):
+        for j in range(nb_y):
+            x_pt = x_c[i + x_start, j + y_start]
+            y_pt = y_c[i + x_start, j + y_start]
+            wn[i, j] = winding_number_poly(x_pt, y_pt, vertices)
+    i_x, i_y = where(wn)
+    i_x += x_start
+    i_y += y_start
+    return i_x, i_y
 
 
 @njit(cache=True, fastmath=True)
@@ -216,6 +243,7 @@ class GridDataset(object):
     GRAVITY = 9.807
     EARTH_RADIUS = 6370997.
     # EARTH_RADIUS = 6378136.3
+    # indice margin (if put to 0, raise warning that i don't understand)
     N = 1
 
     def __init__(self, filename, x_name, y_name, centered=None, indexs=None):
@@ -235,7 +263,7 @@ class GridDataset(object):
         self.filename = filename
         self.coordinates = x_name, y_name
         self.vars = dict()
-        self.indexs = None if indexs is None else indexs
+        self.indexs = dict() if indexs is None else indexs
         self.interpolators = dict()
         if centered is None:
             logger.warning('We assume the position of grid is the center'
@@ -793,18 +821,12 @@ class UnRegularGridDataset(GridDataset):
         dist, idx = self.index_interp.query(vertices, k=1)
         i_y = idx % self.x_c.shape[1]
         i_x = int_((idx - i_y) / self.x_c.shape[1])
-        return (i_x.min() - self.N, i_x.max() + self.N + 1), (i_y.min() - self.N, i_y.max() + self.N + 1)
+        return (max(i_x.min() - self.N, 0), i_x.max() + self.N + 1), \
+               (max(i_y.min() - self.N, 0), i_y.max() + self.N + 1)
 
     def get_pixels_in(self, contour):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
-        pts = array((self.x_c[x_start:x_stop, y_start:y_stop].reshape(-1),
-                     self.y_c[x_start:x_stop, y_start:y_stop].reshape(-1))).T
-        x_stop = min(x_stop, self.x_c.shape[0])
-        mask = contour.contains_points(pts).reshape((x_stop - x_start, -1))
-        i_x, i_y = where(mask)
-        i_x += x_start
-        i_y += y_start
-        return i_x, i_y
+        return _get_pixel_in_unregular(contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop)
 
     def normalize_x_indice(self, indices):
         """Not do"""
@@ -903,25 +925,18 @@ class RegularGridDataset(GridDataset):
         self.yinterp = arange(self.y_bounds.shape[0])
 
     def bbox_indice(self, vertices):
-        return bbox_indice_regular(vertices, self.x_bounds[0], self.y_bounds[0], self.xstep, self.ystep,
+        return bbox_indice_regular(vertices, self.x_bounds, self.y_bounds, self.xstep, self.ystep,
                                    self.N, self.is_circular(), self.x_size)
 
     def get_pixels_in(self, contour):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
-        if x_stop < x_start:
-            x_ref = contour.vertices[0, 0]
-            x_array = (concatenate((self.x_c[x_start:], self.x_c[:x_stop])) - x_ref + 180) % 360 + x_ref - 180
-        else:
-            x_array = self.x_c[x_start:x_stop]
-        return winding_number_grid_in_poly(x_array, self.y_c[y_start:y_stop], x_start, x_stop, self.x_size, y_start,
-                                           contour.vertices)
+        return _get_pixel_in_regular(contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop)
 
     def normalize_x_indice(self, indices):
         return indices % self.x_size
 
     def nearest_grd_indice(self, x, y):
-        return int32(round_(((x - self.x_bounds[0]) % 360) / self.xstep)), \
-               int32(round_((y - self.y_bounds[0]) / self.ystep))
+        return _nearest_grd_indice(x,y, self.x_bounds, self.y_bounds, self.xstep, self.ystep)
 
     @property
     def xstep(self):
@@ -1066,7 +1081,7 @@ class RegularGridDataset(GridDataset):
             t0 = datetime.now()
             if debug_active and len(dt) > 0:
                 dt_mean = np_mean(dt) * (nb_lines - i)
-                print('Remain ', dt_mean, 'ETA ', t0 + dt_mean, 'current kernel size :', k_shape, 'Step : %d/%d' % (i, nb_lines), end="\r")
+                print('Remain ', dt_mean, 'ETA ', t0 + dt_mean, 'current kernel size :', k_shape, 'Step : %d/%d    ' % (i, nb_lines), end="\r")
             
             
             # Half size, k_shape must be always impair
@@ -1452,11 +1467,16 @@ def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
     lon, lat = vertices[:, 0], vertices[:, 1]
     lon_min, lon_max = lon.min(), lon.max()
     lat_min, lat_max = lat.min(), lat.max()
-    i_x0, i_y0 = int32(((lon_min - x0) % 360) // xstep), int32((lat_min - y0) // ystep)
-    i_x1, i_y1 = int32(((lon_max - x0) % 360) // xstep), int32((lat_max - y0) // ystep)
+    i_x0, i_y0 = _nearest_grd_indice(lon_min, lat_min, x0, y0, xstep, ystep)
+    i_x1, i_y1 = _nearest_grd_indice(lon_max, lat_max, x0, y0, xstep, ystep)
     if circular:
         slice_x = (i_x0 - N) % x_size, (i_x1 + N + 1) % x_size
     else:
-        slice_x = min(i_x0 - N, 0), i_x1 + N + 1
+        slice_x = max(i_x0 - N, 0), i_x1 + N + 1
     slice_y = i_y0 - N, i_y1 + N + 1
     return slice_x, slice_y
+
+
+@njit(cache=True, fastmath=True)
+def _nearest_grd_indice(x, y, x0, y0, xstep, ystep):
+    return numba_types.int32(round(((x - x0[0]) % 360.) / xstep)), numba_types.int32(round((y - y0[0]) / ystep))
