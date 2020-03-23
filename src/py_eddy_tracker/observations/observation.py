@@ -443,8 +443,6 @@ class EddiesObservations(object):
         kwargs["track_extra_variables"] = []
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
-            if var_inv == "type_cyc":
-                continue
             if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                 kwargs["track_extra_variables"].append(var_inv)
         kwargs["raw_data"] = raw_data
@@ -452,8 +450,6 @@ class EddiesObservations(object):
         eddies = cls(size=nb_obs, **kwargs)
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
-            if var_inv == "type_cyc":
-                continue
             logger.debug('%s will be loaded', variable)
             # find unit factor
             factor = 1
@@ -524,8 +520,6 @@ class EddiesObservations(object):
             kwargs["track_extra_variables"] = []
             for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
-                if var_inv == "type_cyc":
-                    continue
                 if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                     kwargs["track_extra_variables"].append(var_inv)
             kwargs["raw_data"] = raw_data
@@ -533,8 +527,6 @@ class EddiesObservations(object):
             eddies = cls(size=nb_obs, **kwargs)
             for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
-                if var_inv == "type_cyc":
-                    continue
                 # Patch
                 h_nc.variables[variable].set_auto_maskandscale(not raw_data)
                 logger.debug('Up load %s variable%s', variable, ', with raw mode' if raw_data else '')
