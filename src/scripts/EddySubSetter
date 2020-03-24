@@ -11,7 +11,7 @@ logger = logging.getLogger("pet")
 
 
 def id_parser():
-    parser = EddyParser('Eddy Identification')
+    parser = EddyParser('Eddy Subsetter')
     parser.add_argument('filename')
     parser.add_argument('filename_out')
 
@@ -30,11 +30,17 @@ def id_parser():
                        metavar=('llcrnrlon', 'llcrnrlat', 'urcrnrlon', 'urcrnrlat'),
                        help='Coordinates of bounding to extract'
                        )
+    group.add_argument('--direction', choices=['E', 'W', 'S', 'N'],
+                       help='Select only track which have an end point which go in this direction')
+    group.add_argument('--minimal_degrees_displacement_in_direction', type=float,
+                       help='Minimal displacement in direction specified in --directio options')
+    group.add_argument('--select_first_observation_in_box', type=float,
+                       help='Select only the first obs in each box for each tracks, value specified must be resolution')
     group.add_argument('--remove_var', nargs='+', type=str, help='remove all listed variable')
     group.add_argument('--include_var', nargs='+', type=str, help='use only listed variable, remove_var will be ignored')
     group.add_argument('-i', '--ids', nargs='+', type=int, help='List of tracks which will be extract')
 
-    group = parser.add_argument_group('Extraction options')
+    group = parser.add_argument_group('General options')
     group.add_argument('--sort_time', action='store_true', help='sort all observation with time')
 
     parser.add_argument('-n', '--no_raw_mode', action='store_true',
@@ -77,6 +83,18 @@ if __name__ == '__main__':
         dataset = dataset.extract_with_area(area, full_path=args.full_path,
                                             remove_incomplete=args.remove_incomplete,
                                               reject_virtual=args.reject_virtual)
+
+    # Select only track which go in the direction specified
+    if args.direction:
+        if args.minimal_degrees_displacement_in_direction:
+            dataset = dataset.extract_in_direction(
+                args.direction,
+                value=args.minimal_degrees_displacement_in_direction)
+        else:
+            dataset = dataset.extract_in_direction(args.direction)
+
+    if args.select_first_observation_in_box:
+        dataset = dataset.extract_first_obs_in_box(res=args.select_first_observation_in_box)
 
     if args.sort_time:
         logger.debug('start sorting ...')

@@ -223,6 +223,33 @@ class TrackEddiesObservations(EddiesObservations):
         mask = self.get_mask_from_id(array(tracks))
         return self.__extract_with_mask(mask)
 
+    def extract_first_obs_in_box(self, res):
+        data = empty(self.obs.shape, dtype=[('lon', 'f4'), ('lat', 'f4'), ('track', 'i4')])
+        data['lon'] = self.longitude - self.longitude % res
+        data['lat'] = self.latitude - self.latitude % res
+        data['track'] = self.obs["track"]
+        _, indexs = unique(data, return_index=True)
+        mask = zeros(self.obs.shape, dtype='bool')
+        mask[indexs] = True
+        return self.__extract_with_mask(mask)
+
+    def extract_in_direction(self, direction, value=0):
+        nb_obs = self.nb_obs_by_track
+        i_start = self.index_from_track
+        i_stop = i_start + nb_obs - 1
+        if direction in ('S', 'N'):
+            d_lat = self.latitude[i_stop] - self.latitude[i_start]
+            mask = d_lat < 0 if 'S' == direction else d_lat > 0
+            mask &= abs(d_lat) > value
+        else:
+            lon_start , lon_end = self.longitude[i_start], self.longitude[i_stop]
+            lon_end = (lon_end - (lon_start - 180)) % 360 + lon_start - 180
+            d_lon = lon_end - lon_start
+            mask = d_lon < 0 if 'W' == direction else d_lon > 0
+            mask &= abs(d_lon) > value
+        mask = mask.repeat(nb_obs)
+        return self.__extract_with_mask(mask)
+
     def extract_with_length(self, bounds):
         b0, b1 = bounds
         if b0 >= 0 and b1 >= 0:

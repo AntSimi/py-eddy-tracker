@@ -2,7 +2,7 @@
 """
 """
 import logging
-from numpy import concatenate, int32, empty, where, array, \
+from numpy import concatenate, empty, where, array, \
     sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
     linspace, errstate, int_, interp, meshgrid, nan, ceil, sinc, isnan, \
     percentile, zeros, arctan2, arcsin, round_, nanmean, exp, mean as np_mean
@@ -1082,8 +1082,7 @@ class RegularGridDataset(GridDataset):
             if debug_active and len(dt) > 0:
                 dt_mean = np_mean(dt) * (nb_lines - i)
                 print('Remain ', dt_mean, 'ETA ', t0 + dt_mean, 'current kernel size :', k_shape, 'Step : %d/%d    ' % (i, nb_lines), end="\r")
-            
-            
+
             # Half size, k_shape must be always impair
             d_lat = int((k_shape[1] - 1) / 2)
             d_lon = int((k_shape[0] - 1) / 2)
@@ -1119,7 +1118,8 @@ class RegularGridDataset(GridDataset):
             out = ma.array(data_out, mask=data_out.mask)
         else:
             out = ma.array(data_out, mask=data.mask + data_out.mask)
-        print()
+        if debug_active:
+            print()
         if out.dtype != data.dtype:
             return out.astype(data.dtype)
         return out

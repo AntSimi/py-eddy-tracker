@@ -81,7 +81,7 @@ def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
     # the  winding number counter
     nb_x, nb_y = len(x_1d), len(y_1d)
     wn = empty((nb_x, nb_y), dtype=numba_types.bool_)
-    for i in range(nb_x):
+    for i in prange(nb_x):
         x_pt = x_1d[i]
         for j in range(nb_y):
             y_pt = y_1d[j]
