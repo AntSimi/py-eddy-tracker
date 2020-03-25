@@ -315,11 +315,12 @@ class EddiesObservations(object):
         nb_obs = nb_obs_self + len(other)
         eddies = self.new_like(self, nb_obs)
         other_keys = other.obs.dtype.fields.keys()
+        self_keys = self.obs.dtype.fields.keys()
         for key in eddies.obs.dtype.fields.keys():
             eddies.obs[key][:nb_obs_self] = self.obs[key][:]
             if key in other_keys:
                 eddies.obs[key][nb_obs_self:] = other.obs[key][:]
-        if 'track' in other_keys:
+        if 'track' in other_keys and 'track' in self_keys:
             last_track = eddies.obs['track'][nb_obs_self - 1] + 1
             eddies.obs['track'][nb_obs_self:] += last_track
         eddies.sign_type = self.sign_type
