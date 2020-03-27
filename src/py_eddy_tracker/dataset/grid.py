@@ -1124,14 +1124,14 @@ class RegularGridDataset(GridDataset):
             return out.astype(data.dtype)
         return out
 
-    def lanczos_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
+    def lanczos_high_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order)
+            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
         self.vars[grid_name] -= data_out
 
-    def lanczos_low_filter(self, grid_name, wave_length, order=1, lat_max=85):
+    def lanczos_low_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order)
+            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
         self.vars[grid_name] = data_out
 
     def bessel_band_filter(self, grid_name, wave_length_inf, wave_length_sup, **kwargs):
@@ -1142,17 +1142,17 @@ class RegularGridDataset(GridDataset):
             grid_name, self.kernel_bessel, wave_length=wave_length_sup, **kwargs)
         self.vars[grid_name] -= data_out
 
-    def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85):
+    def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
         logger.debug('Run filtering with wave of %(wave_length)s km and order of %(order)s ...',
                       dict(wave_length=wave_length, order=order))
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
+            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
         logger.debug('Filtering done')
         self.vars[grid_name] -= data_out
 
-    def bessel_low_filter(self, grid_name, wave_length, order=1, lat_max=85):
+    def bessel_low_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order)
+            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
         self.vars[grid_name] = data_out
 
     def spectrum_lonlat(self, grid_name, area=None, ref=None, **kwargs):
