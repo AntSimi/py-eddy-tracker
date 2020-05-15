@@ -76,7 +76,7 @@ class Amplitude(object):
         i_x = contour.pixels_index[0] - x_start
         if on_bounds:
             i_x %= data.shape[0]
-
+        
         self.pixel_mask[i_x, contour.pixels_index[1] - y_start] = True
         self.nb_pixel = i_x.shape[0]
 
@@ -508,9 +508,9 @@ class Contours(object):
             local_kwargs = kwargs.copy()
             if 'color' not in kwargs:
                 local_kwargs['color'] = collection.get_color()
-                local_kwargs.pop('label')
+                local_kwargs.pop('label', None)
             elif j != 0:
-                local_kwargs.pop('label')
+                local_kwargs.pop('label', None)
             ax.add_collection(LineCollection(paths, **local_kwargs))
 
         if hasattr(self.contours, '_mins'):

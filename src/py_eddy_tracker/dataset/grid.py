@@ -2,10 +2,39 @@
 """
 """
 import logging
-from numpy import concatenate, empty, where, array, \
-    sin, deg2rad, pi, ones, cos, ma, int8, histogram2d, arange, float_, \
-    linspace, errstate, int_, interp, meshgrid, nan, ceil, sinc, isnan, \
-    percentile, zeros, arctan2, arcsin, round_, nanmean, exp, mean as np_mean
+from numpy import (
+    concatenate,
+    empty,
+    where,
+    array,
+    sin,
+    deg2rad,
+    pi,
+    ones,
+    cos,
+    ma,
+    int8,
+    histogram2d,
+    arange,
+    float_,
+    linspace,
+    errstate,
+    int_,
+    interp,
+    meshgrid,
+    nan,
+    ceil,
+    sinc,
+    isnan,
+    percentile,
+    zeros,
+    arctan2,
+    arcsin,
+    round_,
+    nanmean,
+    exp,
+    mean as np_mean,
+)
 from datetime import datetime
 from scipy.special import j1
 from netCDF4 import Dataset
@@ -31,7 +60,9 @@ def raw_resample(datas, fixed_size):
     nb_value = datas.shape[0]
     if nb_value == 1:
         raise Exception()
-    return interp(arange(fixed_size), arange(nb_value) * (fixed_size - 1) / (nb_value - 1), datas)
+    return interp(
+        arange(fixed_size), arange(nb_value) * (fixed_size - 1) / (nb_value - 1), datas
+    )
 
 
 @property
@@ -81,7 +112,9 @@ def value_on_regular_contour(x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size
 
 
 @njit(cache=True)
-def mean_on_regular_contour(x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size=None, nan_remove=False):
+def mean_on_regular_contour(
+    x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size=None, nan_remove=False
+):
     x_val, y_val = vertices[:, 0], vertices[:, 1]
     x_new, y_new = uniform_resample(x_val, y_val, num_fac, fixed_size)
     values = interp2d_geo(x_g, y_g, z_g, m_g, x_new[1:], y_new[1:])
@@ -92,7 +125,7 @@ def mean_on_regular_contour(x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size=
 
 
 def fit_circle_path(self):
-    if not hasattr(self, '_circle_params'):
+    if not hasattr(self, "_circle_params"):
         self._circle_params = _fit_circle_path(self.vertices)
     return self._circle_params
 
@@ -121,17 +154,35 @@ def _fit_circle_path(vertice):
 def _get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
     if x_stop < x_start:
         x_ref = vertices[0, 0]
-        x_array = (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360 + x_ref - 180
-        return winding_number_grid_in_poly(x_array, y_c[y_start:y_stop], x_start, x_stop, x_c.shape[0], y_start,
-                                           vertices)
+        x_array = (
+            (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360
+            + x_ref
+            - 180
+        )
+        return winding_number_grid_in_poly(
+            x_array,
+            y_c[y_start:y_stop],
+            x_start,
+            x_stop,
+            x_c.shape[0],
+            y_start,
+            vertices,
+        )
     else:
-        return winding_number_grid_in_poly(x_c[x_start:x_stop], y_c[y_start:y_stop], x_start, x_stop, x_c.shape[0],
-                                           y_start, vertices)
+        return winding_number_grid_in_poly(
+            x_c[x_start:x_stop],
+            y_c[y_start:y_stop],
+            x_start,
+            x_stop,
+            x_c.shape[0],
+            y_start,
+            vertices,
+        )
 
 
 @njit(cache=True, fastmath=True)
 def _get_pixel_in_unregular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
-    nb_x, nb_y = x_stop - x_start, y_stop -y_start
+    nb_x, nb_y = x_stop - x_start, y_stop - y_start
     wn = empty((nb_x, nb_y), dtype=numba_types.bool_)
     for i in range(nb_x):
         for j in range(nb_y):
@@ -146,7 +197,7 @@ def _get_pixel_in_unregular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop
 
 @njit(cache=True, fastmath=True)
 def coordinates_to_local(lon, lat, lon0, lat0):
-    D2R = pi / 180.
+    D2R = pi / 180.0
     R = 6370997
     dlon = (lon - lon0) * D2R
     sin_dlat = sin((lat - lat0) * 0.5 * D2R)
@@ -158,18 +209,25 @@ def coordinates_to_local(lon, lat, lon0, lat0):
 
     azimuth = pi / 2 - arctan2(
         cos_lat * sin(dlon),
-        cos_lat0 * sin(lat * D2R) - sin(lat0 * D2R) * cos_lat * cos(dlon))
+        cos_lat0 * sin(lat * D2R) - sin(lat0 * D2R) * cos_lat * cos(dlon),
+    )
     return module * cos(azimuth), module * sin(azimuth)
 
 
 @njit(cache=True, fastmath=True)
 def local_to_coordinates(x, y, lon0, lat0):
-    D2R = pi / 180.
+    D2R = pi / 180.0
     R = 6370997
-    d = (x ** 2 + y ** 2) ** .5 / R
+    d = (x ** 2 + y ** 2) ** 0.5 / R
     a = -(arctan2(y, x) - pi / 2)
     lat = arcsin(sin(lat0 * D2R) * cos(d) + cos(lat0 * D2R) * sin(d) * cos(a))
-    lon = lon0 + arctan2(sin(a) * sin(d) * cos(lat0 * D2R), cos(d) - sin(lat0 * D2R) * sin(lat)) / D2R
+    lon = (
+        lon0
+        + arctan2(
+            sin(a) * sin(d) * cos(lat0 * D2R), cos(d) - sin(lat0 * D2R) * sin(lat)
+        )
+        / D2R
+    )
     return lon, lat / D2R
 
 
@@ -177,31 +235,31 @@ BasePath.fit_circle = fit_circle_path
 
 
 def pixels_in(self, grid):
-    if not hasattr(self, '_slice'):
+    if not hasattr(self, "_slice"):
         self._slice = grid.bbox_indice(self.vertices)
-    if not hasattr(self, '_pixels_in'):
+    if not hasattr(self, "_pixels_in"):
         self._pixels_in = grid.get_pixels_in(self)
     return self._pixels_in
 
 
 @property
 def bbox_slice(self):
-    if not hasattr(self, '_slice'):
-        raise Exception('No pixels_in call before!')
+    if not hasattr(self, "_slice"):
+        raise Exception("No pixels_in call before!")
     return self._slice
 
 
 @property
 def pixels_index(self):
-    if not hasattr(self, '_slice'):
-        raise Exception('No pixels_in call before!')
+    if not hasattr(self, "_slice"):
+        raise Exception("No pixels_in call before!")
     return self._pixels_in
 
 
 @property
 def nb_pixel(self):
-    if not hasattr(self, '_pixels_in'):
-        raise Exception('No pixels_in call before!')
+    if not hasattr(self, "_pixels_in"):
+        raise Exception("No pixels_in call before!")
     return self._pixels_in[0].shape[0]
 
 
@@ -217,31 +275,31 @@ class GridDataset(object):
     """
 
     __slots__ = (
-        '_x_var',
-        '_y_var',
-        'x_c',
-        'y_c',
-        'x_bounds',
-        'y_bounds',
-        'centered',
-        'xinterp',
-        'yinterp',
-        'x_dim',
-        'y_dim',
-        'coordinates',
-        'filename',
-        'dimensions',
-        'indexs',
-        'variables_description',
-        'global_attrs',
-        'vars',
-        'interpolators',
-        'speed_coef',
-        'contours',
+        "_x_var",
+        "_y_var",
+        "x_c",
+        "y_c",
+        "x_bounds",
+        "y_bounds",
+        "centered",
+        "xinterp",
+        "yinterp",
+        "x_dim",
+        "y_dim",
+        "coordinates",
+        "filename",
+        "dimensions",
+        "indexs",
+        "variables_description",
+        "global_attrs",
+        "vars",
+        "interpolators",
+        "speed_coef",
+        "contours",
     )
 
     GRAVITY = 9.807
-    EARTH_RADIUS = 6370997.
+    EARTH_RADIUS = 6370997.0
     # EARTH_RADIUS = 6378136.3
     # indice margin (if put to 0, raise warning that i don't understand)
     N = 1
@@ -266,8 +324,9 @@ class GridDataset(object):
         self.indexs = dict() if indexs is None else indexs
         self.interpolators = dict()
         if centered is None:
-            logger.warning('We assume the position of grid is the center'
-                            ' corner for %s', filename)
+            logger.warning(
+                "We assume the position of grid is the center corner for %s", filename,
+            )
         self.load_general_features()
         self.load()
 
@@ -284,43 +343,43 @@ class GridDataset(object):
     def load_general_features(self):
         """Load attrs
         """
-        logger.debug('Load general feature from %(filename)s', dict(filename=self.filename))
+        logger.debug(
+            "Load general feature from %(filename)s", dict(filename=self.filename)
+        )
         with Dataset(self.filename) as h:
             # Load generals
             self.dimensions = {i: len(v) for i, v in h.dimensions.items()}
             self.variables_description = dict()
             for i, v in h.variables.items():
                 args = (i, v.datatype)
-                kwargs = dict(
-                    dimensions=v.dimensions,
-                    zlib=True,
-                )
-                if hasattr(v, '_FillValue'):
-                    kwargs['fill_value'] = v._FillValue,
+                kwargs = dict(dimensions=v.dimensions, zlib=True,)
+                if hasattr(v, "_FillValue"):
+                    kwargs["fill_value"] = (v._FillValue,)
                 attrs = dict()
                 for attr in v.ncattrs():
                     if attr in kwargs.keys():
                         continue
-                    if attr == '_FillValue':
+                    if attr == "_FillValue":
                         continue
                     attrs[attr] = getattr(v, attr)
                 self.variables_description[i] = dict(
-                    args=args,
-                    kwargs=kwargs,
-                    attrs=attrs,
-                    infos=dict())
+                    args=args, kwargs=kwargs, attrs=attrs, infos=dict()
+                )
             self.global_attrs = {attr: getattr(h, attr) for attr in h.ncattrs()}
 
     def write(self, filename):
         """Write dataset output with same format like input
         """
-        with Dataset(filename, 'w') as h_out:
+        with Dataset(filename, "w") as h_out:
             for dimension, size in self.dimensions.items():
                 test = False
                 for varname, variable in self.variables_description.items():
-                    if varname not in self.coordinates and varname not in self.vars.keys():
+                    if (
+                        varname not in self.coordinates
+                        and varname not in self.vars.keys()
+                    ):
                         continue
-                    if dimension in variable['kwargs']['dimensions']:
+                    if dimension in variable["kwargs"]["dimensions"]:
                         test = True
                         break
                 if test:
@@ -329,12 +388,12 @@ class GridDataset(object):
             for varname, variable in self.variables_description.items():
                 if varname not in self.coordinates and varname not in self.vars.keys():
                     continue
-                var = h_out.createVariable(*variable['args'], **variable['kwargs'])
-                for key, value in variable['attrs'].items():
+                var = h_out.createVariable(*variable["args"], **variable["kwargs"])
+                for key, value in variable["attrs"].items():
                     setattr(var, key, value)
 
-                infos = self.variables_description[varname]['infos']
-                if infos.get('transpose', False):
+                infos = self.variables_description[varname]["infos"]
+                if infos.get("transpose", False):
                     var[:] = self.vars[varname].T
                 else:
                     var[:] = self.vars[varname]
@@ -356,14 +415,16 @@ class GridDataset(object):
             self.vars[y_name] = h.variables[y_name][sl_y]
 
             if self.is_centered:
-                logger.info('Grid center')
+                logger.info("Grid center")
                 self.x_c = self.vars[x_name]
                 self.y_c = self.vars[y_name]
 
-                self.x_bounds = concatenate((
-                    self.x_c, (2 * self.x_c[-1] - self.x_c[-2],)))
-                self.y_bounds = concatenate((
-                    self.y_c, (2 * self.y_c[-1] - self.y_c[-2],)))
+                self.x_bounds = concatenate(
+                    (self.x_c, (2 * self.x_c[-1] - self.x_c[-2],))
+                )
+                self.y_bounds = concatenate(
+                    (self.y_c, (2 * self.y_c[-1] - self.y_c[-2],))
+                )
                 d_x = self.x_bounds[1:] - self.x_bounds[:-1]
                 d_y = self.y_bounds[1:] - self.y_bounds[:-1]
                 self.x_bounds[:-1] -= d_x / 2
@@ -385,7 +446,7 @@ class GridDataset(object):
                     self.y_c[:-1] += dy2
                     self.y_c[-1] += dy2[-1]
                 else:
-                    raise Exception('not write')
+                    raise Exception("not write")
 
         self.init_pos_interpolator()
 
@@ -395,12 +456,12 @@ class GridDataset(object):
         return False
 
     def units(self, varname):
-        stored_units = self.variables_description[varname]['attrs'].get('units', None)
+        stored_units = self.variables_description[varname]["attrs"].get("units", None)
         if stored_units is not None:
             return stored_units
         with Dataset(self.filename) as h:
             var = h.variables[varname]
-            if hasattr(var, 'units'):
+            if hasattr(var, "units"):
                 return var.units
 
     def copy(self, grid_in, grid_out):
@@ -415,10 +476,10 @@ class GridDataset(object):
         """
         h_dict = self.variables_description[grid_in]
         self.variables_description[grid_out] = dict(
-            infos=h_dict['infos'].copy(),
-            attrs=h_dict['attrs'].copy(),
-            args=tuple((grid_out, *h_dict['args'][1:])),
-            kwargs=h_dict['kwargs'].copy(),
+            infos=h_dict["infos"].copy(),
+            attrs=h_dict["attrs"].copy(),
+            args=tuple((grid_out, *h_dict["args"][1:])),
+            kwargs=h_dict["kwargs"].copy(),
         )
         self.vars[grid_out] = self.grid(grid_in).copy()
 
@@ -430,19 +491,33 @@ class GridDataset(object):
         if varname not in self.vars:
             coordinates_dims = list(self.x_dim)
             coordinates_dims.extend(list(self.y_dim))
-            logger.debug('Load %(varname)s from %(filename)s', dict(varname=varname, filename=self.filename))
+            logger.debug(
+                "Load %(varname)s from %(filename)s",
+                dict(varname=varname, filename=self.filename),
+            )
             with Dataset(self.filename) as h:
                 dims = h.variables[varname].dimensions
-                sl = [indexs.get(dim, self.indexs.get(dim, slice(None) if dim in coordinates_dims else 0)) for dim in dims]
+                sl = [
+                    indexs.get(
+                        dim,
+                        self.indexs.get(
+                            dim, slice(None) if dim in coordinates_dims else 0
+                        ),
+                    )
+                    for dim in dims
+                ]
                 self.vars[varname] = h.variables[varname][sl]
                 if len(self.x_dim) == 1:
                     i_x = where(array(dims) == self.x_dim)[0][0]
                     i_y = where(array(dims) == self.y_dim)[0][0]
                     if i_x > i_y:
-                        self.variables_description[varname]['infos']['transpose'] = True
+                        self.variables_description[varname]["infos"]["transpose"] = True
                         self.vars[varname] = self.vars[varname].T
-            if not hasattr(self.vars[varname], 'mask'):
-                self.vars[varname] = ma.array(self.vars[varname], mask=zeros(self.vars[varname].shape, dtype='bool'))
+            if not hasattr(self.vars[varname], "mask"):
+                self.vars[varname] = ma.array(
+                    self.vars[varname],
+                    mask=zeros(self.vars[varname].shape, dtype="bool"),
+                )
         return self.vars[varname]
 
     def grid_tiles(self, varname, slice_x, slice_y):
@@ -450,42 +525,70 @@ class GridDataset(object):
         """
         coordinates_dims = list(self.x_dim)
         coordinates_dims.extend(list(self.y_dim))
-        logger.debug('Extract %(varname)s from %(filename)s with slice(x:%(slice_x)s,y:%(slice_y)s)',
-                      dict(varname=varname, filename=self.filename, slice_y=slice_y, slice_x=slice_x))
+        logger.debug(
+            "Extract %(varname)s from %(filename)s with slice(x:%(slice_x)s,y:%(slice_y)s)",
+            dict(
+                varname=varname,
+                filename=self.filename,
+                slice_y=slice_y,
+                slice_x=slice_x,
+            ),
+        )
         with Dataset(self.filename) as h:
             dims = h.variables[varname].dimensions
-            sl = [(slice_x if dim in list(self.x_dim) else slice_y) if dim in coordinates_dims else 0 for dim in dims]
+            sl = [
+                (slice_x if dim in list(self.x_dim) else slice_y)
+                if dim in coordinates_dims
+                else 0
+                for dim in dims
+            ]
             data = h.variables[varname][sl]
             if len(self.x_dim) == 1:
                 i_x = where(array(dims) == self.x_dim)[0][0]
                 i_y = where(array(dims) == self.y_dim)[0][0]
                 if i_x > i_y:
                     data = data.T
-        if not hasattr(data, 'mask'):
-            data = ma.array(data, mask=zeros(data.shape, dtype='bool'))
+        if not hasattr(data, "mask"):
+            data = ma.array(data, mask=zeros(data.shape, dtype="bool"))
         return data
 
-    def high_filter(self, grid_name, x_cut, y_cut):
+    def high_filter(self, grid_name, w_cut, **kwargs):
         """create a high filter with a low one
         """
-        result = self._low_filter(grid_name, x_cut, y_cut)
+        result = self._low_filter(grid_name, w_cut, **kwargs)
         self.vars[grid_name] -= result
 
-    def low_filter(self, grid_name, x_cut, y_cut):
+    def low_filter(self, grid_name, w_cut, **kwargs):
         """low filtering
         """
-        result = self._low_filter(grid_name, x_cut, y_cut)
+        result = self._low_filter(grid_name, w_cut, **kwargs)
         self.vars[grid_name] -= self.vars[grid_name] - result
 
     @property
     def bounds(self):
         """Give bound
         """
-        return self.x_bounds.min(), self.x_bounds.max(), self.y_bounds.min(), self.y_bounds.max()
+        return (
+            self.x_bounds.min(),
+            self.x_bounds.max(),
+            self.y_bounds.min(),
+            self.y_bounds.max(),
+        )
 
-    def eddy_identification(self, grid_height, uname, vname, date, step=0.005, shape_error=55,
-                            array_sampling=50, pixel_limit=None, precision=None, force_height_unit=None,
-                            force_speed_unit=None):
+    def eddy_identification(
+        self,
+        grid_height,
+        uname,
+        vname,
+        date,
+        step=0.005,
+        shape_error=55,
+        array_sampling=50,
+        pixel_limit=None,
+        precision=None,
+        force_height_unit=None,
+        force_speed_unit=None,
+    ):
         """
 
         Args:
@@ -503,7 +606,7 @@ class GridDataset(object):
 
         """
         if not isinstance(date, datetime):
-            raise Exception('Date argument be a datetime object')
+            raise Exception("Date argument be a datetime object")
         # The inf limit must be in pixel and  sup limit in surface
         if pixel_limit is None:
             pixel_limit = (4, 1000)
@@ -513,21 +616,26 @@ class GridDataset(object):
 
         # Get unit of h grid
 
-        h_units = self.units(grid_height) if force_height_unit is None else force_height_unit
+        h_units = (
+            self.units(grid_height) if force_height_unit is None else force_height_unit
+        )
         units = UnitRegistry()
         in_h_unit = units.parse_expression(h_units)
         if in_h_unit is not None:
-            factor, _ = in_h_unit.to('m').to_tuple()
-            logger.info('We will apply on step a factor to be coherent with grid : %f', 1 / factor)
+            factor, _ = in_h_unit.to("m").to_tuple()
+            logger.info(
+                "We will apply on step a factor to be coherent with grid : %f",
+                1 / factor,
+            )
             step /= factor
             if precision is not None:
                 precision /= factor
 
         # Get h grid
-        data = self.grid(grid_height).astype('f8')
+        data = self.grid(grid_height).astype("f8")
         # In case of a reduce mask
         if len(data.mask.shape) == 0 and not data.mask:
-            data.mask = zeros(data.shape, dtype='bool')
+            data.mask = zeros(data.shape, dtype="bool")
         # we remove noisy information
         if precision is not None:
             data = (data / precision).round() * precision
@@ -536,11 +644,19 @@ class GridDataset(object):
         d_z = z_max - z_min
         data_tmp = data[~data.mask]
         epsilon = 0.001  # in %
-        z_min_p, z_max_p = percentile(data_tmp, epsilon), percentile(data_tmp, 100 - epsilon)
+        z_min_p, z_max_p = (
+            percentile(data_tmp, epsilon),
+            percentile(data_tmp, 100 - epsilon),
+        )
         d_zp = z_max_p - z_min_p
         if d_z / d_zp > 2:
-            logger.warning('Maybe some extrema are present zmin %f (m) and zmax %f (m) will be replace by %f and %f',
-                            z_min, z_max, z_min_p, z_max_p)
+            logger.warning(
+                "Maybe some extrema are present zmin %f (m) and zmax %f (m) will be replace by %f and %f",
+                z_min,
+                z_max,
+                z_min_p,
+                z_max_p,
+            )
             z_min, z_max = z_min_p, z_max_p
 
         levels = arange(z_min - z_min % step, z_max - z_max % step + 2 * step, step)
@@ -551,9 +667,20 @@ class GridDataset(object):
         # Compute ssh contour
         self.contours = Contours(x, y, data, levels, wrap_x=self.is_circular())
 
-        track_extra_variables = ['height_max_speed_contour', 'height_external_contour', 'height_inner_contour',
-                                 'lon_max', 'lat_max']
-        array_variables = ['contour_lon_e', 'contour_lat_e', 'contour_lon_s', 'contour_lat_s', 'uavg_profile']
+        track_extra_variables = [
+            "height_max_speed_contour",
+            "height_external_contour",
+            "height_inner_contour",
+            "lon_max",
+            "lat_max",
+        ]
+        array_variables = [
+            "contour_lon_e",
+            "contour_lat_e",
+            "contour_lon_s",
+            "contour_lat_s",
+            "uavg_profile",
+        ]
         # Compute cyclonic and anticylonic research:
         a_and_c = list()
         for anticyclonic_search in [True, False]:
@@ -564,21 +691,30 @@ class GridDataset(object):
             for coll_ind, coll in enumerate(self.contours.iter(step=iterator)):
                 corrected_coll_index = coll_ind
                 if iterator == -1:
-                    corrected_coll_index = - coll_ind - 1
+                    corrected_coll_index = -coll_ind - 1
 
                 contour_paths = coll.get_paths()
                 nb_paths = len(contour_paths)
                 if nb_paths == 0:
                     continue
                 cvalues = self.contours.cvalues[corrected_coll_index]
-                logger.debug('doing collection %s, contour value %.4f, %d paths',
-                              corrected_coll_index, cvalues, nb_paths)
+                logger.debug(
+                    "doing collection %s, contour value %.4f, %d paths",
+                    corrected_coll_index,
+                    cvalues,
+                    nb_paths,
+                )
 
                 # Loop over individual c_s contours (i.e., every eddy in field)
                 for current_contour in contour_paths:
                     if current_contour.used:
                         continue
-                    centlon_e, centlat_e, eddy_radius_e, aerr = current_contour.fit_circle()
+                    (
+                        centlon_e,
+                        centlat_e,
+                        eddy_radius_e,
+                        aerr,
+                    ) = current_contour.fit_circle()
 
                     # Filter for shape
                     if aerr < 0 or aerr > shape_error or isnan(aerr):
@@ -600,14 +736,21 @@ class GridDataset(object):
                     i_x_in, i_y_in = current_contour.pixels_in(self)
 
                     # Maybe limit max must be replace with a maximum of surface
-                    if current_contour.nb_pixel < pixel_limit[0] or current_contour.nb_pixel > pixel_limit[1]:
+                    if (
+                        current_contour.nb_pixel < pixel_limit[0]
+                        or current_contour.nb_pixel > pixel_limit[1]
+                    ):
                         continue
 
                     # Compute amplitude
-                    reset_centroid, amp = self.get_amplitude(current_contour, cvalues, data,
-                                                             anticyclonic_search=anticyclonic_search,
-                                                             level=self.contours.levels[corrected_coll_index],
-                                                             step=step)
+                    reset_centroid, amp = self.get_amplitude(
+                        current_contour,
+                        cvalues,
+                        data,
+                        anticyclonic_search=anticyclonic_search,
+                        level=self.contours.levels[corrected_coll_index],
+                        step=step,
+                    )
                     # If we have a valid amplitude
                     if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
                         continue
@@ -628,93 +771,160 @@ class GridDataset(object):
                             centlat_e = y[centi, centj]
 
                     # centlat_e and centlon_e must be index of maximum, we will loose some inner contour, if it's not
-                    max_average_speed, speed_contour, inner_contour, speed_array, i_max_speed, i_inner = \
-                        self.get_uavg(self.contours, centlon_e, centlat_e, current_contour, anticyclonic_search,
-                                      corrected_coll_index, pixel_min=pixel_limit[0])
+                    (
+                        max_average_speed,
+                        speed_contour,
+                        inner_contour,
+                        speed_array,
+                        i_max_speed,
+                        i_inner,
+                    ) = self.get_uavg(
+                        self.contours,
+                        centlon_e,
+                        centlat_e,
+                        current_contour,
+                        anticyclonic_search,
+                        corrected_coll_index,
+                        pixel_min=pixel_limit[0],
+                    )
 
                     # Use azimuth equal projection for radius
-                    proj = Proj('+proj=aeqd +ellps=WGS84 +lat_0={1} +lon_0={0}'.format(*inner_contour.mean_coordinates))
+                    proj = Proj(
+                        "+proj=aeqd +ellps=WGS84 +lat_0={1} +lon_0={0}".format(
+                            *inner_contour.mean_coordinates
+                        )
+                    )
                     # First, get position based on innermost
                     # contour
-                    centx_i, centy_i, _, _ = fit_circle(*proj(inner_contour.lon, inner_contour.lat))
+                    centx_i, centy_i, _, _ = fit_circle(
+                        *proj(inner_contour.lon, inner_contour.lat)
+                    )
                     centlon_i, centlat_i = proj(centx_i, centy_i, inverse=True)
                     # Second, get speed-based radius based on
                     # contour of max uavg
-                    centx_s, centy_s, eddy_radius_s, aerr_s = fit_circle(*proj(speed_contour.lon, speed_contour.lat))
+                    centx_s, centy_s, eddy_radius_s, aerr_s = fit_circle(
+                        *proj(speed_contour.lon, speed_contour.lat)
+                    )
                     # Computed again to be coherent with speed_radius, we will be compute in same reference
-                    _, _, eddy_radius_e, aerr_e = fit_circle(*proj(current_contour.lon, current_contour.lat))
+                    _, _, eddy_radius_e, aerr_e = fit_circle(
+                        *proj(current_contour.lon, current_contour.lat)
+                    )
                     centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
 
                     # Instantiate new EddyObservation object (high cost need to be review)
-                    properties = EddiesObservations(size=1, track_extra_variables=track_extra_variables,
-                                                    track_array_variables=array_sampling,
-                                                    array_variables=array_variables)
+                    properties = EddiesObservations(
+                        size=1,
+                        track_extra_variables=track_extra_variables,
+                        track_array_variables=array_sampling,
+                        array_variables=array_variables,
+                    )
 
-                    properties.obs['height_max_speed_contour'] = self.contours.cvalues[i_max_speed]
-                    properties.obs['height_external_contour'] = cvalues
-                    properties.obs['height_inner_contour'] = self.contours.cvalues[i_inner]
+                    properties.obs["height_max_speed_contour"] = self.contours.cvalues[
+                        i_max_speed
+                    ]
+                    properties.obs["height_external_contour"] = cvalues
+                    properties.obs["height_inner_contour"] = self.contours.cvalues[
+                        i_inner
+                    ]
                     array_size = speed_array.shape[0]
-                    properties.obs['nb_contour_selected'] = array_size
+                    properties.obs["nb_contour_selected"] = array_size
                     if speed_array.shape[0] == 1:
-                        properties.obs['uavg_profile'][:] = speed_array[0]
+                        properties.obs["uavg_profile"][:] = speed_array[0]
                     else:
-                        properties.obs['uavg_profile'] = raw_resample(speed_array, array_sampling)
-                    properties.obs['amplitude'] = amp.amplitude
-                    properties.obs['radius_s'] = eddy_radius_s
-                    properties.obs['speed_average'] = max_average_speed
-                    properties.obs['radius_e'] = eddy_radius_e
-                    properties.obs['shape_error_e'] = aerr_e
-                    properties.obs['shape_error_s'] = aerr_s
-                    properties.obs['lon'] = centlon_s
-                    properties.obs['lat'] = centlat_s
-                    properties.obs['lon_max'] = centlon_i
-                    properties.obs['lat_max'] = centlat_i
-                    properties.obs['contour_lon_e'], properties.obs['contour_lat_e'] = uniform_resample(
-                        current_contour.lon, current_contour.lat, fixed_size=array_sampling)
-                    properties.obs['contour_lon_s'], properties.obs['contour_lat_s'] = uniform_resample(
-                        speed_contour.lon, speed_contour.lat, fixed_size=array_sampling)
+                        properties.obs["uavg_profile"] = raw_resample(
+                            speed_array, array_sampling
+                        )
+                    properties.obs["amplitude"] = amp.amplitude
+                    properties.obs["radius_s"] = eddy_radius_s
+                    properties.obs["speed_average"] = max_average_speed
+                    properties.obs["radius_e"] = eddy_radius_e
+                    properties.obs["shape_error_e"] = aerr_e
+                    properties.obs["shape_error_s"] = aerr_s
+                    properties.obs["lon"] = centlon_s
+                    properties.obs["lat"] = centlat_s
+                    properties.obs["lon_max"] = centlon_i
+                    properties.obs["lat_max"] = centlat_i
+                    (
+                        properties.obs["contour_lon_e"],
+                        properties.obs["contour_lat_e"],
+                    ) = uniform_resample(
+                        current_contour.lon,
+                        current_contour.lat,
+                        fixed_size=array_sampling,
+                    )
+                    (
+                        properties.obs["contour_lon_s"],
+                        properties.obs["contour_lat_s"],
+                    ) = uniform_resample(
+                        speed_contour.lon, speed_contour.lat, fixed_size=array_sampling
+                    )
                     if aerr > 99.9 or aerr_s > 99.9:
-                        logger.warning('Strange shape at this step! shape_error : %f, %f', aerr, aerr_s)
+                        logger.warning(
+                            "Strange shape at this step! shape_error : %f, %f",
+                            aerr,
+                            aerr_s,
+                        )
 
                     eddies.append(properties)
                     # To reserve definitively the area
                     data.mask[i_x_in, i_y_in] = True
             if len(eddies) == 0:
-                eddies_collection = EddiesObservations(track_extra_variables=track_extra_variables,
-                                                       track_array_variables=array_sampling,
-                                                       array_variables=array_variables)
+                eddies_collection = EddiesObservations(
+                    track_extra_variables=track_extra_variables,
+                    track_array_variables=array_sampling,
+                    array_variables=array_variables,
+                )
             else:
                 eddies_collection = EddiesObservations.concatenate(eddies)
             eddies_collection.sign_type = 1 if anticyclonic_search else -1
-            eddies_collection.obs['time'] = (date - datetime(1950, 1, 1)).total_seconds() / 86400.
+            eddies_collection.obs["time"] = (
+                date - datetime(1950, 1, 1)
+            ).total_seconds() / 86400.0
 
             # normalization longitude between 0 - 360, because storage have an offset on 180
-            eddies_collection.obs['lon_max'] %= 360
-            eddies_collection.obs['lon'] %= 360
-            ref = eddies_collection.obs['lon'] - 180
-            eddies_collection.obs['contour_lon_e'] = ((eddies_collection.obs['contour_lon_e'].T - ref) % 360 + ref).T
-            eddies_collection.obs['contour_lon_s'] = ((eddies_collection.obs['contour_lon_s'].T - ref) % 360 + ref).T
+            eddies_collection.obs["lon_max"] %= 360
+            eddies_collection.obs["lon"] %= 360
+            ref = eddies_collection.obs["lon"] - 180
+            eddies_collection.obs["contour_lon_e"] = (
+                (eddies_collection.obs["contour_lon_e"].T - ref) % 360 + ref
+            ).T
+            eddies_collection.obs["contour_lon_s"] = (
+                (eddies_collection.obs["contour_lon_s"].T - ref) % 360 + ref
+            ).T
 
             a_and_c.append(eddies_collection)
 
         if in_h_unit is not None:
-            for name in ['amplitude', 'height_max_speed_contour', 'height_external_contour', 'height_inner_contour']:
-                out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
+            for name in [
+                "amplitude",
+                "height_max_speed_contour",
+                "height_external_contour",
+                "height_inner_contour",
+            ]:
+                out_unit = units.parse_expression(VAR_DESCR[name]["nc_attr"]["units"])
                 factor, _ = in_h_unit.to(out_unit).to_tuple()
                 a_and_c[0].obs[name] *= factor
                 a_and_c[1].obs[name] *= factor
         u_units = self.units(uname) if force_speed_unit is None else force_speed_unit
         in_u_units = units.parse_expression(u_units)
         if in_u_units is not None:
-            for name in ['speed_average', 'uavg_profile']:
-                out_unit = units.parse_expression(VAR_DESCR[name]['nc_attr']['units'])
+            for name in ["speed_average", "uavg_profile"]:
+                out_unit = units.parse_expression(VAR_DESCR[name]["nc_attr"]["units"])
                 factor, _ = in_u_units.to(out_unit).to_tuple()
                 a_and_c[0].obs[name] *= factor
                 a_and_c[1].obs[name] *= factor
         return a_and_c
 
-    def get_uavg(self, all_contours, centlon_e, centlat_e, original_contour, anticyclonic_search, level_start,
-                 pixel_min=3):
+    def get_uavg(
+        self,
+        all_contours,
+        centlon_e,
+        centlat_e,
+        original_contour,
+        anticyclonic_search,
+        level_start,
+        pixel_min=3,
+    ):
         """
         Calculate geostrophic speed around successive contours
         Returns the average
@@ -729,7 +939,9 @@ class GridDataset(object):
         step = 1 if anticyclonic_search else -1
         i_inner = i_max_speed = -1
 
-        for i, coll in enumerate(all_contours.iter(start=level_start + step, step=step)):
+        for i, coll in enumerate(
+            all_contours.iter(start=level_start + step, step=step)
+        ):
             level_contour = coll.get_nearest_path_bbox_contain_pt(centlon_e, centlat_e)
             # Leave loop if no contours at level
             if level_contour is None:
@@ -743,7 +955,10 @@ class GridDataset(object):
             # Interpolate uspd to seglon, seglat, then get mean
             level_average_speed = self.speed_coef_mean(level_contour)
             speed_array.append(level_average_speed)
-            if pixel_min < level_contour.nb_pixel and level_average_speed >= max_average_speed:
+            if (
+                pixel_min < level_contour.nb_pixel
+                and level_average_speed >= max_average_speed
+            ):
                 max_average_speed = level_average_speed
                 i_max_speed = i
                 selected_contour = level_contour
@@ -754,10 +969,17 @@ class GridDataset(object):
             contour.used = True
         i_max_speed = level_start + step + step * i_max_speed
         i_inner = level_start + step + step * i_inner
-        return max_average_speed, selected_contour, inner_contour, array(speed_array), i_max_speed, i_inner
+        return (
+            max_average_speed,
+            selected_contour,
+            inner_contour,
+            array(speed_array),
+            i_max_speed,
+            i_inner,
+        )
 
     @staticmethod
-    def _gaussian_filter(data, sigma, mode='reflect'):
+    def _gaussian_filter(data, sigma, mode="reflect"):
         """Standard gaussian filter
         """
         local_data = data.copy()
@@ -766,11 +988,13 @@ class GridDataset(object):
         v = gaussian_filter(local_data, sigma=sigma, mode=mode)
         w = gaussian_filter(float_(~data.mask), sigma=sigma, mode=mode)
 
-        with errstate(invalid='ignore'):
+        with errstate(invalid="ignore"):
             return ma.array(v / w, mask=w == 0)
 
     @staticmethod
-    def get_amplitude(contour, contour_height, data, anticyclonic_search=True, level=None, step=None):
+    def get_amplitude(
+        contour, contour_height, data, anticyclonic_search=True, level=None, step=None
+    ):
         # Instantiate Amplitude object
         amp = Amplitude(
             # Indices of all pixels in contour
@@ -780,7 +1004,8 @@ class GridDataset(object):
             # All grid
             data=data,
             # Step by level
-            interval=step)
+            interval=step,
+        )
 
         if anticyclonic_search:
             reset_centroid = amp.all_pixels_above_h0(level)
@@ -795,8 +1020,8 @@ class UnRegularGridDataset(GridDataset):
     """
 
     __slots__ = (
-        'index_interp',
-        '_speed_norm',
+        "index_interp",
+        "_speed_norm",
     )
 
     def load(self):
@@ -817,16 +1042,26 @@ class UnRegularGridDataset(GridDataset):
 
             self.init_pos_interpolator()
 
+    @property
+    def bounds(self):
+        """Give bound
+        """
+        return self.x_c.min(), self.x_c.max(), self.y_c.min(), self.y_c.max()
+
     def bbox_indice(self, vertices):
         dist, idx = self.index_interp.query(vertices, k=1)
         i_y = idx % self.x_c.shape[1]
         i_x = int_((idx - i_y) / self.x_c.shape[1])
-        return (max(i_x.min() - self.N, 0), i_x.max() + self.N + 1), \
-               (max(i_y.min() - self.N, 0), i_y.max() + self.N + 1)
+        return (
+            (max(i_x.min() - self.N, 0), i_x.max() + self.N + 1),
+            (max(i_y.min() - self.N, 0), i_y.max() + self.N + 1),
+        )
 
     def get_pixels_in(self, contour):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
-        return _get_pixel_in_unregular(contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop)
+        return _get_pixel_in_unregular(
+            contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop
+        )
 
     def normalize_x_indice(self, indices):
         """Not do"""
@@ -842,11 +1077,12 @@ class UnRegularGridDataset(GridDataset):
         pass
 
     def init_pos_interpolator(self):
-        logger.debug('Create a KdTree could be long ...')
+        logger.debug("Create a KdTree could be long ...")
         self.index_interp = cKDTree(
-            prepare_for_kdtree(self.x_c.reshape(-1), self.y_c.reshape(-1)))
+            prepare_for_kdtree(self.x_c.reshape(-1), self.y_c.reshape(-1))
+        )
 
-        logger.debug('... OK')
+        logger.debug("... OK")
 
     def _low_filter(self, grid_name, x_cut, y_cut, factor=40.):
         data = self.grid(grid_name)
@@ -889,14 +1125,16 @@ class UnRegularGridDataset(GridDataset):
         return ma.array(z_interp, mask=m_interp.ev(x, y) > 0.00001)
 
     def speed_coef_mean(self, contour):
-        dist, idx = self.index_interp.query(uniform_resample_stack(contour.vertices)[1:], k=4)
+        dist, idx = self.index_interp.query(
+            uniform_resample_stack(contour.vertices)[1:], k=4
+        )
         i_y = idx % self.x_c.shape[1]
         i_x = int_((idx - i_y) / self.x_c.shape[1])
         # A simplified solution to be change by a weight mean
         return self._speed_norm[i_x, i_y].mean(axis=1).mean()
 
-    def init_speed_coef(self, uname='u', vname='v'):
-        self._speed_norm = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** .5
+    def init_speed_coef(self, uname="u", vname="v"):
+        self._speed_norm = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** 0.5
 
 
 class RegularGridDataset(GridDataset):
@@ -904,11 +1142,11 @@ class RegularGridDataset(GridDataset):
     """
 
     __slots__ = (
-        '_speed_ev',
-        '_is_circular',
-        'x_size',
-        '_x_step',
-        '_y_step',
+        "_speed_ev",
+        "_is_circular",
+        "x_size",
+        "_x_step",
+        "_y_step",
     )
 
     def __init__(self, *args, **kwargs):
@@ -918,6 +1156,7 @@ class RegularGridDataset(GridDataset):
         self._x_step = (self.x_c[1:] - self.x_c[:-1]).mean()
         self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
 
+
     def init_pos_interpolator(self):
         """Create function to have a quick index interpolator
         """
@@ -925,18 +1164,30 @@ class RegularGridDataset(GridDataset):
         self.yinterp = arange(self.y_bounds.shape[0])
 
     def bbox_indice(self, vertices):
-        return bbox_indice_regular(vertices, self.x_bounds, self.y_bounds, self.xstep, self.ystep,
-                                   self.N, self.is_circular(), self.x_size)
+        return bbox_indice_regular(
+            vertices,
+            self.x_bounds,
+            self.y_bounds,
+            self.xstep,
+            self.ystep,
+            self.N,
+            self.is_circular(),
+            self.x_size,
+        )
 
     def get_pixels_in(self, contour):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
-        return _get_pixel_in_regular(contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop)
+        return _get_pixel_in_regular(
+            contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop
+        )
 
     def normalize_x_indice(self, indices):
         return indices % self.x_size
 
     def nearest_grd_indice(self, x, y):
-        return _nearest_grd_indice(x,y, self.x_bounds, self.y_bounds, self.xstep, self.ystep)
+        return _nearest_grd_indice(
+            x, y, self.x_bounds, self.y_bounds, self.xstep, self.ystep
+        )
 
     @property
     def xstep(self):
@@ -954,8 +1205,16 @@ class RegularGridDataset(GridDataset):
         """Give a series of index which describe the path between to position
         """
         return compute_pixel_path(
-            x0, y0, x1, y1,
-            self.x_bounds[0], self.y_bounds[0], self.xstep, self.ystep, self.x_size)
+            x0,
+            y0,
+            x1,
+            y1,
+            self.x_bounds[0],
+            self.y_bounds[0],
+            self.xstep,
+            self.ystep,
+            self.x_size,
+        )
 
     def clean_land(self):
         """Function to remove all land pixel
@@ -966,7 +1225,9 @@ class RegularGridDataset(GridDataset):
         """Check if grid is circular
         """
         if self._is_circular is None:
-            self._is_circular = abs((self.x_bounds[0] % 360) - (self.x_bounds[-1] % 360)) < 0.0001
+            self._is_circular = (
+                abs((self.x_bounds[0] % 360) - (self.x_bounds[-1] % 360)) < 0.0001
+            )
         return self._is_circular
 
     def kernel_lanczos(self, lat, wave_length, order=1):
@@ -974,25 +1235,30 @@ class RegularGridDataset(GridDataset):
         # wave_length in km
         # order must be int
         if order < 1:
-            logger.warning('order must be superior to 0')
+            logger.warning("order must be superior to 0")
         order = ceil(order).astype(int)
         # Estimate size of kernel
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
         # half size will be multiply with by order
-        half_x_pt, half_y_pt = ceil(wave_length / step_x_km).astype(int), ceil(wave_length / step_y_km).astype(int)
+        half_x_pt, half_y_pt = (
+            ceil(wave_length / step_x_km).astype(int),
+            ceil(wave_length / step_y_km).astype(int),
+        )
 
         y = arange(
             lat - self.ystep * half_y_pt * order,
             lat + self.ystep * half_y_pt * order + 0.01 * self.ystep,
-            self.ystep)
+            self.ystep,
+        )
         x = arange(
             -self.xstep * half_x_pt * order,
             self.xstep * half_x_pt * order + 0.01 * self.xstep,
-            self.xstep)
+            self.xstep,
+        )
 
         y, x = meshgrid(y, x)
-        dist_norm = distance(0, lat, x, y) / 1000. / wave_length
+        dist_norm = distance(0, lat, x, y) / 1000.0 / wave_length
 
         # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
         kernel = sinc(dist_norm / order) * sinc(dist_norm)
@@ -1003,35 +1269,42 @@ class RegularGridDataset(GridDataset):
         # wave_length in km
         # order must be int
         if order < 1:
-            logger.warning('order must be superior to 0')
+            logger.warning("order must be superior to 0")
         order = ceil(order).astype(int)
         # Estimate size of kernel
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
         min_wave_length = max(step_x_km * 2, step_y_km * 2)
         if wave_length < min_wave_length:
-            logger.error('Wave_length to short for resolution, must be > %d km', ceil(min_wave_length))
+            logger.error(
+                "Wave_length to short for resolution, must be > %d km",
+                ceil(min_wave_length),
+            )
             raise Exception()
         # half size will be multiply with by order
-        half_x_pt, half_y_pt = ceil(wave_length / step_x_km).astype(int), ceil(wave_length / step_y_km).astype(int)
+        half_x_pt, half_y_pt = (
+            ceil(wave_length / step_x_km).astype(int),
+            ceil(wave_length / step_y_km).astype(int),
+        )
         # x size is not good over 60 degrees
         y = arange(
             lat - self.ystep * half_y_pt * order,
             lat + self.ystep * half_y_pt * order + 0.01 * self.ystep,
-            self.ystep)
+            self.ystep,
+        )
         # We compute half + 1 and the other part will be compute by symetry
         x = arange(0, self.xstep * half_x_pt * order + 0.01 * self.xstep, self.xstep)
         y, x = meshgrid(y, x)
-        dist_norm = distance(0, lat, x, y) / 1000. / wave_length
+        dist_norm = distance(0, lat, x, y) / 1000.0 / wave_length
         # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
-        with errstate(invalid='ignore'):
+        with errstate(invalid="ignore"):
             kernel = sinc(dist_norm / order) * j1(2 * pi * dist_norm) / dist_norm
         kernel[0, half_y_pt * order] = pi
         kernel[dist_norm > order] = 0
         # Symetry
         kernel_ = empty((half_x_pt * 2 * order + 1, half_y_pt * 2 * order + 1))
-        kernel_[half_x_pt * order:] = kernel
-        kernel_[:half_x_pt * order] = kernel[:0:-1]
+        kernel_[half_x_pt * order :] = kernel
+        kernel_[: half_x_pt * order] = kernel[:0:-1]
         # remove unused row/column
         k_valid = kernel_ != 0
         x_valid = where(k_valid.sum(axis=1))[0]
@@ -1040,24 +1313,18 @@ class RegularGridDataset(GridDataset):
         y_slice = slice(y_valid[0], y_valid[-1] + 1)
         return kernel_[x_slice, y_slice]
 
-    def _low_filter(self, grid_name, x_cut, y_cut):
+    def _low_filter(self, grid_name, w_cut, **kwargs):
         """low filtering
         """
-        i_x, i_y = x_cut * 0.125 / self.xstep, y_cut * 0.125 / self.xstep
-        logger.info(
-            'Filtering with this wave : (%s, %s) converted in pixel (%s, %s)',
-            x_cut, y_cut, i_x, i_y
+        return self.convolve_filter_with_dynamic_kernel(
+            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=w_cut, **kwargs
         )
-        data = self.grid(grid_name).copy()
-        data[data.mask] = 0
-        return self._gaussian_filter(
-            data,
-            (i_x, i_y),
-            mode='wrap' if self.is_circular() else 'reflect')
 
-    def convolve_filter_with_dynamic_kernel(self, grid, kernel_func, lat_max=85, extend=False, **kwargs_func):
+    def convolve_filter_with_dynamic_kernel(
+        self, grid, kernel_func, lat_max=85, extend=False, **kwargs_func
+    ):
         if (abs(self.y_c) > lat_max).any():
-            logger.warning('No filtering above %f degrees of latitude', lat_max)
+            logger.warning("No filtering above %f degrees of latitude", lat_max)
         if isinstance(grid, str):
             data = self.grid(grid).copy()
         else:
@@ -1067,9 +1334,9 @@ class RegularGridDataset(GridDataset):
         data_out.mask = ones(data_out.shape, dtype=bool)
         nb_lines = self.y_c.shape[0]
         dt = list()
-        
+
         debug_active = logger.getEffectiveLevel() == logging.DEBUG
-        
+
         for i, lat in enumerate(self.y_c):
             if abs(lat) > lat_max or data[:, i].mask.all():
                 data_out.mask[:, i] = True
@@ -1081,7 +1348,16 @@ class RegularGridDataset(GridDataset):
             t0 = datetime.now()
             if debug_active and len(dt) > 0:
                 dt_mean = np_mean(dt) * (nb_lines - i)
-                print('Remain ', dt_mean, 'ETA ', t0 + dt_mean, 'current kernel size :', k_shape, 'Step : %d/%d    ' % (i, nb_lines), end="\r")
+                print(
+                    "Remain ",
+                    dt_mean,
+                    "ETA ",
+                    t0 + dt_mean,
+                    "current kernel size :",
+                    k_shape,
+                    "Step : %d/%d    " % (i, nb_lines),
+                    end="\r",
+                )
 
             # Half size, k_shape must be always impair
             d_lat = int((k_shape[1] - 1) / 2)
@@ -1092,7 +1368,9 @@ class RegularGridDataset(GridDataset):
             # Slice to apply on input data
             sl_lat_data = slice(max(0, i - d_lat), min(i + d_lat, data.shape[1]))
             # slice to apply on temporary matrix to store input data
-            sl_lat_in = slice(d_lat - (i - sl_lat_data.start), d_lat + (sl_lat_data.stop - i))
+            sl_lat_in = slice(
+                d_lat - (i - sl_lat_data.start), d_lat + (sl_lat_data.stop - i)
+            )
             # If global => manual wrapping
             if self.is_circular():
                 tmp_matrix[:d_lon, sl_lat_in] = data[-d_lon:, sl_lat_data]
@@ -1106,9 +1384,12 @@ class RegularGridDataset(GridDataset):
             demi_x, demi_y = k_shape[0] // 2, k_shape[1] // 2
             values_sum = filter2D(tmp_matrix.data, -1, kernel)[demi_x:-demi_x, demi_y]
             kernel_sum = filter2D(m.astype(float), -1, kernel)[demi_x:-demi_x, demi_y]
-            with errstate(invalid='ignore'):
+            with errstate(invalid="ignore"):
                 if extend:
-                    data_out[:, i] = ma.array(values_sum / kernel_sum, mask=kernel_sum < (extend * kernel.sum()))
+                    data_out[:, i] = ma.array(
+                        values_sum / kernel_sum,
+                        mask=kernel_sum < (extend * kernel.sum()),
+                    )
                 else:
                     data_out[:, i] = values_sum / kernel_sum
             dt.append(datetime.now() - t0)
@@ -1124,44 +1405,74 @@ class RegularGridDataset(GridDataset):
             return out.astype(data.dtype)
         return out
 
-    def lanczos_high_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
+    def lanczos_high_filter(
+        self, grid_name, wave_length, order=1, lat_max=85, **kwargs
+    ):
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
+            grid_name,
+            self.kernel_lanczos,
+            lat_max=lat_max,
+            wave_length=wave_length,
+            order=order,
+            **kwargs
+        )
         self.vars[grid_name] -= data_out
 
     def lanczos_low_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_lanczos, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
+            grid_name,
+            self.kernel_lanczos,
+            lat_max=lat_max,
+            wave_length=wave_length,
+            order=order,
+            **kwargs
+        )
         self.vars[grid_name] = data_out
 
     def bessel_band_filter(self, grid_name, wave_length_inf, wave_length_sup, **kwargs):
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_bessel, wave_length=wave_length_inf, **kwargs)
+            grid_name, self.kernel_bessel, wave_length=wave_length_inf, **kwargs
+        )
         self.vars[grid_name] = data_out
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_bessel, wave_length=wave_length_sup, **kwargs)
+            grid_name, self.kernel_bessel, wave_length=wave_length_sup, **kwargs
+        )
         self.vars[grid_name] -= data_out
 
     def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
-        logger.debug('Run filtering with wave of %(wave_length)s km and order of %(order)s ...',
-                      dict(wave_length=wave_length, order=order))
+        logger.debug(
+            "Run filtering with wave of %(wave_length)s km and order of %(order)s ...",
+            dict(wave_length=wave_length, order=order),
+        )
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
-        logger.debug('Filtering done')
+            grid_name,
+            self.kernel_bessel,
+            lat_max=lat_max,
+            wave_length=wave_length,
+            order=order,
+            **kwargs
+        )
+        logger.debug("Filtering done")
         self.vars[grid_name] -= data_out
 
     def bessel_low_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
         data_out = self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=wave_length, order=order, **kwargs)
+            grid_name,
+            self.kernel_bessel,
+            lat_max=lat_max,
+            wave_length=wave_length,
+            order=order,
+            **kwargs
+        )
         self.vars[grid_name] = data_out
 
     def spectrum_lonlat(self, grid_name, area=None, ref=None, **kwargs):
         if area is None:
             area = dict(llcrnrlon=190, urcrnrlon=280, llcrnrlat=-62, urcrnrlat=8)
-        scaling = kwargs.pop('scaling', 'density')
-        ref_grid_name = kwargs.pop('ref_grid_name', None)
-        x0, y0 = self.nearest_grd_indice(area['llcrnrlon'], area['llcrnrlat'])
-        x1, y1 = self.nearest_grd_indice(area['urcrnrlon'], area['urcrnrlat'])
+        scaling = kwargs.pop("scaling", "density")
+        ref_grid_name = kwargs.pop("ref_grid_name", None)
+        x0, y0 = self.nearest_grd_indice(area["llcrnrlon"], area["llcrnrlat"])
+        x1, y1 = self.nearest_grd_indice(area["urcrnrlon"], area["urcrnrlat"])
 
         data = self.grid(grid_name)[x0:x1, y0:y1]
 
@@ -1176,7 +1487,7 @@ class RegularGridDataset(GridDataset):
                 continue
             pws.append(pw)
         if nb_invalid:
-            logger.warning('%d/%d columns invalid', nb_invalid, i + 1)
+            logger.warning("%d/%d columns invalid", nb_invalid, i + 1)
         lat_content = 1 / f, array(pws).mean(axis=0)
 
         # Lon spectrum
@@ -1198,23 +1509,31 @@ class RegularGridDataset(GridDataset):
             fs.append(f)
             pws.append(pw)
         if nb_invalid:
-            logger.warning('%d/%d lines invalid', nb_invalid, i + 1)
+            logger.warning("%d/%d lines invalid", nb_invalid, i + 1)
         f_interp = linspace(f_min, f_max, f.shape[0])
         pw_m = array(
-            [interp1d(f, pw, fill_value=0., bounds_error=False)(f_interp) for f, pw in zip(fs, pws)]).mean(axis=0)
+            [
+                interp1d(f, pw, fill_value=0.0, bounds_error=False)(f_interp)
+                for f, pw in zip(fs, pws)
+            ]
+        ).mean(axis=0)
         lon_content = 1 / f_interp, pw_m
         if ref is None:
             return lon_content, lat_content
         else:
             if ref_grid_name is not None:
                 grid_name = ref_grid_name
-            ref_lon_content, ref_lat_content = ref.spectrum_lonlat(grid_name, area, **kwargs)
-            return (lon_content[0], lon_content[1] / ref_lon_content[1]), \
-                   (lat_content[0], lat_content[1] / ref_lat_content[1])
+            ref_lon_content, ref_lat_content = ref.spectrum_lonlat(
+                grid_name, area, **kwargs
+            )
+            return (
+                (lon_content[0], lon_content[1] / ref_lon_content[1]),
+                (lat_content[0], lat_content[1] / ref_lat_content[1]),
+            )
 
-    def compute_finite_difference(self, data, schema=1, mode='reflect', vertical=False):
+    def compute_finite_difference(self, data, schema=1, mode="reflect", vertical=False):
         if not isinstance(schema, int) and schema < 1:
-            raise Exception('schema must be a positive int')
+            raise Exception("schema must be a positive int")
 
         data2 = data.copy()
         data1 = data.copy()
@@ -1227,7 +1546,7 @@ class RegularGridDataset(GridDataset):
         else:
             data1[:-schema] = data[schema:]
             data2[schema:] = data[:-schema]
-            if mode == 'wrap':
+            if mode == "wrap":
                 data1[-schema:] = data[:schema]
                 data2[:schema] = data[-schema:]
             else:
@@ -1235,23 +1554,26 @@ class RegularGridDataset(GridDataset):
                 data1[-schema:] = nan
                 data2[:schema] = nan
 
+        d = self.EARTH_RADIUS * 2 * pi / 360 * 2 * schema
         if vertical:
-            d = self.EARTH_RADIUS * 2 * pi / 360 * 2 * schema * self.ystep
+            d *= self.ystep
         else:
-            d = self.EARTH_RADIUS * 2 * pi / 360 * 2 * schema * self.xstep * cos(deg2rad(self.y_c))
+            d *= self.xstep * cos(deg2rad(self.y_c))
         return (data1 - data2) / d
 
-    def compute_stencil(self, data, stencil_halfwidth=4, mode='reflect', vertical=False):
+    def compute_stencil(
+        self, data, stencil_halfwidth=4, mode="reflect", vertical=False
+    ):
         stencil_halfwidth = max(min(int(stencil_halfwidth), 4), 1)
-        logger.debug('Stencil half width apply : %d', stencil_halfwidth)
+        logger.debug("Stencil half width apply : %d", stencil_halfwidth)
         # output
         grad = None
 
         weights = [
-            array((3, -32, 168, -672, 0, 672, -168, 32, -3)) / 840.,
-            array((-1, 9, -45, 0, 45, -9, 1)) / 60.,
-            array((1, -8, 0, 8, -1)) / 12.,
-            array((-1, 0, 1)) / 2.,
+            array((3, -32, 168, -672, 0, 672, -168, 32, -3)) / 840.0,
+            array((-1, 9, -45, 0, 45, -9, 1)) / 60.0,
+            array((1, -8, 0, 8, -1)) / 12.0,
+            array((-1, 0, 1)) / 2.0,
             # uncentered kernel
             # like array((0, -1, 1)) but left value could be default value
             array((-1, 1)),
@@ -1259,7 +1581,7 @@ class RegularGridDataset(GridDataset):
             (1, array((-1, 1))),
         ]
         # reduce to stencil selected
-        weights = weights[4 - stencil_halfwidth:]
+        weights = weights[4 - stencil_halfwidth :]
         if vertical:
             data = data.T
         # Iteration from larger stencil to smaller (to fill matrix)
@@ -1275,7 +1597,9 @@ class RegularGridDataset(GridDataset):
                 data_ = data
             # Delta h
             d_h = convolve(data_, weights=weight.reshape((-1, 1)), mode=mode)
-            mask = convolve(int8(data_.mask), weights=ones(weight.shape).reshape((-1, 1)), mode=mode)
+            mask = convolve(
+                int8(data_.mask), weights=ones(weight.shape).reshape((-1, 1)), mode=mode
+            )
             d_h = ma.array(d_h, mask=mask != 0)
 
             # Delta d
@@ -1283,7 +1607,7 @@ class RegularGridDataset(GridDataset):
                 d_h = d_h.T
                 d = self.EARTH_RADIUS * 2 * pi / 360 * convolve(self.y_c, weight)
             else:
-                if mode == 'wrap':
+                if mode == "wrap":
                     # Along x axis, we need to close
                     # we will compute in two part
                     x = self.x_c % 360
@@ -1294,7 +1618,14 @@ class RegularGridDataset(GridDataset):
                     d_degrees[m] = d_degrees_180[m]
                 else:
                     d_degrees = convolve(self.x_c, weight, mode=mode)
-                d = self.EARTH_RADIUS * 2 * pi / 360 * d_degrees.reshape((-1, 1)) * cos(deg2rad(self.y_c))
+                d = (
+                    self.EARTH_RADIUS
+                    * 2
+                    * pi
+                    / 360
+                    * d_degrees.reshape((-1, 1))
+                    * cos(deg2rad(self.y_c))
+                )
             if grad is None:
                 # First Gradient
                 grad = d_h / d
@@ -1303,78 +1634,125 @@ class RegularGridDataset(GridDataset):
                 grad[grad.mask] = (d_h / d)[grad.mask]
         return grad
 
-    def add_uv_lagerloef(self, grid_height, uname='u', vname='v', schema=15):
+    def add_uv_lagerloef(self, grid_height, uname="u", vname="v", schema=15):
         self.add_uv(grid_height, uname, vname)
         latmax = 5
         _, (i_start, i_end) = self.nearest_grd_indice((0, 0), (-latmax, latmax))
         sl = slice(i_start, i_end)
         # Divide by sideral day
         lat = self.y_c[sl]
-        gob = cos(deg2rad(lat)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (
-                    23 * 3600 + 56 * 60 + 4.1) / self.EARTH_RADIUS
-        with errstate(divide='ignore'):
+        gob = (
+            cos(deg2rad(lat))
+            * ones((self.x_c.shape[0], 1))
+            * 4.0
+            * pi
+            / (23 * 3600 + 56 * 60 + 4.1)
+            / self.EARTH_RADIUS
+        )
+        with errstate(divide="ignore"):
             gob = self.GRAVITY / (gob * ones((self.x_c.shape[0], 1)))
-        mode = 'wrap' if self.is_circular() else 'reflect'
+        mode = "wrap" if self.is_circular() else "reflect"
 
         # fill data to compute a finite difference on all point
-        data = self.convolve_filter_with_dynamic_kernel(grid_height, self.kernel_bessel, lat_max=10, wave_length=500,
-                                                        order=1, extend=.1)
-        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1,
-                                                        extend=.1)
-        data = self.convolve_filter_with_dynamic_kernel(data, self.kernel_bessel, lat_max=10, wave_length=500, order=1,
-                                                        extend=.1)
-        v_lagerloef = self.compute_finite_difference(
-            self.compute_finite_difference(data, mode=mode, schema=schema), mode=mode, schema=schema)[:, sl] * gob
-        u_lagerloef = - self.compute_finite_difference(
-            self.compute_finite_difference(data, vertical=True, schema=schema), vertical=True, schema=schema)[:,
-                        sl] * gob
-        w = 1 - exp(-(lat / 2.2) ** 2)
+        data = self.convolve_filter_with_dynamic_kernel(
+            grid_height,
+            self.kernel_bessel,
+            lat_max=10,
+            wave_length=500,
+            order=1,
+            extend=0.1,
+        )
+        data = self.convolve_filter_with_dynamic_kernel(
+            data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=0.1
+        )
+        data = self.convolve_filter_with_dynamic_kernel(
+            data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=0.1
+        )
+        v_lagerloef = (
+            self.compute_finite_difference(
+                self.compute_finite_difference(data, mode=mode, schema=schema),
+                mode=mode,
+                schema=schema,
+            )[:, sl]
+            * gob
+        )
+        u_lagerloef = (
+            -self.compute_finite_difference(
+                self.compute_finite_difference(data, vertical=True, schema=schema),
+                vertical=True,
+                schema=schema,
+            )[:, sl]
+            * gob
+        )
+        w = 1 - exp(-((lat / 2.2) ** 2))
         self.vars[vname][:, sl] = self.vars[vname][:, sl] * w + v_lagerloef * (1 - w)
         self.vars[uname][:, sl] = self.vars[uname][:, sl] * w + u_lagerloef * (1 - w)
 
-    def add_uv(self, grid_height, uname='u', vname='v', stencil_halfwidth=4):
+    def add_uv(self, grid_height, uname="u", vname="v", stencil_halfwidth=4):
         """Compute a u and v grid
                """
-        logger.info('Add u/v variable with stencil method')
+        logger.info("Add u/v variable with stencil method")
         data = self.grid(grid_height)
         h_dict = self.variables_description[grid_height]
         for variable in (uname, vname):
             self.variables_description[variable] = dict(
-                infos=h_dict['infos'].copy(),
-                attrs=h_dict['attrs'].copy(),
-                args=tuple((variable, *h_dict['args'][1:])),
-                kwargs=h_dict['kwargs'].copy(),
+                infos=h_dict["infos"].copy(),
+                attrs=h_dict["attrs"].copy(),
+                args=tuple((variable, *h_dict["args"][1:])),
+                kwargs=h_dict["kwargs"].copy(),
             )
-            if 'units' in self.variables_description[variable]['attrs']:
-                self.variables_description[variable]['attrs']['units'] += '/s'
-            if 'long_name' in self.variables_description[variable]['attrs']:
-                self.variables_description[variable]['attrs']['long_name'] += ' gradient'
+            if "units" in self.variables_description[variable]["attrs"]:
+                self.variables_description[variable]["attrs"]["units"] += "/s"
+            if "long_name" in self.variables_description[variable]["attrs"]:
+                self.variables_description[variable]["attrs"][
+                    "long_name"
+                ] += " gradient"
         # Divide by sideral day
-        gof = sin(deg2rad(self.y_c)) * ones((self.x_c.shape[0], 1)) * 4. * pi / (23 * 3600 + 56 * 60 + 4.1)
-        with errstate(divide='ignore'):
+        gof = (
+            sin(deg2rad(self.y_c))
+            * ones((self.x_c.shape[0], 1))
+            * 4.0
+            * pi
+            / (23 * 3600 + 56 * 60 + 4.1)
+        )
+        with errstate(divide="ignore"):
             gof = self.GRAVITY / (gof * ones((self.x_c.shape[0], 1)))
 
         # Compute v
-        mode = 'wrap' if self.is_circular() else 'reflect'
-        self.vars[vname] = self.compute_stencil(data, mode=mode, stencil_halfwidth=stencil_halfwidth) * gof
+        mode = "wrap" if self.is_circular() else "reflect"
+        self.vars[vname] = (
+            self.compute_stencil(data, mode=mode, stencil_halfwidth=stencil_halfwidth)
+            * gof
+        )
         # Compute u
-        self.vars[uname] = -self.compute_stencil(data, vertical=True, stencil_halfwidth=stencil_halfwidth) * gof
+        self.vars[uname] = (
+            -self.compute_stencil(
+                data, vertical=True, stencil_halfwidth=stencil_halfwidth
+            )
+            * gof
+        )
 
     def speed_coef_mean(self, contour):
         """some nan can be compute over contour if we are near border,
         something to explore
         """
         return mean_on_regular_contour(
-            self.x_c, self.y_c, self._speed_ev, self._speed_ev.mask, contour.vertices, nan_remove=True)
+            self.x_c,
+            self.y_c,
+            self._speed_ev,
+            self._speed_ev.mask,
+            contour.vertices,
+            nan_remove=True,
+        )
 
-    def init_speed_coef(self, uname='u', vname='v'):
+    def init_speed_coef(self, uname="u", vname="v"):
         """Draft
         """
-        self._speed_ev = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** .5
+        self._speed_ev = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** 0.5
 
     def display(self, ax, name, **kwargs):
-        if 'cmap' not in kwargs:
-            kwargs['cmap'] = 'coolwarm'
+        if "cmap" not in kwargs:
+            kwargs["cmap"] = "coolwarm"
         return ax.pcolormesh(self.x_bounds, self.y_bounds, self.grid(name).T, **kwargs)
 
     def interp(self, grid_name, lons, lats):
@@ -1432,31 +1810,31 @@ def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
     for i, delta in enumerate(d_max):
         # If the travel don't cross multiple pixel
         if delta == 0:
-            i_g[ii: ii + delta + 1] = i_x0[i]
-            j_g[ii: ii + delta + 1] = i_y0[i]
+            i_g[ii : ii + delta + 1] = i_x0[i]
+            j_g[ii : ii + delta + 1] = i_y0[i]
         # Vertical move
         elif d_x[i] == 0:
             sup = -1 if d_y[i] < 0 else 1
-            i_g[ii: ii + delta + 1] = i_x0[i]
-            j_g[ii: ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
+            i_g[ii : ii + delta + 1] = i_x0[i]
+            j_g[ii : ii + delta + 1] = arange(i_y0[i], i_y1[i] + sup, sup)
         # Horizontal move
         elif d_y[i] == 0:
             sup = -1 if d_x[i] < 0 else 1
-            i_g[ii: ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup)
-            j_g[ii: ii + delta + 1] = i_y0[i]
+            i_g[ii : ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup)
+            j_g[ii : ii + delta + 1] = i_y0[i]
         # In case of multiple direction
         else:
             a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
             if abs(d_x[i]) >= abs(d_y[i]):
                 sup = -1 if d_x[i] < 0 else 1
                 value = arange(i_x0[i], i_x1[i] + sup, sup)
-                i_g[ii: ii + delta + 1] = value
-                j_g[ii: ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
+                i_g[ii : ii + delta + 1] = value
+                j_g[ii : ii + delta + 1] = (value - i_x0[i]) / a + i_y0[i]
             else:
                 sup = -1 if d_y[i] < 0 else 1
                 value = arange(i_y0[i], i_y1[i] + sup, sup)
-                j_g[ii: ii + delta + 1] = value
-                i_g[ii: ii + delta + 1] = (value - i_y0[i]) * a + i_x0[i]
+                j_g[ii : ii + delta + 1] = value
+                i_g[ii : ii + delta + 1] = (value - i_y0[i]) * a + i_x0[i]
         ii += delta + 1
     i_g %= nb_x
     return i_g, j_g, d_max
@@ -1479,4 +1857,7 @@ def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
 
 @njit(cache=True, fastmath=True)
 def _nearest_grd_indice(x, y, x0, y0, xstep, ystep):
-    return numba_types.int32(round(((x - x0[0]) % 360.) / xstep)), numba_types.int32(round((y - y0[0]) / ystep))
+    return (
+        numba_types.int32(round(((x - x0[0]) % 360.0) / xstep)),
+        numba_types.int32(round((y - y0[0]) / ystep)),
+    )
