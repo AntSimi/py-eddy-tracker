@@ -304,7 +304,9 @@ class GridDataset(object):
     # indice margin (if put to 0, raise warning that i don't understand)
     N = 1
 
-    def __init__(self, filename, x_name, y_name, centered=None, indexs=None):
+    def __init__(
+        self, filename, x_name, y_name, centered=None, indexs=None, unset=False
+    ):
         self.dimensions = None
         self.variables_description = None
         self.global_attrs = None
@@ -327,8 +329,9 @@ class GridDataset(object):
             logger.warning(
                 "We assume the position of grid is the center corner for %s", filename,
             )
-        self.load_general_features()
-        self.load()
+        if not unset:
+            self.load_general_features()
+            self.load()
 
     @property
     def is_centered(self):
@@ -414,41 +417,40 @@ class GridDataset(object):
             self.vars[x_name] = h.variables[x_name][sl_x]
             self.vars[y_name] = h.variables[y_name][sl_y]
 
-            if self.is_centered:
-                logger.info("Grid center")
-                self.x_c = self.vars[x_name]
-                self.y_c = self.vars[y_name]
-
-                self.x_bounds = concatenate(
-                    (self.x_c, (2 * self.x_c[-1] - self.x_c[-2],))
-                )
-                self.y_bounds = concatenate(
-                    (self.y_c, (2 * self.y_c[-1] - self.y_c[-2],))
-                )
-                d_x = self.x_bounds[1:] - self.x_bounds[:-1]
-                d_y = self.y_bounds[1:] - self.y_bounds[:-1]
-                self.x_bounds[:-1] -= d_x / 2
-                self.x_bounds[-1] -= d_x[-1] / 2
-                self.y_bounds[:-1] -= d_y / 2
-                self.y_bounds[-1] -= d_y[-1] / 2
-
-            else:
-                self.x_bounds = self.vars[x_name]
-                self.y_bounds = self.vars[y_name]
-
-                if len(self.x_dim) == 1:
-                    self.x_c = self.x_bounds.copy()
-                    dx2 = (self.x_bounds[1:] - self.x_bounds[:-1]) / 2
-                    self.x_c[:-1] += dx2
-                    self.x_c[-1] += dx2[-1]
-                    self.y_c = self.y_bounds.copy()
-                    dy2 = (self.y_bounds[1:] - self.y_bounds[:-1]) / 2
-                    self.y_c[:-1] += dy2
-                    self.y_c[-1] += dy2[-1]
-                else:
-                    raise Exception("not write")
-
+        self.setup_coordinates()
         self.init_pos_interpolator()
+
+    def setup_coordinates(self):
+        x_name, y_name = self.coordinates
+        if self.is_centered:
+            logger.info("Grid center")
+            self.x_c = self.vars[x_name]
+            self.y_c = self.vars[y_name]
+
+            self.x_bounds = concatenate((self.x_c, (2 * self.x_c[-1] - self.x_c[-2],)))
+            self.y_bounds = concatenate((self.y_c, (2 * self.y_c[-1] - self.y_c[-2],)))
+            d_x = self.x_bounds[1:] - self.x_bounds[:-1]
+            d_y = self.y_bounds[1:] - self.y_bounds[:-1]
+            self.x_bounds[:-1] -= d_x / 2
+            self.x_bounds[-1] -= d_x[-1] / 2
+            self.y_bounds[:-1] -= d_y / 2
+            self.y_bounds[-1] -= d_y[-1] / 2
+
+        else:
+            self.x_bounds = self.vars[x_name]
+            self.y_bounds = self.vars[y_name]
+
+            if len(self.x_dim) == 1:
+                self.x_c = self.x_bounds.copy()
+                dx2 = (self.x_bounds[1:] - self.x_bounds[:-1]) / 2
+                self.x_c[:-1] += dx2
+                self.x_c[-1] += dx2[-1]
+                self.y_c = self.y_bounds.copy()
+                dy2 = (self.y_bounds[1:] - self.y_bounds[:-1]) / 2
+                self.y_c[:-1] += dy2
+                self.y_c[-1] += dy2[-1]
+            else:
+                raise Exception("not write")
 
     def is_circular(self):
         """Check grid circularity
@@ -1084,44 +1086,47 @@ class UnRegularGridDataset(GridDataset):
 
         logger.debug("... OK")
 
-    def _low_filter(self, grid_name, x_cut, y_cut, factor=40.):
+    def _low_filter(self, grid_name, w_cut, factor=8.0):
         data = self.grid(grid_name)
         mean_data = data.mean()
         x = self.grid(self.coordinates[0])
         y = self.grid(self.coordinates[1])
-        regrid_x_step = x_cut / factor
-        regrid_y_step = y_cut / factor
+        regrid_step = w_cut / 111.0 / factor
         x_min, x_max, y_min, y_max = self.bounds
-        x_array = arange(x_min, x_max + regrid_x_step, regrid_x_step)
-        y_array = arange(y_min, y_max + regrid_y_step, regrid_y_step)
+        x_array = arange(x_min, x_max + regrid_step, regrid_step)
+        y_array = arange(y_min, min(y_max + regrid_step, 89), regrid_step)
         bins = (x_array, y_array)
 
         x_flat, y_flat, z_flat = x.reshape((-1,)), y.reshape((-1,)), data.reshape((-1,))
-        m = -z_flat.mask
+        m = ~z_flat.mask
         x_flat, y_flat, z_flat = x_flat[m], y_flat[m], z_flat[m]
 
-        nb_value, bounds_x, bounds_y = histogram2d(
-            x_flat, y_flat,
-            bins=bins)
+        nb_value, _, _ = histogram2d(x_flat, y_flat, bins=bins)
 
-        sum_value, _, _ = histogram2d(
-            x_flat, y_flat,
-            bins=bins,
-            weights=z_flat)
+        sum_value, _, _ = histogram2d(x_flat, y_flat, bins=bins, weights=z_flat)
 
-        with errstate(invalid='ignore'):
+        with errstate(invalid="ignore"):
             z_grid = ma.array(sum_value / nb_value, mask=nb_value == 0)
-        i_x, i_y = x_cut * 0.125 / regrid_x_step, y_cut * 0.125 / regrid_y_step
-        m = nb_value == 0
-
-        z_filtered = self._gaussian_filter(z_grid, (i_x, i_y))
-
-        z_filtered[m] = 0
-        x_center = (bounds_x[:-1] + bounds_x[1:]) / 2
-        y_center = (bounds_y[:-1] + bounds_y[1:]) / 2
+        regular_grid = RegularGridDataset.with_array(
+            coordinates=self.coordinates,
+            datas={
+                grid_name: z_grid,
+                self.coordinates[0]: x_array[:-1],
+                self.coordinates[1]: y_array[:-1],
+            },
+        )
+        regular_grid.bessel_low_filter(grid_name, w_cut, order=1)
+        z_filtered = regular_grid.grid(grid_name)
+        x_center = (x_array[:-1] + x_array[1:]) / 2
+        y_center = (y_array[:-1] + y_array[1:]) / 2
         opts_interpolation = dict(kx=1, ky=1, s=0)
-        m_interp = RectBivariateSpline(x_center, y_center, m, **opts_interpolation)
-        z_interp = RectBivariateSpline(x_center, y_center, z_filtered, **opts_interpolation).ev(x, y)
+        m_interp = RectBivariateSpline(
+            x_center, y_center, z_filtered.mask, **opts_interpolation
+        )
+        z_filtered.data[z_filtered.mask] = 0
+        z_interp = RectBivariateSpline(
+            x_center, y_center, z_filtered.data, **opts_interpolation
+        ).ev(x, y)
         return ma.array(z_interp, mask=m_interp.ev(x, y) > 0.00001)
 
     def speed_coef_mean(self, contour):
@@ -1152,10 +1157,23 @@ class RegularGridDataset(GridDataset):
     def __init__(self, *args, **kwargs):
         super(RegularGridDataset, self).__init__(*args, **kwargs)
         self._is_circular = None
+
+    def setup_coordinates(self):
+        super(RegularGridDataset, self).setup_coordinates()
         self.x_size = self.x_c.shape[0]
         self._x_step = (self.x_c[1:] - self.x_c[:-1]).mean()
         self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
 
+    @classmethod
+    def with_array(cls, coordinates, datas):
+        x_name, y_name = coordinates[0], coordinates[1]
+        obj = cls("array", x_name, y_name, unset=True, centered=False)
+        obj.x_dim = (x_name,)
+        obj.y_dim = (y_name,)
+        for k, v in datas.items():
+            obj.vars[k] = v
+        obj.setup_coordinates()
+        return obj
 
     def init_pos_interpolator(self):
         """Create function to have a quick index interpolator
@@ -1277,7 +1295,7 @@ class RegularGridDataset(GridDataset):
         min_wave_length = max(step_x_km * 2, step_y_km * 2)
         if wave_length < min_wave_length:
             logger.error(
-                "Wave_length to short for resolution, must be > %d km",
+                "Wave_length too short for resolution, must be > %d km",
                 ceil(min_wave_length),
             )
             raise Exception()
