@@ -1179,12 +1179,17 @@ class EddiesObservations(object):
         lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
         lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
         lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
+        kwargs_e = kwargs.copy()
+        if 'label' in kwargs:
+            kwargs['label'] += " (%s eddies)" % self.obs["contour_lon_s"].shape[0]
+            kwargs_e.pop('label', None)
         if ref is None:
             ax.plot(lon_s, lat_s, **kwargs)
-            ax.plot(lon_e, lat_e, linestyle="-.", **kwargs)
+            ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
         else:
+            # FIXME : ref could split eddies
             ax.plot((lon_s - ref) % 360 + ref, lat_s, **kwargs)
-            ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs)
+            ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs_e)
 
 
 class VirtualEddiesObservations(EddiesObservations):
