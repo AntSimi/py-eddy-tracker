@@ -44,7 +44,7 @@ from numpy import (
     absolute,
     concatenate,
     float64,
-    ceil
+    ceil,
 )
 from netCDF4 import Dataset
 from ..generic import distance_grid, distance, flatten_line_matrix
@@ -222,7 +222,7 @@ class EddiesObservations(object):
 
     @classmethod
     def obs_dimension(cls, handler):
-        for candidate in ('obs', 'Nobs', 'observation', 'i'):
+        for candidate in ("obs", "Nobs", "observation", "i"):
             if candidate in handler.dimensions.keys():
                 return candidate
 
@@ -233,22 +233,24 @@ class EddiesObservations(object):
         nb_obs = self.obs.shape[0]
         new = self.__class__(
             size=nb_obs,
-            track_extra_variables=list(concatenate((self.track_extra_variables, fields))),
+            track_extra_variables=list(
+                concatenate((self.track_extra_variables, fields))
+            ),
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables,
             only_variables=list(concatenate((self.obs.dtype.names, fields))),
-            raw_data=self.raw_data
+            raw_data=self.raw_data,
         )
         new.sign_type = self.sign_type
         for field in self.obs.dtype.descr:
-            logger.debug('Copy of field %s ...', field)
+            logger.debug("Copy of field %s ...", field)
             var = field[0]
             new.obs[var] = self.obs[var]
         return new
 
     def add_rotation_type(self):
-        new = self.add_fields(('type_cyc',))
-        new.observations['type_cyc'] = self.sign_type
+        new = self.add_fields(("type_cyc",))
+        new.observations["type_cyc"] = self.sign_type
         return new
 
     @property
@@ -320,9 +322,9 @@ class EddiesObservations(object):
             eddies.obs[key][:nb_obs_self] = self.obs[key][:]
             if key in other_keys:
                 eddies.obs[key][nb_obs_self:] = other.obs[key][:]
-        if 'track' in other_keys and 'track' in self_keys:
-            last_track = eddies.obs['track'][nb_obs_self - 1] + 1
-            eddies.obs['track'][nb_obs_self:] += last_track
+        if "track" in other_keys and "track" in self_keys:
+            last_track = eddies.obs["track"][nb_obs_self - 1] + 1
+            eddies.obs["track"][nb_obs_self:] += last_track
         eddies.sign_type = self.sign_type
         return eddies
 
@@ -387,7 +389,7 @@ class EddiesObservations(object):
             track_array_variables=eddies.track_array_variables,
             array_variables=eddies.array_variables,
             only_variables=eddies.only_variables,
-            raw_data=eddies.raw_data
+            raw_data=eddies.raw_data,
         )
 
     def index(self, index):
@@ -410,13 +412,15 @@ class EddiesObservations(object):
 
     @classmethod
     def load_file(cls, filename, **kwargs):
-        if filename.endswith('.zarr'):
+        if filename.endswith(".zarr"):
             return cls.load_from_zarr(filename, **kwargs)
         else:
             return cls.load_from_netcdf(filename, **kwargs)
 
     @classmethod
-    def load_from_zarr(cls, filename, raw_data=False, remove_vars=None, include_vars=None):
+    def load_from_zarr(
+        cls, filename, raw_data=False, remove_vars=None, include_vars=None
+    ):
         # FIXME must be investigate, in zarr no dimensions name (or could be add in attr)
         array_dim = 50
         BLOC = 5000000
@@ -430,7 +434,7 @@ class EddiesObservations(object):
             var_list = [i for i in var_list if i not in remove_vars]
 
         nb_obs = getattr(h_zarr, var_list[0]).shape[0]
-        logger.debug('%d observations will be load', nb_obs)
+        logger.debug("%d observations will be load", nb_obs)
         kwargs = dict()
         dims = cls.zarr_dimension(filename)
         if array_dim in dims:
@@ -447,22 +451,32 @@ class EddiesObservations(object):
             if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                 kwargs["track_extra_variables"].append(var_inv)
         kwargs["raw_data"] = raw_data
-        kwargs["only_variables"] = None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
+        kwargs["only_variables"] = (
+            None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
+        )
         eddies = cls(size=nb_obs, **kwargs)
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
-            logger.debug('%s will be loaded', variable)
+            logger.debug("%s will be loaded", variable)
             # find unit factor
             factor = 1
-            input_unit = h_zarr[variable].attrs.get('unit', None)
+            input_unit = h_zarr[variable].attrs.get("unit", None)
             if input_unit is None:
-                input_unit = h_zarr[variable].attrs.get('units', None)
-            output_unit = VAR_DESCR[var_inv]['nc_attr'].get('units', None)
-            if output_unit is not None and input_unit is not None and output_unit != input_unit:
+                input_unit = h_zarr[variable].attrs.get("units", None)
+            output_unit = VAR_DESCR[var_inv]["nc_attr"].get("units", None)
+            if (
+                output_unit is not None
+                and input_unit is not None
+                and output_unit != input_unit
+            ):
                 units = UnitRegistry()
                 try:
-                    input_unit = units.parse_expression(input_unit, case_sensitive=False)
-                    output_unit = units.parse_expression(output_unit, case_sensitive=False)
+                    input_unit = units.parse_expression(
+                        input_unit, case_sensitive=False
+                    )
+                    output_unit = units.parse_expression(
+                        output_unit, case_sensitive=False
+                    )
                 except UndefinedUnitError:
                     input_unit = None
                 except TokenError:
@@ -471,12 +485,17 @@ class EddiesObservations(object):
                     factor = input_unit.to(output_unit).to_tuple()[0]
                     # If we are able to find a conversion
                     if factor != 1:
-                        logger.info('%s will be multiply by %f to take care of units(%s->%s)',
-                                     variable, factor, input_unit, output_unit)
+                        logger.info(
+                            "%s will be multiply by %f to take care of units(%s->%s)",
+                            variable,
+                            factor,
+                            input_unit,
+                            output_unit,
+                        )
             nb = h_zarr[variable].shape[0]
 
-            scale_factor = VAR_DESCR[var_inv].get('scale_factor', None)
-            add_offset = VAR_DESCR[var_inv].get('add_offset', None)
+            scale_factor = VAR_DESCR[var_inv].get("scale_factor", None)
+            add_offset = VAR_DESCR[var_inv].get("add_offset", None)
             for i in range(0, nb, BLOC):
                 sl = slice(i, i + BLOC)
                 data = h_zarr[variable][sl]
@@ -496,7 +515,9 @@ class EddiesObservations(object):
         return eddies
 
     @classmethod
-    def load_from_netcdf(cls, filename, raw_data=False, remove_vars=None, include_vars=None):
+    def load_from_netcdf(
+        cls, filename, raw_data=False, remove_vars=None, include_vars=None
+    ):
         array_dim = "NbSample"
         if not isinstance(filename, str):
             filename = filename.astype(str)
@@ -508,7 +529,7 @@ class EddiesObservations(object):
                 var_list = [i for i in var_list if i not in remove_vars]
 
             nb_obs = len(h_nc.dimensions[cls.obs_dimension(h_nc)])
-            logger.debug('%d observations will be load', nb_obs)
+            logger.debug("%d observations will be load", nb_obs)
             kwargs = dict()
             if array_dim in h_nc.dimensions:
                 kwargs["track_array_variables"] = len(h_nc.dimensions[array_dim])
@@ -524,25 +545,41 @@ class EddiesObservations(object):
                 if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
                     kwargs["track_extra_variables"].append(var_inv)
             kwargs["raw_data"] = raw_data
-            kwargs["only_variables"] = None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
+            kwargs["only_variables"] = (
+                None
+                if include_vars is None
+                else [VAR_DESCR_inv[i] for i in include_vars]
+            )
             eddies = cls(size=nb_obs, **kwargs)
             for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
                 # Patch
                 h_nc.variables[variable].set_auto_maskandscale(not raw_data)
-                logger.debug('Up load %s variable%s', variable, ', with raw mode' if raw_data else '')
+                logger.debug(
+                    "Up load %s variable%s",
+                    variable,
+                    ", with raw mode" if raw_data else "",
+                )
                 # find unit factor
                 factor = 1
                 if not raw_data:
-                    input_unit = getattr(h_nc.variables[variable], 'unit', None)
+                    input_unit = getattr(h_nc.variables[variable], "unit", None)
                     if input_unit is None:
-                        input_unit = getattr(h_nc.variables[variable], 'units', None)
-                    output_unit = VAR_DESCR[var_inv]['nc_attr'].get('units', None)
-                    if output_unit is not None and input_unit is not None and output_unit != input_unit:
+                        input_unit = getattr(h_nc.variables[variable], "units", None)
+                    output_unit = VAR_DESCR[var_inv]["nc_attr"].get("units", None)
+                    if (
+                        output_unit is not None
+                        and input_unit is not None
+                        and output_unit != input_unit
+                    ):
                         units = UnitRegistry()
                         try:
-                            input_unit = units.parse_expression(input_unit, case_sensitive=False)
-                            output_unit = units.parse_expression(output_unit, case_sensitive=False)
+                            input_unit = units.parse_expression(
+                                input_unit, case_sensitive=False
+                            )
+                            output_unit = units.parse_expression(
+                                output_unit, case_sensitive=False
+                            )
                         except UndefinedUnitError:
                             input_unit = None
                         except TokenError:
@@ -551,8 +588,13 @@ class EddiesObservations(object):
                             factor = input_unit.to(output_unit).to_tuple()[0]
                             # If we are able to find a conversion
                             if factor != 1:
-                                logger.info('%s will be multiply by %f to take care of units(%s->%s)',
-                                             variable, factor, input_unit, output_unit)
+                                logger.info(
+                                    "%s will be multiply by %f to take care of units(%s->%s)",
+                                    variable,
+                                    factor,
+                                    input_unit,
+                                    output_unit,
+                                )
                 if factor != 1:
                     eddies.obs[var_inv] = h_nc.variables[variable][:] * factor
                 else:
@@ -563,11 +605,11 @@ class EddiesObservations(object):
                 if var_inv == "type_cyc":
                     eddies.sign_type = h_nc.variables[variable][0]
             if eddies.sign_type is None:
-                title = getattr(h_nc, 'title', None)
+                title = getattr(h_nc, "title", None)
                 if title is None:
                     eddies.sign_type = getattr(h_nc, "rotation_type", 0)
                 else:
-                    eddies.sign_type = -1 if title == 'Cyclonic' else 1
+                    eddies.sign_type = -1 if title == "Cyclonic" else 1
             if eddies.sign_type == 0:
                 logger.debug("File come from another algorithm of identification")
                 eddies.sign_type = -1
@@ -669,6 +711,13 @@ class EddiesObservations(object):
         next_obs["segment_size"][:] += 1
         return next_obs
 
+    def match(self, other, intern=False):
+        x_name, y_name = (
+            ("contour_lon_s", "contour_lat_s")
+            if intern
+            else ("contour_lon_e", "contour_lat_e")
+        )
+
     @staticmethod
     def cost_function_common_area(xy_in, xy_out, distance, intern=False):
         """ How does it work on x bound ?
@@ -685,7 +734,6 @@ class EddiesObservations(object):
             if intern
             else ("contour_lon_e", "contour_lat_e")
         )
-        r_name = "radius_s" if intern else "radius_e"
         nb_records = xy_in.shape[0]
         x_in, y_in = xy_in[x_name], xy_in[y_name]
         x_out, y_out = xy_out[x_name], xy_out[y_name]
@@ -845,9 +893,7 @@ class EddiesObservations(object):
             cost_reduce = cost[i_self_keep][:, i_other_keep]
             shape = cost_reduce.shape
             nb_conflict = (~cost_reduce.mask).sum()
-            logger.debug(
-                "Shape conflict matrix : %s, %d conflicts", shape, nb_conflict
-            )
+            logger.debug("Shape conflict matrix : %s, %d conflicts", shape, nb_conflict)
 
             if nb_conflict >= (shape[0] + shape[1]):
                 logger.warning(
@@ -902,9 +948,7 @@ class EddiesObservations(object):
             cost_reduce = cost[i_self_keep][:, i_other_keep]
             shape = cost_reduce.shape
             nb_conflict = (~cost_reduce.mask).sum()
-            logger.debug(
-                "Shape conflict matrix : %s, %d conflicts", shape, nb_conflict
-            )
+            logger.debug("Shape conflict matrix : %s, %d conflicts", shape, nb_conflict)
 
             if nb_conflict >= (shape[0] + shape[1]):
                 logger.warning(
@@ -963,10 +1007,10 @@ class EddiesObservations(object):
         return i_self, i_other, cost_mat[i_self, i_other]
 
     def to_zarr(self, handler, **kwargs):
-        handler.attrs['track_extra_variables'] = ",".join(self.track_extra_variables)
+        handler.attrs["track_extra_variables"] = ",".join(self.track_extra_variables)
         if self.track_array_variables != 0:
-            handler.attrs['track_array_variables'] = self.track_array_variables
-            handler.attrs['array_variables'] = ",".join(self.array_variables)
+            handler.attrs["track_array_variables"] = self.track_array_variables
+            handler.attrs["array_variables"] = ",".join(self.array_variables)
         # Iter on variables to create:
         fields = [field[0] for field in self.observations.dtype.descr]
         for ori_name in fields:
@@ -987,7 +1031,7 @@ class EddiesObservations(object):
                 scale_factor=VAR_DESCR[name].get("scale_factor", None),
                 add_offset=VAR_DESCR[name].get("add_offset", None),
                 filters=VAR_DESCR[name].get("filters", None),
-                ** kwargs
+                **kwargs,
             )
         self.set_global_attr_zarr(handler)
 
@@ -998,7 +1042,9 @@ class EddiesObservations(object):
         else:
             old_nb = len(handler.dimensions[dim])
             if nb != old_nb:
-                raise Exception(f'{dim} dimensions previously set to a different size {old_nb} (current value : {nb})')
+                raise Exception(
+                    f"{dim} dimensions previously set to a different size {old_nb} (current value : {nb})"
+                )
 
     def to_netcdf(self, handler):
         eddy_size = len(self)
@@ -1006,7 +1052,9 @@ class EddiesObservations(object):
         self.netcdf_create_dimensions(handler, "obs", eddy_size)
         handler.track_extra_variables = ",".join(self.track_extra_variables)
         if self.track_array_variables != 0:
-            self.netcdf_create_dimensions(handler, "NbSample", self.track_array_variables)
+            self.netcdf_create_dimensions(
+                handler, "NbSample", self.track_array_variables
+            )
             handler.track_array_variables = self.track_array_variables
             handler.array_variables = ",".join(self.array_variables)
         # Iter on variables to create:
@@ -1043,7 +1091,7 @@ class EddiesObservations(object):
         scale_factor=None,
         add_offset=None,
     ):
-        dims = kwargs_variable.get('dimensions', None)
+        dims = kwargs_variable.get("dimensions", None)
         # Manage chunk in 2d case
         if dims is not None and len(dims) > 1:
             chunk = [1]
@@ -1053,7 +1101,7 @@ class EddiesObservations(object):
                 chunk.append(nb)
                 cum *= nb
             chunk[0] = min(int(400000 / cum), len(handler_nc.dimensions[dims[0]]))
-            kwargs_variable['chunksizes'] = chunk
+            kwargs_variable["chunksizes"] = chunk
         var = handler_nc.createVariable(zlib=True, complevel=1, **kwargs_variable)
         attrs = list(attr_variable.keys())
         attrs.sort()
@@ -1086,33 +1134,36 @@ class EddiesObservations(object):
         scale_factor=None,
         add_offset=None,
         filters=None,
-        compressor=None
+        compressor=None,
     ):
-        kwargs_variable['shape'] = data.shape
-        kwargs_variable['compressor'] = \
-            zarr.Blosc(cname='zstd', clevel=2) if compressor is None else compressor
-        kwargs_variable['filters'] = list()
-        store_dtype = kwargs_variable.pop('store_dtype', None)
+        kwargs_variable["shape"] = data.shape
+        kwargs_variable["compressor"] = (
+            zarr.Blosc(cname="zstd", clevel=2) if compressor is None else compressor
+        )
+        kwargs_variable["filters"] = list()
+        store_dtype = kwargs_variable.pop("store_dtype", None)
         if scale_factor is not None or add_offset is not None:
             if add_offset is None:
                 add_offset = 0
-            kwargs_variable['filters'].append(zarr.FixedScaleOffset(
-                offset=float64(add_offset),
-                scale=1 / float64(scale_factor),
-                dtype=kwargs_variable['dtype'],
-                astype=store_dtype
-            ))
+            kwargs_variable["filters"].append(
+                zarr.FixedScaleOffset(
+                    offset=float64(add_offset),
+                    scale=1 / float64(scale_factor),
+                    dtype=kwargs_variable["dtype"],
+                    astype=store_dtype,
+                )
+            )
         if filters is not None:
-            kwargs_variable['filters'].extend(filters)
-        dims = kwargs_variable.get('dimensions', None)
+            kwargs_variable["filters"].extend(filters)
+        dims = kwargs_variable.get("dimensions", None)
         # Manage chunk in 2d case
         if len(dims) == 1:
-            kwargs_variable['chunks'] = (2500000,)
+            kwargs_variable["chunks"] = (2500000,)
         if len(dims) == 2:
             second_dim = data.shape[1]
-            kwargs_variable['chunks'] = (200000, second_dim)
+            kwargs_variable["chunks"] = (200000, second_dim)
 
-        kwargs_variable.pop('dimensions')
+        kwargs_variable.pop("dimensions")
         v = handler_zarr.create_dataset(**kwargs_variable)
         attrs = list(attr_variable.keys())
         attrs.sort()
@@ -1121,7 +1172,7 @@ class EddiesObservations(object):
             v.attrs[attr] = str(attr_value)
         if self.raw_data:
             if scale_factor is not None:
-                s_bloc = kwargs_variable['chunks'][0]
+                s_bloc = kwargs_variable["chunks"][0]
                 nb_bloc = int(ceil(data.shape[0] / s_bloc))
                 for i in range(nb_bloc):
                     sl = slice(i * s_bloc, (i + 1) * s_bloc)
@@ -1137,7 +1188,9 @@ class EddiesObservations(object):
         except ValueError:
             logger.warning("Data is empty")
 
-    def write_file(self, path="./", filename="%(path)s/%(sign_type)s.nc", zarr_flag=False):
+    def write_file(
+        self, path="./", filename="%(path)s/%(sign_type)s.nc", zarr_flag=False
+    ):
         """Write a netcdf with eddy obs
         """
         filename = filename % dict(
@@ -1146,12 +1199,12 @@ class EddiesObservations(object):
             prod_time=datetime.now().strftime("%Y%m%d"),
         )
         if zarr_flag:
-            filename = filename.replace('.nc', '.zarr')
-        if filename.endswith('.zarr'):
+            filename = filename.replace(".nc", ".zarr")
+        if filename.endswith(".zarr"):
             zarr_flag = True
         logger.info("Store in %s", filename)
         if zarr_flag:
-            handler = zarr.open(filename, 'w')
+            handler = zarr.open(filename, "w")
             self.to_zarr(handler)
         else:
             with Dataset(filename, "w", format="NETCDF4") as handler:
@@ -1160,11 +1213,12 @@ class EddiesObservations(object):
     @property
     def global_attr(self):
         return dict(
-        Metadata_Conventions="Unidata Dataset Discovery v1.0",
-        comment="Surface product; mesoscale eddies",
-        framework_used="https://github.com/AntSimi/py-eddy-tracker",
-        standard_name_vocabulary="NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table",
-        rotation_type=self.sign_type)
+            Metadata_Conventions="Unidata Dataset Discovery v1.0",
+            comment="Surface product; mesoscale eddies",
+            framework_used="https://github.com/AntSimi/py-eddy-tracker",
+            standard_name_vocabulary="NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table",
+            rotation_type=self.sign_type,
+        )
 
     def set_global_attr_zarr(self, h_zarr):
         for key, item in self.global_attr.items():
@@ -1180,9 +1234,9 @@ class EddiesObservations(object):
         lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
         lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
         kwargs_e = kwargs.copy()
-        if 'label' in kwargs:
-            kwargs['label'] += " (%s eddies)" % self.obs["contour_lon_s"].shape[0]
-            kwargs_e.pop('label', None)
+        if "label" in kwargs:
+            kwargs["label"] += " (%s eddies)" % self.obs["contour_lon_s"].shape[0]
+            kwargs_e.pop("label", None)
         if ref is None:
             ax.plot(lon_s, lat_s, **kwargs)
             ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
