@@ -27,6 +27,7 @@ Version 3.0.0
 ===========================================================================
 
 """
+import logging
 import zarr
 from numpy import (
     zeros,
@@ -47,15 +48,15 @@ from numpy import (
     ceil,
 )
 from netCDF4 import Dataset
-from ..generic import distance_grid, distance, flatten_line_matrix
-from .. import VAR_DESCR, VAR_DESCR_inv
-import logging
 from datetime import datetime
 from numba import njit, types as numba_types
 from Polygon import Polygon
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
 from tokenize import TokenError
+from .. import VAR_DESCR, VAR_DESCR_inv
+from ..generic import distance_grid, distance, flatten_line_matrix
+from ..poly import bbox_intersection, common_area
 
 logger = logging.getLogger("pet")
 
@@ -712,11 +713,21 @@ class EddiesObservations(object):
         return next_obs
 
     def match(self, other, intern=False):
+        """return index and score compute with area
+        """
         x_name, y_name = (
             ("contour_lon_s", "contour_lat_s")
             if intern
             else ("contour_lon_e", "contour_lat_e")
         )
+        i, j = bbox_intersection(
+            self[x_name], self[y_name], other[x_name], other[y_name]
+        )
+        c = common_area(
+            self[x_name][i], self[y_name][i], other[x_name][j], other[y_name][j]
+        )
+        m = c > 0
+        return i[m], j[m], c[m]
 
     @staticmethod
     def cost_function_common_area(xy_in, xy_out, distance, intern=False):
@@ -1228,21 +1239,25 @@ class EddiesObservations(object):
         for key, item in self.global_attr.items():
             h_nc.setncattr(key, item)
 
-    def display(self, ax, ref=None, **kwargs):
-        lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
-        lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
+    def display(self, ax, ref=None, extern_only=False, **kwargs):
+        if not extern_only:
+            lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
+            lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
         lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
         lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
-        kwargs_e = kwargs.copy()
         if "label" in kwargs:
-            kwargs["label"] += " (%s eddies)" % self.obs["contour_lon_s"].shape[0]
+            kwargs["label"] += " (%s eddies)" % len(self)
+        kwargs_e = kwargs.copy()
+        if not extern_only:
             kwargs_e.pop("label", None)
         if ref is None:
-            ax.plot(lon_s, lat_s, **kwargs)
+            if not extern_only:
+                ax.plot(lon_s, lat_s, **kwargs)
             ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
         else:
             # FIXME : ref could split eddies
-            ax.plot((lon_s - ref) % 360 + ref, lat_s, **kwargs)
+            if not extern_only:
+                ax.plot((lon_s - ref) % 360 + ref, lat_s, **kwargs)
             ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs_e)
 
 

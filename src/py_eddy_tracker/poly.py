@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 """
-from numpy import empty, where
+from numpy import empty, where, array
 from numba import njit, prange, types as numba_types
+from Polygon import Polygon
 
 
 @njit(cache=True)
@@ -17,7 +18,9 @@ def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
     See: Algorithm 1 "Area of Triangles and Polygons"
     """
     # Vector product
-    product = (x_line_1 - x_line_0) * (y_test - y_line_0) - (x_test - x_line_0) * (y_line_1 - y_line_0)
+    product = (x_line_1 - x_line_0) * (y_test - y_line_0) - (x_test - x_line_0) * (
+        y_line_1 - y_line_0
+    )
     return product > 0
 
 
@@ -50,21 +53,13 @@ def winding_number_poly(x, y, xy_poly):
             y_next = xy_poly[i_elt + 1, 1]
         if xy_poly[i_elt, 1] <= y:
             if y_next > y:
-                if is_left(xy_poly[i_elt, 0],
-                           xy_poly[i_elt, 1],
-                           x_next,
-                           y_next,
-                           x, y
-                           ):
+                if is_left(xy_poly[i_elt, 0], xy_poly[i_elt, 1], x_next, y_next, x, y):
                     wn += 1
         else:
             if y_next <= y:
-                if not is_left(xy_poly[i_elt, 0],
-                               xy_poly[i_elt, 1],
-                               x_next,
-                               y_next,
-                               x, y
-                               ):
+                if not is_left(
+                    xy_poly[i_elt, 0], xy_poly[i_elt, 1], x_next, y_next, x, y
+                ):
                     wn -= 1
     return wn
 
@@ -92,3 +87,58 @@ def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
     if i_x1 < i_x0:
         i_x %= x_size
     return i_x, i_y
+
+
+@njit(cache=True, fastmath=True)
+def bbox_intersection(x0, y0, x1, y1):
+    """compute bbox to check if there are a bbox intersection
+    """
+    nb0 = x0.shape[0]
+    nb1 = x1.shape[0]
+    x1_min, y1_min = empty(nb1), empty(nb1)
+    x1_max, y1_max = empty(nb1), empty(nb1)
+    for i1 in range(nb1):
+        x1_min[i1], y1_min[i1] = x1[i1].min(), y1[i1].min()
+        x1_max[i1], y1_max[i1] = x1[i1].max(), y1[i1].max()
+
+    i, j = list(), list()
+    for i0 in range(nb0):
+        x_in_min, y_in_min = x0[i0].min(), y0[i0].min()
+        x_in_max, y_in_max = x0[i0].max(), y0[i0].max()
+        for i1 in range(nb1):
+            if y_in_max < y1_min[i1] or y_in_min > y1_max[i1]:
+                continue
+            x1_min_ = x1_min[i1]
+            x1_max_ = x1_max[i1]
+            if abs(x_in_min - x1_min_) > 180:
+                ref = x_in_min - 180
+                x1_min_ = (x1_min_ - ref) % 360 + ref
+                x1_max_ = (x1_max_ - ref) % 360 + ref
+            if x_in_max < x1_min_ or x_in_min > x1_max_:
+                continue
+            i.append(i0)
+            j.append(i1)
+    return array(i), array(j)
+
+
+@njit(cache=True, fastmath=True)
+def create_vertice(x, y):
+    nb = x.shape[0]
+    v = empty((nb, 2))
+    for i in range(nb):
+        v[i, 0] = x[i]
+        v[i, 1] = y[i]
+    return v
+
+
+def common_area(x0, y0, x1, y1):
+    nb, _ = x0.shape
+    cost = empty((nb))
+    for i in range(nb):
+        x0_, x1_ = x0[i], x1[i]
+        if abs(x0_[0] - x1_[0]) > 180:
+            x1_ = (x1[i] - (x0_[0] - 180)) % 360 + x0_[0] - 180
+        p0 = Polygon(create_vertice(x0_, y0[i]))
+        p1 = Polygon(create_vertice(x1_, y1[i]))
+        cost[i] = (p0 & p1).area() / (p0 + p1).area()
+    return cost
