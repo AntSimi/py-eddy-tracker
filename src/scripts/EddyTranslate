@@ -41,7 +41,7 @@ if __name__ == '__main__':
     args = id_parser().parse_args()
 
     variables = get_variable_name(args.filename_in)
-    if is_nc(args.filename_out):
+    if not is_nc(args.filename_out):
         h = zarr.open(args.filename_out, 'w')
         for varname in variables:
             get_variable(args.filename_in, varname).to_zarr(h)

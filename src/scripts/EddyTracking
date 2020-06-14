@@ -151,13 +151,13 @@ if __name__ == '__main__':
             data_dir=None,
             files_model=None,
             files=CONFIG['PATHS']['FILES_PATTERN'],
-            date_regexp='.*c_([0-9]*?).nc',
+            date_regexp='.*c_([0-9]*?).[nz].*',
             date_model='%Y%m%d')
     else:
         DATASET_LIST = browse_dataset_in(
             data_dir=dirname(CONFIG['PATHS']['FILES_PATTERN']),
             files_model=basename(CONFIG['PATHS']['FILES_PATTERN']),
-            date_regexp='.*c_([0-9]*?).nc',
+            date_regexp='.*c_([0-9]*?).[nz].*',
             date_model='%Y%m%d')
 
     if BLANK_PERIOD > 0:
