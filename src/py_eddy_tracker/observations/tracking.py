@@ -27,12 +27,24 @@ Version 3.0.0
 ===========================================================================
 
 """
-from numpy import empty, arange, where, unique, interp, ones, bool_, zeros, array, median
+from numpy import (
+    empty,
+    arange,
+    where,
+    unique,
+    interp,
+    ones,
+    bool_,
+    zeros,
+    array,
+    median,
+)
 from .. import VAR_DESCR_inv
 import logging
 from datetime import datetime, timedelta
 from .observation import EddiesObservations
 from numba import njit
+from ..generic import split_line
 
 logger = logging.getLogger("pet")
 
@@ -224,12 +236,14 @@ class TrackEddiesObservations(EddiesObservations):
         return self.__extract_with_mask(mask)
 
     def extract_first_obs_in_box(self, res):
-        data = empty(self.obs.shape, dtype=[('lon', 'f4'), ('lat', 'f4'), ('track', 'i4')])
-        data['lon'] = self.longitude - self.longitude % res
-        data['lat'] = self.latitude - self.latitude % res
-        data['track'] = self.obs["track"]
+        data = empty(
+            self.obs.shape, dtype=[("lon", "f4"), ("lat", "f4"), ("track", "i4")]
+        )
+        data["lon"] = self.longitude - self.longitude % res
+        data["lat"] = self.latitude - self.latitude % res
+        data["track"] = self.obs["track"]
         _, indexs = unique(data, return_index=True)
-        mask = zeros(self.obs.shape, dtype='bool')
+        mask = zeros(self.obs.shape, dtype="bool")
         mask[indexs] = True
         return self.__extract_with_mask(mask)
 
@@ -237,15 +251,15 @@ class TrackEddiesObservations(EddiesObservations):
         nb_obs = self.nb_obs_by_track
         i_start = self.index_from_track
         i_stop = i_start + nb_obs - 1
-        if direction in ('S', 'N'):
+        if direction in ("S", "N"):
             d_lat = self.latitude[i_stop] - self.latitude[i_start]
-            mask = d_lat < 0 if 'S' == direction else d_lat > 0
+            mask = d_lat < 0 if "S" == direction else d_lat > 0
             mask &= abs(d_lat) > value
         else:
-            lon_start , lon_end = self.longitude[i_start], self.longitude[i_stop]
+            lon_start, lon_end = self.longitude[i_start], self.longitude[i_stop]
             lon_end = (lon_end - (lon_start - 180)) % 360 + lon_start - 180
             d_lon = lon_end - lon_start
-            mask = d_lon < 0 if 'W' == direction else d_lon > 0
+            mask = d_lon < 0 if "W" == direction else d_lon > 0
             mask &= abs(d_lon) > value
         mask = mask.repeat(nb_obs)
         return self.__extract_with_mask(mask)
@@ -280,7 +294,12 @@ class TrackEddiesObservations(EddiesObservations):
             self.obs[yfield] = result
 
     def __extract_with_mask(
-        self, mask, full_path=False, remove_incomplete=False, compress_id=False, reject_virtual=False,
+        self,
+        mask,
+        full_path=False,
+        remove_incomplete=False,
+        compress_id=False,
+        reject_virtual=False,
     ):
         """
         Extract a subset of observations
@@ -302,7 +321,7 @@ class TrackEddiesObservations(EddiesObservations):
 
         if full_path:
             if reject_virtual:
-                mask *= ~self.obs['virtual'].astype('bool')
+                mask *= ~self.obs["virtual"].astype("bool")
             tracks = unique(self.tracks[mask])
             mask = self.get_mask_from_id(tracks)
         elif remove_incomplete:
@@ -332,6 +351,14 @@ class TrackEddiesObservations(EddiesObservations):
                 id_translate[list_id] = arange(len(list_id)) + 1
                 new.obs["track"] = id_translate[new.obs["track"]]
         return new
+
+    def plot(self, ax, ref=None, ** kwargs):
+        if "label" in kwargs:
+            kwargs["label"] += " (%s eddies)" % (self.nb_obs_by_track != 0).sum()
+        x, y = split_line(self.longitude, self.latitude, self.tracks)
+        if ref is not None:
+            x = (x - ref) % 360 + ref
+        return ax.plot(x, y, **kwargs)
 
 
 @njit(cache=True)
@@ -373,7 +400,9 @@ def track_loess_filter(half_window, x, y, track):
         if i != 0:
             i_previous = i - 1
             dx = x[i] - x[i_previous]
-            while dx < half_window and i_previous != 0 and cur_track == track[i_previous]:
+            while (
+                dx < half_window and i_previous != 0 and cur_track == track[i_previous]
+            ):
                 w = (1 - (dx / half_window) ** 3) ** 3
                 y_sum += y[i_previous] * w
                 w_sum += w
@@ -412,7 +441,11 @@ def track_median_filter(half_window, x, y, track):
         cur_track = track[i]
         while x[i] - x[i_previous] > half_window or cur_track != track[i_previous]:
             i_previous += 1
-        while i_next < nb and x[i_next] - x[i] <= half_window and cur_track == track[i_next]:
+        while (
+            i_next < nb
+            and x[i_next] - x[i] <= half_window
+            and cur_track == track[i_next]
+        ):
             i_next += 1
         y_new[i] = median(y[i_previous:i_next])
     return y_new
