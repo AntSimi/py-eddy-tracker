@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import argparse
+import zarr
+
+def zarr_header_parser():
+    parser = argparse.ArgumentParser('Zarr header')
+    parser.add_argument('dataset')
+    return parser
+
+if __name__ == '__main__':
+    args = zarr_header_parser().parse_args()
+    print(args.dataset)
+    for v in zarr.open(args.dataset).values():
+        print(v.info)

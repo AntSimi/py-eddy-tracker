@@ -1,7 +1,20 @@
 # -*- coding: utf-8 -*-
 """
 """
-from numpy import sin, pi, cos, arctan2, empty, nan, absolute, floor, ones, linspace, interp
+from numpy import (
+    sin,
+    pi,
+    cos,
+    arctan2,
+    empty,
+    nan,
+    absolute,
+    floor,
+    ones,
+    linspace,
+    interp,
+    where,
+)
 from numba import njit, prange
 from numpy.linalg import lstsq
 
@@ -21,7 +34,7 @@ def distance_grid(lon0, lat0, lon1, lat1):
     nb_0 = lon0.shape[0]
     nb_1 = lon1.shape[0]
     dist = empty((nb_0, nb_1))
-    D2R = pi / 180.
+    D2R = pi / 180.0
     for i in prange(nb_0):
         for j in prange(nb_1):
             dlat = absolute(lat1[j] - lat0[i])
@@ -45,7 +58,7 @@ def distance_grid(lon0, lat0, lon1, lat1):
 
 @njit(cache=True, fastmath=True)
 def distance(lon0, lat0, lon1, lat1):
-    D2R = pi / 180.
+    D2R = pi / 180.0
     sin_dlat = sin((lat1 - lat0) * 0.5 * D2R)
     sin_dlon = sin((lon1 - lon0) * 0.5 * D2R)
     cos_lat1 = cos(lat0 * D2R)
@@ -57,7 +70,7 @@ def distance(lon0, lat0, lon1, lat1):
 @njit(cache=True)
 def distance_vincenty(lon0, lat0, lon1, lat1):
     """ better than haversine but buggy ??"""
-    D2R = pi / 180.
+    D2R = pi / 180.0
     dlon = (lon1 - lon0) * D2R
     cos_dlon = cos(dlon)
     cos_lat1 = cos(lat0 * D2R)
@@ -65,8 +78,13 @@ def distance_vincenty(lon0, lat0, lon1, lat1):
     sin_lat1 = sin(lat0 * D2R)
     sin_lat2 = sin(lat1 * D2R)
     return 6370997.0 * arctan2(
-        ((cos_lat2 * sin(dlon) ** 2) + (cos_lat1 * sin_lat2 - sin_lat1 * cos_lat2 * cos_dlon) ** 2) ** .5,
-        sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_dlon)
+        (
+            (cos_lat2 * sin(dlon) ** 2)
+            + (cos_lat1 * sin_lat2 - sin_lat1 * cos_lat2 * cos_dlon) ** 2
+        )
+        ** 0.5,
+        sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_dlon,
+    )
 
 
 @njit(cache=True, fastmath=True)
@@ -86,13 +104,13 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
         y_ = (y[i] - y_ref) / y_step
         i0 = int(floor(x_))
         i1 = i0 + 1
-        xd = (x_ - i0)
+        xd = x_ - i0
         if is_circular:
             i0 %= nb_x
             i1 %= nb_x
         j0 = int(floor(y_))
         j1 = j0 + 1
-        yd = (y_ - j0)
+        yd = y_ - j0
         z00 = z_g[i0, j0]
         z01 = z_g[i0, j1]
         z10 = z_g[i1, j0]
@@ -100,11 +118,13 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
         if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
             z[i] = nan
         else:
-            z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (z01 * (1 - xd) + z11 * xd) * yd
+            z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (
+                z01 * (1 - xd) + z11 * xd
+            ) * yd
     return z
 
 
-@njit(cache=True, fastmath=True, parallel=True)
+@njit(cache=True, fastmath=True, parallel=False)
 def custom_convolution(data, mask, kernel):
     """do sortin at high lattitude big part of value are masked"""
     nb_x = kernel.shape[0]
@@ -113,9 +133,9 @@ def custom_convolution(data, mask, kernel):
     out = empty(data.shape[0] - nb_x + 1)
     for i in prange(out.shape[0]):
         if mask[i + demi_x, demi_y] == 1:
-            w = (mask[i:i + nb_x] * kernel).sum()
+            w = (mask[i : i + nb_x] * kernel).sum()
             if w != 0:
-                out[i] = (data[i:i + nb_x] * kernel).sum() / w
+                out[i] = (data[i : i + nb_x] * kernel).sum() / w
             else:
                 out[i] = nan
         else:
@@ -135,19 +155,19 @@ def fit_circle(x_vec, y_vec):
 
     norme = (x_vec[1:] - x_mean) ** 2 + (y_vec[1:] - y_mean) ** 2
     norme_max = norme.max()
-    scale = norme_max ** .5
+    scale = norme_max ** 0.5
 
     # Form matrix equation and solve it
     # Maybe put f4
     datas = ones((nb_elt - 1, 3))
-    datas[:, 0] = 2. * (x_vec[1:] - x_mean) / scale
-    datas[:, 1] = 2. * (y_vec[1:] - y_mean) / scale
+    datas[:, 0] = 2.0 * (x_vec[1:] - x_mean) / scale
+    datas[:, 1] = 2.0 * (y_vec[1:] - y_mean) / scale
 
     (center_x, center_y, radius), residuals, rank, s = lstsq(datas, norme / norme_max)
 
     # Unscale data and get circle variables
     radius += center_x ** 2 + center_y ** 2
-    radius **= .5
+    radius **= 0.5
     center_x *= scale
     center_y *= scale
     # radius of fitted circle
@@ -162,13 +182,16 @@ def fit_circle(x_vec, y_vec):
     # Find distance between circle center and contour points_inside_poly
     for i_elt in range(nb_elt):
         # Find distance between circle center and contour points_inside_poly
-        dist_poly = ((x_vec[i_elt] - center_x) ** 2 + (y_vec[i_elt] - center_y) ** 2) ** .5
+        dist_poly = (
+            (x_vec[i_elt] - center_x) ** 2 + (y_vec[i_elt] - center_y) ** 2
+        ) ** 0.5
         # Indices of polygon points outside circle
         # p_inon_? : polygon x or y points inside & on the circle
         if dist_poly > radius:
             p_inon_y[i_elt] = center_y + radius * (y_vec[i_elt] - center_y) / dist_poly
-            p_inon_x[i_elt] = center_x - (center_x - x_vec[i_elt]) * (center_y - p_inon_y[i_elt]) / (
-                    center_y - y_vec[i_elt])
+            p_inon_x[i_elt] = center_x - (center_x - x_vec[i_elt]) * (
+                center_y - p_inon_y[i_elt]
+            ) / (center_y - y_vec[i_elt])
         else:
             p_inon_x[i_elt] = x_vec[i_elt]
             p_inon_y[i_elt] = y_vec[i_elt]
@@ -179,14 +202,17 @@ def fit_circle(x_vec, y_vec):
     for i_elt in range(nb_elt - 1):
         # Indices of polygon points outside circle
         # p_inon_? : polygon x or y points inside & on the circle
-        p_area_incirc += p_inon_x[i_elt] * p_inon_y[1 + i_elt] - p_inon_x[i_elt + 1] * p_inon_y[i_elt]
+        p_area_incirc += (
+            p_inon_x[i_elt] * p_inon_y[1 + i_elt]
+            - p_inon_x[i_elt + 1] * p_inon_y[i_elt]
+        )
         # Shape test
         # Area and centroid of closed contour/polygon
         p_area += x_vec[i_elt] * y_vec[1 + i_elt] - x_vec[1 + i_elt] * y_vec[i_elt]
-    p_area = abs(p_area) * .5
-    p_area_incirc = abs(p_area_incirc) * .5
+    p_area = abs(p_area) * 0.5
+    p_area_incirc = abs(p_area_incirc) * 0.5
 
-    a_err = (c_area - 2 * p_area_incirc + p_area) * 100. / c_area
+    a_err = (c_area - 2 * p_area_incirc + p_area) * 100.0 / c_area
     return center_x, center_y, radius, a_err
 
 
@@ -228,8 +254,36 @@ def flatten_line_matrix(l_matrix):
     inc = 0
     for i in range(nb_line):
         for j in range(sampling):
-            out[inc] = l_matrix[i,j]
+            out[inc] = l_matrix[i, j]
             inc += 1
         out[inc] = nan
         inc += 1
     return out
+
+
+@njit(cache=True)
+def split_line(x, y, i):
+    """
+    Split x and y at each i change
+    Args:
+        x: array
+        y: array
+        i: array of int at each i change, we cut x, y
+
+    Returns: x and y separate by nan at each i jump
+    """
+    nb_jump = len(where(i[1:] - i[0] != 0)[0])
+    nb_value = x.shape[0]
+    final_size = (nb_jump - 1) + nb_value
+    new_x = empty(final_size, dtype=x.dtype)
+    new_y = empty(final_size, dtype=y.dtype)
+    new_j = 0
+    for j in range(nb_value):
+        new_x[new_j] = x[j]
+        new_y[new_j] = y[j]
+        new_j += 1
+        if j < (nb_value -1) and i[j] != i[j + 1]:
+            new_x[new_j] = nan
+            new_y[new_j] = nan
+            new_j += 1
+    return new_x, new_y

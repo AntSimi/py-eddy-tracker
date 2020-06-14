@@ -46,6 +46,9 @@ from numpy import (
     concatenate,
     float64,
     ceil,
+    meshgrid,
+    arange,
+    histogram2d,
 )
 from netCDF4 import Dataset
 from datetime import datetime
@@ -54,6 +57,7 @@ from Polygon import Polygon
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
 from tokenize import TokenError
+from matplotlib.path import Path as BasePath
 from .. import VAR_DESCR, VAR_DESCR_inv
 from ..generic import distance_grid, distance, flatten_line_matrix
 from ..poly import bbox_intersection, common_area
@@ -712,14 +716,17 @@ class EddiesObservations(object):
         next_obs["segment_size"][:] += 1
         return next_obs
 
+    def intern(self, flag):
+        return (
+            ("contour_lon_s", "contour_lat_s")
+            if flag
+            else ("contour_lon_e", "contour_lat_e")
+        )
+
     def match(self, other, intern=False):
         """return index and score compute with area
         """
-        x_name, y_name = (
-            ("contour_lon_s", "contour_lat_s")
-            if intern
-            else ("contour_lon_e", "contour_lat_e")
-        )
+        x_name, y_name = self.intern(intern)
         i, j = bbox_intersection(
             self[x_name], self[y_name], other[x_name], other[y_name]
         )
@@ -740,11 +747,7 @@ class EddiesObservations(object):
         Returns:
 
         """
-        x_name, y_name = (
-            ("contour_lon_s", "contour_lat_s")
-            if intern
-            else ("contour_lon_e", "contour_lat_e")
-        )
+        x_name, y_name = self.intern(intern)
         nb_records = xy_in.shape[0]
         x_in, y_in = xy_in[x_name], xy_in[y_name]
         x_out, y_out = xy_out[x_name], xy_out[y_name]
@@ -1057,7 +1060,7 @@ class EddiesObservations(object):
                     f"{dim} dimensions previously set to a different size {old_nb} (current value : {nb})"
                 )
 
-    def to_netcdf(self, handler):
+    def to_netcdf(self, handler, **kwargs):
         eddy_size = len(self)
         logger.debug('Create Dimensions "obs" : %d', eddy_size)
         self.netcdf_create_dimensions(handler, "obs", eddy_size)
@@ -1090,6 +1093,7 @@ class EddiesObservations(object):
                 self.observations[ori_name],
                 scale_factor=VAR_DESCR[name].get("scale_factor", None),
                 add_offset=VAR_DESCR[name].get("add_offset", None),
+                **kwargs,
             )
         self.set_global_attr_netcdf(handler)
 
@@ -1101,6 +1105,7 @@ class EddiesObservations(object):
         data,
         scale_factor=None,
         add_offset=None,
+        **kwargs,
     ):
         dims = kwargs_variable.get("dimensions", None)
         # Manage chunk in 2d case
@@ -1113,7 +1118,10 @@ class EddiesObservations(object):
                 cum *= nb
             chunk[0] = min(int(400000 / cum), len(handler_nc.dimensions[dims[0]]))
             kwargs_variable["chunksizes"] = chunk
-        var = handler_nc.createVariable(zlib=True, complevel=1, **kwargs_variable)
+        kwargs_variable["zlib"] = True
+        kwargs_variable["complevel"] = 1
+        kwargs_variable.update(kwargs)
+        var = handler_nc.createVariable(**kwargs_variable)
         attrs = list(attr_variable.keys())
         attrs.sort()
         for attr in attrs:
@@ -1259,6 +1267,34 @@ class EddiesObservations(object):
             if not extern_only:
                 ax.plot((lon_s - ref) % 360 + ref, lat_s, **kwargs)
             ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs_e)
+
+    def grid_count(self, bins, intern=False, center=False):
+        x_name, y_name = self.intern(intern)
+        x_bins = arange(*bins[0])
+        y_bins = arange(*bins[1])
+        grid = ma.zeros((x_bins.shape[0] - 1, y_bins.shape[0] - 1), dtype="u4")
+        from ..dataset.grid import RegularGridDataset
+        regular_grid = RegularGridDataset.with_array(
+            coordinates=("lon", "lat"),
+            datas=dict(count=grid, lon=x_bins[:-1], lat=y_bins[:-1],),
+        )
+        if center:
+            x, y = self.longitude, self.latitude
+            grid[:] = histogram2d(x,y, (x_bins, y_bins))[0]
+            grid.mask = grid.data == 0
+        else:
+            x, y = self[x_name], self[y_name]
+            for x_, y_ in zip(x,y):
+                i, j = BasePath(custom_concat(x_,y_)).pixels_in(regular_grid)
+                grid_count_(grid, i, j)
+            grid.mask = grid == 0
+        return regular_grid
+
+
+@njit(cache=True)
+def grid_count_(grid, i, j):
+    for i_, j_ in zip(i,j):
+        grid[i_, j_] += 1
 
 
 class VirtualEddiesObservations(EddiesObservations):
