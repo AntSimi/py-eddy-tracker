@@ -13,6 +13,11 @@ Welcome to py-eddy-tracker's documentation!
 
    installation
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   python_module/index
 
 .. toctree::
    :maxdepth: 2

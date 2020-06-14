@@ -33,7 +33,16 @@ extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'sphinx_gallery.gen_gallery',
 ]
+
+sphinx_gallery_conf = {
+     'examples_dirs': '../examples',   # path to your example scripts
+     'gallery_dirs': 'python_module',
+     'capture_repr': ('_repr_html_', '__repr__'),
+     'line_numbers': False,
+     'filename_pattern': '/pet',
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['.templates']
