@@ -272,7 +272,7 @@ def split_line(x, y, i):
 
     Returns: x and y separate by nan at each i jump
     """
-    nb_jump = len(where(i[1:] - i[0] != 0)[0])
+    nb_jump = len(where(i[1:] - i[:-1] != 0)[0])
     nb_value = x.shape[0]
     final_size = (nb_jump - 1) + nb_value
     new_x = empty(final_size, dtype=x.dtype)

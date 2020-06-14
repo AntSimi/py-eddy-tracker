@@ -24,6 +24,6 @@ g = a.grid_count(((-5, 37, step), (30, 46, step)), center=True)
 g.vars['count'] = g.vars['count'] / (step ** 2 * (t1 - t0))
 m = g.display(ax, name='count', vmin=0, vmax=2)
 ax.grid()
-cb = plt.colorbar(m)
+cb = plt.colorbar(m, cax=fig.add_axes([0.95, 0.05, 0.01, 0.9]))
 cb.set_label('Eddies by 1°^2 by day')
 

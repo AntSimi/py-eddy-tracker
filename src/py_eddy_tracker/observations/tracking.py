@@ -355,9 +355,10 @@ class TrackEddiesObservations(EddiesObservations):
     def plot(self, ax, ref=None, ** kwargs):
         if "label" in kwargs:
             kwargs["label"] += " (%s eddies)" % (self.nb_obs_by_track != 0).sum()
-        x, y = split_line(self.longitude, self.latitude, self.tracks)
+        x = self.longitude
         if ref is not None:
             x = (x - ref) % 360 + ref
+        x, y = split_line(x, self.latitude, self.tracks)
         return ax.plot(x, y, **kwargs)
 
 
