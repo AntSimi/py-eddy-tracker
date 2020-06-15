@@ -15,7 +15,7 @@ Welcome to py-eddy-tracker's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Toolbox gallery:
 
    python_module/index
 

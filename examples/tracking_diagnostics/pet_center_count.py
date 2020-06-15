@@ -7,15 +7,15 @@ Count center
 from matplotlib import pyplot as plt
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
+import pylook
 
 
 a = TrackEddiesObservations.load_file(py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr"))
 c = TrackEddiesObservations.load_file(py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr"))
 a = a.merge(c)
 # Plot
-fig = plt.figure(figsize=(15, 8))
-ax = fig.add_subplot(111)
-ax.set_aspect("equal")
+fig = plt.figure(figsize=(20, 8))
+ax = fig.add_subplot(111, projection='plat_carre')
 ax.set_xlim(-5, 37)
 ax.set_ylim(30, 46)
 step = .1
