@@ -19,15 +19,15 @@ ax_ratio_lifetime = fig.add_axes([0.05, 0.05, .4, .4])
 ax_ratio_cum_lifetime = fig.add_axes([0.55, 0.05, .4, .4])
 
 
-cum_a, bins, _ = ax_cum_lifetime.hist(a['n'], histtype='step', bins=arange(0,800,1), label='Anticyclonic', color='b')
-cum_c, bins, _ = ax_cum_lifetime.hist(c['n'], histtype='step', bins=arange(0,800,1), label='Cyclonic', color='r')
+cum_a, bins, _ = ax_cum_lifetime.hist(a['n'], histtype='step', bins=arange(0,800,1), label='Anticyclonic', color='r')
+cum_c, bins, _ = ax_cum_lifetime.hist(c['n'], histtype='step', bins=arange(0,800,1), label='Cyclonic', color='b')
 
 x = (bins[1:] + bins[:-1]) / 2.
 ax_ratio_cum_lifetime.plot(x, cum_c/cum_a)
 
 nb_a, nb_c = cum_a[:-1] - cum_a[1:], cum_c[:-1] - cum_c[1:]
-ax_lifetime.plot(x[1:], nb_a, label='Anticyclonic', color='b')
-ax_lifetime.plot(x[1:], nb_c, label='Cyclonic', color='r')
+ax_lifetime.plot(x[1:], nb_a, label='Anticyclonic', color='r')
+ax_lifetime.plot(x[1:], nb_c, label='Cyclonic', color='b')
 
 ax_ratio_lifetime.plot(x[1:], nb_c / nb_a)
 

@@ -32,6 +32,12 @@ a = TrackEddiesObservations.load_file(
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
+
+a.median_filter(1, 'time', 'lon').loess_filter(5, 'time', 'lon')
+a.median_filter(1, 'time', 'lat').loess_filter(5, 'time', 'lat')
+c.median_filter(1, 'time', 'lon').loess_filter(5, 'time', 'lon')
+c.median_filter(1, 'time', 'lat').loess_filter(5, 'time', 'lat')
+
 d_a = distance(a.longitude[:-1], a.latitude[:-1], a.longitude[1:], a.latitude[1:])
 d_c = distance(c.longitude[:-1], c.latitude[:-1], c.longitude[1:], c.latitude[1:])
 d_a = cum_distance_by_track(d_a, a["track"]) / 1000.
@@ -45,20 +51,20 @@ ax_ratio_propagation = fig.add_axes([0.05, 0.05, 0.4, 0.4])
 ax_ratio_cum_propagation = fig.add_axes([0.55, 0.05, 0.4, 0.4])
 
 
-bins = arange(0, 1500, 25)
+bins = arange(0, 1500, 10)
 cum_a, bins, _ = ax_cum_propagation.hist(
-    d_a, histtype="step", bins=bins, label="Anticyclonic", color="b"
+    d_a, histtype="step", bins=bins, label="Anticyclonic", color="r"
 )
 cum_c, bins, _ = ax_cum_propagation.hist(
-    d_c, histtype="step", bins=bins, label="Cyclonic", color="r"
+    d_c, histtype="step", bins=bins, label="Cyclonic", color="b"
 )
 
 x = (bins[1:] + bins[:-1]) / 2.0
 ax_ratio_cum_propagation.plot(x, cum_c / cum_a)
 
 nb_a, nb_c = cum_a[:-1] - cum_a[1:], cum_c[:-1] - cum_c[1:]
-ax_propagation.plot(x[1:], nb_a, label="Anticyclonic", color="b")
-ax_propagation.plot(x[1:], nb_c, label="Cyclonic", color="r")
+ax_propagation.plot(x[1:], nb_a, label="Anticyclonic", color="r")
+ax_propagation.plot(x[1:], nb_c, label="Cyclonic", color="b")
 
 ax_ratio_propagation.plot(x[1:], nb_c / nb_a)
 
