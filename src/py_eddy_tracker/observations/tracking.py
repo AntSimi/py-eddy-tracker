@@ -284,6 +284,7 @@ class TrackEddiesObservations(EddiesObservations):
         result = track_loess_filter(half_window, x, y, track)
         if inplace:
             self.obs[yfield] = result
+            return self
 
     def median_filter(self, half_window, xfield, yfield, inplace=True):
         track = self.obs["track"]
@@ -292,6 +293,7 @@ class TrackEddiesObservations(EddiesObservations):
         result = track_median_filter(half_window, x, y, track)
         if inplace:
             self.obs[yfield] = result
+            return self
 
     def __extract_with_mask(
         self,
