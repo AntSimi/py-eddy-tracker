@@ -1767,10 +1767,12 @@ class RegularGridDataset(GridDataset):
         """
         self._speed_ev = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** 0.5
 
-    def display(self, ax, name, **kwargs):
+    def display(self, ax, name, factor=1, **kwargs):
         if "cmap" not in kwargs:
             kwargs["cmap"] = "coolwarm"
-        return ax.pcolormesh(self.x_bounds, self.y_bounds, self.grid(name).T, **kwargs)
+        return ax.pcolormesh(
+            self.x_bounds, self.y_bounds, self.grid(name).T * factor, **kwargs
+        )
 
     def interp(self, grid_name, lons, lats):
         """

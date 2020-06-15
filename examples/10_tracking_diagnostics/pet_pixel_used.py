@@ -15,6 +15,7 @@ a = TrackEddiesObservations.load_file(
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
+t0, t1 = a.period
 
 # Plot
 fig = plt.figure(figsize=(15, 20))
@@ -26,16 +27,13 @@ ax_all = fig.add_subplot(313)
 ax_all.set_title("All eddies frequency")
 
 step = 0.1
+bins = ((-10, 37, step), (30, 46, step))
 kwargs_pcolormesh = dict(cmap="terrain_r", vmin=0, vmax=0.75)
-g_a = a.grid_count(((-5, 37, step), (30, 46, step)), intern=True)
-t0, t1 = a.period
-g_a.vars["count"] = g_a.vars["count"] / (t1 - t0)
-m = g_a.display(ax_a, name="count", **kwargs_pcolormesh)
+g_a = a.grid_count(bins, intern=True)
+m = g_a.display(ax_a, name="count", factor=1 / (t1 - t0), **kwargs_pcolormesh)
 
-g_c = c.grid_count(((-5, 37, step), (30, 46, step)), intern=True)
-t0, t1 = c.period
-g_c.vars["count"] = g_c.vars["count"] / (t1 - t0)
-m = g_c.display(ax_c, name="count", **kwargs_pcolormesh)
+g_c = c.grid_count(bins, intern=True)
+m = g_c.display(ax_c, name="count", factor=1 / (t1 - t0), **kwargs_pcolormesh)
 
 m_c = g_c.vars["count"].mask
 m = m_c & g_a.vars["count"].mask
@@ -43,7 +41,7 @@ g_c.vars["count"][m_c] = 0
 g_c.vars["count"] += g_a.vars["count"]
 g_c.vars["count"].mask = m
 
-m = g_c.display(ax_all, name="count", **kwargs_pcolormesh)
+m = g_c.display(ax_all, name="count", factor=1 / (t1 - t0), **kwargs_pcolormesh)
 
 for ax in (ax_a, ax_c, ax_all):
     ax.set_aspect("equal")

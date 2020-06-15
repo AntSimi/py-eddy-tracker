@@ -1241,6 +1241,12 @@ class EddiesObservations(object):
         for key, item in self.global_attr.items():
             h_nc.setncattr(key, item)
 
+    def scatter(self, ax, name, ref=None, ** kwargs):
+        x = self.longitude
+        if ref is not None:
+            x = (x - ref) % 360 + ref
+        return ax.scatter(x, self.latitude, c=self[name], **kwargs)
+
     def display(self, ax, ref=None, extern_only=False, **kwargs):
         if not extern_only:
             lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
@@ -1264,8 +1270,8 @@ class EddiesObservations(object):
 
     def grid_count(self, bins, intern=False, center=False):
         x_name, y_name = self.intern(intern)
-        x_bins = arange(*bins[0])
-        y_bins = arange(*bins[1])
+        x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
+        x0 = bins[0][0]
         grid = ma.zeros((x_bins.shape[0] - 1, y_bins.shape[0] - 1), dtype="u4")
         from ..dataset.grid import RegularGridDataset
 
@@ -1274,15 +1280,33 @@ class EddiesObservations(object):
             datas=dict(count=grid, lon=x_bins[:-1], lat=y_bins[:-1],),
         )
         if center:
-            x, y = self.longitude, self.latitude
+            x, y = (self.longitude - x0) % 360 + x0, self.latitude
             grid[:] = histogram2d(x, y, (x_bins, y_bins))[0]
             grid.mask = grid.data == 0
         else:
-            x, y = self[x_name], self[y_name]
+            x, y = (self[x_name] - x0) % 360 + x0, self[y_name]
             for x_, y_ in zip(x, y):
                 i, j = BasePath(custom_concat(x_, y_)).pixels_in(regular_grid)
                 grid_count_(grid, i, j)
             grid.mask = grid == 0
+        return regular_grid
+
+    def grid_stat(self, bins, varname):
+        x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
+        x0 = bins[0][0]
+        x, y = (self.longitude - x0) % 360 + x0, self.latitude
+        sum_obs = histogram2d(x, y, (x_bins, y_bins), weights=self[varname])[0]
+        nb_obs = histogram2d(x, y, (x_bins, y_bins))[0]
+        from ..dataset.grid import RegularGridDataset
+
+        regular_grid = RegularGridDataset.with_array(
+            coordinates=("x", "y"),
+            datas={
+                varname: ma.array(sum_obs / nb_obs, mask=nb_obs == 0),
+                "x": x_bins[:-1],
+                "y": y_bins[:-1],
+            },
+        )
         return regular_grid
 
 

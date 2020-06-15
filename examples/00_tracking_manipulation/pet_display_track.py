@@ -24,11 +24,12 @@ c.median_filter(1, 'time', 'lat').loess_filter(5, 'time', 'lat')
 
 
 # Plot
-fig = plt.figure(figsize=(15, 8))
-ax = fig.add_subplot(111)
+fig = plt.figure(figsize=(12, 5))
+ax = fig.add_axes((0.05, 0.1, 0.9, 0.9))
 ax.set_aspect("equal")
 ax.set_xlim(-5, 37)
 ax.set_ylim(30, 46)
 a.plot(ax, ref=-10, label="Anticyclonic", color="r", lw=0.1)
 c.plot(ax, ref=-10, label="Cyclonic", color="b", lw=0.1)
 ax.legend()
+ax.grid()
