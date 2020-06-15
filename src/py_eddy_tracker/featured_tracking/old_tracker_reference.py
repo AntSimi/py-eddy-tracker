@@ -1,6 +1,6 @@
 from ..observations.observation import EddiesObservations as Model
 from ..dataset.grid import RegularGridDataset
-from numpy import where, meshgrid, bincount, ones, unique, bool_, arange
+from numpy import where, bincount, ones, unique, bool_, arange
 from numba import njit
 from os import path
 

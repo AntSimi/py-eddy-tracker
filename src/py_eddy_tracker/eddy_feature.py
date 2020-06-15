@@ -40,17 +40,18 @@ class Amplitude(object):
     Class to calculate *amplitude* and counts of *local maxima/minima*
     within a closed region of a sea level anomaly field.
     """
+
     EPSILON = 1e-8
     __slots__ = (
-        'h_0',
-        'grid_extract',
-        'pixel_mask',
-        'nb_pixel',
-        'sla',
-        'contour',
-        'interval_min',
-        'amplitude',
-        'mle',
+        "h_0",
+        "grid_extract",
+        "pixel_mask",
+        "nb_pixel",
+        "sla",
+        "contour",
+        "interval_min",
+        "amplitude",
+        "mle",
     )
 
     def __init__(self, contour, contour_height, data, interval):
@@ -64,19 +65,23 @@ class Amplitude(object):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
         on_bounds = x_start > x_stop
         if on_bounds:
-            self.grid_extract = ma.concatenate((data[x_start:, y_start:y_stop], data[:x_stop, y_start:y_stop]))
+            self.grid_extract = ma.concatenate(
+                (data[x_start:, y_start:y_stop], data[:x_stop, y_start:y_stop])
+            )
             if self.grid_extract.mask.size == 1:
                 self.grid_extract = ma.array(
                     self.grid_extract,
-                    mask=ones(self.grid_extract.shape, dtype='bool') * self.grid_extract.mask)
+                    mask=ones(self.grid_extract.shape, dtype="bool")
+                    * self.grid_extract.mask,
+                )
         else:
             self.grid_extract = data[x_start:x_stop, y_start:y_stop]
         # => maybe replace pixel out of contour by nan?
-        self.pixel_mask = zeros(self.grid_extract.shape, dtype='bool')
+        self.pixel_mask = zeros(self.grid_extract.shape, dtype="bool")
         i_x = contour.pixels_index[0] - x_start
         if on_bounds:
             i_x %= data.shape[0]
-        
+
         self.pixel_mask[i_x, contour.pixels_index[1] - y_start] = True
         self.nb_pixel = i_x.shape[0]
 
@@ -103,18 +108,29 @@ class Amplitude(object):
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask,
-                                                self.mle, 1)
+            lmi_i, lmi_j = detect_local_minima_(
+                self.grid_extract.data,
+                self.grid_extract.mask,
+                self.pixel_mask,
+                self.mle,
+                1,
+            )
             # After we use grid.data because index are in contour and we check before than no pixel are hide
             nb = len(lmi_i)
             if nb == 0:
-                logger.warning('No extrema found in contour of %d pixels in level %f', self.nb_pixel,level)
+                logger.warning(
+                    "No extrema found in contour of %d pixels in level %f",
+                    self.nb_pixel,
+                    level,
+                )
                 return False
             elif nb == 1:
                 i, j = lmi_i[0], lmi_j[0]
             else:
                 # Verify if several extrema are seriously below contour
-                nb_real_extrema = ((level - self.grid_extract.data[lmi_i, lmi_j]) >= self.interval_min).sum()
+                nb_real_extrema = (
+                    (level - self.grid_extract.data[lmi_i, lmi_j]) >= self.interval_min
+                ).sum()
                 if nb_real_extrema > self.mle:
                     return False
                 index = self.grid_extract.data[lmi_i, lmi_j].argmin()
@@ -135,17 +151,28 @@ class Amplitude(object):
             return False
         else:
             # All local extrema index on th box
-            lmi_i, lmi_j = detect_local_minima_(self.grid_extract.data, self.grid_extract.mask, self.pixel_mask,
-                                                self.mle, -1)
+            lmi_i, lmi_j = detect_local_minima_(
+                self.grid_extract.data,
+                self.grid_extract.mask,
+                self.pixel_mask,
+                self.mle,
+                -1,
+            )
             nb = len(lmi_i)
             if nb == 0:
-                logger.warning('No extrema found in contour of %d pixels in level %f', self.nb_pixel,level)
+                logger.warning(
+                    "No extrema found in contour of %d pixels in level %f",
+                    self.nb_pixel,
+                    level,
+                )
                 return False
             elif nb == 1:
                 i, j = lmi_i[0], lmi_j[0]
             else:
                 # Verify if several extrema are seriously above contour
-                nb_real_extrema = ((self.grid_extract.data[lmi_i, lmi_j] - level) >= self.interval_min).sum()
+                nb_real_extrema = (
+                    (self.grid_extract.data[lmi_i, lmi_j] - level) >= self.interval_min
+                ).sum()
                 if nb_real_extrema > self.mle:
                     return False
                 index = self.grid_extract.data[lmi_i, lmi_j].argmax()
@@ -257,18 +284,19 @@ class Contours(object):
       grd:
         A grid object
     """
+
     __slots__ = (
-        'contours',
-        'x_value',
-        'y_value',
-        'contour_index',
-        'level_index',
-        'x_min_per_contour',
-        'y_min_per_contour',
-        'x_max_per_contour',
-        'y_max_per_contour',
-        'nb_pt_per_contour',
-        'nb_contour_per_level',
+        "contours",
+        "x_value",
+        "y_value",
+        "contour_index",
+        "level_index",
+        "x_min_per_contour",
+        "y_min_per_contour",
+        "x_max_per_contour",
+        "y_max_per_contour",
+        "nb_pt_per_contour",
+        "nb_contour_per_level",
     )
 
     DELTA_PREC = 1e-10
@@ -301,9 +329,15 @@ class Contours(object):
             # All path near meridian bounds
             for path in paths:
                 x_start, x_end = path.vertices[0, 0], path.vertices[-1, 0]
-                if abs(x_start - x0) < self.DELTA_PREC and abs(x_end - x0) < self.DELTA_PREC:
+                if (
+                    abs(x_start - x0) < self.DELTA_PREC
+                    and abs(x_end - x0) < self.DELTA_PREC
+                ):
                     paths_left.append(path)
-                elif abs(x_start - x1) < self.DELTA_PREC and abs(x_end - x1) < self.DELTA_PREC:
+                elif (
+                    abs(x_start - x1) < self.DELTA_PREC
+                    and abs(x_end - x1) < self.DELTA_PREC
+                ):
                     paths_right.append(path)
                 else:
                     paths_out.append(path)
@@ -312,11 +346,19 @@ class Contours(object):
                 # Solve simple close (2 segment)
                 for i_left, path_left in enumerate(paths_left):
                     for i_right, path_right in enumerate(paths_right):
-                        if abs(path_left.vertices[0, 1] - path_right.vertices[-1, 1]) < self.DELTA_PREC and abs(
-                                path_left.vertices[-1, 1] - path_right.vertices[0, 1]) < self.DELTA_PREC:
+                        if (
+                            abs(path_left.vertices[0, 1] - path_right.vertices[-1, 1])
+                            < self.DELTA_PREC
+                            and abs(
+                                path_left.vertices[-1, 1] - path_right.vertices[0, 1]
+                            )
+                            < self.DELTA_PREC
+                        ):
                             polys_to_pop_left.append(i_left)
                             path_right.vertices[:, 0] -= 360
-                            path_left.vertices = concatenate((path_left.vertices, path_right.vertices[1:]))
+                            path_left.vertices = concatenate(
+                                (path_left.vertices, path_right.vertices[1:])
+                            )
                             path_left.vertices[-1] = path_left.vertices[0]
                             paths_solve.append(path_left)
                             paths_right.pop(i_right)
@@ -336,28 +378,35 @@ class Contours(object):
                 paths_out.extend(paths_left)
                 paths_out.extend(paths_right)
                 collection._paths = paths_out
-        logger.info('%d contours close over the bounds', poly_solve)
+        logger.info("%d contours close over the bounds", poly_solve)
 
     def __init__(self, x, y, z, levels, wrap_x=False, keep_unclose=False):
         """
         c_i : index to contours
         l_i : index to levels
         """
-        logger.info('Start computing iso lines')
+        logger.info("Start computing iso lines")
         fig = Figure()
         ax = fig.add_subplot(111)
         if wrap_x:
-            logger.debug('wrapping activate to compute contour')
+            logger.debug("wrapping activate to compute contour")
             x = concatenate((x, x[:1] + 360))
             z = ma.concatenate((z, z[:1]))
-        logger.debug('X shape : %s', x.shape)
-        logger.debug('Y shape : %s', y.shape)
-        logger.debug('Z shape : %s', z.shape)
-        logger.info('Start computing iso lines with %d levels from %f to %f ...', len(levels), levels[0], levels[-1])
-        self.contours = ax.contour(x, y, z.T if z.shape != x.shape else z, levels, cmap='rainbow')
+        logger.debug("X shape : %s", x.shape)
+        logger.debug("Y shape : %s", y.shape)
+        logger.debug("Z shape : %s", z.shape)
+        logger.info(
+            "Start computing iso lines with %d levels from %f to %f ...",
+            len(levels),
+            levels[0],
+            levels[-1],
+        )
+        self.contours = ax.contour(
+            x, y, z.T if z.shape != x.shape else z, levels, cmap="rainbow"
+        )
         if wrap_x:
             self.find_wrapcut_path_and_join(x[0], x[-1])
-        logger.info('Finish computing iso lines')
+        logger.info("Finish computing iso lines")
 
         nb_level = 0
         nb_contour = 0
@@ -366,8 +415,9 @@ class Contours(object):
         closed_contours = 0
         # Count level and contour
         for i, collection in enumerate(self.contours.collections):
-            collection.get_nearest_path_bbox_contain_pt = \
-                lambda x, y, i=i: self.get_index_nearest_path_bbox_contain_pt(i, x, y)
+            collection.get_nearest_path_bbox_contain_pt = lambda x, y, i=i: self.get_index_nearest_path_bbox_contain_pt(
+                i, x, y
+            )
             nb_level += 1
 
             keep_path = list()
@@ -380,8 +430,10 @@ class Contours(object):
                     keep_path.append(contour)
                     continue
                 # Remove unclosed path
-                d_closed = ((contour.vertices[0, 0] - contour.vertices[-1, 0]) ** 2 + (
-                            contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2) ** .5
+                d_closed = (
+                    (contour.vertices[0, 0] - contour.vertices[-1, 0]) ** 2
+                    + (contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2
+                ) ** 0.5
                 if d_closed > self.DELTA_SUP:
                     continue
                 elif d_closed != 0:
@@ -407,8 +459,12 @@ class Contours(object):
                 contour.used = False
                 nb_contour += 1
                 nb_pt += contour.vertices.shape[0]
-        logger.info('Repair %d closed contours and %d almost closed contours / %d contours', closed_contours,
-                     almost_closed_contours, nb_contour)
+        logger.info(
+            "Repair %d closed contours and %d almost closed contours / %d contours",
+            closed_contours,
+            almost_closed_contours,
+            nb_contour,
+        )
         # Type for coordinates
         coord_dtype = contour.vertices.dtype
 
@@ -416,10 +472,10 @@ class Contours(object):
         self.x_value = empty(nb_pt, dtype=coord_dtype)
         self.y_value = empty(nb_pt, dtype=coord_dtype)
 
-        self.level_index = empty(nb_level, dtype='u4')
-        self.nb_contour_per_level = empty(nb_level, dtype='u4')
+        self.level_index = empty(nb_level, dtype="u4")
+        self.nb_contour_per_level = empty(nb_level, dtype="u4")
 
-        self.nb_pt_per_contour = empty(nb_contour, dtype='u4')
+        self.nb_pt_per_contour = empty(nb_contour, dtype="u4")
 
         self.x_min_per_contour = empty(nb_contour, dtype=coord_dtype)
         self.x_max_per_contour = empty(nb_contour, dtype=coord_dtype)
@@ -435,12 +491,18 @@ class Contours(object):
             for contour in collection.get_paths():
                 nb_pt = contour.vertices.shape[0]
                 # Copy pt
-                self.x_value[i_pt:i_pt + nb_pt] = contour.vertices[:, 0]
-                self.y_value[i_pt:i_pt + nb_pt] = contour.vertices[:, 1]
+                self.x_value[i_pt : i_pt + nb_pt] = contour.vertices[:, 0]
+                self.y_value[i_pt : i_pt + nb_pt] = contour.vertices[:, 1]
 
                 # Set bbox
-                self.x_min_per_contour[i_c], self.y_min_per_contour[i_c] = contour.xmin, contour.ymin
-                self.x_max_per_contour[i_c], self.y_max_per_contour[i_c] = contour.xmax, contour.ymax
+                self.x_min_per_contour[i_c], self.y_min_per_contour[i_c] = (
+                    contour.xmin,
+                    contour.ymin,
+                )
+                self.x_max_per_contour[i_c], self.y_max_per_contour[i_c] = (
+                    contour.xmax,
+                    contour.ymax,
+                )
 
                 # Count pt
                 self.nb_pt_per_contour[i_c] = nb_pt
@@ -449,8 +511,7 @@ class Contours(object):
             i_l += 1
 
         self.contour_index = array(
-            self.nb_pt_per_contour.cumsum() - self.nb_pt_per_contour,
-            dtype='u4'
+            self.nb_pt_per_contour.cumsum() - self.nb_pt_per_contour, dtype="u4"
         )
         self.level_index[0] = 0
         self.nb_contour_per_level[:-1] = self.level_index[1:] - self.level_index[:-1]
@@ -470,7 +531,7 @@ class Contours(object):
     def get_index_nearest_path_bbox_contain_pt(self, level, xpt, ypt):
         """Get index from the nearest path in the level, if the bbox of the
         path contain pt
-        
+
         overhead of python is huge with numba, cython little bit best??
         """
         index = index_from_nearest_path_with_pt_in_bbox_(
@@ -486,15 +547,24 @@ class Contours(object):
             self.x_max_per_contour,
             self.y_max_per_contour,
             xpt,
-            ypt
+            ypt,
         )
         if index == -1:
             return None
         else:
             return self.contours.collections[level]._paths[index]
 
-    def display(self, ax, step=1, only_used=False, only_unused=False, only_contain_eddies=False, **kwargs):
+    def display(
+        self,
+        ax,
+        step=1,
+        only_used=False,
+        only_unused=False,
+        only_contain_eddies=False,
+        **kwargs
+    ):
         from matplotlib.collections import LineCollection
+
         for j, collection in enumerate(self.contours.collections[::step]):
             paths = list()
             for i in collection.get_paths():
@@ -506,14 +576,14 @@ class Contours(object):
                     continue
                 paths.append(i.vertices)
             local_kwargs = kwargs.copy()
-            if 'color' not in kwargs:
-                local_kwargs['color'] = collection.get_color()
-                local_kwargs.pop('label', None)
+            if "color" not in kwargs:
+                local_kwargs["color"] = collection.get_color()
+                local_kwargs.pop("label", None)
             elif j != 0:
-                local_kwargs.pop('label', None)
+                local_kwargs.pop("label", None)
             ax.add_collection(LineCollection(paths, **local_kwargs))
 
-        if hasattr(self.contours, '_mins'):
+        if hasattr(self.contours, "_mins"):
             ax.update_datalim([self.contours._mins, self.contours._maxs])
         ax.autoscale_view()
 
@@ -521,7 +591,7 @@ class Contours(object):
         """Select contour which contain several eddies"""
         if eddies.sign_type == 1:
             # anticyclonic
-            sl = slice(None,-1)
+            sl = slice(None, -1)
             cor = 1
         else:
             # cyclonic
@@ -531,7 +601,7 @@ class Contours(object):
         # On each level
         for j, collection in enumerate(self.contours.collections[sl]):
             # get next height
-            contour_height= self.contours.cvalues[j + cor]
+            contour_height = self.contours.cvalues[j + cor]
             # On each contour
             for i in collection.get_paths():
                 i.contain_eddies = False
@@ -540,13 +610,15 @@ class Contours(object):
                 nb = 0
                 # try with each eddy
                 for eddy in eddies:
-                    if abs(eddy['height_external_contour'] - contour_height) > 1e-8:
+                    if abs(eddy["height_external_contour"] - contour_height) > 1e-8:
                         continue
                     # If eddy center in contour
-                    wn = winding_number_poly(eddy['lon_max'], eddy['lat_max'], i.vertices)
+                    wn = winding_number_poly(
+                        eddy["lon_max"], eddy["lat_max"], i.vertices
+                    )
                     if wn != 0:
                         # Count
-                        nb +=1
+                        nb += 1
 
                 if nb > 1:
                     i.contain_eddies = True
@@ -554,20 +626,20 @@ class Contours(object):
 
 @njit(cache=True, fastmath=True)
 def index_from_nearest_path_with_pt_in_bbox_(
-        level_index,
-        l_i,
-        nb_c_per_l,
-        nb_pt_per_c,
-        indices_of_first_pts,
-        x_value,
-        y_value,
-        x_min_per_c,
-        y_min_per_c,
-        x_max_per_c,
-        y_max_per_c,
-        xpt,
-        ypt,
-    ):
+    level_index,
+    l_i,
+    nb_c_per_l,
+    nb_pt_per_c,
+    indices_of_first_pts,
+    x_value,
+    y_value,
+    x_min_per_c,
+    y_min_per_c,
+    x_max_per_c,
+    y_max_per_c,
+    xpt,
+    ypt,
+):
     """Get index from nearest path in edge bbox contain pt
     """
     # Nb contour in level

@@ -46,7 +46,6 @@ from numpy import (
     concatenate,
     float64,
     ceil,
-    meshgrid,
     arange,
     histogram2d,
 )
@@ -630,15 +629,12 @@ class EddiesObservations(object):
             kwargs["array_variables"] = handler.array_variables.split(",")
         if len(handler.track_extra_variables) > 1:
             kwargs["track_extra_variables"] = handler.track_extra_variables.split(",")
-        for variable in handler.variables:
-            var_inv = VAR_DESCR_inv[variable]
         eddies = cls(size=nb_obs, **kwargs)
         for variable in handler.variables:
             # Patch
             if variable == "time":
                 eddies.obs[variable] = handler.variables[variable][:]
             else:
-                #
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
         return eddies
 
@@ -651,15 +647,12 @@ class EddiesObservations(object):
             kwargs["array_variables"] = handler.array_variables.split(",")
         if len(handler.track_extra_variables) > 1:
             kwargs["track_extra_variables"] = handler.track_extra_variables.split(",")
-        for variable in handler.variables:
-            var_inv = VAR_DESCR_inv[variable]
         eddies = cls(size=nb_obs, **kwargs)
         for variable in handler.variables:
             # Patch
             if variable == "time":
                 eddies.obs[variable] = handler.variables[variable][:]
             else:
-                #
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
         return eddies
 
@@ -716,7 +709,8 @@ class EddiesObservations(object):
         next_obs["segment_size"][:] += 1
         return next_obs
 
-    def intern(self, flag):
+    @staticmethod
+    def intern(flag):
         return (
             ("contour_lon_s", "contour_lat_s")
             if flag
@@ -736,8 +730,8 @@ class EddiesObservations(object):
         m = c > 0
         return i[m], j[m], c[m]
 
-    @staticmethod
-    def cost_function_common_area(xy_in, xy_out, distance, intern=False):
+    @classmethod
+    def cost_function_common_area(cls, xy_in, xy_out, distance, intern=False):
         """ How does it work on x bound ?
         Args:
             xy_in:
@@ -747,7 +741,7 @@ class EddiesObservations(object):
         Returns:
 
         """
-        x_name, y_name = self.intern(intern)
+        x_name, y_name = cls.intern(intern)
         nb_records = xy_in.shape[0]
         x_in, y_in = xy_in[x_name], xy_in[y_name]
         x_out, y_out = xy_out[x_name], xy_out[y_name]
@@ -1274,18 +1268,19 @@ class EddiesObservations(object):
         y_bins = arange(*bins[1])
         grid = ma.zeros((x_bins.shape[0] - 1, y_bins.shape[0] - 1), dtype="u4")
         from ..dataset.grid import RegularGridDataset
+
         regular_grid = RegularGridDataset.with_array(
             coordinates=("lon", "lat"),
             datas=dict(count=grid, lon=x_bins[:-1], lat=y_bins[:-1],),
         )
         if center:
             x, y = self.longitude, self.latitude
-            grid[:] = histogram2d(x,y, (x_bins, y_bins))[0]
+            grid[:] = histogram2d(x, y, (x_bins, y_bins))[0]
             grid.mask = grid.data == 0
         else:
             x, y = self[x_name], self[y_name]
-            for x_, y_ in zip(x,y):
-                i, j = BasePath(custom_concat(x_,y_)).pixels_in(regular_grid)
+            for x_, y_ in zip(x, y):
+                i, j = BasePath(custom_concat(x_, y_)).pixels_in(regular_grid)
                 grid_count_(grid, i, j)
             grid.mask = grid == 0
         return regular_grid
@@ -1293,7 +1288,7 @@ class EddiesObservations(object):
 
 @njit(cache=True)
 def grid_count_(grid, i, j):
-    for i_, j_ in zip(i,j):
+    for i_, j_ in zip(i, j):
         grid[i_, j_] += 1
 
 

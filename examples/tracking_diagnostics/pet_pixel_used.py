@@ -9,20 +9,24 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 
 
-a = TrackEddiesObservations.load_file(py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr"))
-c = TrackEddiesObservations.load_file(py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr"))
+a = TrackEddiesObservations.load_file(
+    py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
+)
+c = TrackEddiesObservations.load_file(
+    py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
+)
 
 # Plot
 fig = plt.figure(figsize=(15, 20))
 ax_a = fig.add_subplot(311)
-ax_a.set_title('Anticyclonic frequency')
+ax_a.set_title("Anticyclonic frequency")
 ax_c = fig.add_subplot(312)
-ax_c.set_title('Cyclonic frequency')
+ax_c.set_title("Cyclonic frequency")
 ax_all = fig.add_subplot(313)
-ax_all.set_title('All eddies frequency')
+ax_all.set_title("All eddies frequency")
 
 step = 0.1
-kwargs_pcolormesh = dict(cmap='terrain_r', vmin=0, vmax=.75)
+kwargs_pcolormesh = dict(cmap="terrain_r", vmin=0, vmax=0.75)
 g_a = a.grid_count(((-5, 37, step), (30, 46, step)), intern=True)
 t0, t1 = a.period
 g_a.vars["count"] = g_a.vars["count"] / (t1 - t0)

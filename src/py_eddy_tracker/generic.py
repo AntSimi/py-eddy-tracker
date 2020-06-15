@@ -282,7 +282,7 @@ def split_line(x, y, i):
         new_x[new_j] = x[j]
         new_y[new_j] = y[j]
         new_j += 1
-        if j < (nb_value -1) and i[j] != i[j + 1]:
+        if j < (nb_value - 1) and i[j] != i[j + 1]:
             new_x[new_j] = nan
             new_y[new_j] = nan
             new_j += 1

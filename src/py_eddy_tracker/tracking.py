@@ -152,7 +152,7 @@ class Correspondances(list):
         """
         self.previous2_obs = self.previous_obs
         self.previous_obs = self.current_obs
-        self.current_obs = self.class_method.load_from_netcdf(dataset, raw_data=raw_data)
+        self.current_obs = self.class_method.load_file(dataset, raw_data=raw_data)
 
     def merge_correspondance(self, other):
         # Verify compliance of file
@@ -225,8 +225,8 @@ class Correspondances(list):
             nb_rebirth = correspondance['virtual'].sum()
             if nb_rebirth != 0:
                 logger.debug('%d re-birth due to prolongation with'
-                              ' virtual observations', nb_rebirth)
-                ## Set id for virtual
+                             ' virtual observations', nb_rebirth)
+                # Set id for virtual
                 # get correspondance mask using virtual obs
                 m_virtual = correspondance['virtual']
                 # index of virtual in virtual obs
@@ -303,7 +303,7 @@ class Correspondances(list):
             first_dataset = len(self.previous_correspondance.datasets)
             for correspondance in self.previous_correspondance[:first_dataset]:
                 self.append(correspondance)
-            self.current_obs = self.class_method.load_from_netcdf(self.datasets[first_dataset - 2])
+            self.current_obs = self.class_method.load_file(self.datasets[first_dataset - 2])
             flg_virtual = self.previous_correspondance.virtual
             with Dataset(self.filename_previous_correspondance) as general_handler:
                 self.current_id = general_handler.last_current_id
@@ -472,8 +472,8 @@ class Correspondances(list):
             if self.virtual:
                 # When start is virtual, we don't have a previous
                 # correspondance
-                self.nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]
-                ] += correspondance['virtual_length'][correspondance['virtual']]
+                self.nb_obs_by_tracks[correspondance['id'][correspondance['virtual']]] += \
+                    correspondance['virtual_length'][correspondance['virtual']]
 
         # Compute index of each tracks
         self.i_current_by_tracks = self.nb_obs_by_tracks.cumsum() - self.nb_obs_by_tracks

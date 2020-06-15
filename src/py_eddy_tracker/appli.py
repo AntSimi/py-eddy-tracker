@@ -25,4 +25,3 @@ def merge_eddies():
             other = other.add_rotation_type()
         obs = obs.merge(other)
     obs.write_file(filename=args.out)
-

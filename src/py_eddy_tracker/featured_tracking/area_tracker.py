@@ -1,5 +1,4 @@
 from ..observations.observation import EddiesObservations as Model
-from ..dataset.grid import RegularGridDataset
 from numpy import ma
 import logging
 

@@ -26,6 +26,7 @@ def cum_distance_by_track(distance, track):
     new_distance[i + 1] = d_cum
     return new_distance
 
+
 a = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
 )
@@ -33,15 +34,15 @@ c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 
-a.median_filter(1, 'time', 'lon').loess_filter(5, 'time', 'lon')
-a.median_filter(1, 'time', 'lat').loess_filter(5, 'time', 'lat')
-c.median_filter(1, 'time', 'lon').loess_filter(5, 'time', 'lon')
-c.median_filter(1, 'time', 'lat').loess_filter(5, 'time', 'lat')
+a.median_filter(1, "time", "lon").loess_filter(5, "time", "lon")
+a.median_filter(1, "time", "lat").loess_filter(5, "time", "lat")
+c.median_filter(1, "time", "lon").loess_filter(5, "time", "lon")
+c.median_filter(1, "time", "lat").loess_filter(5, "time", "lat")
 
 d_a = distance(a.longitude[:-1], a.latitude[:-1], a.longitude[1:], a.latitude[1:])
 d_c = distance(c.longitude[:-1], c.latitude[:-1], c.longitude[1:], c.latitude[1:])
-d_a = cum_distance_by_track(d_a, a["track"]) / 1000.
-d_c = cum_distance_by_track(d_c, c["track"]) / 1000.
+d_a = cum_distance_by_track(d_a, a["track"]) / 1000.0
+d_c = cum_distance_by_track(d_c, c["track"]) / 1000.0
 
 # Plot
 fig = plt.figure()
@@ -69,7 +70,12 @@ ax_propagation.plot(x[1:], nb_c, label="Cyclonic", color="b")
 ax_ratio_propagation.plot(x[1:], nb_c / nb_a)
 
 
-for ax in (ax_propagation, ax_cum_propagation, ax_ratio_cum_propagation, ax_ratio_propagation):
+for ax in (
+    ax_propagation,
+    ax_cum_propagation,
+    ax_ratio_cum_propagation,
+    ax_ratio_propagation,
+):
     ax.set_xlim(0, 1000)
     if ax in (ax_propagation, ax_cum_propagation):
         ax.set_ylim(1, None)

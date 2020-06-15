@@ -1088,7 +1088,6 @@ class UnRegularGridDataset(GridDataset):
 
     def _low_filter(self, grid_name, w_cut, factor=8.0):
         data = self.grid(grid_name)
-        mean_data = data.mean()
         x = self.grid(self.coordinates[0])
         y = self.grid(self.coordinates[1])
         regrid_step = w_cut / 111.0 / factor
@@ -1335,7 +1334,7 @@ class RegularGridDataset(GridDataset):
         """low filtering
         """
         return self.convolve_filter_with_dynamic_kernel(
-            grid_name, self.kernel_bessel, lat_max=lat_max, wave_length=w_cut, **kwargs
+            grid_name, self.kernel_bessel, wave_length=w_cut, **kwargs
         )
 
     def convolve_filter_with_dynamic_kernel(
