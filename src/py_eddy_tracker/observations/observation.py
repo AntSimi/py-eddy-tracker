@@ -1247,26 +1247,29 @@ class EddiesObservations(object):
             x = (x - ref) % 360 + ref
         return ax.scatter(x, self.latitude, c=self[name], **kwargs)
 
-    def display(self, ax, ref=None, extern_only=False, **kwargs):
+    def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
         if not extern_only:
             lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
             lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
-        lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
-        lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
+        if not intern_only:
+            lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
+            lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
         if "label" in kwargs:
-            kwargs["label"] += " (%s eddies)" % len(self)
+            kwargs["label"] += " (%s observations)" % len(self)
         kwargs_e = kwargs.copy()
         if not extern_only:
             kwargs_e.pop("label", None)
         if ref is None:
             if not extern_only:
                 ax.plot(lon_s, lat_s, **kwargs)
-            ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
+            if not intern_only:
+                ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
         else:
             # FIXME : ref could split eddies
             if not extern_only:
                 ax.plot((lon_s - ref) % 360 + ref, lat_s, **kwargs)
-            ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs_e)
+            if not intern_only:
+                ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs_e)
 
     def grid_count(self, bins, intern=False, center=False):
         x_name, y_name = self.intern(intern)

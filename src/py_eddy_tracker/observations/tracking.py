@@ -295,6 +295,14 @@ class TrackEddiesObservations(EddiesObservations):
             self.obs[yfield] = result
             return self
 
+    def position_filter(self, median_half_window, loess_half_window):
+        self.median_filter(median_half_window, "time", "lon").loess_filter(
+            loess_half_window, "time", "lon"
+        )
+        self.median_filter(median_half_window, "time", "lat").loess_filter(
+            loess_half_window, "time", "lat"
+        )
+
     def __extract_with_mask(
         self,
         mask,
@@ -354,7 +362,7 @@ class TrackEddiesObservations(EddiesObservations):
                 new.obs["track"] = id_translate[new.obs["track"]]
         return new
 
-    def plot(self, ax, ref=None, ** kwargs):
+    def plot(self, ax, ref=None, **kwargs):
         if "label" in kwargs:
             kwargs["label"] += " (%s eddies)" % (self.nb_obs_by_track != 0).sum()
         x = self.longitude

@@ -17,11 +17,8 @@ c = TrackEddiesObservations.load_file(
 
 a = a.extract_with_length((7 * 20, -1))
 c = c.extract_with_length((7 * 20, -1))
-a.median_filter(1, 'time', 'lon').loess_filter(5, 'time', 'lon')
-a.median_filter(1, 'time', 'lat').loess_filter(5, 'time', 'lat')
-c.median_filter(1, 'time', 'lon').loess_filter(5, 'time', 'lon')
-c.median_filter(1, 'time', 'lat').loess_filter(5, 'time', 'lat')
-
+a.position_filter(median_half_window=1, loess_half_window=5)
+c.position_filter(median_half_window=1, loess_half_window=5)
 
 # Plot
 fig = plt.figure(figsize=(12, 5))

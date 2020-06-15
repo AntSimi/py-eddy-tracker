@@ -34,10 +34,8 @@ c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 
-a.median_filter(1, "time", "lon").loess_filter(5, "time", "lon")
-a.median_filter(1, "time", "lat").loess_filter(5, "time", "lat")
-c.median_filter(1, "time", "lon").loess_filter(5, "time", "lon")
-c.median_filter(1, "time", "lat").loess_filter(5, "time", "lat")
+a.position_filter(median_half_window=1, loess_half_window=5)
+c.position_filter(median_half_window=1, loess_half_window=5)
 
 d_a = distance(a.longitude[:-1], a.latitude[:-1], a.longitude[1:], a.latitude[1:])
 d_c = distance(c.longitude[:-1], c.latitude[:-1], c.longitude[1:], c.latitude[1:])

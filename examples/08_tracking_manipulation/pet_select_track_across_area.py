@@ -10,8 +10,7 @@ import py_eddy_tracker_sample
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
-c.median_filter(1, "time", "lon").loess_filter(5, "time", "lon")
-c.median_filter(1, "time", "lat").loess_filter(5, "time", "lat")
+c.position_filter(median_half_window=1, loess_half_window=5)
 x0, x1, y0, y1 = 3, 4, 37, 38
 area = dict(llcrnrlon=x0, llcrnrlat=y0, urcrnrlon=x1, urcrnrlat=y1)
 c_subset = c.extract_with_area(area, full_path=True)
