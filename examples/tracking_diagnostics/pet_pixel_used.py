@@ -7,7 +7,6 @@ Count pixel used
 from matplotlib import pyplot as plt
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
-import pylook
 
 
 a = TrackEddiesObservations.load_file(py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr"))
@@ -15,11 +14,11 @@ c = TrackEddiesObservations.load_file(py_eddy_tracker_sample.get_path("eddies_me
 
 # Plot
 fig = plt.figure(figsize=(15, 20))
-ax_a = fig.add_subplot(311, projection='plat_carre')
+ax_a = fig.add_subplot(311)
 ax_a.set_title('Anticyclonic frequency')
-ax_c = fig.add_subplot(312, projection='plat_carre')
+ax_c = fig.add_subplot(312)
 ax_c.set_title('Cyclonic frequency')
-ax_all = fig.add_subplot(313, projection='plat_carre')
+ax_all = fig.add_subplot(313)
 ax_all.set_title('All eddies frequency')
 
 step = 0.1
