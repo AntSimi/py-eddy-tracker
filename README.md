@@ -29,10 +29,12 @@ Then run the following to install the eddy tracker:
 ```bash
 python setup.py install
 ```
+### Tools gallery ###
+Several examples based on py eddy tracker module are [here](https://py-eddy-tracker.readthedocs.io/en/latest/python_module/index.html).
 
-Two executables are now available in your PATH: EddyIdentification and EddyTracking
+![](https://py-eddy-tracker.readthedocs.io/en/latest/_static/logo.png)
 
-Edit the corresponding yaml files and then run the code, e.g.:
+### Quick use ###
 
 ```bash
 EddyId share/nrt_global_allsat_phy_l4_20190223_20190226.nc 20190223 adt ugos vgos longitude latitude ./ -v INFO
@@ -44,6 +46,4 @@ for identification, followed by:
 EddyTracking tracking.yaml
 ```
 
-for tracking.
-
-
+for tracking (Edit the corresponding yaml files and then run the code).
