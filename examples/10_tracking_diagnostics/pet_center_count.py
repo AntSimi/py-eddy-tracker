@@ -17,14 +17,13 @@ c = TrackEddiesObservations.load_file(
 )
 a = a.merge(c)
 # Plot
-fig = plt.figure(figsize=(20, 8))
-ax = fig.add_subplot(111)
-ax.set_xlim(-5, 37)
-ax.set_ylim(30, 46)
+fig = plt.figure(figsize=(13.5, 5))
+ax = fig.add_axes([0.03, 0.03, 0.90, 0.94])
+ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)
 ax.set_aspect("equal")
 step = 0.1
 t0, t1 = a.period
-g = a.grid_count(((-6, 37, step), (30, 46, step)), center=True)
+g = a.grid_count(((-7, 37, step), (30, 46, step)), center=True)
 m = g.display(ax, name="count", vmin=0, vmax=2, factor=1 / (step ** 2 * (t1 - t0)))
 ax.grid()
 cb = plt.colorbar(m, cax=fig.add_axes([0.95, 0.05, 0.01, 0.9]))

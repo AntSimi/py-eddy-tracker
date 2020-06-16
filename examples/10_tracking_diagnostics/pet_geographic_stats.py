@@ -9,6 +9,15 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 
 
+def start_axes(title):
+    fig = plt.figure(figsize=(13.5, 5))
+    ax = fig.add_axes([0.03, 0.03, 0.90, 0.94])
+    ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)
+    ax.set_aspect("equal")
+    ax.set_title(title)
+    return ax
+
+
 a = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
 )
@@ -17,42 +26,27 @@ c = TrackEddiesObservations.load_file(
 )
 a = a.merge(c)
 
-fig = plt.figure(figsize=(15, 7))
-ax = fig.add_subplot(111)
-ax.set_xlim(-5, 37)
-ax.set_ylim(30, 46)
-ax.set_aspect("equal")
 step = 0.1
+ax = start_axes("Amplitude mean by box of %s°" % step)
 g = a.grid_stat(((-5, 37, step), (30, 46, step)), "amplitude")
-m = g.display(ax, name="amplitude", vmin=0, vmax=0.2)
+m = g.display(ax, name="amplitude", vmin=0, vmax=10, factor=100)
 ax.grid()
-cb = plt.colorbar(m, cax=fig.add_axes([0.92, 0.05, 0.01, 0.9]))
-cb.set_label("Amplitude (m)")
-ax.set_title("Amplitude mean by box of %s°" % step)
+cb = plt.colorbar(m, cax=ax.figure.add_axes([0.94, 0.05, 0.01, 0.9]))
+cb.set_label("Amplitude (cm)")
 
-fig = plt.figure(figsize=(15, 7))
-ax = fig.add_subplot(111)
-ax.set_xlim(-5, 37)
-ax.set_ylim(30, 46)
-ax.set_aspect("equal")
+ax = start_axes("Speed radius mean by box of %s°" % step)
 step = 0.1
-g = a.grid_stat(((-5, 37, step), (30, 46, step)), "radius_s")
+g = a.grid_stat(((-7, 37, step), (30, 46, step)), "radius_s")
 m = g.display(ax, name="radius_s", vmin=10, vmax=50, factor=0.001)
 ax.grid()
-cb = plt.colorbar(m, cax=fig.add_axes([0.92, 0.05, 0.01, 0.9]))
+cb = plt.colorbar(m, cax=ax.figure.add_axes([0.94, 0.05, 0.01, 0.9]))
 cb.set_label("Speed radius (km)")
-ax.set_title("Speed radius mean by box of %s°" % step)
 
-fig = plt.figure(figsize=(15, 7))
-ax = fig.add_subplot(111)
-ax.set_xlim(-5, 37)
-ax.set_ylim(30, 46)
-ax.set_aspect("equal")
+ax = start_axes("Percent of virtual by box of %s°" % step)
 step = 0.1
-g = a.grid_stat(((-5, 37, step), (30, 46, step)), "virtual")
+g = a.grid_stat(((-7, 37, step), (30, 46, step)), "virtual")
 g.vars["virtual"] *= 100
 m = g.display(ax, name="virtual", vmin=0, vmax=15)
 ax.grid()
-cb = plt.colorbar(m, cax=fig.add_axes([0.92, 0.05, 0.01, 0.9]))
+cb = plt.colorbar(m, cax=ax.figure.add_axes([0.94, 0.05, 0.01, 0.9]))
 cb.set_label("Percent of virtual (%)")
-ax.set_title("Percent of virtual by box of %s°" % step)

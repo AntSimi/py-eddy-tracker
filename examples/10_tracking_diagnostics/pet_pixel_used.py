@@ -18,12 +18,12 @@ c = TrackEddiesObservations.load_file(
 t0, t1 = a.period
 
 # Plot
-fig = plt.figure(figsize=(15, 20))
-ax_a = fig.add_subplot(311)
+fig = plt.figure(figsize=(12, 14))
+ax_a = fig.add_axes([0.03, 0.66, 0.90, 0.33])
 ax_a.set_title("Anticyclonic frequency")
-ax_c = fig.add_subplot(312)
+ax_c = fig.add_axes([0.03, 0.33, 0.90, 0.33])
 ax_c.set_title("Cyclonic frequency")
-ax_all = fig.add_subplot(313)
+ax_all = fig.add_axes([0.03, 0, 0.90, 0.33])
 ax_all.set_title("All eddies frequency")
 
 step = 0.1
@@ -45,8 +45,7 @@ m = g_c.display(ax_all, name="count", factor=1 / (t1 - t0), **kwargs_pcolormesh)
 
 for ax in (ax_a, ax_c, ax_all):
     ax.set_aspect("equal")
-    ax.set_xlim(-5, 37)
-    ax.set_ylim(30, 46)
+    ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)
     ax.grid()
 
 plt.colorbar(m, cax=fig.add_axes([0.95, 0.05, 0.01, 0.9]))
