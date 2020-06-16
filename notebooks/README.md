@@ -1,0 +1,1 @@
+rsync -vrltp doc/python_module notebooks/.   --include '*/' --include '*.ipynb' --exclude '*' --prune-empty-dirs
