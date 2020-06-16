@@ -1241,11 +1241,11 @@ class EddiesObservations(object):
         for key, item in self.global_attr.items():
             h_nc.setncattr(key, item)
 
-    def scatter(self, ax, name, ref=None, ** kwargs):
+    def scatter(self, ax, name, ref=None, factor=1, ** kwargs):
         x = self.longitude
         if ref is not None:
             x = (x - ref) % 360 + ref
-        return ax.scatter(x, self.latitude, c=self[name], **kwargs)
+        return ax.scatter(x, self.latitude, c=self[name] * factor, **kwargs)
 
     def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
         if not extern_only:
