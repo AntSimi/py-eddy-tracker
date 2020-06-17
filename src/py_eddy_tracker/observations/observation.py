@@ -416,7 +416,8 @@ class EddiesObservations(object):
 
     @classmethod
     def load_file(cls, filename, **kwargs):
-        if filename.endswith(".zarr"):
+        end = b".zarr" if isinstance(filename, bytes) else ".zarr"
+        if filename.endswith(end):
             return cls.load_from_zarr(filename, **kwargs)
         else:
             return cls.load_from_netcdf(filename, **kwargs)

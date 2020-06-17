@@ -142,9 +142,9 @@ class Correspondances(list):
 
         """
         date_start = datetime(1950, 1, 1) + timedelta(
-            int(self.class_method.load_from_netcdf(self.datasets[0]).obs['time'][0]))
+            int(self.class_method.load_file(self.datasets[0]).obs['time'][0]))
         date_stop = datetime(1950, 1, 1) + timedelta(
-            int(self.class_method.load_from_netcdf(self.datasets[-1]).obs['time'][0]))
+            int(self.class_method.load_file(self.datasets[-1]).obs['time'][0]))
         return date_start, date_stop
 
     def swap_dataset(self, dataset, raw_data=False):
@@ -652,7 +652,7 @@ class Correspondances(list):
         j = 0
         for i, dataset in enumerate(self.datasets):
             logger.debug('Loaf file : (%d) %s', i, dataset)
-            current_obs = self.class_method.load_from_netcdf(dataset, raw_data=raw_data)
+            current_obs = self.class_method.load_file(dataset, raw_data=raw_data)
             if i == 0:
                 eddies.sign_type = current_obs.sign_type
             unused_obs = current_obs.observations[list_mask[i]]
