@@ -37,11 +37,23 @@ extensions = [
 ]
 
 sphinx_gallery_conf = {
-     'examples_dirs': '../examples',   # path to your example scripts
-     'gallery_dirs': 'python_module',
-     'capture_repr': ('_repr_html_'),
-     'line_numbers': False,
-     'filename_pattern': '/pet',
+    'examples_dirs': '../examples',   # path to your example scripts
+    'gallery_dirs': 'python_module',
+    'capture_repr': ('_repr_html_'),
+    'line_numbers': False,
+    'filename_pattern': '/pet',
+    'binder': {
+        # Required keys
+        'org': 'AntSimi',
+        'repo': 'py-eddy-tracker',
+        'branch': 'master',
+        'binderhub_url': 'https://mybinder.org',
+        'dependencies': ['../requirements.txt'],
+        # Optional keys
+        # 'filepath_prefix': '<prefix>' # A prefix to prepend to any filepaths in Binder links.
+        # 'notebooks_dir': '<notebooks-directory-name>' # Jupyter notebooks for Binder will be copied to this directory (relative to built documentation root).
+        # 'use_jupyter_lab': <bool> # Whether Binder links should start Jupyter Lab instead of the Jupyter Notebook interface.
+    }
 }
 
 # Add any paths that contain templates here, relative to this directory.

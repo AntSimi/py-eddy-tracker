@@ -8,3 +8,5 @@ pyproj
 pint
 numba
 polygon3
+# for binder
+pyeddytrackersample
