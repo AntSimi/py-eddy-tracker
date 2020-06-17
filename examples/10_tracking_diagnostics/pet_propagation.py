@@ -10,7 +10,8 @@ import py_eddy_tracker_sample
 from numpy import arange, empty
 from numba import njit
 
-
+# %%
+# We will create a function compile with numba, to compute a field which contains curvilign distance
 @njit(cache=True)
 def cum_distance_by_track(distance, track):
     tr_previous = 0
@@ -27,6 +28,8 @@ def cum_distance_by_track(distance, track):
     return new_distance
 
 
+# %%
+# Load an experimental med atlas over a period of 26 years (1993-2019)
 a = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
 )
@@ -34,21 +37,25 @@ c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 
+# %%
+# Filtering position to remove noisy position
 a.position_filter(median_half_window=1, loess_half_window=5)
 c.position_filter(median_half_window=1, loess_half_window=5)
 
+# %%
+# Compute curvilign distance
 d_a = distance(a.longitude[:-1], a.latitude[:-1], a.longitude[1:], a.latitude[1:])
 d_c = distance(c.longitude[:-1], c.latitude[:-1], c.longitude[1:], c.latitude[1:])
 d_a = cum_distance_by_track(d_a, a["track"]) / 1000.0
 d_c = cum_distance_by_track(d_c, c["track"]) / 1000.0
 
+# %%
 # Plot
 fig = plt.figure()
 ax_propagation = fig.add_axes([0.05, 0.55, 0.4, 0.4])
 ax_cum_propagation = fig.add_axes([0.55, 0.55, 0.4, 0.4])
 ax_ratio_propagation = fig.add_axes([0.05, 0.05, 0.4, 0.4])
 ax_ratio_cum_propagation = fig.add_axes([0.55, 0.05, 0.4, 0.4])
-
 
 bins = arange(0, 1500, 10)
 cum_a, bins, _ = ax_cum_propagation.hist(
@@ -66,7 +73,6 @@ ax_propagation.plot(x[1:], nb_a, label="Anticyclonic", color="r")
 ax_propagation.plot(x[1:], nb_c, label="Cyclonic", color="b")
 
 ax_ratio_propagation.plot(x[1:], nb_c / nb_a)
-
 
 for ax in (
     ax_propagation,

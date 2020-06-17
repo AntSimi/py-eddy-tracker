@@ -50,9 +50,7 @@ sphinx_gallery_conf = {
         'binderhub_url': 'https://mybinder.org',
         'dependencies': ['../requirements.txt'],
         # Optional keys
-        # 'filepath_prefix': '<prefix>' # A prefix to prepend to any filepaths in Binder links.
-        # 'notebooks_dir': '<notebooks-directory-name>' # Jupyter notebooks for Binder will be copied to this directory (relative to built documentation root).
-        # 'use_jupyter_lab': <bool> # Whether Binder links should start Jupyter Lab instead of the Jupyter Notebook interface.
+        'use_jupyter_lab': True
     }
 }
 

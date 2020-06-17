@@ -8,6 +8,8 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 from numpy import arange
 
+# %%
+# Load an experimental med atlas over a period of 26 years (1993-2019)
 a = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
 )
@@ -15,13 +17,13 @@ c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 
+# %%
 # Plot
 fig = plt.figure()
 ax_lifetime = fig.add_axes([0.05, 0.55, 0.4, 0.4])
 ax_cum_lifetime = fig.add_axes([0.55, 0.55, 0.4, 0.4])
 ax_ratio_lifetime = fig.add_axes([0.05, 0.05, 0.4, 0.4])
 ax_ratio_cum_lifetime = fig.add_axes([0.55, 0.05, 0.4, 0.4])
-
 
 cum_a, bins, _ = ax_cum_lifetime.hist(
     a["n"], histtype="step", bins=arange(0, 800, 1), label="Anticyclonic", color="r"
@@ -38,7 +40,6 @@ ax_lifetime.plot(x[1:], nb_a, label="Anticyclonic", color="r")
 ax_lifetime.plot(x[1:], nb_c, label="Cyclonic", color="b")
 
 ax_ratio_lifetime.plot(x[1:], nb_c / nb_a)
-
 
 for ax in (ax_lifetime, ax_cum_lifetime, ax_ratio_cum_lifetime, ax_ratio_lifetime):
     ax.set_xlim(0, 365)

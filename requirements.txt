@@ -1,12 +1,13 @@
-numpy
 matplotlib
-scipy
 netCDF4
-opencv-python
-pyyaml
-pyproj
-pint
 numba
+numpy
+opencv-python
+pint
 polygon3
+pyproj
+pyyaml
+scipy
+zarr
 # for binder
 pyeddytrackersample

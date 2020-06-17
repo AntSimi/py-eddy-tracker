@@ -27,19 +27,12 @@ Welcome to py-eddy-tracker's documentation!
    grid_load_display
    spectrum
 
-
 .. toctree::
    :maxdepth: 2
    :caption: Tracking
 
    run_tracking
    custom_tracking
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Work with eddies
-
-   observation_manipulation
 
 .. toctree::
    :maxdepth: 2

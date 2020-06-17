@@ -8,6 +8,8 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 from numpy import arange
 
+# %%
+# Load an experimental med atlas over a period of 26 years (1993-2019)
 a = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
 )
@@ -17,6 +19,7 @@ c = TrackEddiesObservations.load_file(
 kwargs_a = dict(label="Anticyclonic", color="r", histtype="step", density=True)
 kwargs_c = dict(label="Cyclonic", color="b", histtype="step", density=True)
 
+# %%
 # Plot
 fig = plt.figure(figsize=(12, 7))
 

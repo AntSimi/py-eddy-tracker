@@ -8,13 +8,15 @@ from matplotlib import pyplot as plt
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 
+# %%
+# Load an experimental cyclonic atlas, we keep only eddies which are follow more than 180 days
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
-
 c = c.extract_with_length((180, -1))
 
-# Plot
+# %%
+# Plot amplitude field
 fig = plt.figure(figsize=(12, 6))
 ax = fig.add_axes((0.05, 0.1, 0.9, 0.9))
 ax.set_aspect("equal")

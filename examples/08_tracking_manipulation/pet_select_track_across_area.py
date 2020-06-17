@@ -7,13 +7,21 @@ from matplotlib import pyplot as plt
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 
+# %%
+# Load experimental atlas, we filter position to have nice display
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 c.position_filter(median_half_window=1, loess_half_window=5)
+
+# %%
+# We extract eddies in the area set below, but we ask to keep `full_path`
 x0, x1, y0, y1 = 3, 4, 37, 38
 area = dict(llcrnrlon=x0, llcrnrlat=y0, urcrnrlon=x1, urcrnrlat=y1)
 c_subset = c.extract_with_area(area, full_path=True)
+
+# %%
+# Plot
 fig = plt.figure(figsize=(12, 5))
 ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
 ax.set_xlim(-1, 9)

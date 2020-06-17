@@ -8,18 +8,23 @@ from matplotlib import pyplot as plt
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 
+# %%
+# Load experimental atlas, and keep only eddies longer than 20 weeks
 a = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
 )
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
-
 a = a.extract_with_length((7 * 20, -1))
 c = c.extract_with_length((7 * 20, -1))
+
+# %%
+# Position filtering for nice display
 a.position_filter(median_half_window=1, loess_half_window=5)
 c.position_filter(median_half_window=1, loess_half_window=5)
 
+# %%
 # Plot
 fig = plt.figure(figsize=(12, 5))
 ax = fig.add_axes((0.05, 0.1, 0.9, 0.9))
