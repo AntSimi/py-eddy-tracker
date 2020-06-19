@@ -24,6 +24,7 @@ setup(
         "src/scripts/EddyFinalTracking",
         "src/scripts/EddyMergeCorrespondances",
         "src/scripts/ZarrDump",
+        "src/scripts/GUIEddy",
     ],
     zip_safe=False,
     entry_points=dict(
