@@ -424,8 +424,8 @@ class GridDataset(object):
         x_name, y_name = self.coordinates
         if self.is_centered:
             logger.info("Grid center")
-            self.x_c = self.vars[x_name]
-            self.y_c = self.vars[y_name]
+            self.x_c = self.vars[x_name].astype('float64')
+            self.y_c = self.vars[y_name].astype('float64')
 
             self.x_bounds = concatenate((self.x_c, (2 * self.x_c[-1] - self.x_c[-2],)))
             self.y_bounds = concatenate((self.y_c, (2 * self.y_c[-1] - self.y_c[-2],)))
@@ -437,8 +437,8 @@ class GridDataset(object):
             self.y_bounds[-1] -= d_y[-1] / 2
 
         else:
-            self.x_bounds = self.vars[x_name]
-            self.y_bounds = self.vars[y_name]
+            self.x_bounds = self.vars[x_name].astype('float64')
+            self.y_bounds = self.vars[y_name].astype('float64')
 
             if len(self.x_dim) == 1:
                 self.x_c = self.x_bounds.copy()
