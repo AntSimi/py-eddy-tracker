@@ -14,6 +14,7 @@ from numpy import (
     linspace,
     interp,
     where,
+    isnan,
 )
 from numba import njit, prange
 from numpy.linalg import lstsq
@@ -287,3 +288,50 @@ def split_line(x, y, i):
             new_y[new_j] = nan
             new_j += 1
     return new_x, new_y
+
+
+@njit(cache=True)
+def wrap_longitude(x, y, ref, cut=False):
+    if cut:
+        indexs = list()
+        nb = x.shape[0]
+        new_previous = (x[0] - ref) % 360
+        x_previous = x[0]
+        for i in range(1, nb):
+            x_ = x[i]
+            new_x = (x_ - ref) % 360
+            if not isnan(x_) and not isnan(x_previous):
+                d_new = new_x - new_previous
+                d = x_ - x_previous
+                if d != d_new:
+                    indexs.append(i)
+            x_previous, new_previous = x_, new_x
+
+        nb_indexs = len(indexs)
+        new_size = nb + nb_indexs * 3
+        out_x = empty(new_size, dtype=x.dtype)
+        out_y = empty(new_size, dtype=y.dtype)
+        i_ = 0
+        j = 0
+        for i in range(nb):
+            if j < nb_indexs and i == indexs[j]:
+                j += 1
+                cor = 360 if x[i - 1] > x[i] else -360
+                out_x[i + i_] = (x[i] - ref) % 360 + ref - cor
+                out_y[i + i_] = y[i]
+                out_x[i + i_ + 1] = nan
+                out_y[i + i_ + 1] = nan
+                out_x[i + i_ + 2] = (x[i - 1] - ref) % 360 + ref + cor
+                out_y[i + i_ + 2] = y[i - 1]
+                i_ += 3
+            out_x[i + i_] = (x[i] - ref) % 360 + ref
+            out_y[i + i_] = y[i]
+        return out_x, out_y
+
+    else:
+        nb = x.shape[0]
+        out = empty(nb, dtype=x.dtype)
+        for i in range(nb):
+            out[i] = (x[i] - ref) % 360 + ref
+        return out, y
+

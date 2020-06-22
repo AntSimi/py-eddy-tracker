@@ -44,7 +44,7 @@ import logging
 from datetime import datetime, timedelta
 from .observation import EddiesObservations
 from numba import njit
-from ..generic import split_line
+from ..generic import split_line, wrap_longitude
 
 logger = logging.getLogger("pet")
 
@@ -365,10 +365,9 @@ class TrackEddiesObservations(EddiesObservations):
     def plot(self, ax, ref=None, **kwargs):
         if "label" in kwargs:
             kwargs["label"] += " (%s eddies)" % (self.nb_obs_by_track != 0).sum()
-        x = self.longitude
+        x, y = split_line(self.longitude, self.latitude, self.tracks)
         if ref is not None:
-            x = (x - ref) % 360 + ref
-        x, y = split_line(x, self.latitude, self.tracks)
+            x, y = wrap_longitude(x, y, ref, cut=True)
         return ax.plot(x, y, **kwargs)
 
 

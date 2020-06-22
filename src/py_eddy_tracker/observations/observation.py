@@ -58,7 +58,7 @@ from pint.errors import UndefinedUnitError
 from tokenize import TokenError
 from matplotlib.path import Path as BasePath
 from .. import VAR_DESCR, VAR_DESCR_inv
-from ..generic import distance_grid, distance, flatten_line_matrix
+from ..generic import distance_grid, distance, flatten_line_matrix, wrap_longitude
 from ..poly import bbox_intersection, common_area
 
 logger = logging.getLogger("pet")
@@ -1242,7 +1242,7 @@ class EddiesObservations(object):
         for key, item in self.global_attr.items():
             h_nc.setncattr(key, item)
 
-    def scatter(self, ax, name, ref=None, factor=1, ** kwargs):
+    def scatter(self, ax, name, ref=None, factor=1, **kwargs):
         x = self.longitude
         if ref is not None:
             x = (x - ref) % 360 + ref
@@ -1260,17 +1260,15 @@ class EddiesObservations(object):
         kwargs_e = kwargs.copy()
         if not extern_only:
             kwargs_e.pop("label", None)
-        if ref is None:
-            if not extern_only:
-                ax.plot(lon_s, lat_s, **kwargs)
-            if not intern_only:
-                ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
-        else:
-            # FIXME : ref could split eddies
-            if not extern_only:
-                ax.plot((lon_s - ref) % 360 + ref, lat_s, **kwargs)
-            if not intern_only:
-                ax.plot((lon_e - ref) % 360 + ref, lat_e, linestyle="-.", **kwargs_e)
+
+        if not extern_only:
+            if ref is not None:
+                lon_s, lat_s = wrap_longitude(lon_s, lat_s, ref, cut=True)
+            ax.plot(lon_s, lat_s, **kwargs)
+        if not intern_only:
+            if ref is not None:
+                lon_e, lat_e = wrap_longitude(lon_e, lat_e, ref, cut=True)
+            ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
 
     def grid_count(self, bins, intern=False, center=False):
         x_name, y_name = self.intern(intern)
