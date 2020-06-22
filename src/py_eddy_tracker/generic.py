@@ -303,7 +303,7 @@ def wrap_longitude(x, y, ref, cut=False):
             if not isnan(x_) and not isnan(x_previous):
                 d_new = new_x - new_previous
                 d = x_ - x_previous
-                if d != d_new:
+                if abs(d - d_new) > 1e-5:
                     indexs.append(i)
             x_previous, new_previous = x_, new_x
 
