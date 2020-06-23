@@ -2,7 +2,6 @@ import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.projections import register_projection
-from matplotlib.widgets import Slider
 import py_eddy_tracker_sample as sample
 from .generic import flatten_line_matrix, split_line
 from .observations.tracking import TrackEddiesObservations
@@ -10,7 +9,7 @@ from .observations.tracking import TrackEddiesObservations
 
 try:
     from pylook.axes import PlatCarreAxes
-except:
+except ImportError:
     from matplotlib.axes import Axes
 
     class PlatCarreAxes(Axes):
@@ -80,8 +79,7 @@ class GUI:
             t0_, t1_ = dataset.period
             t0, t1 = min(t0, t0_), max(t1, t1_)
 
-        self.settings = dict(period=(t0, t1), now=20000,)
-        # self.settings = dict(period=(t0, t1), now=t0,)
+        self.settings = dict(period=(t0, t1), now=t1,)
 
     @property
     def now(self):
