@@ -59,7 +59,7 @@ from tokenize import TokenError
 from matplotlib.path import Path as BasePath
 from .. import VAR_DESCR, VAR_DESCR_inv
 from ..generic import distance_grid, distance, flatten_line_matrix, wrap_longitude
-from ..poly import bbox_intersection, common_area
+from ..poly import bbox_intersection, common_area, create_vertice
 
 logger = logging.getLogger("pet")
 
@@ -121,16 +121,6 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
             d_normalize = dx ** 2 / major[j] ** 2 + dy ** 2 / minor ** 2
             m[j, i] = d_normalize < 1.0
     return m
-
-
-@njit(cache=True, fastmath=True)
-def custom_concat(x, y):
-    nb = x.shape[0]
-    a = empty((nb, 2))
-    for i in range(nb):
-        a[i, 0] = x[i]
-        a[i, 1] = y[i]
-    return a
 
 
 class EddiesObservations(object):
@@ -761,10 +751,10 @@ class EddiesObservations(object):
                 continue
 
             x_in_, x_out_ = x_in[i], x_out[i]
-            p_in = Polygon(custom_concat(x_in_, y_in[i]))
+            p_in = Polygon(create_vertice(x_in_, y_in[i]))
             if abs(x_in_[0] - x_out_[0]) > 180:
                 x_out_ = (x_out[i] - (x_in_[0] - 180)) % 360 + x_in_[0] - 180
-            p_out = Polygon(custom_concat(x_out_, y_out[i]))
+            p_out = Polygon(create_vertice(x_out_, y_out[i]))
             costs[i] = 1 - (p_in & p_out).area() / min(p_in.area(), p_out.area())
         costs.mask = costs == 1
         return costs
@@ -1288,7 +1278,7 @@ class EddiesObservations(object):
         else:
             x, y = (self[x_name] - x0) % 360 + x0, self[y_name]
             for x_, y_ in zip(x, y):
-                i, j = BasePath(custom_concat(x_, y_)).pixels_in(regular_grid)
+                i, j = BasePath(create_vertice(x_, y_)).pixels_in(regular_grid)
                 grid_count_(grid, i, j)
             grid.mask = grid == 0
         return regular_grid

@@ -7,8 +7,9 @@ Select pixel in eddies
 from matplotlib import pyplot as plt
 from matplotlib.path import Path
 from numpy import ones
-from py_eddy_tracker.observations.observation import EddiesObservations, custom_concat
+from py_eddy_tracker.observations.observation import EddiesObservations
 from py_eddy_tracker.dataset.grid import RegularGridDataset
+from py_eddy_tracker.poly import create_vertice
 from py_eddy_tracker import data
 
 # %%
@@ -35,7 +36,7 @@ x_name, y_name = a.intern(False)
 adt = g.grid("adt")
 mask = ones(adt.shape, dtype='bool')
 for eddy in a:
-    i, j = Path(custom_concat(eddy[x_name], eddy[y_name])).pixels_in(g)
+    i, j = Path(create_vertice(eddy[x_name], eddy[y_name])).pixels_in(g)
     mask[i, j] = False
 adt.mask[:] += ~mask
 g.display(ax, "adt")
