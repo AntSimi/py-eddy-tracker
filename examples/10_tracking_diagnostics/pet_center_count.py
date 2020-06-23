@@ -27,7 +27,7 @@ kwargs_pcolormesh = dict(
 
 
 # %%
-# Plot 
+# Plot
 fig = plt.figure(figsize=(12, 18.5))
 ax_a = fig.add_axes([0.03, 0.75, 0.90, 0.25])
 ax_a.set_title("Anticyclonic center frequency")
