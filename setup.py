@@ -28,7 +28,10 @@ setup(
     ],
     zip_safe=False,
     entry_points=dict(
-        console_scripts=["MergeEddies = py_eddy_tracker.appli:merge_eddies"]
+        console_scripts=[
+            "MergeEddies = py_eddy_tracker.appli:merge_eddies",
+            "EddyNetworkGroup = py_eddy_tracker.network:build_network",
+        ]
     ),
     package_data={
         "py_eddy_tracker.featured_tracking": ["*.nc"],
