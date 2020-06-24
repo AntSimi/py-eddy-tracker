@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 ===========================================================================
 This file is part of py-eddy-tracker.
@@ -16,17 +17,11 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2017 by Evan Mason and Antoine Delepoulle
-Email: emason@imedea.uib-csic.es
+Copyright (c) 2014-2020 by Evan Mason
+Email: evanmason@gmail.com
 ===========================================================================
-
-tracking.py
-
-Version 3.0.0
-
-===========================================================================
-
 """
+
 from datetime import timedelta, datetime
 from py_eddy_tracker.observations.observation import EddiesObservations, VirtualEddiesObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations

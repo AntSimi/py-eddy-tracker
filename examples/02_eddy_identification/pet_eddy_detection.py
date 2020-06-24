@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker import data
 
+
 # %%
 def start_axes(title):
     fig = plt.figure(figsize=(13, 5))

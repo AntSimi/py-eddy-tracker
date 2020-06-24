@@ -17,13 +17,8 @@ This file is part of py-eddy-tracker.
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
 Copyright (c) 2014-2020 by Evan Mason
-Email: evanmason@gamil.com
+Email: evanmason@gmail.com
 ===========================================================================
-
-Version 3.0
-
-===========================================================================
-
 """
 
 import logging

@@ -7,7 +7,6 @@ Run in a terminal this script, which allow to watch eddy evolution
 """
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
-import matplotlib.transforms as mt
 from numpy import arange
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 from py_eddy_tracker.poly import create_vertice

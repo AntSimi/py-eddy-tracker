@@ -16,17 +16,11 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2017 by Antoine Delepoulle and Evan Mason
-Email: emason@imedea.uib-csic.es
+Copyright (c) 2014-2020 by Evan Mason
+Email: evanmason@gmail.com
 ===========================================================================
-
-__init__.py
-
-Version 3.0.0
-
-===========================================================================
-
 """
+
 from argparse import ArgumentParser
 import logging
 import numpy
@@ -329,7 +323,8 @@ VAR_DESCR = dict(
         nc_attr=dict(
             longname="speed radius scale",
             units="m",
-            description="Radius of a circle whose area is equal to that enclosed by the contour of maximum circum-average speed",
+            description="Radius of a circle whose area is equal to that \
+                enclosed by the contour of maximum circum-average speed",
         ),
     ),
     track=dict(
