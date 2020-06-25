@@ -15,7 +15,7 @@ from netCDF4 import Dataset
 from datetime import datetime
 from glob import glob
 import logging
-import datetime as dt
+
 
 logger = logging.getLogger("pet")
 
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         DATASET_LIST = DATASET_LIST[:-BLANK_PERIOD]
         logger.info("Last %d files will be pop", BLANK_PERIOD)
 
-    START_TIME = dt.datetime.now()
+    START_TIME = datetime.now()
     logger.info("Start tracking on %d files", len(DATASET_LIST))
 
     NB_OBS_MIN = int(CONFIG.get("TRACK_DURATION_MIN", 14))
@@ -254,7 +254,7 @@ if __name__ == "__main__":
         SHORT_TRACK.filled_by_interpolation(SHORT_TRACK["virtual"] == 1)
 
     # Total running time
-    FULL_TIME = dt.datetime.now() - START_TIME
+    FULL_TIME = datetime.now() - START_TIME
     logger.info("Mean duration by loop : %s", FULL_TIME / (len(DATASET_LIST) - 1))
     logger.info("Duration : %s", FULL_TIME)
 

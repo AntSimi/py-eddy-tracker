@@ -40,9 +40,9 @@ ax_ratio.set_title("Ratio cyclonic / Anticyclonic")
 
 # Count pixel used for each center
 g_a = a.grid_count(bins, intern=True, center=True)
-m = g_a.display(ax_a, **kwargs_pcolormesh)
+g_a.display(ax_a, **kwargs_pcolormesh)
 g_c = c.grid_count(bins, intern=True, center=True)
-m = g_c.display(ax_c, **kwargs_pcolormesh)
+g_c.display(ax_c, **kwargs_pcolormesh)
 # Compute a ratio Cyclonic / Anticyclonic
 ratio = g_c.vars["count"] / g_a.vars["count"]
 

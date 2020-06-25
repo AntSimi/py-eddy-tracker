@@ -91,7 +91,6 @@ class Amplitude(object):
         """Need update
         """
         return self.interval_min <= self.amplitude
-        return self.eddy.ampmin <= self.amplitude <= self.eddy.ampmax
 
     def all_pixels_below_h0(self, level):
         """

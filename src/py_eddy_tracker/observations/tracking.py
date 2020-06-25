@@ -327,7 +327,7 @@ class TrackEddiesObservations(EddiesObservations):
             logger.warning(
                 "Incompatible option, remove_incomplete option will be remove"
             )
-            remove_incomplete = False
+            # remove_incomplete = False
 
         if full_path:
             if reject_virtual:

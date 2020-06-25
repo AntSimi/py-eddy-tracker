@@ -48,8 +48,6 @@ if True:
         # 0.02, # step between two isolines of detection (m)
         pixel_limit=(5, 2000),  # Min and max of pixel can be include in contour
         shape_error=55,  # Error maximal of circle fitting over contour to be accepted
-        bbox_surface_min_degree=0.125
-        ** 2,  # degrees surface minimal to take in account contour
     )
     fig = plt.figure(figsize=(15, 7))
     ax = fig.add_axes([0.03, 0.03, 0.94, 0.94])
