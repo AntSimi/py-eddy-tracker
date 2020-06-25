@@ -1,0 +1,7 @@
+include README.md
+include COPYING
+include requirements.txt
+graft is_number
+recursive-exclude * *.py[co]
+include versioneer.py
+include src/py_eddy_tracker/_version.py

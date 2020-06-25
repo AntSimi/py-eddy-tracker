@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
+import versioneer
 from setuptools import setup, find_packages
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(
     name="pyEddyTracker",
-    version="3.0.0",
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     description="Py-Eddy-Tracker libraries",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Scientific/Engineering :: Physics",

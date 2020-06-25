@@ -588,3 +588,7 @@ for key in VAR_DESCR.keys():
     VAR_DESCR_inv[VAR_DESCR[key]["nc_name"]] = key
     for key_old in VAR_DESCR[key].get("old_nc_name", list()):
         VAR_DESCR_inv[key_old] = key
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
