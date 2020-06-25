@@ -1,4 +1,4 @@
-[![Documentation Status](https://readthedocs.org/projects/py-eddy-tracker/badge/?version=latest)](https://py-eddy-tracker.readthedocs.io/en/latest/?badge=latest) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/AntSimi/py-eddy-tracker/master?urlpath=lab/tree/notebooks/python_module/)
+[![PyPI version](https://badge.fury.io/py/pyEddyTracker.svg)](https://badge.fury.io/py/pyEddyTracker) [![Documentation Status](https://readthedocs.org/projects/py-eddy-tracker/badge/?version=latest)](https://py-eddy-tracker.readthedocs.io/en/latest/?badge=latest) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/AntSimi/py-eddy-tracker/master?urlpath=lab/tree/notebooks/python_module/)
 
 # README #
 
