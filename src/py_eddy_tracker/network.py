@@ -92,29 +92,27 @@ def get_group_array(results, nb_obs):
     gr = empty(nb_obs.sum(), dtype="u4")
     gr[:] = NOGROUP
 
-    next_id_group = 1
-    for i, j, i_ref, i_etu in results:
-        sl_ref = slice(day_start[i], day_start[i] + nb_obs[i])
-        sl_etu = slice(day_start[j], day_start[j] + nb_obs[j])
+    id_free = 1
+    for i, j, ii, ij in results:
+        gr_i = gr[slice(day_start[i], day_start[i] + nb_obs[i])]
+        gr_j = gr[slice(day_start[j], day_start[j] + nb_obs[j])]
         # obs with no groups
-        m = (gr[sl_ref][i_ref] == NOGROUP) * (gr[sl_etu][i_etu] == NOGROUP)
-        nb_no_groups = m.sum()
-        gr[sl_ref][i_ref[m]] = gr[sl_etu][i_etu[m]] = arange(
-            next_id_group, next_id_group + nb_no_groups
-        )
-        next_id_group += nb_no_groups
+        m = (gr_i[ii] == NOGROUP) * (gr_j[ij] == NOGROUP)
+        nb_new = m.sum()
+        gr_i[ii[m]] = gr_j[ij[m]] = arange(id_free, id_free + nb_new)
+        id_free += nb_new
         # associate obs with no group with obs with group
-        m = (gr[sl_ref][i_ref] != NOGROUP) * (gr[sl_etu][i_etu] == NOGROUP)
-        gr[sl_etu][i_etu[m]] = gr[sl_ref][i_ref[m]]
-        m = (gr[sl_ref][i_ref] == NOGROUP) * (gr[sl_etu][i_etu] != NOGROUP)
-        gr[sl_ref][i_ref[m]] = gr[sl_etu][i_etu[m]]
+        m = (gr_i[ii] != NOGROUP) * (gr_j[ij] == NOGROUP)
+        gr_j[ij[m]] = gr_i[ii[m]]
+        m = (gr_i[ii] == NOGROUP) * (gr_j[ij] != NOGROUP)
+        gr_i[ii[m]] = gr_j[ij[m]]
         # case where 2 obs have a different group
-        m = gr[sl_ref][i_ref] != gr[sl_etu][i_etu]
+        m = gr_i[ii] != gr_j[ij]
         if m.any():
             # Merge of group, ref over etu
-            for i_, j_ in zip(i_ref[m], i_etu[m]):
-                g_ref, g_etu = gr[sl_ref][i_], gr[sl_etu][j_]
-                gr[gr == g_ref] = g_etu
+            for i_, j_ in zip(ii[m], ij[m]):
+                gr_i_, gr_j_ = gr_i[i_], gr_j[j_]
+                gr[gr == gr_i_] = gr_j_
     return gr
 
 
@@ -161,7 +159,7 @@ def save(filenames, gr, out):
         debug_active = logger.getEffectiveLevel() == logging.DEBUG
         for filename in filenames:
             if debug_active:
-                print(f'Load {filename} to copy', end="\r")
+                print(f"Load {filename} to copy", end="\r")
             with Dataset(filename) as h_in:
                 stop = i + len(h_in.dimensions["obs"])
                 sl = slice(i, stop)
@@ -222,7 +220,7 @@ def network(regex, filename_out, window=1, intern=False):
     debug_active = logger.getEffectiveLevel() == logging.DEBUG
     for i, filename in enumerate(filenames):
         if debug_active:
-            print(f'{filename} compared to {window} next', end="\r")
+            print(f"{filename} compared to {window} next", end="\r")
         xi, yi = load_contour(filename, *coord)
         nb_obs.append(xi.shape[0])
         for j in range(i + 1, min(window + i + 1, nb_in)):
