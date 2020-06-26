@@ -26,6 +26,7 @@ from numpy import (
     pi,
     cos,
     arctan2,
+    arcsin,
     empty,
     nan,
     absolute,
@@ -354,3 +355,39 @@ def wrap_longitude(x, y, ref, cut=False):
         for i in range(nb):
             out[i] = (x[i] - ref) % 360 + ref
         return out, y
+
+
+@njit(cache=True, fastmath=True)
+def coordinates_to_local(lon, lat, lon0, lat0):
+    D2R = pi / 180.0
+    R = 6370997
+    dlon = (lon - lon0) * D2R
+    sin_dlat = sin((lat - lat0) * 0.5 * D2R)
+    sin_dlon = sin(dlon * 0.5)
+    cos_lat0 = cos(lat0 * D2R)
+    cos_lat = cos(lat * D2R)
+    a_val = sin_dlon ** 2 * cos_lat0 * cos_lat + sin_dlat ** 2
+    module = R * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+
+    azimuth = pi / 2 - arctan2(
+        cos_lat * sin(dlon),
+        cos_lat0 * sin(lat * D2R) - sin(lat0 * D2R) * cos_lat * cos(dlon),
+    )
+    return module * cos(azimuth), module * sin(azimuth)
+
+
+@njit(cache=True, fastmath=True)
+def local_to_coordinates(x, y, lon0, lat0):
+    D2R = pi / 180.0
+    R = 6370997
+    d = (x ** 2 + y ** 2) ** 0.5 / R
+    a = -(arctan2(y, x) - pi / 2)
+    lat = arcsin(sin(lat0 * D2R) * cos(d) + cos(lat0 * D2R) * sin(d) * cos(a))
+    lon = (
+        lon0
+        + arctan2(
+            sin(a) * sin(d) * cos(lat0 * D2R), cos(d) - sin(lat0 * D2R) * sin(lat)
+        )
+        / D2R
+    )
+    return lon, lat / D2R

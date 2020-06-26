@@ -28,8 +28,6 @@ from numpy import (
     isnan,
     percentile,
     zeros,
-    arctan2,
-    arcsin,
     round_,
     nanmean,
     exp,
@@ -50,8 +48,8 @@ from pint import UnitRegistry
 from ..observations.observation import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
 from .. import VAR_DESCR
-from ..generic import distance, interp2d_geo, fit_circle, uniform_resample
-from ..poly import poly_contain_poly, winding_number_grid_in_poly, winding_number_poly
+from ..generic import distance, interp2d_geo, fit_circle, uniform_resample, coordinates_to_local, local_to_coordinates
+from ..poly import poly_contain_poly, winding_number_grid_in_poly, winding_number_poly, create_vertice
 
 logger = logging.getLogger("pet")
 
@@ -84,14 +82,6 @@ def lat(self):
 BasePath.mean_coordinates = mean_coordinates
 BasePath.lon = lon
 BasePath.lat = lat
-
-
-@njit(cache=True)
-def prepare_for_kdtree(x_val, y_val):
-    data = empty((x_val.shape[0], 2))
-    data[:, 0] = x_val
-    data[:, 1] = y_val
-    return data
 
 
 @njit(cache=True)
@@ -193,45 +183,6 @@ def _get_pixel_in_unregular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop
     i_x += x_start
     i_y += y_start
     return i_x, i_y
-
-
-@njit(cache=True, fastmath=True)
-def coordinates_to_local(lon, lat, lon0, lat0):
-    D2R = pi / 180.0
-    R = 6370997
-    dlon = (lon - lon0) * D2R
-    sin_dlat = sin((lat - lat0) * 0.5 * D2R)
-    sin_dlon = sin(dlon * 0.5)
-    cos_lat0 = cos(lat0 * D2R)
-    cos_lat = cos(lat * D2R)
-    a_val = sin_dlon ** 2 * cos_lat0 * cos_lat + sin_dlat ** 2
-    module = R * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
-
-    azimuth = pi / 2 - arctan2(
-        cos_lat * sin(dlon),
-        cos_lat0 * sin(lat * D2R) - sin(lat0 * D2R) * cos_lat * cos(dlon),
-    )
-    return module * cos(azimuth), module * sin(azimuth)
-
-
-@njit(cache=True, fastmath=True)
-def local_to_coordinates(x, y, lon0, lat0):
-    D2R = pi / 180.0
-    R = 6370997
-    d = (x ** 2 + y ** 2) ** 0.5 / R
-    a = -(arctan2(y, x) - pi / 2)
-    lat = arcsin(sin(lat0 * D2R) * cos(d) + cos(lat0 * D2R) * sin(d) * cos(a))
-    lon = (
-        lon0
-        + arctan2(
-            sin(a) * sin(d) * cos(lat0 * D2R), cos(d) - sin(lat0 * D2R) * sin(lat)
-        )
-        / D2R
-    )
-    return lon, lat / D2R
-
-
-BasePath.fit_circle = fit_circle_path
 
 
 def pixels_in(self, grid):
@@ -1081,7 +1032,7 @@ class UnRegularGridDataset(GridDataset):
     def init_pos_interpolator(self):
         logger.debug("Create a KdTree could be long ...")
         self.index_interp = cKDTree(
-            prepare_for_kdtree(self.x_c.reshape(-1), self.y_c.reshape(-1))
+            create_vertice(self.x_c.reshape(-1), self.y_c.reshape(-1))
         )
 
         logger.debug("... OK")

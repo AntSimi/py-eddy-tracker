@@ -144,7 +144,7 @@ def bbox_intersection(x0, y0, x1, y1):
 @njit(cache=True)
 def create_vertice(x, y):
     nb = x.shape[0]
-    v = empty((nb, 2))
+    v = empty((nb, 2), dtype=x.dtype)
     for i in range(nb):
         v[i, 0] = x[i]
         v[i, 1] = y[i]
