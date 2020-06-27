@@ -48,8 +48,20 @@ from pint import UnitRegistry
 from ..observations.observation import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
 from .. import VAR_DESCR
-from ..generic import distance, interp2d_geo, fit_circle, uniform_resample, coordinates_to_local, local_to_coordinates
-from ..poly import poly_contain_poly, winding_number_grid_in_poly, winding_number_poly, create_vertice
+from ..generic import (
+    distance,
+    interp2d_geo,
+    fit_circle,
+    uniform_resample,
+    coordinates_to_local,
+    local_to_coordinates,
+)
+from ..poly import (
+    poly_contain_poly,
+    winding_number_grid_in_poly,
+    winding_number_poly,
+    create_vertice,
+)
 
 logger = logging.getLogger("pet")
 
@@ -183,6 +195,9 @@ def _get_pixel_in_unregular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop
     i_x += x_start
     i_y += y_start
     return i_x, i_y
+
+
+BasePath.fit_circle = fit_circle_path
 
 
 def pixels_in(self, grid):
