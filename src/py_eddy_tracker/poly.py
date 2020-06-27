@@ -115,8 +115,8 @@ def bbox_intersection(x0, y0, x1, y1):
     """
     nb0 = x0.shape[0]
     nb1 = x1.shape[0]
-    x1_min, y1_min = empty(nb1), empty(nb1)
-    x1_max, y1_max = empty(nb1), empty(nb1)
+    x1_min, y1_min = empty(nb1, dtype=x1.dtype), empty(nb1, dtype=x1.dtype)
+    x1_max, y1_max = empty(nb1, dtype=x1.dtype), empty(nb1, dtype=x1.dtype)
     for i1 in range(nb1):
         x1_min[i1], y1_min[i1] = x1[i1].min(), y1[i1].min()
         x1_max[i1], y1_max[i1] = x1[i1].max(), y1[i1].max()

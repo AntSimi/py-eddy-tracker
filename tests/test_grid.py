@@ -7,6 +7,7 @@ G = RegularGridDataset(get_path("mask_1_60.nc"), "lon", "lat")
 X = 0.025
 contour = Path(((-X, 0), (X, 0), (X, X), (-X, X), (-X, 0),))
 
+
 # contour
 def test_contour_lon():
     assert (contour.lon == (-X, X, X, -X, -X)).all()
@@ -43,4 +44,3 @@ def test_bounds():
     x0, x1, y0, y1 = G.bounds
     assert x0 == -1 / 120.0 and x1 == 360 - 1 / 120
     assert y0 == approx(-90 - 1 / 120.0) and y1 == approx(90 - 1 / 120)
-

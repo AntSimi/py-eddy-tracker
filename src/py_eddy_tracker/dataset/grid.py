@@ -100,7 +100,7 @@ BasePath.lat = lat
 def uniform_resample_stack(vertices, num_fac=2, fixed_size=None):
     x_val, y_val = vertices[:, 0], vertices[:, 1]
     x_new, y_new = uniform_resample(x_val, y_val, num_fac, fixed_size)
-    data = empty((x_new.shape[0], 2))
+    data = empty((x_new.shape[0], 2), dtype=vertices.dtype)
     data[:, 0] = x_new
     data[:, 1] = y_new
     return data

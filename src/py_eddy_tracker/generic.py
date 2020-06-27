@@ -120,7 +120,7 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
     y_step = y_g[1] - y_ref
     nb_x = x_g.shape[0]
     is_circular = (x_g[-1] + x_step) % 360 == x_g[0] % 360
-    z = empty(x.shape)
+    z = empty(x.shape, dtype=z_g.dtype)
     for i in prange(x.size):
         x_ = (x[i] - x_ref) / x_step
         y_ = (y[i] - y_ref) / y_step
