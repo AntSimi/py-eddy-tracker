@@ -48,6 +48,8 @@ from numpy import (
     ceil,
     arange,
     histogram2d,
+    linspace,
+    sin,
 )
 from netCDF4 import Dataset
 from datetime import datetime
@@ -58,7 +60,13 @@ from pint.errors import UndefinedUnitError
 from tokenize import TokenError
 from matplotlib.path import Path as BasePath
 from .. import VAR_DESCR, VAR_DESCR_inv
-from ..generic import distance_grid, distance, flatten_line_matrix, wrap_longitude
+from ..generic import (
+    distance_grid,
+    distance,
+    flatten_line_matrix,
+    wrap_longitude,
+    local_to_coordinates,
+)
 from ..poly import bbox_intersection, common_area, create_vertice
 
 logger = logging.getLogger("pet")
@@ -246,6 +254,23 @@ class EddiesObservations(object):
         new = self.add_fields(("type_cyc",))
         new.observations["type_cyc"] = self.sign_type
         return new
+
+    def circle_contour(self):
+        angle = radians(linspace(0, 360, self.track_array_variables))
+        x_norm, y_norm = cos(angle), sin(angle)
+        for i, obs in enumerate(self):
+            r_s, r_e, x, y = (
+                obs["radius_s"],
+                obs["radius_e"],
+                obs["lon"],
+                obs["lat"],
+            )
+            obs["contour_lon_s"], obs["contour_lat_s"] = local_to_coordinates(
+                x_norm * r_s, y_norm * r_s, x, y
+            )
+            obs["contour_lon_e"], obs["contour_lat_e"] = local_to_coordinates(
+                x_norm * r_e, y_norm * r_e, x, y
+            )
 
     @property
     def dtype(self):
