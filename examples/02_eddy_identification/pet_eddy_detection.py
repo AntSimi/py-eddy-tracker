@@ -93,7 +93,9 @@ ax.legend()
 update_axes(ax)
 
 # %%
-# Display detected eddies
+# Display detected eddies, dashed lines represent effective contour
+# and solid lines represent contour of maximum of speed. See figure 1 of https://doi.org/10.1175/JTECH-D-14-00019.1
+
 ax = start_axes("Eddies detected")
 a.display(ax, color="r", linewidth=0.5, label="Anticyclonic", ref=-10)
 c.display(ax, color="b", linewidth=0.5, label="Cyclonic", ref=-10)
