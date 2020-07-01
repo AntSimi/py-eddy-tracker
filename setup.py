@@ -4,6 +4,8 @@ from setuptools import setup, find_packages
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+with open("requirements.txt", "r") as fh:
+    requirements = fh.read().split("\n")
 
 setup(
     name="pyEddyTracker",
@@ -44,17 +46,5 @@ setup(
         "py_eddy_tracker.featured_tracking": ["*.nc"],
         "py_eddy_tracker": ["data/*.nc"],
     },
-    install_requires=[
-        "matplotlib",
-        "netCDF4>=1.1.0",
-        "numba",
-        "numpy>=1.14",
-        "opencv-python",
-        "pint",
-        "polygon3",
-        "pyproj",
-        "pyyaml",
-        "scipy>=0.15.1",
-        "zarr",
-    ],
+    install_requires=requirements,
 )
