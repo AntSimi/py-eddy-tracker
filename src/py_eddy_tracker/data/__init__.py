@@ -4,6 +4,7 @@ import io
 import tarfile
 import lzma
 
+
 def get_path(name):
     return path.join(path.dirname(__file__), name)
 

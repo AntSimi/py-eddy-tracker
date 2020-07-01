@@ -1471,7 +1471,8 @@ class RegularGridDataset(GridDataset):
             pws.append(pw)
         if nb_invalid:
             logger.warning("%d/%d columns invalid", nb_invalid, i + 1)
-        lat_content = 1 / f, array(pws).mean(axis=0)
+        with errstate(divide="ignore"):
+            lat_content = 1 / f, array(pws).mean(axis=0)
 
         # Lon spectrum
         fs, pws = list(), list()
@@ -1500,7 +1501,8 @@ class RegularGridDataset(GridDataset):
                 for f, pw in zip(fs, pws)
             ]
         ).mean(axis=0)
-        lon_content = 1 / f_interp, pw_m
+        with errstate(divide="ignore"):
+            lon_content = 1 / f_interp, pw_m
         if ref is None:
             return lon_content, lat_content
         else:
