@@ -30,11 +30,10 @@ def browse_dataset_in(
     sub_sampling_step=1,
     files=None,
 ):
+    pattern_regexp = re_compile(".*/" + date_regexp)
     if files is not None:
-        pattern_regexp = re_compile(".*/" + date_regexp)
         filenames = bytes_(files)
     else:
-        pattern_regexp = re_compile(".*/" + date_regexp)
         full_path = join_path(data_dir, files_model)
         logger.info("Search files : %s", full_path)
         filenames = bytes_(glob(full_path))
@@ -148,24 +147,21 @@ if __name__ == "__main__":
     if SAVE_DIR is not None and not exists(SAVE_DIR):
         mkdir(SAVE_DIR)
 
-    YAML_CORRESPONDANCES_IN = CONFIG["PATHS"].get("CORRESPONDANCES_IN", None)
     YAML_CORRESPONDANCES_OUT = CONFIG["PATHS"].get("CORRESPONDANCES_OUT", None)
     if CORRESPONDANCES_IN is None:
-        CORRESPONDANCES_IN = YAML_CORRESPONDANCES_IN
+        CORRESPONDANCES_IN = CONFIG["PATHS"].get("CORRESPONDANCES_IN", None)
     if CORRESPONDANCES_OUT is None:
         CORRESPONDANCES_OUT = YAML_CORRESPONDANCES_OUT
     if YAML_CORRESPONDANCES_OUT is None and CORRESPONDANCES_OUT is None:
         CORRESPONDANCES_OUT = "{path}/{sign_type}_correspondances.nc"
 
+    CLASS = None
     if "CLASS" in CONFIG:
+        CLASSNAME = CONFIG["CLASS"]["CLASS"]
         CLASS = getattr(
-            __import__(
-                CONFIG["CLASS"]["MODULE"], globals(), locals(), CONFIG["CLASS"]["CLASS"]
-            ),
-            CONFIG["CLASS"]["CLASS"],
+            __import__(CONFIG["CLASS"]["MODULE"], globals(), locals(), CLASSNAME),
+            CLASSNAME,
         )
-    else:
-        CLASS = None
 
     NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG.get("VIRTUAL_LENGTH_MAX", 0))
 
@@ -205,11 +201,10 @@ if __name__ == "__main__":
         class_method=CLASS,
         previous_correspondance=CORRESPONDANCES_IN,
     )
-
     CORRESPONDANCES.track()
     logger.info("Track finish")
-    logger.info("Start merging")
 
+    logger.info("Start merging")
     DATE_START, DATE_STOP = CORRESPONDANCES.period
     DICT_COMPLETION = dict(
         date_start=DATE_START,
