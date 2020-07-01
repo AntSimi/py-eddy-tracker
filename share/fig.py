@@ -1,5 +1,7 @@
 from matplotlib import pyplot as plt
 from py_eddy_tracker.dataset.grid import RegularGridDataset
+from datetime import datetime
+import logging
 
 grid_name, lon_name, lat_name = (
     "nrt_global_allsat_phy_l4_20190223_20190226.nc",
@@ -29,10 +31,7 @@ plt.colorbar(m, cax=fig.add_axes([0.94, 0.02, 0.01, 0.45]))
 fig.savefig("png/filter.png")
 
 
-import logging
-
 logging.getLogger().setLevel("DEBUG")  # Values: ERROR, WARNING, INFO, DEBUG
-from datetime import datetime
 
 h = RegularGridDataset(grid_name, lon_name, lat_name)
 h.bessel_high_filter("adt", 500, order=3)

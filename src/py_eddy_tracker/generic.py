@@ -185,7 +185,7 @@ def fit_circle(x_vec, y_vec):
     datas[:, 0] = 2.0 * (x_vec[1:] - x_mean) / scale
     datas[:, 1] = 2.0 * (y_vec[1:] - y_mean) / scale
 
-    (center_x, center_y, radius), residuals, rank, s = lstsq(datas, norme / norme_max)
+    (center_x, center_y, radius), _, _, _ = lstsq(datas, norme / norme_max)
 
     # Unscale data and get circle variables
     radius += center_x ** 2 + center_y ** 2

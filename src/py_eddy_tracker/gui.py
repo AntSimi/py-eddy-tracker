@@ -108,6 +108,10 @@ class GUI:
     def now(self):
         return self.settings["now"]
 
+    @now.setter
+    def now(self, value):
+        self.settings["now"] = value
+
     @property
     def period(self):
         return self.settings["period"]
@@ -115,6 +119,11 @@ class GUI:
     @property
     def bbox(self):
         return self.map.get_xlim(), self.map.get_ylim()
+
+    @bbox.setter
+    def bbox(self, values):
+        self.map.set_xlim(values[0], values[1])
+        self.map.set_ylim(values[2], values[3])
 
     def indexs(self, dataset):
         (x0, x1), (y0, y1) = self.bbox
