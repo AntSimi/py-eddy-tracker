@@ -58,6 +58,7 @@ from Polygon import Polygon
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
 from tokenize import TokenError
+from tarfile import ExFileObject
 from matplotlib.path import Path as BasePath
 from .. import VAR_DESCR, VAR_DESCR_inv
 from ..generic import (
@@ -431,8 +432,11 @@ class EddiesObservations(object):
 
     @classmethod
     def load_file(cls, filename, **kwargs):
-        end = b".zarr" if isinstance(filename, bytes) else ".zarr"
-        if filename.endswith(end):
+        filename_ = (
+            filename.filename if isinstance(filename, ExFileObject) else filename
+        )
+        end = b".zarr" if isinstance(filename_, bytes) else ".zarr"
+        if filename_.endswith(end):
             return cls.load_from_zarr(filename, **kwargs)
         else:
             return cls.load_from_netcdf(filename, **kwargs)
@@ -539,9 +543,14 @@ class EddiesObservations(object):
         cls, filename, raw_data=False, remove_vars=None, include_vars=None
     ):
         array_dim = "NbSample"
-        if not isinstance(filename, str):
+        if isinstance(filename, bytes):
             filename = filename.astype(str)
-        with Dataset(filename) as h_nc:
+        if isinstance(filename, ExFileObject):
+            filename.seek(0)
+            args, kwargs = ("in-mem-file",), dict(memory=filename.read())
+        else:
+            args, kwargs = (filename,), dict()
+        with Dataset(*args, **kwargs) as h_nc:
             var_list = list(h_nc.variables.keys())
             if include_vars is not None:
                 var_list = [i for i in var_list if i in include_vars]
