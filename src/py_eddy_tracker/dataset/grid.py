@@ -1213,57 +1213,26 @@ class RegularGridDataset(GridDataset):
             )
         return self._is_circular
 
-    def kernel_lanczos(self, lat, wave_length, order=1):
-        # Not really operational
-        # wave_length in km
-        # order must be int
+    @staticmethod
+    def check_order(order):
         if order < 1:
             logger.warning("order must be superior to 0")
-        order = ceil(order).astype(int)
-        # Estimate size of kernel
+        return ceil(order).astype(int)
+
+    def get_step_in_km(self, lat, wave_length):
         step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
         step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
-        # half size will be multiply with by order
-        half_x_pt, half_y_pt = (
-            ceil(wave_length / step_x_km).astype(int),
-            ceil(wave_length / step_y_km).astype(int),
-        )
-
-        y = arange(
-            lat - self.ystep * half_y_pt * order,
-            lat + self.ystep * half_y_pt * order + 0.01 * self.ystep,
-            self.ystep,
-        )
-        x = arange(
-            -self.xstep * half_x_pt * order,
-            self.xstep * half_x_pt * order + 0.01 * self.xstep,
-            self.xstep,
-        )
-
-        y, x = meshgrid(y, x)
-        dist_norm = distance(0, lat, x, y) / 1000.0 / wave_length
-
-        # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
-        kernel = sinc(dist_norm / order) * sinc(dist_norm)
-        kernel[dist_norm > order] = 0
-        return kernel
-
-    def kernel_bessel(self, lat, wave_length, order=1):
-        # wave_length in km
-        # order must be int
-        if order < 1:
-            logger.warning("order must be superior to 0")
-        order = ceil(order).astype(int)
-        # Estimate size of kernel
-        step_y_km = self.ystep * distance(0, 0, 0, 1) / 1000
-        step_x_km = self.xstep * distance(0, lat, 1, lat) / 1000
-        min_wave_length = max(step_x_km * 2, step_y_km * 2)
+        min_wave_length = max(step_x_km, step_y_km) * 2
         if wave_length < min_wave_length:
             logger.error(
                 "Wave_length too short for resolution, must be > %d km",
                 ceil(min_wave_length),
             )
             raise Exception()
+        return step_x_km, step_y_km
+
+    def estimate_kernel_shape(self, lat, wave_length, order):
+        step_x_km, step_y_km = self.get_step_in_km(lat, wave_length)
         # half size will be multiply with by order
         half_x_pt, half_y_pt = (
             ceil(wave_length / step_x_km).astype(int),
@@ -1279,11 +1248,9 @@ class RegularGridDataset(GridDataset):
         x = arange(0, self.xstep * half_x_pt * order + 0.01 * self.xstep, self.xstep)
         y, x = meshgrid(y, x)
         dist_norm = distance(0, lat, x, y) / 1000.0 / wave_length
-        # sinc(d_x) and sinc(d_y) are windows and bessel function give an equivalent of sinc for lanczos filter
-        with errstate(invalid="ignore"):
-            kernel = sinc(dist_norm / order) * j1(2 * pi * dist_norm) / dist_norm
-        kernel[0, half_y_pt * order] = pi
-        kernel[dist_norm > order] = 0
+        return half_x_pt, half_y_pt, dist_norm
+
+    def finalize_kernel(self, kernel, order, half_x_pt, half_y_pt):
         # Symetry
         kernel_ = empty((half_x_pt * 2 * order + 1, half_y_pt * 2 * order + 1))
         kernel_[half_x_pt * order :] = kernel
@@ -1295,6 +1262,33 @@ class RegularGridDataset(GridDataset):
         y_valid = where(k_valid.sum(axis=0))[0]
         y_slice = slice(y_valid[0], y_valid[-1] + 1)
         return kernel_[x_slice, y_slice]
+
+    def kernel_lanczos(self, lat, wave_length, order=1):
+        """Not really operational
+        wave_length in km
+        order must be int
+        """
+        order = self.check_order(order)
+        half_x_pt, half_y_pt, dist_norm = self.estimate_kernel_shape(
+            lat, wave_length, order
+        )
+        kernel = sinc(dist_norm / order) * sinc(dist_norm)
+        kernel[dist_norm > order] = 0
+        return self.finalize_kernel(kernel, order, half_x_pt, half_y_pt)
+
+    def kernel_bessel(self, lat, wave_length, order=1):
+        """wave_length in km
+        order must be int
+        """
+        order = self.check_order(order)
+        half_x_pt, half_y_pt, dist_norm = self.estimate_kernel_shape(
+            lat, wave_length, order
+        )
+        with errstate(invalid="ignore"):
+            kernel = sinc(dist_norm / order) * j1(2 * pi * dist_norm) / dist_norm
+        kernel[0, half_y_pt * order] = pi
+        kernel[dist_norm > order] = 0
+        return self.finalize_kernel(kernel, order, half_x_pt, half_y_pt)
 
     def _low_filter(self, grid_name, w_cut, **kwargs):
         """low filtering
@@ -1391,6 +1385,7 @@ class RegularGridDataset(GridDataset):
     def lanczos_high_filter(
         self, grid_name, wave_length, order=1, lat_max=85, **kwargs
     ):
+        logger.warning("It could be not safe to use lanczos filter")
         data_out = self.convolve_filter_with_dynamic_kernel(
             grid_name,
             self.kernel_lanczos,
@@ -1402,6 +1397,7 @@ class RegularGridDataset(GridDataset):
         self.vars[grid_name] -= data_out
 
     def lanczos_low_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
+        logger.warning("It could be not safe to use lanczos filter")
         data_out = self.convolve_filter_with_dynamic_kernel(
             grid_name,
             self.kernel_lanczos,

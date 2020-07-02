@@ -10,6 +10,7 @@ We code a specific filter in order to filter grid with same wavelength at each p
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker import data
 from matplotlib import pyplot as plt
+from numpy import arange
 
 
 def start_axes(title):
@@ -35,11 +36,11 @@ g = RegularGridDataset(
 # %%
 # Kernel
 # ------
-# Shape of kernel will increase in x when latitude increase
+# Shape of kernel will increase in x, when latitude increase
 fig = plt.figure(figsize=(12, 8))
 for i, latitude in enumerate((15, 35, 55, 75)):
     k = g.kernel_bessel(latitude, 500, order=3).T
-    ax0 = plt.subplot(
+    ax0 = fig.add_subplot(
         2,
         2,
         i + 1,
@@ -48,6 +49,26 @@ for i, latitude in enumerate((15, 35, 55, 75)):
     )
     m = ax0.pcolormesh(k, vmin=-0.5, vmax=2, cmap="viridis_r")
 plt.colorbar(m, cax=fig.add_axes((0.92, 0.05, 0.01, 0.9)))
+
+# %%
+# Kernel along latitude
+
+fig = plt.figure(figsize=(12, 8))
+ax = fig.add_subplot(
+    111,
+    ylabel="Kernel weight",
+    xlabel="Latitude in °",
+    title="Kernel in latitude, centered at 0° of latitude ",
+)
+k = g.kernel_bessel(0, 500, order=3)
+k_lat = k[k.shape[0] // 2 + 1]
+nb = k_lat.shape[0] // 2
+ax.plot(
+    arange(-nb * g.xstep, (nb + 0.5) * g.xstep, g.xstep), k_lat, label="Bessel kernel"
+)
+
+ax.legend()
+ax.grid()
 
 # %%
 # Kernel applying
@@ -62,17 +83,17 @@ update_axes(ax, m)
 #
 # Low frequency
 ax = start_axes("ADT low frequency")
-g.copy("adt", "adt_low")
-g.bessel_low_filter("adt_low", 300, order=3)
-m = g.display(ax, "adt_low", vmin=-0.15, vmax=0.15)
+g.copy("adt", "adt_low_300")
+g.bessel_low_filter("adt_low_300", 300, order=3)
+m = g.display(ax, "adt_low_300", vmin=-0.15, vmax=0.15)
 update_axes(ax, m)
 
 # %%
 # High frequency
 ax = start_axes("ADT high frequency")
-g.copy("adt", "adt_high")
-g.bessel_high_filter("adt_high", 300, order=3)
-m = g.display(ax, "adt_high", vmin=-0.15, vmax=0.15)
+g.copy("adt", "adt_high_300")
+g.bessel_high_filter("adt_high_300", 300, order=3)
+m = g.display(ax, "adt_high_300", vmin=-0.15, vmax=0.15)
 update_axes(ax, m)
 
 # %%
@@ -80,10 +101,10 @@ update_axes(ax, m)
 # -----
 # wavelength : 80km
 
-g.copy("adt", "adt_high_80")
-g.bessel_high_filter("adt_high_80", 80, order=3)
-g.copy("adt", "adt_low_80")
-g.bessel_low_filter("adt_low_80", 80, order=3)
+g.copy("adt", "adt_high_bessel")
+g.bessel_high_filter("adt_high_bessel", 80, order=3)
+g.copy("adt", "adt_low_bessel")
+g.bessel_low_filter("adt_low_bessel", 80, order=3)
 
 area = dict(llcrnrlon=11.75, urcrnrlon=21, llcrnrlat=33, urcrnrlat=36.75)
 
@@ -94,17 +115,12 @@ ax = fig.add_subplot(111)
 ax.set_title("Spectrum")
 ax.set_xlabel("km")
 
-lon_spec, lat_spec = g.spectrum_lonlat("adt", area=area)
-mappable = ax.loglog(*lat_spec, label="lat raw")[0]
-ax.loglog(*lon_spec, label="lon raw", color=mappable.get_color(), linestyle="--")
-
-lon_spec, lat_spec = g.spectrum_lonlat("adt_high_80", area=area)
-mappable = ax.loglog(*lat_spec, label="lat high")[0]
-ax.loglog(*lon_spec, label="lon high", color=mappable.get_color(), linestyle="--")
-
-lon_spec, lat_spec = g.spectrum_lonlat("adt_low_80", area=area)
-mappable = ax.loglog(*lat_spec, label="lat low")[0]
-ax.loglog(*lon_spec, label="lon low", color=mappable.get_color(), linestyle="--")
+for label in ("adt_high_bessel", "adt_low_bessel", "adt"):
+    lon_spec, lat_spec = g.spectrum_lonlat(label, area=area)
+    mappable = ax.loglog(*lat_spec, label=f"lat {label}")[0]
+    ax.loglog(
+        *lon_spec, label=f"lon {label}", color=mappable.get_color(), linestyle="--"
+    )
 
 ax.set_xlim(10, 1000)
 ax.set_ylim(1e-6, 1)
@@ -119,17 +135,10 @@ ax = fig.add_subplot(111)
 ax.set_title("Spectrum ratio")
 ax.set_xlabel("km")
 
-lon_spec, lat_spec = g.spectrum_lonlat(
-    "adt_high_80", area=area, ref=g, ref_grid_name="adt"
-)
-mappable = ax.plot(*lat_spec, label="lat high")[0]
-ax.plot(*lon_spec, label="lon high", color=mappable.get_color(), linestyle="--")
-
-lon_spec, lat_spec = g.spectrum_lonlat(
-    "adt_low_80", area=area, ref=g, ref_grid_name="adt"
-)
-mappable = ax.plot(*lat_spec, label="lat low")[0]
-ax.plot(*lon_spec, label="lon low", color=mappable.get_color(), linestyle="--")
+for label in ("adt_high_bessel", "adt_low_bessel"):
+    lon_spec, lat_spec = g.spectrum_lonlat(label, area=area, ref=g, ref_grid_name="adt")
+    mappable = ax.plot(*lat_spec, label=f"lat {label}")[0]
+    ax.plot(*lon_spec, label=f"lon {label}", color=mappable.get_color(), linestyle="--")
 
 ax.set_xlim(10, 1000)
 ax.set_ylim(0, 1)
@@ -141,4 +150,3 @@ ax.grid()
 # Old filter
 # ----------
 # To do ...
-

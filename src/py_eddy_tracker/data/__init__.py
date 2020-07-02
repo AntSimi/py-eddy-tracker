@@ -11,8 +11,9 @@ def get_path(name):
 
 def get_remote_sample(path):
     url = (
-    f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}.tar.xz"
+        f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}.tar.xz"
     )
+
     content = requests.get(url).content
 
     # Tar module could manage lzma tar, but it will apply un compress for each extractfile

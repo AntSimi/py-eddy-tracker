@@ -10,20 +10,7 @@ This example didn't replace EddyTracking, we remove check that application do an
 from py_eddy_tracker.data import get_remote_sample
 from py_eddy_tracker.tracking import Correspondances
 from py_eddy_tracker.featured_tracking.area_tracker import AreaTracker
-from numpy import where, empty
 from py_eddy_tracker.gui import GUI
-
-
-# %%
-# Function to have track with contiguous longitude
-def wrap_longitude(eddies):
-    lon = eddies.longitude
-    first = where(eddies.obs["n"] == 0)[0]
-    nb_obs = empty(first.shape, dtype="u4")
-    nb_obs[:-1] = first[1:] - first[:-1]
-    nb_obs[-1] = lon.shape[0] - first[-1]
-    lon0 = (lon[first] - 180).repeat(nb_obs)
-    lon[:] = (lon - lon0) % 360 + lon0
 
 
 # %%
@@ -34,20 +21,22 @@ file_objects = get_remote_sample(
 
 # %%
 # We run a traking with a tracker which use contour overlap
-c = Correspondances(datasets=file_objects, class_method=AreaTracker)
+c = Correspondances(datasets=file_objects, class_method=AreaTracker, virtual=3)
 c.track()
 c.prepare_merging()
 # We have now an eddy object
 eddies_area_tracker = c.merge(raw_data=False)
-wrap_longitude(eddies_area_tracker)
+eddies_area_tracker["virtual"][:] = eddies_area_tracker["time"] == 0
+eddies_area_tracker.filled_by_interpolation(eddies_area_tracker["virtual"] == 1)
 
 # %%
 # We run a traking with default tracker
-c = Correspondances(datasets=file_objects)
+c = Correspondances(datasets=file_objects, virtual=3)
 c.track()
 c.prepare_merging()
 eddies_default_tracker = c.merge(raw_data=False)
-wrap_longitude(eddies_default_tracker)
+eddies_default_tracker["virtual"][:] = eddies_default_tracker["time"] == 0
+eddies_default_tracker.filled_by_interpolation(eddies_default_tracker["virtual"] == 1)
 
 # %%
 # Start GUI to compare tracking
