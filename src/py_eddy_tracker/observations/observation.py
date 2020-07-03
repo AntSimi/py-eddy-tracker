@@ -67,6 +67,7 @@ from ..generic import (
     flatten_line_matrix,
     wrap_longitude,
     local_to_coordinates,
+    reverse_index
 )
 from ..poly import bbox_intersection, common_area, create_vertice
 
@@ -412,9 +413,11 @@ class EddiesObservations(object):
             raw_data=eddies.raw_data,
         )
 
-    def index(self, index):
+    def index(self, index, reverse=False):
         """Return obs from self at the index
         """
+        if reverse:
+            index = reverse_index(index, len(self))
         size = 1
         if hasattr(index, "__iter__"):
             size = len(index)
@@ -742,7 +745,7 @@ class EddiesObservations(object):
             else ("contour_lon_e", "contour_lat_e")
         )
 
-    def match(self, other, intern=False):
+    def match(self, other, intern=False, cmin=0):
         """return index and score compute with area
         """
         x_name, y_name = self.intern(intern)
@@ -752,7 +755,7 @@ class EddiesObservations(object):
         c = common_area(
             self[x_name][i], self[y_name][i], other[x_name][j], other[y_name][j]
         )
-        m = c > 0
+        m = c > cmin
         return i[m], j[m], c[m]
 
     @classmethod

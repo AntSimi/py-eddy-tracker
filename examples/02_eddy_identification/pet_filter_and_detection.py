@@ -7,7 +7,6 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker import data
-from py_eddy_tracker.generic import reverse_index
 from numpy import arange
 
 
@@ -83,10 +82,7 @@ ax_a.legend()
 # Match detection and compare
 # ---------------------------
 
-i, j, c = merge_f.match(merge_r)
-m = c > 0.1
-i_, j_ = i[m], j[m]
-
+i_, j_, c = merge_f.match(merge_r, 0.1)
 
 # %%
 # where is lonely eddies
@@ -94,8 +90,8 @@ kwargs_f = dict(lw=1.5, label="Lonely eddy from filtered grid", ref=-10, color="
 kwargs_r = dict(lw=1.5, label="Lonely eddy from raw grid", ref=-10, color="r")
 ax = start_axes("Eddies with no match, over filtered ADT")
 mappable = g.display(ax, "adt_high", vmin=-0.15, vmax=0.15)
-merge_f.index(reverse_index(i_, len(merge_f))).display(ax, **kwargs_f)
-merge_r.index(reverse_index(j_, len(merge_r))).display(ax, **kwargs_r)
+merge_f.index(i_, reverse=True).display(ax, **kwargs_f)
+merge_r.index(j_, reverse=True).display(ax, **kwargs_r)
 ax.legend()
 update_axes(ax, mappable)
 
@@ -104,14 +100,14 @@ ax.set_xlim(25, 36), ax.set_ylim(31, 35.25)
 mappable = g.display(ax, "adt_high", vmin=-0.15, vmax=0.15)
 u, v = g.grid("u").T, g.grid("v").T
 ax.quiver(g.x_c, g.y_c, u, v, scale=10, pivot="mid", color="gray")
-merge_f.index(reverse_index(i_, len(merge_f))).display(ax, **kwargs_f)
-merge_r.index(reverse_index(j_, len(merge_r))).display(ax, **kwargs_r)
+merge_f.index(i_, reverse=True).display(ax, **kwargs_f)
+merge_r.index(j_, reverse=True).display(ax, **kwargs_r)
 ax.legend()
 update_axes(ax, mappable)
 
 # %%
 fig = plt.figure(figsize=(12, 12))
-fig.suptitle(f"Scatter plot ({m.sum()} matches)")
+fig.suptitle(f"Scatter plot ({i_.shape[0]} matches)")
 
 for i, (label, field, factor, stop) in enumerate(
     (
