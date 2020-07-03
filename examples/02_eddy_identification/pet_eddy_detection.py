@@ -40,6 +40,8 @@ m = g.display(ax, "adt", vmin=-0.15, vmax=0.15)
 update_axes(ax, m)
 
 # %%
+# Get u/v
+# -------
 # U/V are deduced from ADT, this algortihm are not usable around equator (~+- 2°)
 g.add_uv("adt")
 ax = start_axes("U/V deduce from ADT (m)")
@@ -50,14 +52,18 @@ ax.quiver(g.x_c, g.y_c, u, v, scale=10)
 update_axes(ax, m)
 
 # %%
+# Pre-processings
+# ---------------
 # Apply high filter to remove long scale to highlight mesoscale
-g.bessel_high_filter("adt", 500, order=2)
-ax = start_axes("ADT (m) filtered (500km, order 2)")
+g.bessel_high_filter("adt", 500)
+ax = start_axes("ADT (m) filtered (500km)")
 m = g.display(ax, "adt", vmin=-0.15, vmax=0.15)
 update_axes(ax, m)
 
 # %%
-#  Run identification with slice of 2 mm
+# Identification
+# --------------
+# run identification with slice of 2 mm
 date = datetime(2016, 5, 15)
 a, c = g.eddy_identification("adt", "u", "v", date, 0.002)
 
@@ -93,6 +99,8 @@ ax.legend()
 update_axes(ax)
 
 # %%
+# Output
+# ------
 # Display detected eddies, dashed lines represent effective contour
 # and solid lines represent contour of maximum of speed. See figure 1 of https://doi.org/10.1175/JTECH-D-14-00019.1
 

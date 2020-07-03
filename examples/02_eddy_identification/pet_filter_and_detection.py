@@ -7,6 +7,7 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker import data
+from py_eddy_tracker.generic import reverse_index
 from numpy import arange
 
 
@@ -35,7 +36,7 @@ g = RegularGridDataset(
 g.add_uv("adt")
 g.copy("adt", "adt_high")
 wavelength = 400
-g.bessel_high_filter("adt_high", wavelength, order=3)
+g.bessel_high_filter("adt_high", wavelength)
 date = datetime(2016, 5, 15)
 
 # %%
@@ -60,7 +61,6 @@ update_axes(ax, m)
 fig = plt.figure(figsize=(12, 5))
 ax_a = plt.subplot(121, xlabel="amplitdue(cm)")
 ax_r = plt.subplot(122, xlabel="speed radius (km)")
-ax_a.grid(), ax_r.grid()
 ax_a.hist(
     merge_f["amplitude"] * 100,
     bins=arange(0.0005, 100, 1),
@@ -86,15 +86,39 @@ ax_a.legend()
 i, j, c = merge_f.match(merge_r)
 m = c > 0.1
 i_, j_ = i[m], j[m]
+
+
+# %%
+# where is lonely eddies
+kwargs_f = dict(lw=1.5, label="Lonely eddy from filtered grid", ref=-10, color="k")
+kwargs_r = dict(lw=1.5, label="Lonely eddy from raw grid", ref=-10, color="r")
+ax = start_axes("Eddies with no match, over filtered ADT")
+mappable = g.display(ax, "adt_high", vmin=-0.15, vmax=0.15)
+merge_f.index(reverse_index(i_, len(merge_f))).display(ax, **kwargs_f)
+merge_r.index(reverse_index(j_, len(merge_r))).display(ax, **kwargs_r)
+ax.legend()
+update_axes(ax, mappable)
+
+ax = start_axes("Eddies with no match, over filtered ADT (zoom)")
+ax.set_xlim(25, 36), ax.set_ylim(31, 35.25)
+mappable = g.display(ax, "adt_high", vmin=-0.15, vmax=0.15)
+u, v = g.grid("u").T, g.grid("v").T
+ax.quiver(g.x_c, g.y_c, u, v, scale=10, pivot="mid", color="gray")
+merge_f.index(reverse_index(i_, len(merge_f))).display(ax, **kwargs_f)
+merge_r.index(reverse_index(j_, len(merge_r))).display(ax, **kwargs_r)
+ax.legend()
+update_axes(ax, mappable)
+
+# %%
 fig = plt.figure(figsize=(12, 12))
-fig.suptitle(f"Scatter plot of speed_radius(km) ({m.sum()} matches)")
+fig.suptitle(f"Scatter plot ({m.sum()} matches)")
 
 for i, (label, field, factor, stop) in enumerate(
-    zip(
-        ("speed radius (km)", "outter radius (km)", "amplitude (cm)"),
-        ("radius_s", "radius_e", "amplitude"),
-        (0.001, 0.001, 100),
-        (80, 120, 25),
+    (
+        ("speed radius (km)", "radius_s", 0.001, 80),
+        ("outter radius (km)", "radius_e", 0.001, 120),
+        ("amplitude (cm)", "amplitude", 100, 25),
+        ("speed max (cm/s)", "speed_average", 100, 25),
     )
 ):
     ax = fig.add_subplot(

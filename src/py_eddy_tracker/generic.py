@@ -37,8 +37,16 @@ from numpy import (
     where,
     isnan,
 )
-from numba import njit, prange
+from numba import njit, prange, types as numba_types
 from numpy.linalg import lstsq
+
+
+@njit(cache=True)
+def reverse_index(index, nb):
+    m = ones(nb, dtype=numba_types.bool_)
+    for i in index:
+        m[i] = False
+    return where(m)[0]
 
 
 @njit(cache=True, fastmath=True, parallel=False)
