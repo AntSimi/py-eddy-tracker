@@ -21,11 +21,12 @@ Email: evanmason@gmail.com
 ===========================================================================
 """
 
-from numpy import arange
+from numpy import arange, empty
 from matplotlib import pyplot
 from netCDF4 import Dataset
 from matplotlib.collections import LineCollection
 from py_eddy_tracker.poly import create_vertice
+from py_eddy_tracker.generic import flatten_line_matrix
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
@@ -61,8 +62,118 @@ def merge_eddies():
     obs.write_file(filename=args.out)
 
 
+class Anim:
+    def __init__(self, eddy, intern, **kwargs):
+        self.eddy = eddy
+        x_name, y_name = eddy.intern(intern)
+        self.t, self.x, self.y = eddy.time, eddy[x_name], eddy[y_name]
+        self.pause = False
+        self.period = self.eddy.period
+        self.setup(**kwargs)
+
+    def setup(self, cmap="jet", nb_step=25):
+        cmap = pyplot.get_cmap(cmap)
+        self.colors = cmap(arange(nb_step + 1) / nb_step)
+        self.nb_step = nb_step
+
+        x_min, x_max = self.x.min(), self.x.max()
+        d_x = x_max - x_min
+        x_min -= 0.05 * d_x
+        x_max += 0.05 * d_x
+        y_min, y_max = self.y.min(), self.y.max()
+        d_y = y_max - y_min
+        y_min -= 0.05 * d_y
+        y_max += 0.05 * d_y
+
+        # plot
+        self.fig = pyplot.figure()
+        self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9))
+        self.ax.set_xlim(x_min, x_max), self.ax.set_ylim(y_min, y_max)
+        self.ax.set_aspect("equal")
+        self.ax.grid()
+        # init mappable
+        self.txt = self.ax.text(
+            x_min + 0.05 * d_x,
+            y_min + 0.05 * d_y,
+            "",
+            zorder=10,
+            bbox=dict(facecolor="w", alpha=0.85),
+        )
+        self.contour = LineCollection([], zorder=1)
+        self.ax.add_collection(self.contour)
+
+        self.fig.canvas.draw()
+        self.fig.canvas.mpl_connect("key_press_event", self.keyboard)
+
+    def show(self, sleep_event=0.1, infinity_loop=False):
+        pyplot.show(block=False)
+        # save background for future bliting
+        self.bg_cache = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        loop = True
+        t0, t1 = self.period
+        while loop:
+            self.segs = list()
+            self.now = t0
+            while True:
+                if not self.pause:
+                    self.next()
+                self.fig.canvas.start_event_loop(sleep_event)
+                if self.now > t1:
+                    break
+            if infinity_loop:
+                self.fig.canvas.start_event_loop(0.5)
+            else:
+                loop = False
+
+    def next(self):
+        self.now += 1
+        return self.draw_contour()
+
+    def prev(self):
+        self.now -= 1
+        return self.draw_contour()
+
+    def draw_contour(self):
+        t0, t1 = self.period
+        # select contour for this time step
+        m = self.t == self.now
+        self.ax.figure.canvas.restore_region(self.bg_cache)
+        if m.sum():
+            self.segs.append(
+                create_vertice(
+                    flatten_line_matrix(self.x[m]), flatten_line_matrix(self.y[m])
+                )
+            )
+        else:
+            self.segs.append(empty((0, 2)))
+        self.contour.set_paths(self.segs)
+        self.contour.set_color(self.colors[-len(self.segs) :])
+        self.txt.set_text(f"{t0} -> {self.now} -> {t1}")
+        self.ax.draw_artist(self.contour)
+        self.ax.draw_artist(self.txt)
+        # Remove first segment to keep only T contour
+        if len(self.segs) > self.nb_step:
+            self.segs.pop(0)
+        # paint updated artist
+        self.ax.figure.canvas.blit(self.ax.bbox)
+
+    def keyboard(self, event):
+        if event.key == "escape":
+            exit()
+        elif event.key == " ":
+            self.pause = not self.pause
+        elif event.key == "right" and self.pause:
+            self.next()
+        elif event.key == "left" and self.pause:
+            self.segs.pop(-1)
+            self.segs.pop(-1)
+            self.prev()
+
+
 def anim():
-    parser = EddyParser("Merge eddies")
+    parser = EddyParser(
+        "Anim eddy, keyboard shortcut : Escape => exit, SpaceBar => pause, left arrow => t - 1, right arrow => t + 1"
+    )
     parser.add_argument("filename", help="eddy atlas")
     parser.add_argument("id", help="Track id to anim", type=int)
     parser.add_argument(
@@ -87,68 +198,5 @@ def anim():
 
     atlas = TrackEddiesObservations.load_file(args.filename)
     eddy = atlas.extract_ids([args.id])
-    x_name, y_name = eddy.intern(args.intern)
-    t0, t1 = eddy.period
-    t, x, y = eddy.time, eddy[x_name], eddy[y_name]
-    x_min, x_max = x.min(), x.max()
-    d_x = x_max - x_min
-    x_min -= 0.05 * d_x
-    x_max += 0.05 * d_x
-    y_min, y_max = y.min(), y.max()
-    d_y = y_max - y_min
-    y_min -= 0.05 * d_y
-    y_max += 0.05 * d_y
-
-    # General value
-    cmap = pyplot.get_cmap(args.cmap)
-    colors = cmap(arange(args.keep_step + 1) / args.keep_step)
-
-    # plot
-    fig = pyplot.figure()
-    # manager = plt.get_current_fig_manager()
-    # fig.window.showMaximized()
-    ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_aspect("equal")
-    ax.grid()
-    # # init mappable
-    txt = ax.text(16.6, 36.8, "", zorder=10)
-    c = LineCollection([], zorder=1)
-    ax.add_collection(c)
-
-    fig.canvas.draw()
-    fig.canvas.mpl_connect("key_press_event", keyboard)
-    pyplot.show(block=False)
-    # save background for future bliting
-    bg_cache = fig.canvas.copy_from_bbox(ax.bbox)
-    loop = True
-    while loop:
-        segs = list()
-        # display contour every day
-        for t_ in range(t0, t1 + 1, 1):
-            fig.canvas.restore_region(bg_cache)
-            # select contour for this time step
-            m = t == t_
-            if m.sum():
-                segs.append(create_vertice(x[m][0], y[m][0]))
-                c.set_paths(segs)
-                c.set_color(colors[-len(segs) :])
-                txt.set_text(f"{t0} -> {t_} -> {t1}")
-                ax.draw_artist(c)
-                ax.draw_artist(txt)
-                # Remove first segment to keep only T contour
-                if len(segs) > args.keep_step:
-                    segs.pop(0)
-                # paint updated artist
-                fig.canvas.blit(ax.bbox)
-            fig.canvas.start_event_loop(args.time_sleep)
-        if args.infinity_loop:
-            fig.canvas.start_event_loop(0.5)
-        else:
-            loop = False
-
-
-def keyboard(event):
-    if event.key == "escape":
-        exit()
+    a = Anim(eddy, intern=args.intern, cmap=args.cmap, nb_step=args.keep_step)
+    a.show(sleep_event=args.time_sleep, infinity_loop=args.infinity_loop)
