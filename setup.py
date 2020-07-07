@@ -40,6 +40,7 @@ setup(
         console_scripts=[
             "MergeEddies = py_eddy_tracker.appli:merge_eddies",
             "EddyNetworkGroup = py_eddy_tracker.network:build_network",
+            "EddyAnim = py_eddy_tracker.appli:anim"
         ]
     ),
     package_data={
