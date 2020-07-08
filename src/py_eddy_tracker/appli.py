@@ -73,7 +73,7 @@ class Anim:
         self.sleep_event = sleep_event
         self.setup(**kwargs)
 
-    def setup(self, cmap="jet", nb_step=25):
+    def setup(self, cmap="jet", nb_step=25, figsize=(8, 6)):
         cmap = pyplot.get_cmap(cmap)
         self.colors = cmap(arange(nb_step + 1) / nb_step)
         self.nb_step = nb_step
@@ -88,7 +88,7 @@ class Anim:
         y_max += 0.05 * d_y
 
         # plot
-        self.fig = pyplot.figure()
+        self.fig = pyplot.figure(figsize=figsize)
         self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9))
         self.ax.set_xlim(x_min, x_max), self.ax.set_ylim(y_min, y_max)
         self.ax.set_aspect("equal")
@@ -113,6 +113,7 @@ class Anim:
     def show(self, infinity_loop=False):
         pyplot.show(block=False)
         # save background for future bliting
+        self.fig.canvas.draw()
         self.bg_cache = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         loop = True
         t0, t1 = self.period
