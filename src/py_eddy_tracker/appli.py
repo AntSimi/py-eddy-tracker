@@ -25,6 +25,7 @@ from numpy import arange, empty
 from matplotlib import pyplot
 from netCDF4 import Dataset
 from matplotlib.collections import LineCollection
+from datetime import datetime
 from py_eddy_tracker.poly import create_vertice
 from py_eddy_tracker.generic import flatten_line_matrix
 from py_eddy_tracker import EddyParser
@@ -63,12 +64,13 @@ def merge_eddies():
 
 
 class Anim:
-    def __init__(self, eddy, intern, **kwargs):
+    def __init__(self, eddy, intern=False, sleep_event=0.1, **kwargs):
         self.eddy = eddy
         x_name, y_name = eddy.intern(intern)
         self.t, self.x, self.y = eddy.time, eddy[x_name], eddy[y_name]
         self.pause = False
         self.period = self.eddy.period
+        self.sleep_event = sleep_event
         self.setup(**kwargs)
 
     def setup(self, cmap="jet", nb_step=25):
@@ -99,13 +101,16 @@ class Anim:
             zorder=10,
             bbox=dict(facecolor="w", alpha=0.85),
         )
+        self.display_speed = self.ax.text(
+            x_min + 0.02 * d_x, y_max - 0.04 * d_y, "", fontsize=10
+        )
         self.contour = LineCollection([], zorder=1)
         self.ax.add_collection(self.contour)
 
         self.fig.canvas.draw()
         self.fig.canvas.mpl_connect("key_press_event", self.keyboard)
 
-    def show(self, sleep_event=0.1, infinity_loop=False):
+    def show(self, infinity_loop=False):
         pyplot.show(block=False)
         # save background for future bliting
         self.bg_cache = self.fig.canvas.copy_from_bbox(self.ax.bbox)
@@ -115,9 +120,17 @@ class Anim:
             self.segs = list()
             self.now = t0
             while True:
+                dt = self.sleep_event
                 if not self.pause:
+                    d0 = datetime.now()
                     self.next()
-                self.fig.canvas.start_event_loop(sleep_event)
+                    dt_draw = (datetime.now() - d0).total_seconds()
+                    dt = self.sleep_event - dt_draw
+                    if dt < 0:
+                        self.sleep_event = dt_draw * 1.01
+                        dt = 1e-10
+                self.fig.canvas.start_event_loop(dt)
+
                 if self.now > t1:
                     break
             if infinity_loop:
@@ -149,8 +162,10 @@ class Anim:
         self.contour.set_paths(self.segs)
         self.contour.set_color(self.colors[-len(self.segs) :])
         self.txt.set_text(f"{t0} -> {self.now} -> {t1}")
+        self.display_speed.set_text(f"{1/self.sleep_event:.0f} frame/s")
         self.ax.draw_artist(self.contour)
         self.ax.draw_artist(self.txt)
+        self.ax.draw_artist(self.display_speed)
         # Remove first segment to keep only T contour
         if len(self.segs) > self.nb_step:
             self.segs.pop(0)
@@ -162,6 +177,10 @@ class Anim:
             exit()
         elif event.key == " ":
             self.pause = not self.pause
+        elif event.key == "+":
+            self.sleep_event *= 0.9
+        elif event.key == "-":
+            self.sleep_event *= 1.1
         elif event.key == "right" and self.pause:
             self.next()
         elif event.key == "left" and self.pause:
@@ -172,7 +191,8 @@ class Anim:
 
 def anim():
     parser = EddyParser(
-        "Anim eddy, keyboard shortcut : Escape => exit, SpaceBar => pause, left arrow => t - 1, right arrow => t + 1"
+        """Anim eddy, keyboard shortcut : Escape => exit, SpaceBar => pause,
+        left arrow => t - 1, right arrow => t + 1, + => speed increase of 10 %, - => speed decrease of 10 %"""
     )
     parser.add_argument("filename", help="eddy atlas")
     parser.add_argument("id", help="Track id to anim", type=int)
@@ -195,8 +215,16 @@ def anim():
         "--infinity_loop", action="store_true", help="Press Escape key to stop loop"
     )
     args = parser.parse_args()
+    variables = ["time", "track"]
+    variables.extend(TrackEddiesObservations.intern(args.intern, public_label=True))
 
-    atlas = TrackEddiesObservations.load_file(args.filename)
+    atlas = TrackEddiesObservations.load_file(args.filename, include_vars=variables)
     eddy = atlas.extract_ids([args.id])
-    a = Anim(eddy, intern=args.intern, cmap=args.cmap, nb_step=args.keep_step)
-    a.show(sleep_event=args.time_sleep, infinity_loop=args.infinity_loop)
+    a = Anim(
+        eddy,
+        intern=args.intern,
+        sleep_event=args.time_sleep,
+        cmap=args.cmap,
+        nb_step=args.keep_step,
+    )
+    a.show(infinity_loop=args.infinity_loop)
