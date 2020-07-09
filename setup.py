@@ -25,22 +25,28 @@ setup(
     packages=find_packages("src"),
     package_dir={"": "src"},
     scripts=[
-        "src/scripts/GridFiltering",
         "src/scripts/EddyId",
         "src/scripts/EddySubSetter",
         "src/scripts/EddyTranslate",
         "src/scripts/EddyTracking",
         "src/scripts/EddyFinalTracking",
         "src/scripts/EddyMergeCorrespondances",
-        "src/scripts/ZarrDump",
         "src/scripts/GUIEddy",
     ],
     zip_safe=False,
     entry_points=dict(
         console_scripts=[
-            "MergeEddies = py_eddy_tracker.appli:merge_eddies",
-            "EddyNetworkGroup = py_eddy_tracker.network:build_network",
-            "EddyAnim = py_eddy_tracker.appli:anim"
+            # grid
+            "GridFiltering = py_eddy_tracker.appli.grid:grid_filtering",
+            # eddies
+            "MergeEddies = py_eddy_tracker.appli.eddies:merge_eddies",
+            # network
+            "EddyNetworkGroup = py_eddy_tracker.appli.network:build_network",
+            "EddyNetworkBuildPath = py_eddy_tracker.appli.network:divide_network",
+            # anim/gui
+            "EddyAnim = py_eddy_tracker.appli.gui:anim",
+            # misc
+            "ZarrDump = py_eddy_tracker.appli.misc:zarrdump",
         ]
     ),
     package_data={

@@ -69,7 +69,7 @@ from ..generic import (
     local_to_coordinates,
     reverse_index
 )
-from ..poly import bbox_intersection, common_area, create_vertice
+from ..poly import bbox_intersection, vertice_overlap, create_vertice
 
 logger = logging.getLogger("pet")
 
@@ -755,7 +755,7 @@ class EddiesObservations(object):
         i, j = bbox_intersection(
             self[x_name], self[y_name], other[x_name], other[y_name]
         )
-        c = common_area(
+        c = vertice_overlap(
             self[x_name][i], self[y_name][i], other[x_name][j], other[y_name][j]
         )
         m = c > cmin
