@@ -738,12 +738,15 @@ class EddiesObservations(object):
         return next_obs
 
     @staticmethod
-    def intern(flag):
-        return (
+    def intern(flag, public_label=False):
+        labels = (
             ("contour_lon_s", "contour_lat_s")
             if flag
             else ("contour_lon_e", "contour_lat_e")
         )
+        if public_label:
+            labels = [VAR_DESCR[label]['nc_name'] for label in labels]
+        return labels
 
     def match(self, other, intern=False, cmin=0):
         """return index and score compute with area

@@ -36,6 +36,7 @@ from numpy import (
     interp,
     where,
     isnan,
+    bool_,
 )
 from numba import njit, prange, types as numba_types
 from numpy.linalg import lstsq
@@ -289,6 +290,37 @@ def flatten_line_matrix(l_matrix):
         out[inc] = nan
         inc += 1
     return out
+
+
+@njit(cache=True)
+def simplify(x, y, precision=0.1):
+    precision2 = precision ** 2
+    nb = x.shape[0]
+    x_previous, y_previous = x[0], y[0]
+    mask = ones(nb, dtype=bool_)
+    for i in range(1, nb):
+        x_, y_ = x[i], y[i]
+        d_x = x_ - x_previous
+        if d_x > precision:
+            x_previous, y_previous = x_, y_
+            continue
+        d_y = y_ - y_previous
+        if d_y > precision:
+            x_previous, y_previous = x_, y_
+            continue
+        d2 = d_x ** 2 + d_y ** 2
+        if d2 > precision2:
+            x_previous, y_previous = x_, y_
+            continue
+        mask[i] = False
+    new_nb = mask.sum()
+    new_x, new_y = empty(new_nb, dtype=x.dtype), empty(new_nb, dtype=y.dtype)
+    j = 0
+    for i in range(nb):
+        if mask[i]:
+            new_x[j], new_y[j] = x[i], y[i]
+            j += 1
+    return new_x, new_y
 
 
 @njit(cache=True)

@@ -89,21 +89,14 @@ class Anim:
 
         # plot
         self.fig = pyplot.figure(figsize=figsize)
+        t0, t1 = self.period
+        self.fig.suptitle(f'{t0} -> {t1}')
         self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9))
         self.ax.set_xlim(x_min, x_max), self.ax.set_ylim(y_min, y_max)
         self.ax.set_aspect("equal")
         self.ax.grid()
         # init mappable
-        self.txt = self.ax.text(
-            x_min + 0.05 * d_x,
-            y_min + 0.05 * d_y,
-            "",
-            zorder=10,
-            bbox=dict(facecolor="w", alpha=0.85),
-        )
-        self.display_speed = self.ax.text(
-            x_min + 0.02 * d_x, y_max - 0.04 * d_y, "", fontsize=10
-        )
+        self.txt = self.ax.text(x_min + 0.05 * d_x, y_min + 0.05 * d_y, "", zorder=10)
         self.contour = LineCollection([], zorder=1)
         self.ax.add_collection(self.contour)
 
@@ -128,7 +121,7 @@ class Anim:
                     dt_draw = (datetime.now() - d0).total_seconds()
                     dt = self.sleep_event - dt_draw
                     if dt < 0:
-                        self.sleep_event = dt_draw * 1.01
+                        # self.sleep_event = dt_draw * 1.01
                         dt = 1e-10
                 self.fig.canvas.start_event_loop(dt)
 
@@ -162,11 +155,10 @@ class Anim:
             self.segs.append(empty((0, 2)))
         self.contour.set_paths(self.segs)
         self.contour.set_color(self.colors[-len(self.segs) :])
-        self.txt.set_text(f"{t0} -> {self.now} -> {t1}")
-        self.display_speed.set_text(f"{1/self.sleep_event:.0f} frame/s")
+        self.contour.set_lw(arange(len(self.segs)) / len(self.segs) * 2.5)
+        self.txt.set_text(f"{self.now} - {1/self.sleep_event:.0f} frame/s")
         self.ax.draw_artist(self.contour)
         self.ax.draw_artist(self.txt)
-        self.ax.draw_artist(self.display_speed)
         # Remove first segment to keep only T contour
         if len(self.segs) > self.nb_step:
             self.segs.pop(0)
