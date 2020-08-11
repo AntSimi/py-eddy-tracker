@@ -20,12 +20,11 @@ setup(
         "Programming Language :: Python",
     ],
     keywords="eddy science, eddy tracking, eddy tracker",
-    author="emason",
+    author="emason & adelepoulle",
     author_email="emason@imedea.uib-csic.es",
     packages=find_packages("src"),
     package_dir={"": "src"},
     scripts=[
-        "src/scripts/EddyId",
         "src/scripts/EddySubSetter",
         "src/scripts/EddyTranslate",
         "src/scripts/EddyTracking",
@@ -38,6 +37,7 @@ setup(
         console_scripts=[
             # grid
             "GridFiltering = py_eddy_tracker.appli.grid:grid_filtering",
+            "EddyId = py_eddy_tracker.appli.grid:eddy_id",
             # eddies
             "MergeEddies = py_eddy_tracker.appli.eddies:merge_eddies",
             # network

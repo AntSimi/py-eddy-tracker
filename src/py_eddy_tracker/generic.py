@@ -35,6 +35,7 @@ from numpy import (
     linspace,
     interp,
     where,
+    zeros,
     isnan,
     bool_,
 )
@@ -48,6 +49,26 @@ def reverse_index(index, nb):
     for i in index:
         m[i] = False
     return where(m)[0]
+
+
+@njit(cache=True)
+def build_index(groups):
+    """We expected that variable is monotonous, and return index for each step change
+    """
+    i0, i1 = groups.min(), groups.max()
+    amplitude = i1 - i0 + 1
+    # Index of first observation for each group
+    first_index = zeros(amplitude, dtype=numba_types.int_)
+    for i, group in enumerate(groups[:-1]):
+        # Get next value to compare
+        next_group = groups[i + 1]
+        # if different we need to set index
+        if group != next_group:
+            first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
+    last_index = zeros(amplitude, dtype=numba_types.int_)
+    last_index[:-1] = first_index[1:]
+    last_index[-1] = i + 2
+    return first_index, last_index, i0
 
 
 @njit(cache=True, fastmath=True, parallel=False)
@@ -248,14 +269,23 @@ def fit_circle(x_vec, y_vec):
 
 
 @njit(cache=True, fastmath=True)
-def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
+def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None, only_bigger=False):
     """
     Resample contours to have (nearly) equal spacing
-       x_val, y_val    : input contour coordinates
+       x_val, y_val : input contour coordinates
        num_fac : factor to increase lengths of output coordinates
     """
+    nb = x_val.shape[0]
+    if only_bigger and fixed_size is not None and nb <= fixed_size:
+        x_new = empty(fixed_size, dtype=x_val.dtype)
+        y_new = empty(fixed_size, dtype=y_val.dtype)
+        x_new[:nb] = x_val
+        y_new[:nb] = y_val
+        x_new[nb:] = x_val[-1]
+        y_new[nb:] = y_val[-1]
+        return x_new, y_new
     # Get distances
-    dist = empty(x_val.shape)
+    dist = empty(nb)
     dist[0] = 0
     dist[1:] = distance(x_val[:-1], y_val[:-1], x_val[1:], y_val[1:])
     # To be still monotonous (dist is store in m)

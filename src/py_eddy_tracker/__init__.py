@@ -31,12 +31,13 @@ def start_logger():
     FORMAT_LOG = (
         "%(levelname)-8s %(asctime)s %(module)s.%(funcName)s :\n\t\t\t\t\t%(message)s"
     )
-    # set up logging to CONSOLE
-    console = logging.StreamHandler()
-    console.setFormatter(ColoredFormatter(FORMAT_LOG))
     logger = logging.getLogger("pet")
-    # add the handler to the root logger
-    logger.addHandler(console)
+    if len(logger.handlers) == 0:
+        # set up logging to CONSOLE
+        console = logging.StreamHandler()
+        console.setFormatter(ColoredFormatter(FORMAT_LOG))
+        # add the handler to the root logger
+        logger.addHandler(console)
     return logger
 
 
@@ -50,7 +51,7 @@ class ColoredFormatter(logging.Formatter):
     )
 
     def __init__(self, message):
-        super(ColoredFormatter, self).__init__(message)
+        super().__init__(message)
 
     def format(self, record):
         color = self.COLOR_LEVEL.get(record.levelname, "")
@@ -60,7 +61,7 @@ class ColoredFormatter(logging.Formatter):
         record.funcName = model % record.funcName
         record.module = model % record.module
         record.levelname = model % record.levelname
-        return super(ColoredFormatter, self).format(record)
+        return super().format(record)
 
 
 class EddyParser(ArgumentParser):
@@ -68,7 +69,7 @@ class EddyParser(ArgumentParser):
     """
 
     def __init__(self, *args, **kwargs):
-        super(EddyParser, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.add_base_argument()
 
     def add_base_argument(self):
@@ -85,7 +86,7 @@ class EddyParser(ArgumentParser):
     def parse_args(self, *args, **kwargs):
         logger = start_logger()
         # Parsing
-        opts = super(EddyParser, self).parse_args(*args, **kwargs)
+        opts = super().parse_args(*args, **kwargs)
         # set current level
         logger.setLevel(getattr(logging, opts.logging_level.upper()))
         return opts
@@ -395,6 +396,17 @@ VAR_DESCR = dict(
             axis="X",
         ),
     ),
+    num_point_e=dict(
+        attr_name=None,
+        nc_name="num_point_e",
+        nc_type="u2",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            longname="number of point for effective contour",
+            units="ordinal",
+            description="Number of point for effective contour, if greater than NbSample, there is a resampling",
+        ),
+    ),
     contour_lon_s=dict(
         attr_name=None,
         nc_name="speed_contour_longitude",
@@ -426,6 +438,17 @@ VAR_DESCR = dict(
             description="Latitudes of speed contour",
             units="degrees_east",
             axis="X",
+        ),
+    ),
+    num_point_s=dict(
+        attr_name=None,
+        nc_name="num_point_s",
+        nc_type="u2",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            longname="number of point for speed contour",
+            units="ordinal",
+            description="Number of point for speed contour, if greater than NbSample, there is a resampling",
         ),
     ),
     shape_error_e=dict(
@@ -590,5 +613,6 @@ for key in VAR_DESCR.keys():
         VAR_DESCR_inv[key_old] = key
 
 from ._version import get_versions
-__version__ = get_versions()['version']
+
+__version__ = get_versions()["version"]
 del get_versions

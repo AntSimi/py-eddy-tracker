@@ -23,12 +23,13 @@ Email: evanmason@gmail.com
 
 import logging
 from netCDF4 import Dataset
-from numba import njit, int_
 from numpy import empty, arange, zeros
 from Polygon import Polygon
 from ..poly import polygon_overlap, create_vertice_from_2darray
 from .. import EddyParser
 from ..observations.network import Network
+from ..observations.tracking import TrackEddiesObservations
+from ..generic import build_index
 
 logger = logging.getLogger("pet")
 
@@ -36,10 +37,9 @@ logger = logging.getLogger("pet")
 def build_network():
     parser = EddyParser("Merge eddies")
     parser.add_argument(
-        "identification_regex",
-        help="Give an expression which will use with glob, currently only netcdf file",
+        "identification_regex", help="Give an expression which will use with glob",
     )
-    parser.add_argument("out", help="output file, currently only netcdf file")
+    parser.add_argument("out", help="output file")
     parser.add_argument(
         "--window", "-w", type=int, help="Half time window to search eddy", default=1
     )
@@ -48,39 +48,37 @@ def build_network():
         action="store_true",
         help="Use intern contour instead of outter contour",
     )
+    parser.add_argument(
+        "--keep_untracked",
+        action="store_true",
+        help=f"Store untracked observation with group number {Network.NOGROUP}",
+    )
     args = parser.parse_args()
 
     n = Network(args.identification_regex, window=args.window, intern=args.intern)
-    n.group_observations(minimal_area=True)
-    n.save(args.out)
+    group = n.group_observations(minimal_area=True)
+    n.build_dataset(group, args.keep_untracked).write_file(filename=args.out)
 
 
 def divide_network():
     parser = EddyParser("Separate path for a same group")
     parser.add_argument("input", help="input network file")
-    parser.add_argument("out", help="output file, currently only netcdf file")
+    parser.add_argument("out", help="output file")
+    parser.add_argument(
+        "--intern",
+        action="store_true",
+        help="Use intern contour instead of outter contour",
+    )
+    parser.add_argument(
+        "--window", "-w", type=int, help="Half time window to search eddy", default=1
+    )
     args = parser.parse_args()
-    split_network(args.input, args.out)
-
-
-@njit(cache=True)
-def build_index(groups):
-    """We expected that variable is monotonous, and return index for each step change
-    """
-    i0, i1 = groups.min(), groups.max()
-    amplitude = i1 - i0 + 1
-    # Index of first observation for each group
-    first_index = zeros(amplitude, dtype=int_)
-    for i, group in enumerate(groups[:-1]):
-        # Get next value to compare
-        next_group = groups[i + 1]
-        # if different we need to set index
-        if group != next_group:
-            first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
-    last_index = zeros(amplitude, dtype=int_)
-    last_index[:-1] = first_index[1:]
-    last_index[-1] = i + 2
-    return first_index, last_index, i0
+    contour_name = TrackEddiesObservations.intern(args.intern, public_label=True)
+    e = TrackEddiesObservations.load_file(
+        args.input, include_vars=("time", "track", *contour_name)
+    )
+    e.split_network(intern=args.intern, window=args.window)
+    # split_network(args.input, args.out)
 
 
 def split_network(input, output):
@@ -289,7 +287,7 @@ def display_network(x, y, tr, t, c):
     import matplotlib.pyplot as plt
 
     cmap = plt.get_cmap("jet")
-    from .generic import flatten_line_matrix
+    from ..generic import flatten_line_matrix
 
     fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(121, aspect="equal")

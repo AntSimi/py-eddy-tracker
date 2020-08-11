@@ -32,6 +32,7 @@ from glob import glob
 from numpy import array, empty, arange, unique, bincount, uint32
 from numba import njit
 from .observation import EddiesObservations
+from .tracking import TrackEddiesObservations
 from ..poly import bbox_intersection, vertice_overlap
 
 logger = logging.getLogger("pet")
@@ -42,12 +43,12 @@ class Network:
     # To be used like a buffer
     DATA = dict()
     FLIST = list()
-    NOGROUP = 0
+    NOGROUP = TrackEddiesObservations.NOGROUP
 
     def __init__(self, input_regex, window=5, intern=False):
         self.window = window
         self.contour_name = EddiesObservations.intern(intern, public_label=True)
-        self.xname, self.yname = EddiesObservations.intern(intern,)
+        self.xname, self.yname = EddiesObservations.intern(intern)
         self.filenames = glob(input_regex)
         self.filenames.sort()
         self.nb_input = len(self.filenames)
@@ -115,63 +116,31 @@ class Network:
         logger.info(
             f"{(gr == self.NOGROUP).sum()} alone / {len(gr)} obs, {len(unique(gr))} groups"
         )
+        return gr
 
-    def save(self, output_filename):
-        new_i = get_next_index(gr)
-        nb = gr.shape[0]
-        dtype = list()
-        with Dataset(output_filename, "w") as h_out:
-            with Dataset(self.filenames[0]) as h_model:
-                for name, dim in h_model.dimensions.items():
-                    h_out.createDimension(name, len(dim) if name != "obs" else nb)
-                v = h_out.createVariable(
-                    "track", "u4", ("obs",), True, chunksizes=(min(250000, nb),)
-                )
-                d = v[:].copy()
-                d[new_i] = gr
-                v[:] = d
-                for k in h_model.ncattrs():
-                    h_out.setncattr(k, h_model.getncattr(k))
-                for name, v in h_model.variables.items():
-                    dtype.append(
-                        (
-                            name,
-                            (v.datatype, 50) if "NbSample" in v.dimensions else v.datatype,
-                        )
-                    )
-                    new_v = h_out.createVariable(
-                        name,
-                        v.datatype,
-                        v.dimensions,
-                        True,
-                        chunksizes=(min(25000, nb), 50)
-                        if "NbSample" in v.dimensions
-                        else (min(250000, nb),),
-                    )
-                    for k in v.ncattrs():
-                        if k in ("min", "max",):
-                            continue
-                        new_v.setncattr(k, v.getncattr(k))
-            data = empty(nb, dtype)
-            i = 0
-            debug_active = logger.getEffectiveLevel() == logging.DEBUG
-            for filename in self.filenames:
-                if debug_active:
-                    print(f"Load {filename} to copy", end="\r")
-                with Dataset(filename) as h_in:
-                    stop = i + len(h_in.dimensions["obs"])
-                    sl = slice(i, stop)
-                    for name, _ in dtype:
-                        v = h_in.variables[name]
-                        v.set_auto_maskandscale(False)
-                        data[name][new_i[sl]] = v[:]
-                    i = stop
-            if debug_active:
-                print()
-            for name, _ in dtype:
-                v = h_out.variables[name]
-                v.set_auto_maskandscale(False)
-                v[:] = data[name]
+    def build_dataset(self, group, keep_untracked=True):
+        nb_obs = group.shape[0]
+        model = EddiesObservations.load_file(self.filenames[-1], raw_data=True)
+        eddies = TrackEddiesObservations.new_like(model, nb_obs)
+        eddies.sign_type = model.sign_type
+        # Get new index to re-order observation by group
+        new_i = get_next_index(group)
+        display_iteration = logger.getEffectiveLevel() == logging.INFO
+        elements = eddies.elements
+
+        i = 0
+        for filename in self.filenames:
+            if display_iteration:
+                print(f"Load {filename} to copy", end="\r")
+            e = EddiesObservations.load_file(filename, raw_data=True)
+            stop = i + len(e)
+            sl = slice(i, stop)
+            for element in elements:
+                eddies[element][new_i[sl]] = e[element]
+            i = stop
+        if display_iteration:
+            print()
+        return eddies
 
 
 @njit(cache=True)

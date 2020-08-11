@@ -166,12 +166,12 @@ def get_wrap_vertice(x0, y0, x1, y1, i):
     x0_, x1_ = x0[i], x1[i]
     if abs(x0_[0] - x1_[0]) > 180:
         ref = x0_[0] - x0.dtype.type(180)
-        x1_ = (x1[i] - ref) % 360 + ref
+        x1_ = (x1_ - ref) % 360 + ref
     return create_vertice(x0_, y0[i]), create_vertice(x1_, y1[i])
 
 
 def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
-    nb, _ = x0.shape
+    nb = x0.shape[0]
     cost = empty(nb)
     for i in range(nb):
         # Get wrapped vertice for index i

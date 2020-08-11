@@ -75,29 +75,6 @@ logger = logging.getLogger("pet")
 
 
 @njit(cache=True, fastmath=True)
-def shifted_ellipsoid_degrees_mask(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
-    # c = (major ** 2 - minor ** 2) ** .5 + major
-    c = major
-    major = minor + 0.5 * (major - minor)
-    # r=.5*(c-c0)
-    # a=c0+r
-    # Focal
-    f_right = lon0
-    f_left = f_right - (c - minor)
-    # Ellipse center
-    x_c = (f_left + f_right) * 0.5
-
-    nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
-    m = empty((nb_1, nb_0), dtype=numba_types.bool_)
-    for i in range(nb_1):
-        dy = lat1[i] - lat0
-        dx = (lon1[i] - x_c + 180) % 360 - 180
-        d_normalize = dx ** 2 / major ** 2 + dy ** 2 / minor ** 2
-        m[i] = d_normalize < 1.0
-    return m.T
-
-
-@njit(cache=True, fastmath=True)
 def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
     """
     work only if major is an array but faster * 6
@@ -161,6 +138,8 @@ class EddiesObservations(object):
         "shape_error_e",
         "shape_error_s",
         "nb_contour_selected",
+        'num_point_e',
+        'num_point_s',
         "height_max_speed_contour",
         "height_external_contour",
         "height_inner_contour",
@@ -739,11 +718,10 @@ class EddiesObservations(object):
 
     @staticmethod
     def intern(flag, public_label=False):
-        labels = (
-            ("contour_lon_s", "contour_lat_s")
-            if flag
-            else ("contour_lon_e", "contour_lat_e")
-        )
+        if flag:
+            labels = "contour_lon_s", "contour_lat_s"
+        else:
+            labels = "contour_lon_e", "contour_lat_e"
         if public_label:
             labels = [VAR_DESCR[label]['nc_name'] for label in labels]
         return labels
@@ -1356,6 +1334,6 @@ class VirtualEddiesObservations(EddiesObservations):
 
     @property
     def elements(self):
-        elements = super(VirtualEddiesObservations, self).elements
+        elements = super().elements
         elements.extend(["track", "segment_size", "dlon", "dlat"])
         return list(set(elements))

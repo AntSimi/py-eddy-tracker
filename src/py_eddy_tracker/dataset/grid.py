@@ -551,7 +551,7 @@ class GridDataset(object):
         date,
         step=0.005,
         shape_error=55,
-        array_sampling=50,
+        sampling=50,
         pixel_limit=None,
         precision=None,
         force_height_unit=None,
@@ -566,7 +566,7 @@ class GridDataset(object):
             date:
             step: must be in meter (m)
             shape_error: must be in percent (%)
-            array_sampling:
+            sampling:
             pixel_limit:
             precision: must be in meter(m)
 
@@ -635,6 +635,7 @@ class GridDataset(object):
         # Compute ssh contour
         self.contours = Contours(x, y, data, levels, wrap_x=self.is_circular())
 
+        out_sampling = dict(fixed_size=sampling, only_bigger=False)
         track_extra_variables = [
             "height_max_speed_contour",
             "height_external_contour",
@@ -674,15 +675,10 @@ class GridDataset(object):
                 )
 
                 # Loop over individual c_s contours (i.e., every eddy in field)
-                for current_contour in contour_paths:
-                    if current_contour.used:
+                for contour in contour_paths:
+                    if contour.used:
                         continue
-                    (
-                        centlon_e,
-                        centlat_e,
-                        eddy_radius_e,
-                        aerr,
-                    ) = current_contour.fit_circle()
+                    centlon_e, centlat_e, eddy_radius_e, aerr = contour.fit_circle()
 
                     # Filter for shape
                     if aerr < 0 or aerr > shape_error or isnan(aerr):
@@ -701,18 +697,18 @@ class GridDataset(object):
                         continue
 
                     # Find all pixels in the contour
-                    i_x_in, i_y_in = current_contour.pixels_in(self)
+                    i_x_in, i_y_in = contour.pixels_in(self)
 
                     # Maybe limit max must be replace with a maximum of surface
                     if (
-                        current_contour.nb_pixel < pixel_limit[0]
-                        or current_contour.nb_pixel > pixel_limit[1]
+                        contour.nb_pixel < pixel_limit[0]
+                        or contour.nb_pixel > pixel_limit[1]
                     ):
                         continue
 
                     # Compute amplitude
                     reset_centroid, amp = self.get_amplitude(
-                        current_contour,
+                        contour,
                         cvalues,
                         data,
                         anticyclonic_search=anticyclonic_search,
@@ -750,7 +746,7 @@ class GridDataset(object):
                         self.contours,
                         centlon_e,
                         centlat_e,
-                        current_contour,
+                        contour,
                         anticyclonic_search,
                         corrected_coll_index,
                         pixel_min=pixel_limit[0],
@@ -775,57 +771,47 @@ class GridDataset(object):
                     )
                     # Computed again to be coherent with speed_radius, we will be compute in same reference
                     _, _, eddy_radius_e, aerr_e = fit_circle(
-                        *proj(current_contour.lon, current_contour.lat)
+                        *proj(contour.lon, contour.lat)
                     )
                     centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
 
                     # Instantiate new EddyObservation object (high cost need to be review)
-                    properties = EddiesObservations(
+                    obs = EddiesObservations(
                         size=1,
                         track_extra_variables=track_extra_variables,
-                        track_array_variables=array_sampling,
+                        track_array_variables=sampling,
                         array_variables=array_variables,
                     )
 
-                    properties.obs["height_max_speed_contour"] = self.contours.cvalues[
+                    obs.obs["height_max_speed_contour"] = self.contours.cvalues[
                         i_max_speed
                     ]
-                    properties.obs["height_external_contour"] = cvalues
-                    properties.obs["height_inner_contour"] = self.contours.cvalues[
-                        i_inner
-                    ]
+                    obs.obs["height_external_contour"] = cvalues
+                    obs.obs["height_inner_contour"] = self.contours.cvalues[i_inner]
                     array_size = speed_array.shape[0]
-                    properties.obs["nb_contour_selected"] = array_size
+                    obs.obs["nb_contour_selected"] = array_size
                     if speed_array.shape[0] == 1:
-                        properties.obs["uavg_profile"][:] = speed_array[0]
+                        obs.obs["uavg_profile"][:] = speed_array[0]
                     else:
-                        properties.obs["uavg_profile"] = raw_resample(
-                            speed_array, array_sampling
-                        )
-                    properties.obs["amplitude"] = amp.amplitude
-                    properties.obs["radius_s"] = eddy_radius_s
-                    properties.obs["speed_average"] = max_average_speed
-                    properties.obs["radius_e"] = eddy_radius_e
-                    properties.obs["shape_error_e"] = aerr_e
-                    properties.obs["shape_error_s"] = aerr_s
-                    properties.obs["lon"] = centlon_s
-                    properties.obs["lat"] = centlat_s
-                    properties.obs["lon_max"] = centlon_i
-                    properties.obs["lat_max"] = centlat_i
-                    (
-                        properties.obs["contour_lon_e"],
-                        properties.obs["contour_lat_e"],
-                    ) = uniform_resample(
-                        current_contour.lon,
-                        current_contour.lat,
-                        fixed_size=array_sampling,
+                        obs.obs["uavg_profile"] = raw_resample(speed_array, sampling)
+                    obs.obs["amplitude"] = amp.amplitude
+                    obs.obs["radius_s"] = eddy_radius_s
+                    obs.obs["speed_average"] = max_average_speed
+                    obs.obs["radius_e"] = eddy_radius_e
+                    obs.obs["shape_error_e"] = aerr_e
+                    obs.obs["shape_error_s"] = aerr_s
+                    obs.obs["lon"] = centlon_s
+                    obs.obs["lat"] = centlat_s
+                    obs.obs["lon_max"] = centlon_i
+                    obs.obs["lat_max"] = centlat_i
+                    obs.obs["num_point_e"] = contour.lon.shape[0]
+                    xy = uniform_resample(contour.lon, contour.lat, **out_sampling)
+                    obs.obs["contour_lon_e"], obs.obs["contour_lat_e"] = xy
+                    obs.obs["num_point_s"] = speed_contour.lon.shape[0]
+                    xy = uniform_resample(
+                        speed_contour.lon, speed_contour.lat, **out_sampling
                     )
-                    (
-                        properties.obs["contour_lon_s"],
-                        properties.obs["contour_lat_s"],
-                    ) = uniform_resample(
-                        speed_contour.lon, speed_contour.lat, fixed_size=array_sampling
-                    )
+                    obs.obs["contour_lon_s"], obs.obs["contour_lat_s"] = xy
                     if aerr > 99.9 or aerr_s > 99.9:
                         logger.warning(
                             "Strange shape at this step! shape_error : %f, %f",
@@ -833,34 +819,31 @@ class GridDataset(object):
                             aerr_s,
                         )
 
-                    eddies.append(properties)
+                    eddies.append(obs)
                     # To reserve definitively the area
                     data.mask[i_x_in, i_y_in] = True
             if len(eddies) == 0:
-                eddies_collection = EddiesObservations(
+                eddies = EddiesObservations(
                     track_extra_variables=track_extra_variables,
-                    track_array_variables=array_sampling,
+                    track_array_variables=sampling,
                     array_variables=array_variables,
                 )
             else:
-                eddies_collection = EddiesObservations.concatenate(eddies)
-            eddies_collection.sign_type = 1 if anticyclonic_search else -1
-            eddies_collection.obs["time"] = (
-                date - datetime(1950, 1, 1)
-            ).total_seconds() / 86400.0
+                eddies = EddiesObservations.concatenate(eddies)
+            eddies.sign_type = 1 if anticyclonic_search else -1
+            eddies.obs["time"] = (date - datetime(1950, 1, 1)).total_seconds() / 86400.0
 
             # normalization longitude between 0 - 360, because storage have an offset on 180
-            eddies_collection.obs["lon_max"] %= 360
-            eddies_collection.obs["lon"] %= 360
-            ref = eddies_collection.obs["lon"] - 180
-            eddies_collection.obs["contour_lon_e"] = (
-                (eddies_collection.obs["contour_lon_e"].T - ref) % 360 + ref
+            eddies.obs["lon_max"] %= 360
+            eddies.obs["lon"] %= 360
+            ref = eddies.obs["lon"] - 180
+            eddies.obs["contour_lon_e"] = (
+                (eddies.obs["contour_lon_e"].T - ref) % 360 + ref
             ).T
-            eddies_collection.obs["contour_lon_s"] = (
-                (eddies_collection.obs["contour_lon_s"].T - ref) % 360 + ref
+            eddies.obs["contour_lon_s"] = (
+                (eddies.obs["contour_lon_s"].T - ref) % 360 + ref
             ).T
-
-            a_and_c.append(eddies_collection)
+            a_and_c.append(eddies)
 
         if in_h_unit is not None:
             for name in [
@@ -1120,11 +1103,11 @@ class RegularGridDataset(GridDataset):
     )
 
     def __init__(self, *args, **kwargs):
-        super(RegularGridDataset, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._is_circular = None
 
     def setup_coordinates(self):
-        super(RegularGridDataset, self).setup_coordinates()
+        super().setup_coordinates()
         self.x_size = self.x_c.shape[0]
         self._x_step = (self.x_c[1:] - self.x_c[:-1]).mean()
         self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
