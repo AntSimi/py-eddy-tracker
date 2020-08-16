@@ -269,21 +269,13 @@ def fit_circle(x_vec, y_vec):
 
 
 @njit(cache=True, fastmath=True)
-def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None, only_bigger=False):
+def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     """
     Resample contours to have (nearly) equal spacing
        x_val, y_val : input contour coordinates
        num_fac : factor to increase lengths of output coordinates
     """
     nb = x_val.shape[0]
-    if only_bigger and fixed_size is not None and nb <= fixed_size:
-        x_new = empty(fixed_size, dtype=x_val.dtype)
-        y_new = empty(fixed_size, dtype=y_val.dtype)
-        x_new[:nb] = x_val
-        y_new[:nb] = y_val
-        x_new[nb:] = x_val[-1]
-        y_new[nb:] = y_val[-1]
-        return x_new, y_new
     # Get distances
     dist = empty(nb)
     dist[0] = 0

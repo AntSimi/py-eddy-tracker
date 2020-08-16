@@ -635,7 +635,7 @@ class GridDataset(object):
         # Compute ssh contour
         self.contours = Contours(x, y, data, levels, wrap_x=self.is_circular())
 
-        out_sampling = dict(fixed_size=sampling, only_bigger=False)
+        out_sampling = dict(fixed_size=sampling)
         track_extra_variables = [
             "height_max_speed_contour",
             "height_external_contour",
