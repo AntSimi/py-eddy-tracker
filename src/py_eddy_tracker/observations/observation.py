@@ -67,7 +67,7 @@ from ..generic import (
     flatten_line_matrix,
     wrap_longitude,
     local_to_coordinates,
-    reverse_index
+    reverse_index,
 )
 from ..poly import bbox_intersection, vertice_overlap, create_vertice
 
@@ -138,8 +138,8 @@ class EddiesObservations(object):
         "shape_error_e",
         "shape_error_s",
         "nb_contour_selected",
-        'num_point_e',
-        'num_point_s',
+        "num_point_e",
+        "num_point_s",
         "height_max_speed_contour",
         "height_external_contour",
         "height_inner_contour",
@@ -723,7 +723,7 @@ class EddiesObservations(object):
         else:
             labels = "contour_lon_e", "contour_lat_e"
         if public_label:
-            labels = [VAR_DESCR[label]['nc_name'] for label in labels]
+            labels = [VAR_DESCR[label]["nc_name"] for label in labels]
         return labels
 
     def match(self, other, intern=False, cmin=0):

@@ -69,6 +69,8 @@ class TrackEddiesObservations(EddiesObservations):
         "shape_error_e",
         "shape_error_s",
         "nb_contour_selected",
+        "num_point_e",
+        "num_point_s",
         "height_max_speed_contour",
         "height_external_contour",
         "height_inner_contour",
