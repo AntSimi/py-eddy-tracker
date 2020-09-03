@@ -1278,14 +1278,14 @@ class EddiesObservations(object):
             x = (x - ref) % 360 + ref
         return ax.scatter(x, self.latitude, c=self[name] * factor, **kwargs)
 
-    def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
+    def display(self, ax, ref=None, extern_only=False, intern_only=False, nobs=False, **kwargs):
         if not extern_only:
             lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
             lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
         if not intern_only:
             lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
             lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
-        if "label" in kwargs:
+        if nobs and "label" in kwargs:
             kwargs["label"] += " (%s observations)" % len(self)
         kwargs_e = kwargs.copy()
         if not extern_only:
