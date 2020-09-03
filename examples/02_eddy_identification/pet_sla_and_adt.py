@@ -55,32 +55,32 @@ a_sla, c_sla = g.eddy_identification("sla", "ugosa", "vgosa", date, 0.002)
 # over filtered
 ax = start_axes(f"ADT (m) filtered ({wavelength}km)")
 m = g.display(ax, "adt", vmin=-0.15, vmax=0.15)
-a_adt.display(ax, **kwargs_a_adt), c_adt.display(ax, **kwargs_a_sla)
+a_adt.display(ax, **kwargs_a_adt), c_adt.display(ax, **kwargs_c_adt)
 ax.legend(), update_axes(ax, m)
 
 ax = start_axes(f"SLA (m) filtered ({wavelength}km)")
 m = g.display(ax, "sla", vmin=-0.15, vmax=0.15)
-a_sla.display(ax, **kwargs_c_adt), c_sla.display(ax, **kwargs_c_sla)
+a_sla.display(ax, **kwargs_a_sla), c_sla.display(ax, **kwargs_c_sla)
 ax.legend(), update_axes(ax, m)
 
 # %%
 # over raw
 ax = start_axes("ADT (m)")
 m = g.display(ax, "adt_raw", vmin=-0.15, vmax=0.15)
-a_adt.display(ax, **kwargs_a_adt), c_adt.display(ax, **kwargs_a_sla)
+a_adt.display(ax, **kwargs_a_adt), c_adt.display(ax, **kwargs_c_adt)
 ax.legend(), update_axes(ax, m)
 
 ax = start_axes("SLA (m)")
 m = g.display(ax, "sla_raw", vmin=-0.15, vmax=0.15)
-a_sla.display(ax, **kwargs_c_adt), c_sla.display(ax, **kwargs_c_sla)
+a_sla.display(ax, **kwargs_a_sla), c_sla.display(ax, **kwargs_c_sla)
 ax.legend(), update_axes(ax, m)
 
 # %%
 # Display detection
 ax = start_axes("Eddies detected")
 a_adt.display(ax, **kwargs_a_adt)
-a_sla.display(ax, **kwargs_c_adt)
-c_adt.display(ax, **kwargs_a_sla)
+a_sla.display(ax, **kwargs_a_sla)
+c_adt.display(ax, **kwargs_c_adt)
 c_sla.display(ax, **kwargs_c_sla)
 ax.legend()
 update_axes(ax)

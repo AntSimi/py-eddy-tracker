@@ -35,6 +35,7 @@ from numpy import (
     linspace,
     interp,
     where,
+    zeros,
     isnan,
     bool_,
 )
@@ -48,6 +49,26 @@ def reverse_index(index, nb):
     for i in index:
         m[i] = False
     return where(m)[0]
+
+
+@njit(cache=True)
+def build_index(groups):
+    """We expected that variable is monotonous, and return index for each step change
+    """
+    i0, i1 = groups.min(), groups.max()
+    amplitude = i1 - i0 + 1
+    # Index of first observation for each group
+    first_index = zeros(amplitude, dtype=numba_types.int_)
+    for i, group in enumerate(groups[:-1]):
+        # Get next value to compare
+        next_group = groups[i + 1]
+        # if different we need to set index
+        if group != next_group:
+            first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
+    last_index = zeros(amplitude, dtype=numba_types.int_)
+    last_index[:-1] = first_index[1:]
+    last_index[-1] = i + 2
+    return first_index, last_index, i0
 
 
 @njit(cache=True, fastmath=True, parallel=False)
@@ -251,11 +272,12 @@ def fit_circle(x_vec, y_vec):
 def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     """
     Resample contours to have (nearly) equal spacing
-       x_val, y_val    : input contour coordinates
+       x_val, y_val : input contour coordinates
        num_fac : factor to increase lengths of output coordinates
     """
+    nb = x_val.shape[0]
     # Get distances
-    dist = empty(x_val.shape)
+    dist = empty(nb)
     dist[0] = 0
     dist[1:] = distance(x_val[:-1], y_val[:-1], x_val[1:], y_val[1:])
     # To be still monotonous (dist is store in m)

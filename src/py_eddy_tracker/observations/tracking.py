@@ -27,6 +27,7 @@ Version 3.0.0
 ===========================================================================
 
 """
+import logging
 from numpy import (
     empty,
     arange,
@@ -39,12 +40,14 @@ from numpy import (
     array,
     median,
 )
-from .. import VAR_DESCR_inv
-import logging
 from datetime import datetime, timedelta
-from .observation import EddiesObservations
 from numba import njit
-from ..generic import split_line, wrap_longitude
+from Polygon import Polygon
+from .observation import EddiesObservations
+from .. import VAR_DESCR_inv
+from ..generic import split_line, wrap_longitude, build_index
+from ..poly import polygon_overlap, create_vertice_from_2darray
+
 
 logger = logging.getLogger("pet")
 
@@ -66,14 +69,18 @@ class TrackEddiesObservations(EddiesObservations):
         "shape_error_e",
         "shape_error_s",
         "nb_contour_selected",
+        "num_point_e",
+        "num_point_s",
         "height_max_speed_contour",
         "height_external_contour",
         "height_inner_contour",
         "cost_association",
     ]
 
+    NOGROUP = 0
+
     def __init__(self, *args, **kwargs):
-        super(TrackEddiesObservations, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__first_index_of_track = None
         self.__obs_by_track = None
 
@@ -112,12 +119,7 @@ class TrackEddiesObservations(EddiesObservations):
         mask = nb_obs >= nb_min
         nb_obs_select = mask.sum()
         logger.info("Selection of %d observations", nb_obs_select)
-        eddies = TrackEddiesObservations(
-            size=nb_obs_select,
-            track_extra_variables=self.track_extra_variables,
-            track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables,
-        )
+        eddies = self.__class__.new_like(self, nb_obs_select)
         eddies.sign_type = self.sign_type
         for field in self.obs.dtype.descr:
             logger.debug("Copy of field %s ...", field)
@@ -133,7 +135,7 @@ class TrackEddiesObservations(EddiesObservations):
 
     @property
     def elements(self):
-        elements = super(TrackEddiesObservations, self).elements
+        elements = super().elements
         elements.extend(["track", "n", "virtual"])
         return list(set(elements))
 
@@ -339,13 +341,7 @@ class TrackEddiesObservations(EddiesObservations):
             mask = ~self.get_mask_from_id(tracks)
 
         nb_obs = mask.sum()
-        new = TrackEddiesObservations(
-            size=nb_obs,
-            track_extra_variables=self.track_extra_variables,
-            track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables,
-            raw_data=self.raw_data,
-        )
+        new = self.__class__.new_like(self, nb_obs)
         new.sign_type = self.sign_type
         if nb_obs == 0:
             logger.warning("Empty dataset will be created")
@@ -369,6 +365,130 @@ class TrackEddiesObservations(EddiesObservations):
         if ref is not None:
             x, y = wrap_longitude(x, y, ref, cut=True)
         return ax.plot(x, y, **kwargs)
+
+    def split_network(self, intern=True, **kwargs):
+        """Divide each group in track
+        """
+        track_s, track_e, track_ref = build_index(self.tracks)
+        ids = empty(
+            len(self),
+            dtype=[
+                ("group", self.tracks.dtype),
+                ("time", self.time.dtype),
+                ("track", "u2"),
+                ("previous_cost", "f4"),
+                ("next_cost", "f4"),
+                ("previous_obs", "i4"),
+                ("next_obs", "i4"),
+            ],
+        )
+        ids["group"], ids["time"] = self.tracks, self.time
+        # To store id track
+        ids["track"], ids["previous_cost"], ids["next_cost"] = 0, 0, 0
+        ids["previous_obs"], ids["next_obs"] = -1, -1
+
+        xname, yname = self.intern(intern)
+        for i_s, i_e in zip(track_s, track_e):
+            if i_s == i_e or self.tracks[i_s] == self.NOGROUP:
+                continue
+            sl = slice(i_s, i_e)
+            local_ids = ids[sl]
+            self.set_tracks(self[xname][sl], self[yname][sl], local_ids, **kwargs)
+            m = local_ids["previous_obs"] == -1
+            local_ids["previous_obs"][m] += i_s
+            m = local_ids["next_obs"] == -1
+            local_ids["next_obs"][m] += i_s
+        return ids
+        # ids_sort = ids[new_i]
+        # # To be able to follow indices sorting
+        # reverse_sort = empty(new_i.shape[0], dtype="u4")
+        # reverse_sort[new_i] = arange(new_i.shape[0])
+        # # Redirect indices
+        # m = ids_sort["next_obs"] != -1
+        # ids_sort["next_obs"][m] = reverse_sort[
+        #     ids_sort["next_obs"][m]
+        # ]
+        # m = ids_sort["previous_obs"] != -1
+        # ids_sort["previous_obs"][m] = reverse_sort[
+        #     ids_sort["previous_obs"][m]
+        # ]
+        # # print(ids_sort)
+        # display_network(
+        #     x[new_i],
+        #     y[new_i],
+        #     ids_sort["track"],
+        #     ids_sort["time"],
+        #     ids_sort["next_cost"],
+        # )
+
+    def set_tracks(self, x, y, ids, window):
+        # Will split one group in tracks
+        time_index = build_index(ids["time"])
+        nb = x.shape[0]
+        used = zeros(nb, dtype="bool")
+        track_id = 1
+        # build all polygon (need to check if wrap is needed)
+        polygons = [Polygon(create_vertice_from_2darray(x, y, i)) for i in range(nb)]
+        for i in range(nb):
+            # If observation already in one track, we go to the next one
+            if used[i]:
+                continue
+            self.follow_obs(i, track_id, used, ids, polygons, *time_index, window)
+            track_id += 1
+
+    @classmethod
+    def follow_obs(cls, i_next, track_id, used, ids, *args):
+        while i_next != -1:
+            # Flag
+            used[i_next] = True
+            # Assign id
+            ids["track"][i_next] = track_id
+            # Search next
+            i_next_ = cls.next_obs(i_next, ids, *args)
+            if i_next_ == -1:
+                break
+            ids["next_obs"][i_next] = i_next_
+            # Target was previously used
+            if used[i_next_]:
+                if ids["next_cost"][i_next] == ids["previous_cost"][i_next_]:
+                    m = ids["track"][i_next_:] == ids["track"][i_next_]
+                    ids["track"][i_next_:][m] = track_id
+                    ids["previous_obs"][i_next_] = i_next
+                i_next_ = -1
+            else:
+                ids["previous_obs"][i_next_] = i_next
+            i_next = i_next_
+
+    @staticmethod
+    def next_obs(i_current, ids, polygons, time_s, time_e, time_ref, window):
+        time_max = time_e.shape[0] - 1
+        time_cur = ids["time"][i_current]
+        t0, t1 = time_cur + 1 - time_ref, min(time_cur + window - time_ref, time_max)
+        if t0 > time_max:
+            return -1
+        for t_step in range(t0, t1 + 1):
+            i0, i1 = time_s[t_step], time_e[t_step]
+            # No observation at the time step
+            if i0 == i1:
+                continue
+            # Intersection / union, to be able to separte in case of multiple inside
+            c = polygon_overlap(polygons[i_current], polygons[i0:i1])
+            # We remove low overlap
+            c[c < 0.1] = 0
+            # We get index of maximal overlap
+            i = c.argmax()
+            c_i = c[i]
+            # No overlap found
+            if c_i == 0:
+                continue
+            target = i0 + i
+            # Check if candidate is already used
+            c_target = ids["previous_cost"][target]
+            if (c_target != 0 and c_target < c_i) or c_target == 0:
+                ids["previous_cost"][target] = c_i
+            ids["next_cost"][i_current] = c_i
+            return target
+        return -1
 
 
 @njit(cache=True)

@@ -61,7 +61,7 @@ class Correspondances(list):
     def __init__(self, datasets, virtual=0, class_method=None, previous_correspondance=None):
         """Initiate tracking
         """
-        super(Correspondances, self).__init__()
+        super().__init__()
         # Correspondance dtype
         self.correspondance_dtype = [('in', 'u2'),
                                      ('out', 'u2'),
@@ -245,7 +245,7 @@ class Correspondances(list):
 
     def append(self, *args, **kwargs):
         self.nb_link_max = max(self.nb_link_max, len(args[0]))
-        super(Correspondances, self).append(*args, **kwargs)
+        super().append(*args, **kwargs)
 
     def id_generator(self, nb_id):
         """Generation id and incrementation

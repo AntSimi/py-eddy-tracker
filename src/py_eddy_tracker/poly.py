@@ -151,14 +151,55 @@ def create_vertice(x, y):
     return v
 
 
-def common_area(x0, y0, x1, y1):
-    nb, _ = x0.shape
-    cost = empty((nb))
+@njit(cache=True)
+def create_vertice_from_2darray(x, y, index):
+    _, nb = x.shape
+    v = empty((nb, 2), dtype=x.dtype)
     for i in range(nb):
-        x0_, x1_ = x0[i], x1[i]
-        if abs(x0_[0] - x1_[0]) > 180:
-            x1_ = (x1[i] - (x0_[0] - 180)) % 360 + x0_[0] - 180
-        p0 = Polygon(create_vertice(x0_, y0[i]))
-        p1 = Polygon(create_vertice(x1_, y1[i]))
-        cost[i] = (p0 & p1).area() / (p0 + p1).area()
+        v[i, 0] = x[index, i]
+        v[i, 1] = y[index, i]
+    return v
+
+
+@njit(cache=True)
+def get_wrap_vertice(x0, y0, x1, y1, i):
+    x0_, x1_ = x0[i], x1[i]
+    if abs(x0_[0] - x1_[0]) > 180:
+        ref = x0_[0] - x0.dtype.type(180)
+        x1_ = (x1_ - ref) % 360 + ref
+    return create_vertice(x0_, y0[i]), create_vertice(x1_, y1[i])
+
+
+def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
+    nb = x0.shape[0]
+    cost = empty(nb)
+    for i in range(nb):
+        # Get wrapped vertice for index i
+        v0, v1 = get_wrap_vertice(x0, y0, x1, y1, i)
+        p0 = Polygon(v0)
+        p1 = Polygon(v1)
+        # Area of intersection
+        intersection = (p0 & p1).area()
+        # we divide intersection with the little one result from 0 to 1
+        if minimal_area:
+            cost[i] = intersection / min(p0.area(), p1.area())
+        # we divide intersection with polygon merging result from 0 to 1
+        else:
+            cost[i] = intersection / (p0 + p1).area()
+    return cost
+
+
+def polygon_overlap(p0, p1, minimal_area=False):
+    nb = len(p1)
+    cost = empty(nb)
+    for i in range(nb):
+        p_ = p1[i]
+        # Area of intersection
+        intersection = (p0 & p_).area()
+        # we divide intersection with the little one result from 0 to 1
+        if minimal_area:
+            cost[i] = intersection / min(p0.area(), p_.area())
+        # we divide intersection with polygon merging result from 0 to 1
+        else:
+            cost[i] = intersection / (p0 + p_).area()
     return cost
