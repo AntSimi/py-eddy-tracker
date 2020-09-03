@@ -14,7 +14,7 @@ from py_eddy_tracker.generic import local_to_coordinates
 
 
 # %%
-# Method to compute circle path
+# Method to built circle from center coordinates
 def build_circle(x0, y0, r):
     angle = radians(linspace(0, 360, 50))
     x_norm, y_norm = cos(angle), sin(angle)

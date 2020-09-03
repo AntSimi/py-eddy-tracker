@@ -41,7 +41,7 @@ extensions = [
 sphinx_gallery_conf = {
     "examples_dirs": "../examples",  # path to your example scripts
     "gallery_dirs": "python_module",
-    "capture_repr": ("_repr_html_"),
+    "capture_repr": ("_repr_html_",),
     "line_numbers": False,
     "filename_pattern": "/pet",
     "binder": {
