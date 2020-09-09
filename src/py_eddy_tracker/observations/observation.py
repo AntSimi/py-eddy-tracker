@@ -1256,7 +1256,7 @@ class EddiesObservations(object):
             x = (x - ref) % 360 + ref
         return ax.scatter(x, self.latitude, c=self[name] * factor, **kwargs)
 
-    def display(self, ax, ref=None, extern_only=False, intern_only=False, nobs=False, **kwargs):
+    def display(self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs):
         if not extern_only:
             lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
             lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
