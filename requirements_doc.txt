@@ -12,3 +12,4 @@ zarr
 # doc
 sphinx-gallery
 pyeddytrackersample
+sphinx_rtd_theme
