@@ -1256,7 +1256,9 @@ class EddiesObservations(object):
             x = (x - ref) % 360 + ref
         return ax.scatter(x, self.latitude, c=self[name] * factor, **kwargs)
 
-    def display(self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs):
+    def display(
+        self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs
+    ):
         if not extern_only:
             lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
             lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
@@ -1287,14 +1289,23 @@ class EddiesObservations(object):
 
         regular_grid = RegularGridDataset.with_array(
             coordinates=("lon", "lat"),
-            datas=dict(count=grid, lon=x_bins[:-1], lat=y_bins[:-1],),
+            datas=dict(
+                count=grid,
+                lon=(x_bins[1:] + x_bins[:-1]) / 2,
+                lat=(y_bins[1:] + y_bins[:-1]) / 2,
+            ),
+            variables_description=dict(
+                count=dict(long_name="Number of times pixel is in eddies")
+            ),
+            centered=True,
         )
         if center:
             x, y = (self.longitude - x0) % 360 + x0, self.latitude
             grid[:] = histogram2d(x, y, (x_bins, y_bins))[0]
             grid.mask = grid.data == 0
         else:
-            x, y = (self[x_name] - x0) % 360 + x0, self[y_name]
+            x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
+            x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
             for x_, y_ in zip(x, y):
                 i, j = BasePath(create_vertice(x_, y_)).pixels_in(regular_grid)
                 grid_count_(grid, i, j)
