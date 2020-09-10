@@ -1115,6 +1115,7 @@ class RegularGridDataset(GridDataset):
 
     @classmethod
     def with_array(cls, coordinates, datas, variables_description=None, **kwargs):
+        vd = dict() if variables_description is None else variables_description
         x_name, y_name = coordinates[0], coordinates[1]
         obj = cls("array", x_name, y_name, unset=True, **kwargs)
         obj.x_dim = (x_name,)
@@ -1124,7 +1125,7 @@ class RegularGridDataset(GridDataset):
         for k, v in datas.items():
             obj.vars[k] = v
             obj.variables_description[k] = dict(
-                attrs=variables_description.get(k, dict()),
+                attrs=vd.get(k, dict()),
                 args=(k, v.dtype),
                 kwargs=dict(
                     dimensions=coordinates if k not in coordinates else (k,),
