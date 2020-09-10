@@ -118,7 +118,7 @@ class Network:
         )
         return gr
 
-    def build_dataset(self, group, keep_untracked=True):
+    def build_dataset(self, group):
         nb_obs = group.shape[0]
         model = EddiesObservations.load_file(self.filenames[-1], raw_data=True)
         eddies = TrackEddiesObservations.new_like(model, nb_obs)
@@ -140,6 +140,8 @@ class Network:
             i = stop
         if display_iteration:
             print()
+        eddies = eddies.add_fields(('track',))
+        eddies.obs['track'][new_i] = group
         return eddies
 
 

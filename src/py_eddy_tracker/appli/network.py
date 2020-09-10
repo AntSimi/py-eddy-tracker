@@ -48,16 +48,11 @@ def build_network():
         action="store_true",
         help="Use intern contour instead of outter contour",
     )
-    parser.add_argument(
-        "--keep_untracked",
-        action="store_true",
-        help=f"Store untracked observation with group number {Network.NOGROUP}",
-    )
     args = parser.parse_args()
 
     n = Network(args.identification_regex, window=args.window, intern=args.intern)
     group = n.group_observations(minimal_area=True)
-    n.build_dataset(group, args.keep_untracked).write_file(filename=args.out)
+    n.build_dataset(group).write_file(filename=args.out)
 
 
 def divide_network():
