@@ -58,7 +58,7 @@ cb = plt.colorbar(m, cax=fig.add_axes([0.94, 0.27, 0.01, 0.7]))
 cb.set_label("Eddies by 1°^2 by day")
 
 g_c.vars["count"] = ratio
-m = g_c.display(ax_ratio, name="count", vmin=0.1, vmax=10, norm=LogNorm())
+m = g_c.display(ax_ratio, name="count", vmin=0.1, vmax=10, norm=LogNorm(), cmap='coolwarm_r')
 plt.colorbar(m, cax=fig.add_axes([0.94, 0.02, 0.01, 0.2]))
 
 for ax in (ax_a, ax_c, ax_all, ax_ratio):
