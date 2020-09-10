@@ -293,7 +293,7 @@ class GridDataset(object):
         self.interpolators = dict()
         if centered is None:
             logger.warning(
-                "We assume the position of grid is the center corner for %s", filename,
+                "We assume pixel position of grid is center for %s", filename,
             )
         if not unset:
             self.load_general_features()
@@ -1062,6 +1062,7 @@ class UnRegularGridDataset(GridDataset):
                 self.coordinates[0]: x_array[:-1],
                 self.coordinates[1]: y_array[:-1],
             },
+            centered=False,
         )
         regular_grid.bessel_low_filter(grid_name, w_cut, order=1)
         z_filtered = regular_grid.grid(grid_name)
@@ -1113,13 +1114,26 @@ class RegularGridDataset(GridDataset):
         self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
 
     @classmethod
-    def with_array(cls, coordinates, datas):
+    def with_array(cls, coordinates, datas, variables_description=None, **kwargs):
         x_name, y_name = coordinates[0], coordinates[1]
-        obj = cls("array", x_name, y_name, unset=True, centered=False)
+        obj = cls("array", x_name, y_name, unset=True, **kwargs)
         obj.x_dim = (x_name,)
         obj.y_dim = (y_name,)
+        obj.variables_description = dict()
+        obj.dimensions = {i: v.shape[0] for i, v in datas.items() if i in coordinates}
         for k, v in datas.items():
             obj.vars[k] = v
+            obj.variables_description[k] = dict(
+                attrs=variables_description.get(k, dict()),
+                args=(k, v.dtype),
+                kwargs=dict(
+                    dimensions=coordinates if k not in coordinates else (k,),
+                    complevel=1,
+                    zlib=True,
+                ),
+                infos=dict(),
+            )
+        obj.global_attrs = dict(history="Grid setup with an array")
         obj.setup_coordinates()
         return obj
 
