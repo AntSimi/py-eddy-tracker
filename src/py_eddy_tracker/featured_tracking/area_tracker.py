@@ -11,7 +11,7 @@ class AreaTracker(Model):
         i, j, c = self.match(other, intern=False)
         cost_mat = ma.empty(shape, dtype="f4")
         cost_mat.mask = ma.ones(shape, dtype="bool")
-        m = c > 0
+        m = c > .2
         i, j, c = i[m], j[m], c[m]
         cost_mat[i, j] = 1 - c
 
