@@ -60,6 +60,15 @@ def poly_contain_poly(xy_poly_out, xy_poly_in):
 
 
 @njit(cache=True)
+def poly_area(vertice):
+    p_area = 0
+    nb_elt = vertice.shape[0]
+    for i_elt in range(1, nb_elt - 1):
+        p_area += vertice[i_elt, 0] * (vertice[1 + i_elt, 1] - vertice[i_elt - 1, 1])
+    return abs(p_area) * 0.5
+
+
+@njit(cache=True)
 def winding_number_poly(x, y, xy_poly):
     nb_elt = xy_poly.shape[0]
     wn = 0

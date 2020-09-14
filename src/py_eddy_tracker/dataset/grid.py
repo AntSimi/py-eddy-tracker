@@ -61,6 +61,7 @@ from ..poly import (
     winding_number_grid_in_poly,
     winding_number_poly,
     create_vertice,
+    poly_area,
 )
 
 logger = logging.getLogger("pet")
@@ -126,10 +127,32 @@ def mean_on_regular_contour(
         return values.mean()
 
 
-def fit_circle_path(self):
+def fit_circle_path(self, method="fit"):
     if not hasattr(self, "_circle_params"):
-        self._circle_params = _fit_circle_path(self.vertices)
-    return self._circle_params
+        self._circle_params = dict()
+    if method not in self._circle_params.keys():
+        if method == "fit":
+            self._circle_params["fit"] = _fit_circle_path(self.vertices)
+        if method == "equal_area":
+            self._circle_params["equal_area"] = _circle_from_equal_area(self.vertices)
+    return self._circle_params[method]
+
+
+@njit(cache=True, fastmath=True)
+def _circle_from_equal_area(vertice):
+    lons, lats = vertice[:, 0], vertice[:, 1]
+    # last coordinates == first
+    lon0, lat0 = lons[1:].mean(), lats[1:].mean()
+    c_x, c_y = coordinates_to_local(lons, lats, lon0, lat0)
+    # Some time, edge is only a dot of few coordinates
+    d_lon = lons.max() - lons.min()
+    d_lat = lats.max() - lats.min()
+    if d_lon < 1e-7 and d_lat < 1e-7:
+        # logger.warning('An edge is only define in one position')
+        # logger.debug('%d coordinates %s,%s', len(lons),lons,
+        # lats)
+        return 0, -90, nan, nan
+    return lon0, lat0, (poly_area(create_vertice(c_x, c_y)) / pi) ** 0.5, nan
 
 
 @njit(cache=True, fastmath=True)
@@ -146,10 +169,10 @@ def _fit_circle_path(vertice):
         # logger.debug('%d coordinates %s,%s', len(lons),lons,
         # lats)
         return 0, -90, nan, nan
-    centlon_e, centlat_e, eddy_radius_e, aerr = fit_circle(c_x, c_y)
-    centlon_e, centlat_e = local_to_coordinates(centlon_e, centlat_e, lon0, lat0)
-    centlon_e = (centlon_e - lon0 + 180) % 360 + lon0 - 180
-    return centlon_e, centlat_e, eddy_radius_e, aerr
+    centlon, centlat, eddy_radius, err = fit_circle(c_x, c_y)
+    centlon, centlat = local_to_coordinates(centlon, centlat, lon0, lat0)
+    centlon = (centlon - lon0 + 180) % 360 + lon0 - 180
+    return centlon, centlat, eddy_radius, err
 
 
 @njit(cache=True, fastmath=True)
