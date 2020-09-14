@@ -89,8 +89,8 @@ update_axes(ax)
 # Match
 # -----------------------
 # Where cyclone meet anticyclone
-i_c_adt, i_a_sla, c = c_adt.match(a_sla, 0.1)
-i_a_adt, i_c_sla, c = a_adt.match(c_sla, 0.1)
+i_c_adt, i_a_sla, c = c_adt.match(a_sla, cmin=0.01)
+i_a_adt, i_c_sla, c = a_adt.match(c_sla, cmin=0.01)
 
 ax = start_axes("Cyclone share area with anticyclone")
 a_adt.index(i_a_adt).display(ax, **kwargs_a_adt)
@@ -104,8 +104,8 @@ update_axes(ax)
 # %%
 # Scatter plot
 # ------------
-i_a_adt, i_a_sla, c = a_adt.match(a_sla, 0.1)
-i_c_adt, i_c_sla, c = c_adt.match(c_sla, 0.1)
+i_a_adt, i_a_sla, c = a_adt.match(a_sla, cmin=0.1)
+i_c_adt, i_c_sla, c = c_adt.match(c_sla, cmin=0.1)
 
 # %%
 # where is lonely eddies

@@ -82,7 +82,7 @@ ax_a.legend()
 # Match detection and compare
 # ---------------------------
 
-i_, j_, c = merge_f.match(merge_r, 0.1)
+i_, j_, c = merge_f.match(merge_r, cmin=0.1)
 
 # %%
 # where is lonely eddies
