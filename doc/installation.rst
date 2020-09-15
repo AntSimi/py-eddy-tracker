@@ -7,11 +7,11 @@ Source are available on github https://github.com/AntSimi/py-eddy-tracker
 Use python3.
 To avoid problems with installation, use of the virtualenv Python virtual environment is recommended or conda.
 
-Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, pyproj, ...), e.g.:
+Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, ...), e.g.:
 
 .. code-block:: bash
 
-    pip install numpy scipy netCDF4 matplotlib opencv-python pyyaml pyproj pint polygon3
+    pip install numpy scipy netCDF4 matplotlib opencv-python pyyaml pint polygon3
 
 
 Then run the following to install the eddy tracker:

@@ -43,7 +43,6 @@ from scipy.signal import welch
 from cv2 import filter2D
 from numba import njit, types as numba_types
 from matplotlib.path import Path as BasePath
-from pyproj import Proj
 from pint import UnitRegistry
 from ..observations.observation import EddiesObservations
 from ..eddy_feature import Amplitude, Contours
@@ -701,28 +700,29 @@ class GridDataset(object):
                 for contour in contour_paths:
                     if contour.used:
                         continue
-                    centlon_e, centlat_e, eddy_radius_e, aerr = contour.fit_circle()
+                    # FIXME : center could be not in contour and fit on raw sampling
+                    _, _, _, aerr = contour.fit_circle()
 
                     # Filter for shape
                     if aerr < 0 or aerr > shape_error or isnan(aerr):
-                        continue
-                    # Get indices of centroid
-                    # Give only 1D array of lon and lat not 2D data
-                    i_x, i_y = self.nearest_grd_indice(centlon_e, centlat_e)
-                    i_x = self.normalize_x_indice(i_x)
-
-                    # Check if centroid is on define value
-                    if data.mask[i_x, i_y]:
-                        continue
-                    # Test to know cyclone or anticyclone
-                    acyc_not_cyc = data[i_x, i_y] >= cvalues
-                    if anticyclonic_search != acyc_not_cyc:
                         continue
 
                     # Find all pixels in the contour
                     i_x_in, i_y_in = contour.pixels_in(self)
 
-                    # Maybe limit max must be replace with a maximum of surface
+                    # Check if pixels in contour are masked
+                    if data.mask[i_x_in, i_y_in].any():
+                        continue
+
+                    # Test to know cyclone or anticyclone
+                    if anticyclonic_search:
+                        if (data[i_x_in, i_y_in] < cvalues).any():
+                            continue
+                    else:
+                        if (data[i_x_in, i_y_in] > cvalues).any():
+                            continue
+
+                    # FIXME : Maybe limit max must be replace with a maximum of surface
                     if (
                         contour.nb_pixel < pixel_limit[0]
                         or contour.nb_pixel > pixel_limit[1]
@@ -775,30 +775,7 @@ class GridDataset(object):
                         pixel_min=pixel_limit[0],
                     )
 
-                    # Use azimuth equal projection for radius
-                    proj = Proj(
-                        "+proj=aeqd +ellps=WGS84 +lat_0={1} +lon_0={0}".format(
-                            *inner_contour.mean_coordinates
-                        )
-                    )
-                    # First, get position based on innermost
-                    # contour
-                    centx_i, centy_i, _, _ = fit_circle(
-                        *proj(inner_contour.lon, inner_contour.lat)
-                    )
-                    centlon_i, centlat_i = proj(centx_i, centy_i, inverse=True)
-                    # Second, get speed-based radius based on
-                    # contour of max uavg
-                    centx_s, centy_s, eddy_radius_s, aerr_s = fit_circle(
-                        *proj(speed_contour.lon, speed_contour.lat)
-                    )
-                    # Computed again to be coherent with speed_radius, we will be compute in same reference
-                    _, _, eddy_radius_e, aerr_e = fit_circle(
-                        *proj(contour.lon, contour.lat)
-                    )
-                    centlon_s, centlat_s = proj(centx_s, centy_s, inverse=True)
-
-                    # Instantiate new EddyObservation object (high cost need to be review)
+                    # FIXME : Instantiate new EddyObservation object (high cost need to be review)
                     obs = EddiesObservations(
                         size=1,
                         track_extra_variables=track_extra_variables,
@@ -818,8 +795,31 @@ class GridDataset(object):
                     else:
                         obs.obs["uavg_profile"] = raw_resample(speed_array, sampling)
                     obs.obs["amplitude"] = amp.amplitude
-                    obs.obs["radius_s"] = eddy_radius_s
                     obs.obs["speed_average"] = max_average_speed
+                    obs.obs["num_point_e"] = contour.lon.shape[0]
+                    xy_e = uniform_resample(contour.lon, contour.lat, **out_sampling)
+                    obs.obs["contour_lon_e"], obs.obs["contour_lat_e"] = xy_e
+                    obs.obs["num_point_s"] = speed_contour.lon.shape[0]
+                    xy_s = uniform_resample(
+                        speed_contour.lon, speed_contour.lat, **out_sampling
+                    )
+                    obs.obs["contour_lon_s"], obs.obs["contour_lat_s"] = xy_s
+
+                    # FIXME : we use a contour without resampling
+                    # First, get position based on innermost contour
+                    centlon_i, centlat_i, _, _ = _fit_circle_path(
+                        create_vertice(inner_contour.lon, inner_contour.lat)
+                    )
+                    # Second, get speed-based radius based on contour of max uavg
+                    centlon_s, centlat_s, eddy_radius_s, aerr_s = _fit_circle_path(
+                        create_vertice(*xy_s)
+                    )
+                    # Computed again to use resample contour
+                    _, _, eddy_radius_e, aerr_e = _fit_circle_path(
+                        create_vertice(*xy_e)
+                    )
+
+                    obs.obs["radius_s"] = eddy_radius_s
                     obs.obs["radius_e"] = eddy_radius_e
                     obs.obs["shape_error_e"] = aerr_e
                     obs.obs["shape_error_s"] = aerr_s
@@ -827,14 +827,6 @@ class GridDataset(object):
                     obs.obs["lat"] = centlat_s
                     obs.obs["lon_max"] = centlon_i
                     obs.obs["lat_max"] = centlat_i
-                    obs.obs["num_point_e"] = contour.lon.shape[0]
-                    xy = uniform_resample(contour.lon, contour.lat, **out_sampling)
-                    obs.obs["contour_lon_e"], obs.obs["contour_lat_e"] = xy
-                    obs.obs["num_point_s"] = speed_contour.lon.shape[0]
-                    xy = uniform_resample(
-                        speed_contour.lon, speed_contour.lat, **out_sampling
-                    )
-                    obs.obs["contour_lon_s"], obs.obs["contour_lat_s"] = xy
                     if aerr > 99.9 or aerr_s > 99.9:
                         logger.warning(
                             "Strange shape at this step! shape_error : %f, %f",

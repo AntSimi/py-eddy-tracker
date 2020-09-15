@@ -5,7 +5,6 @@ numpy
 opencv-python
 pint
 polygon3
-pyproj
 pyyaml
 scipy
 zarr
