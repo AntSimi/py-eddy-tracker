@@ -711,16 +711,14 @@ class GridDataset(object):
                     i_x_in, i_y_in = contour.pixels_in(self)
 
                     # Check if pixels in contour are masked
-                    if data.mask[i_x_in, i_y_in].any():
+                    if has_masked_value(data.mask, i_x_in, i_y_in):
                         continue
 
                     # Test to know cyclone or anticyclone
-                    if anticyclonic_search:
-                        if (data[i_x_in, i_y_in] < cvalues).any():
-                            continue
-                    else:
-                        if (data[i_x_in, i_y_in] > cvalues).any():
-                            continue
+                    if has_value(
+                        data, i_x_in, i_y_in, cvalues, below=anticyclonic_search
+                    ):
+                        continue
 
                     # FIXME : Maybe limit max must be replace with a maximum of surface
                     if (
@@ -1857,3 +1855,23 @@ def _nearest_grd_indice(x, y, x0, y0, xstep, ystep):
         numba_types.int32(round(((x - x0[0]) % 360.0) / xstep)),
         numba_types.int32(round((y - y0[0]) / ystep)),
     )
+
+
+@njit(cache=True)
+def has_masked_value(grid, i_x, i_y):
+    for i, j in zip(i_x, i_y):
+        if grid[i, j]:
+            return True
+    return False
+
+
+@njit(cache=True)
+def has_value(grid, i_x, i_y, value, below=False):
+    for i, j in zip(i_x, i_y):
+        if below:
+            if grid[i, j] < value:
+                return True
+        else:
+            if grid[i, j] > value:
+                return True
+    return False

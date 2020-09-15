@@ -10,5 +10,5 @@ g = RegularGridDataset(
 def test_id():
     g.add_uv("adt")
     a, c = g.eddy_identification("adt", "u", "v", datetime(2019, 2, 23))
-    assert len(a) == 35
+    assert len(a) == 36
     assert len(c) == 36
