@@ -668,16 +668,15 @@ class EddiesObservations(object):
     ):
         """
         Filled virtual obs (C)
-        Args:
-            previous_obs: previous obs from current (A)
-            current_obs: previous obs from virtual (B)
-            obs_to_extend:
-            dead_track:
-            nb_next:
-            model:
 
-        Returns:
-            New position C = B + AB
+        :param previous_obs: previous obs from current (A)
+        :param current_obs: previous obs from virtual (B)
+        :param obs_to_extend:
+        :param dead_track:
+        :param nb_next:
+        :param model:
+
+        :return: New position C = B + AB
         """
         next_obs = VirtualEddiesObservations(
             size=nb_next,
@@ -742,12 +741,11 @@ class EddiesObservations(object):
     @classmethod
     def cost_function_common_area(cls, xy_in, xy_out, distance, intern=False):
         """ How does it work on x bound ?
-        Args:
-            xy_in:
-            xy_out:
-            distance:
-            intern:
-        Returns:
+
+        :param xy_in:
+        :param xy_out:
+        :param distance:
+        :param bool intern:
 
         """
         x_name, y_name = cls.intern(intern)

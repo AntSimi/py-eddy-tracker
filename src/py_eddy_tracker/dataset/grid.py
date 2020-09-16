@@ -295,6 +295,14 @@ class GridDataset(object):
     def __init__(
         self, filename, x_name, y_name, centered=None, indexs=None, unset=False
     ):
+        """
+        :param str filename: Filename to load
+        :param str x_name: Name of longitude coordinates
+        :param str y_name: Name of latitude coordinates
+        :param bool,None centered: Allow to know how coordinates could be used with pixel
+        :param dict indexs: A dictionary which set indexs to use for non-coordinate dimensions
+        :param bool unset: Set to True to create an empty grid object without file
+        """
         self.dimensions = None
         self.variables_description = None
         self.global_attrs = None
@@ -457,11 +465,9 @@ class GridDataset(object):
     def copy(self, grid_in, grid_out):
         """
         Duplicate a variable
-        Args:
-            grid_in:
-            grid_out:
 
-        Returns:
+        :param grid_in:
+        :param grid_out:
 
         """
         h_dict = self.variables_description[grid_in]
@@ -580,19 +586,22 @@ class GridDataset(object):
         force_speed_unit=None,
     ):
         """
+        Compute eddy identification on specified grid
 
-        Args:
-            grid_height:
-            uname:
-            vname:
-            date:
-            step: must be in meter (m)
-            shape_error: must be in percent (%)
-            sampling:
-            pixel_limit:
-            precision: must be in meter(m)
+        :param str grid_height: Grid name of height
+        :param str uname: Grid name of u speed component
+        :param str vname: Grid name of v speed component
+        :param datetime.datetime date: Date which will be store in object to date data
+        :param float,int step: Height between two layers in m
+        :param float,int shape_error: Maximal error allow for outter contour in %
+        :param int sampling: Sampling of contour and speed profile
+        :param (int,int),None pixel_limit: Min and max of pixel which must be inside inner and outer contour to be considered like an eddy
+        :param float,None precision: Truncate value at the defined precision in m
+        :param str force_height_unit: Unit to used for height unit
+        :param str force_speed_unit: Unit to used for speed unit
 
-        Returns:
+        :return: Return a list of 2 elements: Anticyclone and Cyclone
+        :rtype: py_eddy_tracker.observations.observation.EddiesObservations
 
         """
         if not isinstance(date, datetime):
@@ -1752,16 +1761,19 @@ class RegularGridDataset(GridDataset):
     def interp(self, grid_name, lons, lats):
         """
         Compute z over lons, lats
-        Args:
-            grid_name: Grid which will be interp
-            lons: new x
-            lats: new y
 
-        Returns:
-            new z
+        :param str grid_name: Grid which will be interp
+        :param lons: new x
+        :param lats: new y
+
+        :return: new z
         """
         g = self.grid(grid_name)
-        return interp2d_geo(self.x_c, self.y_c, g, g.mask, lons, lats)
+        if len(g.mask.shape):
+            m = g.mask
+        else:
+            m = ones(g.shape) if g.mask else zeros(g.shape)
+        return interp2d_geo(self.x_c, self.y_c, g, m, lons, lats)
 
 
 @njit(cache=True, fastmath=True)

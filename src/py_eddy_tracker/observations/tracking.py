@@ -161,11 +161,8 @@ class TrackEddiesObservations(EddiesObservations):
     def extract_with_area(self, area, **kwargs):
         """
         Extract with a bounding box
-        Args:
-            area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
-            **kwargs:
 
-        Returns:
+        :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
 
         """
         mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
@@ -177,12 +174,10 @@ class TrackEddiesObservations(EddiesObservations):
     def extract_with_period(self, period, **kwargs):
         """
         Extract with a period
-        Args:
-            period: two date to define period, must be specify from 1/1/1950
-            **kwargs: directly give to __extract_with_mask
 
-        Returns:
-            same object with selected data
+        :param (datetime.datetime,datetime.datetime) period: two date to define period, must be specify from 1/1/1950
+
+        :return: same object with selected data
         """
         dataset_period = self.period
         p_min, p_max = period
@@ -511,13 +506,14 @@ def compute_mask_from_id(tracks, first_index, number_of_obs, mask):
 def track_loess_filter(half_window, x, y, track):
     """
     Apply a loess filter on y field
-    Args:
-        window: parameter of smoother
-        x: must be growing for each track but could be irregular
-        y: field to smooth
-        track: field which allow to separate path
 
-    Returns:
+    :param int,float window: parameter of smoother
+    :param array_like x: must be growing for each track but could be irregular
+    :param array_like y: field to smooth
+    :param array_like track: field which allow to separate path
+
+    :return: Array smoothed
+    :rtype: array_like
 
     """
     nb = y.shape[0]
@@ -555,13 +551,14 @@ def track_loess_filter(half_window, x, y, track):
 def track_median_filter(half_window, x, y, track):
     """
     Apply a loess filter on y field
-    Args:
-        window: parameter of smoother
-        x: must be growing for each track but could be irregular
-        y: field to smooth
-        track: field which allow to separate path
 
-    Returns:
+    :param int,float half_window: parameter of smoother
+    :param array_like x: must be growing for each track but could be irregular
+    :param array_like y: field to smooth
+    :param array_like track: field which allow to separate path
+
+    :return: Array smoothed
+    :rtype: array_like
 
     """
     nb = y.shape[0]
