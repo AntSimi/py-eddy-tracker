@@ -54,10 +54,12 @@ from ..generic import (
     uniform_resample,
     coordinates_to_local,
     local_to_coordinates,
+    get_pixel_in_regular,
+    nearest_grd_indice,
+    bbox_indice_regular,
 )
 from ..poly import (
     poly_contain_poly,
-    winding_number_grid_in_poly,
     winding_number_poly,
     create_vertice,
     poly_area,
@@ -172,36 +174,6 @@ def _fit_circle_path(vertice):
     centlon, centlat = local_to_coordinates(centlon, centlat, lon0, lat0)
     centlon = (centlon - lon0 + 180) % 360 + lon0 - 180
     return centlon, centlat, eddy_radius, err
-
-
-@njit(cache=True, fastmath=True)
-def _get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
-    if x_stop < x_start:
-        x_ref = vertices[0, 0]
-        x_array = (
-            (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360
-            + x_ref
-            - 180
-        )
-        return winding_number_grid_in_poly(
-            x_array,
-            y_c[y_start:y_stop],
-            x_start,
-            x_stop,
-            x_c.shape[0],
-            y_start,
-            vertices,
-        )
-    else:
-        return winding_number_grid_in_poly(
-            x_c[x_start:x_stop],
-            y_c[y_start:y_stop],
-            x_start,
-            x_stop,
-            x_c.shape[0],
-            y_start,
-            vertices,
-        )
 
 
 @njit(cache=True, fastmath=True)
@@ -454,6 +426,7 @@ class GridDataset(object):
         return False
 
     def units(self, varname):
+        """Get unit from variable"""
         stored_units = self.variables_description[varname]["attrs"].get("units", None)
         if stored_units is not None:
             return stored_units
@@ -478,6 +451,15 @@ class GridDataset(object):
             kwargs=h_dict["kwargs"].copy(),
         )
         self.vars[grid_out] = self.grid(grid_in).copy()
+
+    def add_grid(self, varname, grid):
+        """
+        Add a grid in handler
+
+        :param str varname: name of future grid
+        :param array grid: grid array
+        """
+        self.vars[varname] = grid
 
     def grid(self, varname, indexs=None):
         """give grid required
@@ -1180,7 +1162,7 @@ class RegularGridDataset(GridDataset):
 
     def get_pixels_in(self, contour):
         (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
-        return _get_pixel_in_regular(
+        return get_pixel_in_regular(
             contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop
         )
 
@@ -1188,7 +1170,7 @@ class RegularGridDataset(GridDataset):
         return indices % self.x_size
 
     def nearest_grd_indice(self, x, y):
-        return _nearest_grd_indice(
+        return nearest_grd_indice(
             x, y, self.x_bounds, self.y_bounds, self.xstep, self.ystep
         )
 
@@ -1844,29 +1826,6 @@ def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
         ii += delta + 1
     i_g %= nb_x
     return i_g, j_g, d_max
-
-
-@njit(cache=True)
-def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
-    lon, lat = vertices[:, 0], vertices[:, 1]
-    lon_min, lon_max = lon.min(), lon.max()
-    lat_min, lat_max = lat.min(), lat.max()
-    i_x0, i_y0 = _nearest_grd_indice(lon_min, lat_min, x0, y0, xstep, ystep)
-    i_x1, i_y1 = _nearest_grd_indice(lon_max, lat_max, x0, y0, xstep, ystep)
-    if circular:
-        slice_x = (i_x0 - N) % x_size, (i_x1 + N + 1) % x_size
-    else:
-        slice_x = max(i_x0 - N, 0), i_x1 + N + 1
-    slice_y = i_y0 - N, i_y1 + N + 1
-    return slice_x, slice_y
-
-
-@njit(cache=True, fastmath=True)
-def _nearest_grd_indice(x, y, x0, y0, xstep, ystep):
-    return (
-        numba_types.int32(round(((x - x0[0]) % 360.0) / xstep)),
-        numba_types.int32(round((y - y0[0]) / ystep)),
-    )
 
 
 @njit(cache=True)

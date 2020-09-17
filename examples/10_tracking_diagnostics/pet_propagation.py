@@ -1,6 +1,6 @@
 """
 Propagation Histogram
-===================
+=====================
 
 """
 from matplotlib import pyplot as plt

@@ -3,6 +3,10 @@ EddyId \
     nrt_global_allsat_phy_l4_20190223_20190226.nc \
     20190223 adt ugos vgos longitude latitude . \
     --cut 800 --fil 1
+EddyId \
+    dt_med_allsat_phy_l4_20160515_20190101.nc \
+    20160515 adt None None longitude latitude . \
+    --cut 800 --fil 1
 """
 from os import path
 import requests

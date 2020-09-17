@@ -68,6 +68,8 @@ from ..generic import (
     wrap_longitude,
     local_to_coordinates,
     reverse_index,
+    get_pixel_in_regular,
+    bbox_indice_regular,
 )
 from ..poly import bbox_intersection, vertice_overlap, create_vertice
 
@@ -1328,11 +1330,76 @@ class EddiesObservations(object):
         )
         return regular_grid
 
+    def interp_grid(
+        self, grid_object, varname, method="center", dtype=None, intern=None
+    ):
+        """
+        Interpolate a grid on a center or contour with mean, min or max method
+
+        :param grid_object: Handler of grid to interp
+        :type grid_object: py_eddy_tracker.dataset.grid.RegularGridDataset
+        :param str varname: Name of variable to use
+        :param str method: 'center','mean'
+        :param str dtype: if None we use var dtype
+        :param bool intern: Use extern or intern contour
+        """
+        if method == "center":
+            return grid_object.interp(varname, self.longitude, self.latitude)
+        elif method in ("min", "max", "mean"):
+            x0 = grid_object.x_bounds[0]
+            x_name, y_name = self.intern(False if intern is None else intern)
+            x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
+            x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
+            grid = grid_object.grid(varname)
+            result = empty(self.shape, dtype=grid.dtype if dtype is None else dtype)
+            grid_mean(
+                grid_object.x_c,
+                grid_object.y_c,
+                grid,
+                x,
+                y,
+                result,
+                grid_object.is_circular(),
+            )
+            return result
+        else:
+            raise Exception(f'method "{method}" unknown')
+
 
 @njit(cache=True)
 def grid_count_(grid, i, j):
     for i_, j_ in zip(i, j):
         grid[i_, j_] += 1
+
+
+@njit(cache=True)
+def grid_mean(x_c, y_c, grid, x, y, result, circular=False):
+    """
+    Compute mean of grid for each contour
+
+    :param array_like x_c: longitude coordinate of grid
+    :param array_like y_c: latitude coordinate of grid
+    :param array_like grid: grid value
+    :param array_like x: longitude of contours
+    :param array_like y: latitude of contours
+    :param array_like result: return values
+    :param bool circular: True if grid is wrappable
+    """
+    nb = result.shape[0]
+    xstep, ystep = x_c[1] - x_c[0], y_c[1] - y_c[0]
+    x0, y0 = x_c - xstep / 2.0, y_c - ystep / 2.0
+    nb_x = x_c.shape[0]
+    for elt in range(nb):
+        v = create_vertice(x[elt], y[elt],)
+        (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
+            v, x0, y0, xstep, ystep, 1, circular, nb_x
+        )
+        i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
+
+        v_sum = 0
+        for i_, j_ in zip(i, j):
+            v_sum += grid[i_, j_]
+        result[elt] = v_sum / i.shape[0]
 
 
 class VirtualEddiesObservations(EddiesObservations):

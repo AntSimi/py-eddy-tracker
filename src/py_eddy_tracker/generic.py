@@ -38,9 +38,11 @@ from numpy import (
     zeros,
     isnan,
     bool_,
+    concatenate,
 )
 from numba import njit, prange, types as numba_types
 from numpy.linalg import lstsq
+from .poly import winding_number_grid_in_poly
 
 
 @njit(cache=True)
@@ -74,14 +76,12 @@ def build_index(groups):
 @njit(cache=True, fastmath=True, parallel=False)
 def distance_grid(lon0, lat0, lon1, lat1):
     """
-    Args:
-        lon0:
-        lat0:
-        lon1:
-        lat1:
+    :param lon0:
+    :param lat0:
+    :param lon1:
+    :param lat1:
 
-    Returns:
-        nan value for far away point, and km for other
+    :return: nan value for far away point, and km for other
     """
     nb_0 = lon0.shape[0]
     nb_1 = lon1.shape[0]
@@ -272,8 +272,11 @@ def fit_circle(x_vec, y_vec):
 def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     """
     Resample contours to have (nearly) equal spacing
-       x_val, y_val : input contour coordinates
-       num_fac : factor to increase lengths of output coordinates
+
+    :param array_like x_val: input x contour coordinates
+    :param array_like y_val: input y contour coordinates
+    :param int num_fac: factor to increase lengths of output coordinates
+    :param int,None fixed_size: if define, it will used to set sampling
     """
     nb = x_val.shape[0]
     # Get distances
@@ -296,10 +299,9 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
 def flatten_line_matrix(l_matrix):
     """
     Flat matrix and add on between each line
-    Args:
-        l_matrix: matrix of position
+    :param l_matrix: matrix of position
 
-    Returns: array with nan between line
+    :return: array with nan between line
     """
     nb_line, sampling = l_matrix.shape
     final_size = (nb_line - 1) + nb_line * sampling
@@ -349,12 +351,11 @@ def simplify(x, y, precision=0.1):
 def split_line(x, y, i):
     """
     Split x and y at each i change
-    Args:
-        x: array
-        y: array
-        i: array of int at each i change, we cut x, y
+    :param x: array
+    :param y: array
+    :param i: array of int at each i change, we cut x, y
 
-    Returns: x and y separate by nan at each i jump
+    :return: x and y separate by nan at each i jump
     """
     nb_jump = len(where(i[1:] - i[:-1] != 0)[0])
     nb_value = x.shape[0]
@@ -453,3 +454,89 @@ def local_to_coordinates(x, y, lon0, lat0):
         / D2R
     )
     return lon, lat / D2R
+
+
+@njit(cache=True, fastmath=True)
+def nearest_grd_indice(x, y, x0, y0, xstep, ystep):
+    """
+    Get nearest grid indice from a position
+
+    :param x: longitude
+    :param y: latitude
+    :param float x0: first grid longitude
+    :param float y0: first grid latitude
+    :param float xstep: step between two longitude
+    :param float ystep: step between two latitude
+    """
+    return (
+        numba_types.int32(round(((x - x0[0]) % 360.0) / xstep)),
+        numba_types.int32(round((y - y0[0]) / ystep)),
+    )
+
+
+@njit(cache=True)
+def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
+    """
+    Get bbox indice of a contour in a regular grid
+
+    :param vertices: vertice of contour
+    :param float x0: first grid longitude
+    :param float y0: first grid latitude
+    :param float xstep: step between two longitude
+    :param float ystep: step between two latitude
+    :param int N: shift of index to enlarge window
+    :param bool circular: To know if grid is wrappable
+    :param int x_size: Number of longitude
+    """
+    lon, lat = vertices[:, 0], vertices[:, 1]
+    lon_min, lon_max = lon.min(), lon.max()
+    lat_min, lat_max = lat.min(), lat.max()
+    i_x0, i_y0 = nearest_grd_indice(lon_min, lat_min, x0, y0, xstep, ystep)
+    i_x1, i_y1 = nearest_grd_indice(lon_max, lat_max, x0, y0, xstep, ystep)
+    if circular:
+        slice_x = (i_x0 - N) % x_size, (i_x1 + N + 1) % x_size
+    else:
+        slice_x = max(i_x0 - N, 0), i_x1 + N + 1
+    slice_y = i_y0 - N, i_y1 + N + 1
+    return slice_x, slice_y
+
+
+@njit(cache=True, fastmath=True)
+def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
+    """
+    Get a pixel list of a regular grid contain in a contour
+
+    :param array_like vertices: contour vertice (N,2)
+    :param array_like x_c: longitude coordinate of grid
+    :param array_like y_c: latitude coordinate of grid
+    :param int x_start: west index of contour
+    :param int y_start: east index of contour
+    :param int x_stop: south index of contour
+    :param int y_stop: north index of contour
+    """
+    if x_stop < x_start:
+        x_ref = vertices[0, 0]
+        x_array = (
+            (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360
+            + x_ref
+            - 180
+        )
+        return winding_number_grid_in_poly(
+            x_array,
+            y_c[y_start:y_stop],
+            x_start,
+            x_stop,
+            x_c.shape[0],
+            y_start,
+            vertices,
+        )
+    else:
+        return winding_number_grid_in_poly(
+            x_c[x_start:x_stop],
+            y_c[y_start:y_stop],
+            x_start,
+            x_stop,
+            x_c.shape[0],
+            y_start,
+            vertices,
+        )
