@@ -43,6 +43,7 @@ Welcome to py-eddy-tracker's documentation!
    autodoc/eddy_feature
    autodoc/featured_tracking
    autodoc/poly
+   autodoc/generic
 
 
 Indices and tables

@@ -31,11 +31,19 @@ def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
     """
     http://geomalgorithms.com/a03-_inclusion.html
     isLeft(): tests if a point is Left|On|Right of an infinite line.
-    Input:  three points P0, P1, and P2
-    Return: >0 for P2 left of the line through P0 and P1
-            =0 for P2  on the line
-            <0 for P2  right of the line
     See: Algorithm 1 "Area of Triangles and Polygons"
+
+    :param float x_line_0:
+    :param float y_line_0:
+    :param float x_line_1:
+    :param float y_line_1:
+    :param float x_test:
+    :param float y_test:
+    :return: > 0 for P2 left of the line through P0 and P1
+            = 0 for P2  on the line
+            < 0 for P2  right of the line
+    :rtype: bool
+
     """
     # Vector product
     product = (x_line_1 - x_line_0) * (y_test - y_line_0) - (x_test - x_line_0) * (
@@ -46,6 +54,12 @@ def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
 
 @njit(cache=True)
 def poly_contain_poly(xy_poly_out, xy_poly_in):
+    """
+    :param vertice xy_poly_out:
+    :param vertice xy_poly_in:
+    :return: True if poly_in is in poly_out
+    :rtype: bool
+    """
     nb_elt = xy_poly_in.shape[0]
     x = xy_poly_in[:, 0]
     x_ref = xy_poly_out[0, 0]
@@ -61,7 +75,12 @@ def poly_contain_poly(xy_poly_out, xy_poly_in):
 
 @njit(cache=True)
 def poly_area(vertice):
-    p_area = 0
+    """
+    :param vertice vertice: polygon vertice
+    :return: area of polygon in coordinates unit
+    :rtype: float
+    """
+    p_area = vertice[0, 0] * (vertice[1, 1] - vertice[1, -2])
     nb_elt = vertice.shape[0]
     for i_elt in range(1, nb_elt - 1):
         p_area += vertice[i_elt, 0] * (vertice[1 + i_elt, 1] - vertice[i_elt - 1, 1])
@@ -70,6 +89,15 @@ def poly_area(vertice):
 
 @njit(cache=True)
 def winding_number_poly(x, y, xy_poly):
+    """
+    Check if x,y is in poly
+
+    :param float x: x to test
+    :param float y: y to test
+    :param vertice xy_poly: vertice of polygon
+    :return: wn == 0  if x,y is not in poly
+    :retype: int
+    """
     nb_elt = xy_poly.shape[0]
     wn = 0
     # loop through all edges of the polygon
@@ -97,12 +125,17 @@ def winding_number_poly(x, y, xy_poly):
 def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
     """
     http://geomalgorithms.com/a03-_inclusion.html
-    wn_PnPoly(): winding number test for a point in a polygon
-          Input:   P = a point,
-                   V[] = vertex points of a polygon V[n+1] with V[n]=V[0]
-          Return:  wn = the winding number (=0 only when P is outside)
+
+    :param array x_1d: x of local grid
+    :param array y_1d: y of local grid
+    :param int i_x0: int to add at x index to have index in global grid
+    :param int i_x1: last index in global grid
+    :param int x_size: number of x in global grid
+    :param int i_y0: int to add at y index to have index in global grid
+    :param vertice xy_poly: vertices of polygon which must contain pixel
+    :return: Return index in xy_poly
+    :rtype: (int,int)
     """
-    # the  winding number counter
     nb_x, nb_y = len(x_1d), len(y_1d)
     wn = empty((nb_x, nb_y), dtype=numba_types.bool_)
     for i in prange(nb_x):
@@ -120,7 +153,15 @@ def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
 
 @njit(cache=True, fastmath=True)
 def bbox_intersection(x0, y0, x1, y1):
-    """compute bbox to check if there are a bbox intersection
+    """
+    Compute bbox to check if there are a bbox intersection
+
+    :param array x0: x for polygon list 0
+    :param array y0: y for polygon list 0
+    :param array x1: x for polygon list 1
+    :param array y1: y for polygon list 1
+    :return: index of each polygon bbox which have an intersection
+    :rtype: (int, int)
     """
     nb0 = x0.shape[0]
     nb1 = x1.shape[0]
@@ -152,6 +193,12 @@ def bbox_intersection(x0, y0, x1, y1):
 
 @njit(cache=True)
 def create_vertice(x, y):
+    """
+    :param array x:
+    :param array y:
+    :return: Return the vertice of polygon
+    :rtype: vertice
+    """
     nb = x.shape[0]
     v = empty((nb, 2), dtype=x.dtype)
     for i in range(nb):
@@ -162,6 +209,15 @@ def create_vertice(x, y):
 
 @njit(cache=True)
 def create_vertice_from_2darray(x, y, index):
+    """
+    Choose a polygon in x,y list and return vertice
+
+    :param array x:
+    :param array y:
+    :param int index:
+    :return: Return the vertice of polygon
+    :rtype: vertice
+    """
     _, nb = x.shape
     v = empty((nb, 2), dtype=x.dtype)
     for i in range(nb):
@@ -172,6 +228,17 @@ def create_vertice_from_2darray(x, y, index):
 
 @njit(cache=True)
 def get_wrap_vertice(x0, y0, x1, y1, i):
+    """
+    Return a vertice for each polygon and check that use same reference coordinates
+
+    :param array x0: x for polygon list 0
+    :param array y0: y for polygon list 0
+    :param array x1: x for polygon list 1
+    :param array y1: y for polygon list 1
+    :param int i: index to use fot the 2 list
+    :return: return two compatible vertice
+    :rtype: (vertice, vertice)
+    """
     x0_, x1_ = x0[i], x1[i]
     if abs(x0_[0] - x1_[0]) > 180:
         ref = x0_[0] - x0.dtype.type(180)
@@ -180,6 +247,15 @@ def get_wrap_vertice(x0, y0, x1, y1, i):
 
 
 def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
+    """
+    :param array x0: x for polygon list 0
+    :param array y0: y for polygon list 0
+    :param array x1: x for polygon list 1
+    :param array y1: y for polygon list 1
+    :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union
+    :return: Result of cost function
+    :rtype: array
+    """
     nb = x0.shape[0]
     cost = empty(nb)
     for i in range(nb):
@@ -199,6 +275,13 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
 
 
 def polygon_overlap(p0, p1, minimal_area=False):
+    """
+    :param list(Polygon) p0: List of polygon to compare with p1 list
+    :param list(Polygon) p1: List of polygon to compare with p0 list
+    :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union
+    :return: Result of cost function
+    :rtype: array
+    """
     nb = len(p1)
     cost = empty(nb)
     for i in range(nb):
