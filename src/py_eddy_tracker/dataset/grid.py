@@ -50,7 +50,6 @@ from .. import VAR_DESCR
 from ..generic import (
     distance,
     interp2d_geo,
-    fit_circle,
     uniform_resample,
     coordinates_to_local,
     local_to_coordinates,
@@ -63,6 +62,7 @@ from ..poly import (
     winding_number_poly,
     create_vertice,
     poly_area,
+    fit_circle,
 )
 
 logger = logging.getLogger("pet")
@@ -153,7 +153,7 @@ def _circle_from_equal_area(vertice):
         # logger.debug('%d coordinates %s,%s', len(lons),lons,
         # lats)
         return 0, -90, nan, nan
-    return lon0, lat0, (poly_area(create_vertice(c_x, c_y)) / pi) ** 0.5, nan
+    return lon0, lat0, (poly_area(c_x, c_y) / pi) ** 0.5, nan
 
 
 @njit(cache=True, fastmath=True)

@@ -21,7 +21,8 @@ Email: evanmason@gmail.com
 ===========================================================================
 """
 
-from numpy import empty, where, array
+from numpy import empty, where, array, ones, pi
+from numpy.linalg import lstsq
 from numba import njit, prange, types as numba_types
 from Polygon import Polygon
 
@@ -74,16 +75,27 @@ def poly_contain_poly(xy_poly_out, xy_poly_in):
 
 
 @njit(cache=True)
-def poly_area(vertice):
+def poly_area_vertice(v):
     """
-    :param vertice vertice: polygon vertice
+    :param vertice v: polygon vertice
     :return: area of polygon in coordinates unit
     :rtype: float
     """
-    p_area = vertice[0, 0] * (vertice[1, 1] - vertice[1, -2])
-    nb_elt = vertice.shape[0]
-    for i_elt in range(1, nb_elt - 1):
-        p_area += vertice[i_elt, 0] * (vertice[1 + i_elt, 1] - vertice[i_elt - 1, 1])
+    return poly_area(v[:, 0], v[:, 1])
+
+
+@njit(cache=True)
+def poly_area(x, y):
+    """
+    :param array x:
+    :param array y:
+    :return: area of polygon in coordinates unit
+    :rtype: float
+    """
+    p_area = x[0] * (y[1] - y[-2])
+    nb = x.shape[0]
+    for i in range(1, nb - 1):
+        p_area += x[i] * (y[1 + i] - y[i - 1])
     return abs(p_area) * 0.5
 
 
@@ -295,3 +307,81 @@ def polygon_overlap(p0, p1, minimal_area=False):
         else:
             cost[i] = intersection / (p0 + p_).area()
     return cost
+
+
+@njit(cache=True)
+def fit_circle(x, y):
+    """
+    From a polygon, function will fit a circle
+    Must be call with local coordinates (in m, to get a radius in m)
+
+    :param array x: x of polygon
+    :param array y: y of polygon
+    :return: x0, y0, radius, shape_error
+    :rtype: (float,float,float,float)
+    """
+    nb_elt = x.shape[0]
+
+    # last coordinates == first
+    x_mean = x[1:].mean()
+    y_mean = y[1:].mean()
+
+    norme = (x[1:] - x_mean) ** 2 + (y[1:] - y_mean) ** 2
+    norme_max = norme.max()
+    scale = norme_max ** 0.5
+
+    # Form matrix equation and solve it
+    # Maybe put f4
+    datas = ones((nb_elt - 1, 3))
+    datas[:, 0] = 2.0 * (x[1:] - x_mean) / scale
+    datas[:, 1] = 2.0 * (y[1:] - y_mean) / scale
+
+    (x0, y0, radius), _, _, _ = lstsq(datas, norme / norme_max)
+
+    # Unscale data and get circle variables
+    radius += x0 ** 2 + y0 ** 2
+    radius **= 0.5
+    x0 *= scale
+    y0 *= scale
+    # radius of fitted circle
+    radius *= scale
+    # center X-position of fitted circle
+    x0 += x_mean
+    # center Y-position of fitted circle
+    y0 += y_mean
+
+    err = shape_error(x, y, x0, y0, radius)
+    return x0, y0, radius, err
+
+
+@njit(cache=True, fastmath=True)
+def shape_error(x, y, x0, y0, r):
+    """
+    With a polygon(x,y) in local coordinates
+    and circle properties(x0, y0, r), function compute a shape error:
+
+    .. math:: ShapeError = \\frac{Polygon_{area} + Circle_{area} - 2 * Intersection_{area}}{Circle_{area}} * 100
+
+    When error > 100, area of difference is bigger than circle area
+
+    :param array x: x of polygon
+    :param array y: y of polygon
+    :param float x0: x center of circle
+    :param float y0: y center of circle
+    :param float r: radius of circle
+    :return: shape error
+    :rtype: float
+    """
+    # circle area
+    c_area = (r ** 2) * pi
+    p_area = poly_area(x, y)
+    nb = x.shape[0]
+    x, y = x.copy(), y.copy()
+    # Find distance between circle center and polygon
+    for i in range(nb):
+        dx, dy = x[i] - x0, y[i] - y0
+        rd = r / (dx ** 2 + dy ** 2) ** 0.5
+        if rd < 1:
+            x[i] = x0 + dx * rd
+            y[i] = y0 + dy * rd
+    return 100 + (p_area - 2 * poly_area(x, y)) / c_area * 100
