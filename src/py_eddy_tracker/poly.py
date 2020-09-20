@@ -354,6 +354,48 @@ def fit_circle(x, y):
     return x0, y0, radius, err
 
 
+@njit(cache=True)
+def fit_circle_(x, y):
+    """
+    From a polygon, function will fit a circle.
+
+    Must be call with local coordinates (in m, to get a radius in m).
+
+    .. math:: (x_i - x_0)^2 + (y_i - y_0)^2 = r^2
+    .. math:: x_i^2 - 2 x_i x_0 + x_0^2 + y_i^2 - 2 y_i y_0 + y_0^2 = r^2
+    .. math:: 2 x_0 x_i + 2 y_0 y_i + r^2 - x_0^2 - y_0^2 = x_i^2 + y_i^2
+
+    we get this linear equation
+
+    .. math:: a X + b Y + c = Z
+
+    where :
+
+    .. math:: a = 2 x_0 , b = 2 y_0 , c = r^2 - x_0^2 - y_0^2
+    .. math:: X = x_i , Y = y_i , Z = x_i^2 + y_i^2
+
+    Solutions:
+
+    .. math:: x_0 = a / 2 , y_0 = b / 2 , r = \\sqrt{c + x_0^2 + y_0^2}
+
+
+    :param array x: x of polygon
+    :param array y: y of polygon
+    :return: x0, y0, radius, shape_error
+    :rtype: (float,float,float,float)
+    """
+    datas = ones((x.shape[0] - 1, 3))
+    # we skip first position which are the same than the last
+    datas[:, 0] = x[1:]
+    datas[:, 1] = y[1:]
+    # Linear regression
+    (a, b, c), _, _, _ = lstsq(datas, x[1:] ** 2 + y[1:] ** 2)
+    x0, y0 = a / 2.0, b / 2.0
+    radius = (c + x0 ** 2 + y0 ** 2) ** 0.5
+    err = shape_error(x, y, x0, y0, radius)
+    return x0, y0, radius, err
+
+
 @njit(cache=True, fastmath=True)
 def shape_error(x, y, x0, y0, r):
     """
