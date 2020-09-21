@@ -26,7 +26,7 @@ def start_axes(title):
 def update_axes(ax, mappable=None):
     ax.grid()
     if mappable:
-        plt.colorbar(m, cax=ax.figure.add_axes([0.95, 0.05, 0.01, 0.9]))
+        plt.colorbar(mappable, cax=ax.figure.add_axes([0.95, 0.05, 0.01, 0.9]))
 
 
 # %%

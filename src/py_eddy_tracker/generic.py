@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-===========================================================================
 This file is part of py-eddy-tracker.
 
     py-eddy-tracker is free software: you can redistribute it and/or modify
@@ -46,6 +45,12 @@ from .poly import winding_number_grid_in_poly
 
 @njit(cache=True)
 def reverse_index(index, nb):
+    """
+    :param array index: index of group which will be set to False
+    :param array nb: Count for each group
+    :return: mask of value selected
+    :rtype: array
+    """
     m = ones(nb, dtype=numba_types.bool_)
     for i in index:
         m[i] = False
@@ -55,6 +60,10 @@ def reverse_index(index, nb):
 @njit(cache=True)
 def build_index(groups):
     """We expected that variable is monotonous, and return index for each step change
+
+    :param array groups: array which contain group to be separated
+    :return: (first_index of each group, last_index of each group, value to shift group)
+    :rtype: (array, array, int)
     """
     i0, i1 = groups.min(), groups.max()
     amplitude = i1 - i0 + 1
@@ -75,12 +84,13 @@ def build_index(groups):
 @njit(cache=True, fastmath=True, parallel=False)
 def distance_grid(lon0, lat0, lon1, lat1):
     """
-    :param lon0:
-    :param lat0:
-    :param lon1:
-    :param lat1:
+    :param array lon0:
+    :param array lat0:
+    :param array lon1:
+    :param array lat1:
 
     :return: nan value for far away point, and km for other
+    :rtype: array
     """
     nb_0 = lon0.shape[0]
     nb_1 = lon1.shape[0]
@@ -109,6 +119,16 @@ def distance_grid(lon0, lat0, lon1, lat1):
 
 @njit(cache=True, fastmath=True)
 def distance(lon0, lat0, lon1, lat1):
+    """
+    Compute distance between points from each line
+
+    :param float lon0:
+    :param float lat0:
+    :param float lon1:
+    :param float lat1:
+    :return: distance (in m)
+    :rtype: array
+    """
     D2R = pi / 180.0
     sin_dlat = sin((lat1 - lat0) * 0.5 * D2R)
     sin_dlon = sin((lon1 - lon0) * 0.5 * D2R)
@@ -118,31 +138,21 @@ def distance(lon0, lat0, lon1, lat1):
     return 6370997.0 * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
 
 
-@njit(cache=True)
-def distance_vincenty(lon0, lat0, lon1, lat1):
-    """ better than haversine but buggy ??"""
-    D2R = pi / 180.0
-    dlon = (lon1 - lon0) * D2R
-    cos_dlon = cos(dlon)
-    cos_lat1 = cos(lat0 * D2R)
-    cos_lat2 = cos(lat1 * D2R)
-    sin_lat1 = sin(lat0 * D2R)
-    sin_lat2 = sin(lat1 * D2R)
-    return 6370997.0 * arctan2(
-        (
-            (cos_lat2 * sin(dlon) ** 2)
-            + (cos_lat1 * sin_lat2 - sin_lat1 * cos_lat2 * cos_dlon) ** 2
-        )
-        ** 0.5,
-        sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_dlon,
-    )
-
-
 @njit(cache=True, fastmath=True)
 def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
-    """For geographic grid, test of cicularity
-    Maybe test if we are out of bounds
     """
+    For geographic grid, test of cicularity
+
+    :param array x_g: coordinates of grid
+    :param array y_g: coordinates of grid
+    :param array z_g: Grid value
+    :param array m_g: Boolean grid, True if value is masked
+    :param array x: coordinate where interpolate z
+    :param array y: coordinate where interpolate z
+    :return: z interpolated
+    :rtype: array
+    """
+    # TODO : Maybe test if we are out of bounds
     x_ref = x_g[0]
     y_ref = y_g[0]
     x_step = x_g[1] - x_ref
@@ -173,25 +183,6 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
                 z01 * (1 - xd) + z11 * xd
             ) * yd
     return z
-
-
-@njit(cache=True, fastmath=True, parallel=False)
-def custom_convolution(data, mask, kernel):
-    """do sortin at high lattitude big part of value are masked"""
-    nb_x = kernel.shape[0]
-    demi_x = int((nb_x - 1) / 2)
-    demi_y = int((kernel.shape[1] - 1) / 2)
-    out = empty(data.shape[0] - nb_x + 1)
-    for i in prange(out.shape[0]):
-        if mask[i + demi_x, demi_y] == 1:
-            w = (mask[i : i + nb_x] * kernel).sum()
-            if w != 0:
-                out[i] = (data[i : i + nb_x] * kernel).sum() / w
-            else:
-                out[i] = nan
-        else:
-            out[i] = nan
-    return out
 
 
 @njit(cache=True, fastmath=True)
@@ -225,8 +216,8 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
 def flatten_line_matrix(l_matrix):
     """
     Flat matrix and add on between each line
-    :param l_matrix: matrix of position
 
+    :param l_matrix: matrix of position
     :return: array with nan between line
     """
     nb_line, sampling = l_matrix.shape
@@ -244,6 +235,15 @@ def flatten_line_matrix(l_matrix):
 
 @njit(cache=True)
 def simplify(x, y, precision=0.1):
+    """
+    Will remove all middle point which are closer than precision
+
+    :param array x:
+    :param array y:
+    :param float precision: if two points have distance inferior to precision with remove next point
+    :return: (x,y)
+    :rtype: (array,array)
+    """
     precision2 = precision ** 2
     nb = x.shape[0]
     x_previous, y_previous = x[0], y[0]
@@ -277,6 +277,7 @@ def simplify(x, y, precision=0.1):
 def split_line(x, y, i):
     """
     Split x and y at each i change
+
     :param x: array
     :param y: array
     :param i: array of int at each i change, we cut x, y
@@ -302,6 +303,16 @@ def split_line(x, y, i):
 
 @njit(cache=True)
 def wrap_longitude(x, y, ref, cut=False):
+    """
+    Will wrap contiguous longitude with reference like west bound
+
+    :param array x:
+    :param array y:
+    :param float ref: longitude of reference, all the new value will be between ref and ref + 360
+    :param bool cut: if True line will be cut at the bounds
+    :return: lon,lat
+    :rtype: (array,array)
+    """
     if cut:
         indexs = list()
         nb = x.shape[0]
@@ -348,6 +359,16 @@ def wrap_longitude(x, y, ref, cut=False):
 
 @njit(cache=True, fastmath=True)
 def coordinates_to_local(lon, lat, lon0, lat0):
+    """
+    Take latlong coordinates to transform in local coordinates (in m)
+
+    :param array x: coordinates to transform
+    :param array y: coordinates to transform
+    :param float lon0: longitude of local reference
+    :param float lat0: latitude of local reference
+    :return: x,y
+    :retype: (array, array)
+    """
     D2R = pi / 180.0
     R = 6370997
     dlon = (lon - lon0) * D2R
@@ -367,6 +388,16 @@ def coordinates_to_local(lon, lat, lon0, lat0):
 
 @njit(cache=True, fastmath=True)
 def local_to_coordinates(x, y, lon0, lat0):
+    """
+    Take local coordinates (in m) to transform to latlong
+
+    :param array x: coordinates to transform
+    :param array y: coordinates to transform
+    :param float lon0: longitude of local reference
+    :param float lat0: latitude of local reference
+    :return: lon,lat
+    :retype: (array, array)
+    """
     D2R = pi / 180.0
     R = 6370997
     d = (x ** 2 + y ** 2) ** 0.5 / R

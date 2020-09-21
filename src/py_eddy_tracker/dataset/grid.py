@@ -305,6 +305,9 @@ class GridDataset(object):
     def is_centered(self):
         """Give information if pixel is describe with center position or
         a corner
+
+        :return: True if centered
+        :rtype: bool
         """
         if self.centered is None:
             return True
@@ -312,7 +315,7 @@ class GridDataset(object):
             return self.centered
 
     def load_general_features(self):
-        """Load attrs
+        """Load attrs to  be store in object
         """
         logger.debug(
             "Load general feature from %(filename)s", dict(filename=self.filename)
@@ -340,6 +343,8 @@ class GridDataset(object):
 
     def write(self, filename):
         """Write dataset output with same format like input
+
+        :param str filename: filename which will be used to save grid
         """
         with Dataset(filename, "w") as h_out:
             for dimension, size in self.dimensions.items():
@@ -373,7 +378,9 @@ class GridDataset(object):
                 setattr(h_out, attr, value)
 
     def load(self):
-        """Load variable (data)
+        """
+        Load variable (data).
+        Get coordinates and setup coordinates function
         """
         x_name, y_name = self.coordinates
         with Dataset(self.filename) as h:
