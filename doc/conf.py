@@ -37,10 +37,10 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_gallery.gen_gallery",
     "matplotlib.sphinxext.plot_directive",
-
 ]
 
-autoclass_content = 'both'
+# autodoc conf
+autoclass_content = "both"
 
 sphinx_gallery_conf = {
     "examples_dirs": "../examples",  # path to your example scripts
@@ -59,6 +59,9 @@ sphinx_gallery_conf = {
         "use_jupyter_lab": True,
     },
 }
+
+# matplotlib conf
+plot_include_source = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = [".templates"]
