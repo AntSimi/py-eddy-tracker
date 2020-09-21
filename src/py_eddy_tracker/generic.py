@@ -38,6 +38,7 @@ from numpy import (
     isnan,
     bool_,
     concatenate,
+    radians,
 )
 from numba import njit, prange, types as numba_types
 from .poly import winding_number_grid_in_poly
@@ -497,3 +498,18 @@ def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
             y_start,
             vertices,
         )
+
+
+def build_circle(x0, y0, r):
+    """
+    Method to built circle from center coordinates
+
+    :param float x0: center coordinate
+    :param float y0: center coordinate
+    :param float r: radius i meter
+    :return: x,y
+    :rtype: (array,array)
+    """
+    angle = radians(linspace(0, 360, 50))
+    x_norm, y_norm = cos(angle), sin(angle)
+    return x_norm * r + x0, y_norm * r + y0
