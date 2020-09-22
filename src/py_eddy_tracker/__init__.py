@@ -235,6 +235,28 @@ VAR_DESCR = dict(
             "the eddy and the SSH around the effective contour defining the eddy edge",
         ),
     ),
+    speed_area=dict(
+        attr_name="speed_area",
+        nc_name="speed_area",
+        nc_type="float32",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            long_name="Speed area",
+            units="m^2",
+            comment="Area enclosed by speed contour in m^2",
+        ),
+    ),
+    effective_area=dict(
+        attr_name="effective_area",
+        nc_name="effective_area",
+        nc_type="float32",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            long_name="Effective area",
+            units="m^2",
+            comment="Area enclosed by effective contour in m^2",
+        ),
+    ),
     speed_average=dict(
         attr_name="speed_average",
         scale_factor=0.0001,

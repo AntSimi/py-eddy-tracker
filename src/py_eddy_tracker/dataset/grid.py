@@ -819,6 +819,12 @@ class GridDataset(object):
                     obs.obs["radius_e"] = eddy_radius_e
                     obs.obs["shape_error_e"] = aerr_e
                     obs.obs["shape_error_s"] = aerr_s
+                    obs.obs["speed_area"] = poly_area(
+                        *coordinates_to_local(*xy_s, lon0=centlon_s, lat0=centlat_s)
+                    )
+                    obs.obs["effective_area"] = poly_area(
+                        *coordinates_to_local(*xy_e, lon0=centlon_s, lat0=centlat_s)
+                    )
                     obs.obs["lon"] = centlon_s
                     obs.obs["lat"] = centlat_s
                     obs.obs["lon_max"] = centlon_i

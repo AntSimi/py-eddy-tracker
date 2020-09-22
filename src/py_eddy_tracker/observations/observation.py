@@ -138,6 +138,8 @@ class EddiesObservations(object):
         "time",
         "shape_error_e",
         "shape_error_s",
+        "speed_area",
+        "effective_area",
         "nb_contour_selected",
         "num_point_e",
         "num_point_s",
