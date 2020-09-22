@@ -58,8 +58,8 @@ update_axes(ax, m)
 # Parameters distribution
 # -----------------------
 fig = plt.figure(figsize=(12, 5))
-ax_a = plt.subplot(121, xlabel="amplitdue(cm)")
-ax_r = plt.subplot(122, xlabel="speed radius (km)")
+ax_a = fig.add_subplot(121, xlabel="amplitdue(cm)")
+ax_r = fig.add_subplot(122, xlabel="speed radius (km)")
 ax_a.hist(
     merge_f["amplitude"] * 100,
     bins=arange(0.0005, 100, 1),
