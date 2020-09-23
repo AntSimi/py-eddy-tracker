@@ -109,7 +109,7 @@ class Anim:
         return self.draw_contour()
 
     def draw_contour(self):
-        t0, t1 = self.period
+        # t0, t1 = self.period
         # select contour for this time step
         m = self.t == self.now
         self.ax.figure.canvas.restore_region(self.bg_cache)

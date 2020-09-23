@@ -57,6 +57,37 @@ def merge_eddies():
     obs.write_file(filename=args.out)
 
 
+def get_frequency_grid():
+    parser = EddyParser("Compute eddy frequency")
+    parser.add_argument("observations", help="Input observations to compute frequency")
+    parser.add_argument("out", help="Grid output file")
+    parser.add_argument(
+        "--intern",
+        help="Use speed contour instead of effective contour",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--xrange", nargs="+", type=float, help="Horizontal range : START,STOP,STEP"
+    )
+    parser.add_argument(
+        "--yrange", nargs="+", type=float, help="Vertical range : START,STOP,STEP"
+    )
+    args = parser.parse_args()
+
+    if (args.xrange is None or len(args.xrange) not in (3,)) or (
+        args.yrange is None or len(args.yrange) not in (3,)
+    ):
+        raise Exception("Use START/STOP/STEP for --xrange and --yrange")
+
+    var_to_load = ["longitude"]
+    var_to_load.extend(EddiesObservations.intern(args.intern, public_label=True))
+    e = EddiesObservations.load_file(args.observations, include_vars=var_to_load)
+
+    bins = args.xrange, args.yrange
+    g = e.grid_count(bins, intern=args.intern)
+    g.write(args.out)
+
+
 def display_infos():
     parser = EddyParser("Display General inforamtion")
     parser.add_argument("observations", nargs='+', help="Input observations to compute frequency")

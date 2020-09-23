@@ -49,6 +49,7 @@ from numpy import (
     histogram2d,
     linspace,
     sin,
+    histogram,
 )
 from netCDF4 import Dataset
 from datetime import datetime
@@ -1359,6 +1360,7 @@ class EddiesObservations(object):
             ),
             centered=True,
         )
+        debug_active = logger.getEffectiveLevel() == logging.DEBUG
         if center:
             x, y = (self.longitude - x0) % 360 + x0, self.latitude
             grid[:] = histogram2d(x, y, (x_bins, y_bins))[0]
@@ -1366,9 +1368,14 @@ class EddiesObservations(object):
         else:
             x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
             x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
-            for x_, y_ in zip(x, y):
+            nb = x_ref.shape[0]
+            for i_, (x_, y_) in enumerate(zip(x, y)):
+                if debug_active and i_ % 10000 == 0:
+                    print(f"{i_}/{nb}", end="\r")
                 i, j = BasePath(create_vertice(x_, y_)).pixels_in(regular_grid)
                 grid_count_(grid, i, j)
+            if debug_active:
+                print()
             grid.mask = grid == 0
         return regular_grid
 

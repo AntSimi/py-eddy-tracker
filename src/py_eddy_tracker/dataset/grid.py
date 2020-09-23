@@ -584,7 +584,8 @@ class GridDataset(object):
         :param float,int step: Height between two layers in m
         :param float,int shape_error: Maximal error allow for outter contour in %
         :param int sampling: Sampling of contour and speed profile
-        :param (int,int),None pixel_limit: Min and max of pixel which must be inside inner and outer contour to be considered like an eddy
+        :param (int,int),None pixel_limit:
+            Min and max of pixel which must be inside inner and outer contour to be considered like an eddy
         :param float,None precision: Truncate value at the defined precision in m
         :param str force_height_unit: Unit to used for height unit
         :param str force_speed_unit: Unit to used for speed unit
