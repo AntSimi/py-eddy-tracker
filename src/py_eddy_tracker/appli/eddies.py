@@ -23,6 +23,7 @@ Email: evanmason@gmail.com
 from netCDF4 import Dataset
 from .. import EddyParser
 from ..observations.tracking import TrackEddiesObservations
+from ..observations.observation import EddiesObservations
 
 
 def merge_eddies():
@@ -54,3 +55,20 @@ def merge_eddies():
             other = other.add_rotation_type()
         obs = obs.merge(other)
     obs.write_file(filename=args.out)
+
+
+def display_infos():
+    parser = EddyParser("Display General inforamtion")
+    parser.add_argument("observations", nargs='+', help="Input observations to compute frequency")
+    args = parser.parse_args()
+    array_vars = [
+        "speed_contour_longitude",
+        "speed_contour_latitude",
+        "effective_contour_longitude",
+        "effective_contour_latitude",
+        "uavg_profile",
+    ]
+    for filename in args.observations:
+        print(f"-- {filename} --")
+        e = EddiesObservations.load_file(filename, remove_vars=array_vars)
+        print(e.__repr__())

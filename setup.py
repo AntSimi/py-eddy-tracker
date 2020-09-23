@@ -40,6 +40,7 @@ setup(
             "EddyId = py_eddy_tracker.appli.grid:eddy_id",
             # eddies
             "MergeEddies = py_eddy_tracker.appli.eddies:merge_eddies",
+            "EddyInfos = py_eddy_tracker.appli.eddies:display_infos",
             # network
             "EddyNetworkGroup = py_eddy_tracker.appli.network:build_network",
             "EddyNetworkBuildPath = py_eddy_tracker.appli.network:divide_network",

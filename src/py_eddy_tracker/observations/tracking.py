@@ -192,14 +192,6 @@ class TrackEddiesObservations(EddiesObservations):
             mask *= self.time <= (dataset_period[1] + p_max)
         return self.__extract_with_mask(mask, **kwargs)
 
-    @property
-    def period(self):
-        """
-        Give time coverage
-        Returns: 2 date
-        """
-        return self.time.min(), self.time.max()
-
     def get_mask_from_id(self, tracks):
         mask = zeros(self.tracks.shape, dtype=bool_)
         compute_mask_from_id(tracks, self.index_from_track, self.nb_obs_by_track, mask)

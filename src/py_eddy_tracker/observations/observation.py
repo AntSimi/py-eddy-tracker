@@ -199,7 +199,66 @@ class EddiesObservations(object):
         return self.observations.shape
 
     def __repr__(self):
-        return "%d observations" % len(self.observations)
+        """
+        return general informations on dataset as a string
+
+        :return: informations on datasets
+        :rtype: str
+        """
+        t0, t1 = self.period
+        period = t1 - t0 + 1
+        bins_lat = (-90, -60, -15, 15, 60, 90)
+        bins_amplitude = array((0, 1, 2, 3, 4, 5, 10, 500))
+        bins_radius = array((0, 15, 30, 45, 60, 75, 100, 200, 2000))
+        nb_obs = self.observations.shape[0]
+
+        def hist(varname, x="lat", bins=bins_lat, percent=False, mean=False, nb=False):
+            """
+            :param str varname: variable to use to compute stat
+            :param str x: variable to use to know in which bins
+            :param array bins:
+            :param bool percent: normalize by sum of all bins
+            :param bool mean: compute mean by bins
+            :param nb mean: only count by bins
+            :return: value by bins
+            :rtype: array
+            """
+            if nb:
+                v = histogram(self[x], bins=bins)[0]
+            else:
+                v = histogram(self[x], bins=bins, weights=self[varname])[0]
+            if percent:
+                v = v.astype("f4") / v.sum() * 100
+            elif mean:
+                v /= histogram(self[x], bins=bins)[0]
+            return v
+
+        def box_display(value):
+            """Return value evenly spaced with few numbers"""
+            return "".join([f"{v_:10.2f}" for v_ in value])
+
+        return f"""{nb_obs} observations from {t0} to {t1} ({period} days, ~{nb_obs / period:.0f} obs/day)
+    Speed area      : {self["speed_area"].sum() / period / 1e12:.2f} Mkm²/day
+    Effective area  : {self["effective_area"].sum() / period / 1e12:.2f} Mkm²/day
+
+    Distribution in Amplitude:
+    Amplitude bounds (cm)  {box_display(bins_amplitude)}
+    Percent of eddies         : {box_display(hist('time', 'amplitude', bins_amplitude / 100., percent=True, nb=True))}
+
+    Distribution in Radius:
+    Speed radius (km)      {box_display(bins_radius)}
+    Percent of eddies         : {box_display(hist('time', 'radius_s', bins_radius * 1000., percent=True, nb=True))}
+
+    Distribution in Latitude
+    Latitude bounds        {box_display(bins_lat)}
+    Percent of eddies         : {box_display(hist('time', percent=True, nb=True))}
+    Percent of speed area     : {box_display(hist('speed_area', percent=True))}
+    Percent of effective area : {box_display(hist('effective_area', percent=True))}
+
+    Mean speed radius (km)    : {box_display(hist('radius_s', mean=True) / 1000.)}
+    Mean effective radius (km): {box_display(hist('radius_e', mean=True) / 1000.)}
+    Mean amplitude (cm)       : {box_display(hist('amplitude', mean=True) * 100.)}
+"""
 
     def __getitem__(self, attr):
         if attr in self.elements:
@@ -1365,6 +1424,16 @@ class EddiesObservations(object):
             return result
         else:
             raise Exception(f'method "{method}" unknown')
+
+    @property
+    def period(self):
+        """
+        Give time coverage
+
+        :return: first and last date
+        :rtype: (int,int)
+        """
+        return self.time.min(), self.time.max()
 
 
 @njit(cache=True)
