@@ -1,10 +1,7 @@
 ---
 name: Bug report
-about: Describe this issue template's purpose here.
-title: ''
-labels: ''
-assignees: ''
-
+about: Report a bug or issue with py_eddy_tracker.
+# This template is based on the matplotlib template
 ---
 
 <!--Feel free to delete the sections that do not apply.-->
