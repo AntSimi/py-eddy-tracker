@@ -112,6 +112,11 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
     return m
 
 
+@njit(cache=True)
+def hist_numba(x, bins):
+    return histogram(x, bins)
+
+
 class EddiesObservations(object):
     """
     Class to hold eddy properties *amplitude* and counts of
@@ -199,6 +204,22 @@ class EddiesObservations(object):
     def shape(self):
         return self.observations.shape
 
+    def get_infos(self):
+        infos = dict(
+            bins_lat=(-90, -60, -15, 15, 60, 90),
+            bins_amplitude=array((0, 1, 2, 3, 4, 5, 10, 500)),
+            bins_radius=array((0, 15, 30, 45, 60, 75, 100, 200, 2000)),
+            nb_obs=self.observations.shape[0],
+        )
+        t0, t1 = self.period
+        infos["t0"], infos["t1"] = t0, t1
+        infos["period"] = t1 - t0 + 1
+        return infos
+
+    def _repr_html_(self):
+        infos = self.get_infos()
+        return f"""<b>{infos['nb_obs']} observations from {infos['t0']} to {infos['t1']} </b>"""
+
     def __repr__(self):
         """
         return general informations on dataset as a string
@@ -225,13 +246,13 @@ class EddiesObservations(object):
             :rtype: array
             """
             if nb:
-                v = histogram(self[x], bins=bins)[0]
+                v = hist_numba(self[x], bins=bins)[0]
             else:
                 v = histogram(self[x], bins=bins, weights=self[varname])[0]
             if percent:
                 v = v.astype("f4") / v.sum() * 100
             elif mean:
-                v /= histogram(self[x], bins=bins)[0]
+                v /= hist_numba(self[x], bins=bins)[0]
             return v
 
         def box_display(value):
@@ -241,25 +262,20 @@ class EddiesObservations(object):
         return f"""{nb_obs} observations from {t0} to {t1} ({period} days, ~{nb_obs / period:.0f} obs/day)
     Speed area      : {self["speed_area"].sum() / period / 1e12:.2f} Mkm²/day
     Effective area  : {self["effective_area"].sum() / period / 1e12:.2f} Mkm²/day
-
-    Distribution in Amplitude:
+----Distribution in Amplitude:
     Amplitude bounds (cm)  {box_display(bins_amplitude)}
     Percent of eddies         : {box_display(hist('time', 'amplitude', bins_amplitude / 100., percent=True, nb=True))}
-
-    Distribution in Radius:
+----Distribution in Radius:
     Speed radius (km)      {box_display(bins_radius)}
     Percent of eddies         : {box_display(hist('time', 'radius_s', bins_radius * 1000., percent=True, nb=True))}
-
-    Distribution in Latitude
+----Distribution in Latitude
     Latitude bounds        {box_display(bins_lat)}
     Percent of eddies         : {box_display(hist('time', percent=True, nb=True))}
     Percent of speed area     : {box_display(hist('speed_area', percent=True))}
     Percent of effective area : {box_display(hist('effective_area', percent=True))}
-
     Mean speed radius (km)    : {box_display(hist('radius_s', mean=True) / 1000.)}
     Mean effective radius (km): {box_display(hist('radius_e', mean=True) / 1000.)}
-    Mean amplitude (cm)       : {box_display(hist('amplitude', mean=True) * 100.)}
-"""
+    Mean amplitude (cm)       : {box_display(hist('amplitude', mean=True) * 100.)}"""
 
     def __getitem__(self, attr):
         if attr in self.elements:
@@ -1367,9 +1383,10 @@ class EddiesObservations(object):
             grid.mask = grid.data == 0
         else:
             x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
-            x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
+            # x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
             nb = x_ref.shape[0]
-            for i_, (x_, y_) in enumerate(zip(x, y)):
+            for i_, (x, y_) in enumerate(zip(self[x_name], self[y_name])):
+                x_ = (x - x_ref[i_]) % 360 + x_ref[i_]
                 if debug_active and i_ % 10000 == 0:
                     print(f"{i_}/{nb}", end="\r")
                 i, j = BasePath(create_vertice(x_, y_)).pixels_in(regular_grid)

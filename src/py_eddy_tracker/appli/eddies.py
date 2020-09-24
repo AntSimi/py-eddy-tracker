@@ -90,16 +90,20 @@ def get_frequency_grid():
 
 def display_infos():
     parser = EddyParser("Display General inforamtion")
-    parser.add_argument("observations", nargs='+', help="Input observations to compute frequency")
+    parser.add_argument(
+        "observations", nargs="+", help="Input observations to compute frequency"
+    )
     args = parser.parse_args()
-    array_vars = [
-        "speed_contour_longitude",
-        "speed_contour_latitude",
-        "effective_contour_longitude",
-        "effective_contour_latitude",
-        "uavg_profile",
+    vars = [
+        "amplitude",
+        "speed_radius",
+        "speed_area",
+        "effective_radius",
+        "effective_area",
+        "time",
+        "latitude",
     ]
     for filename in args.observations:
         print(f"-- {filename} --")
-        e = EddiesObservations.load_file(filename, remove_vars=array_vars)
-        print(e.__repr__())
+        e = EddiesObservations.load_file(filename, include_vars=vars)
+        print(e)
