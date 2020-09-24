@@ -11,7 +11,7 @@ from py_eddy_tracker.gui import GUI
 def parser():
     parser = ArgumentParser("Eddy atlas GUI")
     parser.add_argument("atlas", nargs="+")
-    parser.add_argument("--med", action='store_true')
+    parser.add_argument("--med", action="store_true")
     return parser.parse_args()
 
 

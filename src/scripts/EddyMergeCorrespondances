@@ -17,17 +17,17 @@ def usage():
     """Usage
     """
     # Run using:
-    parser = EddyParser(
-        "Tool to use identification step to compute tracking")
-    parser.add_argument('nc_file',
-                        nargs='+',
-                        help='File of correspondances to reload link '
-                             'without tracking computation')
-    parser.add_argument('path_out', help='Path, where to write file')
+    parser = EddyParser("Tool to use identification step to compute tracking")
+    parser.add_argument(
+        "nc_file",
+        nargs="+",
+        help="File of correspondances to reload link " "without tracking computation",
+    )
+    parser.add_argument("path_out", help="Path, where to write file")
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     CONFIG = usage()
 
     # Create output directory
@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     START_TIME = dt.datetime.now()
     CORRESPONDANCES = Correspondances.load(CONFIG.nc_file[0])
-    logger.info('Start merging')
+    logger.info("Start merging")
     for i in CONFIG.nc_file[1:]:
         CORRESPONDANCES.merge_correspondance(Correspondances.load(i))
 

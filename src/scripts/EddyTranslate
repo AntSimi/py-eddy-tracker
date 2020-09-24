@@ -10,14 +10,16 @@ import zarr
 
 
 def id_parser():
-    parser = EddyParser('Eddy Translate, Translate eddies from netcdf to zarr or from zarr to netcdf')
-    parser.add_argument('filename_in')
-    parser.add_argument('filename_out')
+    parser = EddyParser(
+        "Eddy Translate, Translate eddies from netcdf to zarr or from zarr to netcdf"
+    )
+    parser.add_argument("filename_in")
+    parser.add_argument("filename_out")
     return parser
 
 
 def is_nc(filename):
-    return filename.endswith('.nc')
+    return filename.endswith(".nc")
 
 
 def get_variable_name(filename):
@@ -31,21 +33,23 @@ def get_variable_name(filename):
 
 def get_variable(filename, varname):
     if is_nc(filename):
-        dataset = EddiesObservations.load_from_netcdf(filename, raw_data=True, include_vars=(varname,))
+        dataset = EddiesObservations.load_from_netcdf(
+            filename, raw_data=True, include_vars=(varname,)
+        )
     else:
         dataset = EddiesObservations.load_from_zarr(filename, include_vars=(varname,))
     return dataset
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = id_parser().parse_args()
 
     variables = get_variable_name(args.filename_in)
     if not is_nc(args.filename_out):
-        h = zarr.open(args.filename_out, 'w')
+        h = zarr.open(args.filename_out, "w")
         for varname in variables:
             get_variable(args.filename_in, varname).to_zarr(h)
     else:
-        with Dataset(args.filename_out, 'w') as h:
+        with Dataset(args.filename_out, "w") as h:
             for varname in variables:
                 get_variable(args.filename_in, varname).to_netcdf(h)
