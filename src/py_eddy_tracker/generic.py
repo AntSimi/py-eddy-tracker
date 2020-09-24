@@ -39,6 +39,7 @@ from numpy import (
     bool_,
     concatenate,
     radians,
+    histogram,
 )
 from numba import njit, prange, types as numba_types
 from .poly import winding_number_grid_in_poly
@@ -80,6 +81,11 @@ def build_index(groups):
     last_index[:-1] = first_index[1:]
     last_index[-1] = i + 2
     return first_index, last_index, i0
+
+
+@njit(cache=True)
+def hist_numba(x, bins):
+    return histogram(x, bins)
 
 
 @njit(cache=True, fastmath=True, parallel=False)

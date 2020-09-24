@@ -38,6 +38,7 @@ from numpy import (
     zeros,
     array,
     median,
+    histogram
 )
 from datetime import datetime, timedelta
 from numba import njit
@@ -62,6 +63,8 @@ class TrackEddiesObservations(EddiesObservations):
         "lat",
         "radius_s",
         "radius_e",
+        "speed_area",
+        "effective_area",
         "amplitude",
         "speed_average",
         "time",
@@ -82,6 +85,31 @@ class TrackEddiesObservations(EddiesObservations):
         super().__init__(*args, **kwargs)
         self.__first_index_of_track = None
         self.__obs_by_track = None
+
+    def __repr__(self):
+        content = super().__repr__()
+        t0, t1 = self.period
+        period = t1 - t0 + 1
+        nb = self.nb_obs_by_track
+        nb_obs = self.observations.shape[0]
+        m = self["virtual"].astype("bool")
+        nb_m = m.sum()
+        bins_t = (0, 20, 50, 100, 200, 1000, 10000)
+        nb_tracks_by_t = histogram(nb, bins=bins_t)[0]
+        nb_obs_by_t = histogram(nb, bins=bins_t, weights=nb)[0]
+        pct_tracks_by_t = nb_tracks_by_t / nb_tracks_by_t.sum() * 100.
+        pct_obs_by_t = nb_obs_by_t / nb_obs_by_t.sum() * 100.
+        content += f"""
+    | {nb.shape[0]} tracks ({nb.mean():.2f} obs/tracks, shorter {nb.min()} obs, longer {nb.max()} obs)
+    |   {nb_m} filled observations ({nb_m / nb.shape[0]:.2f} obs/tracks, {nb_m / nb_obs * 100:.2f} % of total)
+    |   Intepolated speed area : {self["speed_area"][m].sum() / period / 1e12:.2f} Mkm²/day
+    |   Intepolated effective area : {self["effective_area"][m].sum() / period / 1e12:.2f} Mkm²/day
+    ----Distribution in lifetime:
+    |   Lifetime (days  )      {self.box_display(bins_t)}
+    |   Percent of tracks         : {self.box_display(pct_tracks_by_t)}
+    |   Percent of eddies         : {self.box_display(pct_obs_by_t)}
+"""
+        return content
 
     def filled_by_interpolation(self, mask):
         """Filled selected values by interpolation

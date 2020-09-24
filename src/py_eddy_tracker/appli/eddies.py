@@ -104,6 +104,13 @@ def display_infos():
         "latitude",
     ]
     for filename in args.observations:
-        print(f"-- {filename} --")
-        e = EddiesObservations.load_file(filename, include_vars=vars)
+        with Dataset(filename) as h:
+            track = 'track' in h.variables
+        print(f"-- {filename} -- ")
+        if track:
+            vars_ = vars.copy()
+            vars_.extend(('track', 'observation_number', 'observation_flag'))
+            e = TrackEddiesObservations.load_file(filename, include_vars=vars_)
+        else:
+            e = EddiesObservations.load_file(filename, include_vars=vars)
         print(e)

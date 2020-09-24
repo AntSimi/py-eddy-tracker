@@ -70,6 +70,7 @@ from ..generic import (
     reverse_index,
     get_pixel_in_regular,
     bbox_indice_regular,
+    hist_numba,
 )
 from ..poly import bbox_intersection, vertice_overlap, create_vertice
 
@@ -110,11 +111,6 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
             d_normalize = dx ** 2 / major[j] ** 2 + dy ** 2 / minor ** 2
             m[j, i] = d_normalize < 1.0
     return m
-
-
-@njit(cache=True)
-def hist_numba(x, bins):
-    return histogram(x, bins)
 
 
 class EddiesObservations(object):
@@ -220,6 +216,32 @@ class EddiesObservations(object):
         infos = self.get_infos()
         return f"""<b>{infos['nb_obs']} observations from {infos['t0']} to {infos['t1']} </b>"""
 
+    def hist(self, varname, x, bins, percent=False, mean=False, nb=False):
+        """
+            :param str varname: variable to use to compute stat
+            :param str x: variable to use to know in which bins
+            :param array bins:
+            :param bool percent: normalize by sum of all bins
+            :param bool mean: compute mean by bins
+            :param nb mean: only count by bins
+            :return: value by bins
+            :rtype: array
+            """
+        if nb:
+            v = hist_numba(self[x], bins=bins)[0]
+        else:
+            v = histogram(self[x], bins=bins, weights=self[varname])[0]
+        if percent:
+            v = v.astype("f4") / v.sum() * 100
+        elif mean:
+            v /= hist_numba(self[x], bins=bins)[0]
+        return v
+
+    @staticmethod
+    def box_display(value):
+        """Return value evenly spaced with few numbers"""
+        return "".join([f"{v_:10.2f}" for v_ in value])
+
     def __repr__(self):
         """
         return general informations on dataset as a string
@@ -234,48 +256,25 @@ class EddiesObservations(object):
         bins_radius = array((0, 15, 30, 45, 60, 75, 100, 200, 2000))
         nb_obs = self.observations.shape[0]
 
-        def hist(varname, x="lat", bins=bins_lat, percent=False, mean=False, nb=False):
-            """
-            :param str varname: variable to use to compute stat
-            :param str x: variable to use to know in which bins
-            :param array bins:
-            :param bool percent: normalize by sum of all bins
-            :param bool mean: compute mean by bins
-            :param nb mean: only count by bins
-            :return: value by bins
-            :rtype: array
-            """
-            if nb:
-                v = hist_numba(self[x], bins=bins)[0]
-            else:
-                v = histogram(self[x], bins=bins, weights=self[varname])[0]
-            if percent:
-                v = v.astype("f4") / v.sum() * 100
-            elif mean:
-                v /= hist_numba(self[x], bins=bins)[0]
-            return v
-
-        def box_display(value):
-            """Return value evenly spaced with few numbers"""
-            return "".join([f"{v_:10.2f}" for v_ in value])
-
-        return f"""{nb_obs} observations from {t0} to {t1} ({period} days, ~{nb_obs / period:.0f} obs/day)
-    Speed area      : {self["speed_area"].sum() / period / 1e12:.2f} Mkm²/day
-    Effective area  : {self["effective_area"].sum() / period / 1e12:.2f} Mkm²/day
-----Distribution in Amplitude:
-    Amplitude bounds (cm)  {box_display(bins_amplitude)}
-    Percent of eddies         : {box_display(hist('time', 'amplitude', bins_amplitude / 100., percent=True, nb=True))}
-----Distribution in Radius:
-    Speed radius (km)      {box_display(bins_radius)}
-    Percent of eddies         : {box_display(hist('time', 'radius_s', bins_radius * 1000., percent=True, nb=True))}
-----Distribution in Latitude
-    Latitude bounds        {box_display(bins_lat)}
-    Percent of eddies         : {box_display(hist('time', percent=True, nb=True))}
-    Percent of speed area     : {box_display(hist('speed_area', percent=True))}
-    Percent of effective area : {box_display(hist('effective_area', percent=True))}
-    Mean speed radius (km)    : {box_display(hist('radius_s', mean=True) / 1000.)}
-    Mean effective radius (km): {box_display(hist('radius_e', mean=True) / 1000.)}
-    Mean amplitude (cm)       : {box_display(hist('amplitude', mean=True) * 100.)}"""
+        return f"""    | {nb_obs} observations from {t0} to {t1} ({period} days, ~{nb_obs / period:.0f} obs/day)
+    |   Speed area      : {self["speed_area"].sum() / period / 1e12:.2f} Mkm²/day
+    |   Effective area  : {self["effective_area"].sum() / period / 1e12:.2f} Mkm²/day
+    ----Distribution in Amplitude:
+    |   Amplitude bounds (cm)  {self.box_display(bins_amplitude)}
+    |   Percent of eddies         : {
+        self.box_display(self.hist('time', 'amplitude', bins_amplitude / 100., percent=True, nb=True))}
+    ----Distribution in Radius:
+    |   Speed radius (km)      {self.box_display(bins_radius)}
+    |   Percent of eddies         : {
+        self.box_display(self.hist('time', 'radius_s', bins_radius * 1000., percent=True, nb=True))}
+    ----Distribution in Latitude
+        Latitude bounds        {self.box_display(bins_lat)}
+        Percent of eddies         : {self.box_display(self.hist('time', 'lat', bins_lat, percent=True, nb=True))}
+        Percent of speed area     : {self.box_display(self.hist('speed_area', 'lat', bins_lat, percent=True))}
+        Percent of effective area : {self.box_display(self.hist('effective_area', 'lat', bins_lat, percent=True))}
+        Mean speed radius (km)    : {self.box_display(self.hist('radius_s', 'lat', bins_lat, mean=True) / 1000.)}
+        Mean effective radius (km): {self.box_display(self.hist('radius_e', 'lat', bins_lat, mean=True) / 1000.)}
+        Mean amplitude (cm)       : {self.box_display(self.hist('amplitude', 'lat', bins_lat, mean=True) * 100.)}"""
 
     def __getitem__(self, attr):
         if attr in self.elements:
