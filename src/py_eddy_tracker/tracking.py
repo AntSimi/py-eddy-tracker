@@ -363,12 +363,16 @@ class Correspondances(list):
         self.reset_dataset_cache()
         first_dataset, flg_virtual = self.load_state()
 
-        self.swap_dataset(self.datasets[first_dataset - 1])
+        kwargs = dict()
+        needed_variable = self.class_method.needed_variable()
+        if needed_variable is not None:
+            kwargs['include_vars'] = needed_variable
+        self.swap_dataset(self.datasets[first_dataset - 1], **kwargs)
         # We begin with second file, first one is in previous
         for file_name in self.datasets[first_dataset:]:
-            self.swap_dataset(file_name)
-            logger.info('%s match with previous state', file_name)
-            logger.debug('%d obs to match', len(self.current_obs))
+            self.swap_dataset(file_name, **kwargs)
+            logger.info("%s match with previous state", file_name)
+            logger.debug("%d obs to match", len(self.current_obs))
 
             nb_real_obs = len(self.previous_obs)
             if flg_virtual:

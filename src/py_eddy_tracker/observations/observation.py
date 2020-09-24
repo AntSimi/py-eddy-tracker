@@ -283,6 +283,10 @@ class EddiesObservations(object):
         raise KeyError("%s unknown" % attr)
 
     @classmethod
+    def needed_variable(cls):
+        return None
+
+    @classmethod
     def obs_dimension(cls, handler):
         for candidate in ("obs", "Nobs", "observation", "i"):
             if candidate in handler.dimensions.keys():

@@ -6,6 +6,13 @@ logger = logging.getLogger("pet")
 
 
 class AreaTracker(Model):
+
+    @classmethod
+    def needed_variable(cls):
+        vars = ['longitude', 'latitude']
+        vars.extend(cls.intern(False, public_label=True))
+        return vars
+
     def tracking(self, other):
         shape = (self.shape[0], other.shape[0])
         i, j, c = self.match(other, intern=False)
