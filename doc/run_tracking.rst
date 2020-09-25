@@ -49,6 +49,11 @@ It will produce 4 files by run:
 - A file which will contains all the short track which are shorter than **TRACK_DURATION_MIN**
 - A file which will contains all the long track which are longer than **TRACK_DURATION_MIN**
 
+Use python module
+*****************
+
+An example of tracking with python module is available in the gallery:
+:ref:`sphx_glr_python_module_08_tracking_manipulation_pet_run_a_tracking.py`
 
 Choose a tracker
 ****************
