@@ -60,7 +60,7 @@ from pint.errors import UndefinedUnitError
 from tokenize import TokenError
 from tarfile import ExFileObject
 from matplotlib.path import Path as BasePath
-from .. import VAR_DESCR, VAR_DESCR_inv
+from .. import VAR_DESCR, VAR_DESCR_inv, __version__
 from ..generic import (
     distance_grid,
     distance,
@@ -1318,6 +1318,7 @@ class EddiesObservations(object):
             Metadata_Conventions="Unidata Dataset Discovery v1.0",
             comment="Surface product; mesoscale eddies",
             framework_used="https://github.com/AntSimi/py-eddy-tracker",
+            framework_version=__version__,
             standard_name_vocabulary="NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table",
             rotation_type=self.sign_type,
         )

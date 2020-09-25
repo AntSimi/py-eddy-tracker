@@ -25,6 +25,10 @@ from argparse import ArgumentParser
 import logging
 import numpy
 import zarr
+from ._version import get_versions
+
+__version__ = get_versions()["version"]
+del get_versions
 
 
 def start_logger():
@@ -139,6 +143,18 @@ VAR_DESCR = dict(
         nc_type="float64",
         nc_dims=("obs",),
         nc_attr=dict(),
+    ),
+    distance_next=dict(
+        attr_name=None,
+        nc_name="distance_next",
+        nc_type="float32",
+        output_type="uint16",
+        scale_factor=50.,
+        nc_dims=("obs",),
+        nc_attr=dict(
+            long_name="Distance to next position",
+            units='m',
+        ),
     ),
     virtual=dict(
         attr_name=None,
@@ -622,8 +638,3 @@ for key in VAR_DESCR.keys():
     VAR_DESCR_inv[VAR_DESCR[key]["nc_name"]] = key
     for key_old in VAR_DESCR[key].get("old_nc_name", list()):
         VAR_DESCR_inv[key_old] = key
-
-from ._version import get_versions
-
-__version__ = get_versions()["version"]
-del get_versions

@@ -5,29 +5,9 @@ Propagation Histogram
 """
 from matplotlib import pyplot as plt
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-from py_eddy_tracker.generic import distance
+from py_eddy_tracker.generic import cumsum_by_track
 import py_eddy_tracker_sample
-from numpy import arange, empty
-from numba import njit
-
-
-# %%
-# We will create a function compile with numba, to compute a field which contains curvilign distance
-@njit(cache=True)
-def cum_distance_by_track(distance, track):
-    tr_previous = 0
-    d_cum = 0
-    new_distance = empty(track.shape, dtype=distance.dtype)
-    for i in range(distance.shape[0]):
-        tr = track[i]
-        if i != 0 and tr != tr_previous:
-            d_cum = 0
-        new_distance[i] = d_cum
-        d_cum += distance[i]
-        tr_previous = tr
-    new_distance[i + 1] = d_cum
-    return new_distance
-
+from numpy import arange
 
 # %%
 # Load an experimental med atlas over a period of 26 years (1993-2019)
@@ -45,10 +25,8 @@ c.position_filter(median_half_window=1, loess_half_window=5)
 
 # %%
 # Compute curvilign distance
-d_a = distance(a.longitude[:-1], a.latitude[:-1], a.longitude[1:], a.latitude[1:])
-d_c = distance(c.longitude[:-1], c.latitude[:-1], c.longitude[1:], c.latitude[1:])
-d_a = cum_distance_by_track(d_a, a["track"]) / 1000.0
-d_c = cum_distance_by_track(d_c, c["track"]) / 1000.0
+d_a = cumsum_by_track(a.distance_to_next(), a.tracks) / 1000.0
+d_c = cumsum_by_track(c.distance_to_next(), c.tracks) / 1000.0
 
 # %%
 # Plot

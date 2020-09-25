@@ -109,7 +109,7 @@ def display_infos():
         print(f"-- {filename} -- ")
         if track:
             vars_ = vars.copy()
-            vars_.extend(('track', 'observation_number', 'observation_flag'))
+            vars_.extend(('track', 'observation_number', 'observation_flag', 'longitude'))
             e = TrackEddiesObservations.load_file(filename, include_vars=vars_)
         else:
             e = EddiesObservations.load_file(filename, include_vars=vars)

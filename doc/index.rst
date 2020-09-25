@@ -42,6 +42,7 @@ Welcome to py-eddy-tracker's documentation!
    autodoc/observations
    autodoc/eddy_feature
    autodoc/featured_tracking
+   autodoc/tracking
    autodoc/poly
    autodoc/generic
 

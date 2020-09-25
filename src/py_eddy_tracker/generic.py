@@ -145,6 +145,30 @@ def distance(lon0, lat0, lon1, lat1):
     return 6370997.0 * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
 
 
+@njit(cache=True)
+def cumsum_by_track(field, track):
+    """
+    Cumsum by track
+
+    :param array field: data to sum
+    :pram array(int) track: id of track to separate data
+    :return: cumsum with a reset at each start of track
+    :rtype: array
+    """
+    tr_previous = 0
+    d_cum = 0
+    cumsum_array = empty(track.shape, dtype=field.dtype)
+    for i in range(field.shape[0]):
+        tr = track[i]
+        if tr != tr_previous:
+            d_cum = 0
+        cumsum_array[i] = d_cum
+        d_cum += field[i]
+        tr_previous = tr
+    cumsum_array[i + 1] = d_cum
+    return cumsum_array
+
+
 @njit(cache=True, fastmath=True)
 def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
     """

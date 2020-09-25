@@ -38,14 +38,14 @@ from numpy import (
     zeros,
     array,
     median,
-    histogram
+    histogram,
 )
 from datetime import datetime, timedelta
 from numba import njit
 from Polygon import Polygon
 from .observation import EddiesObservations
 from .. import VAR_DESCR_inv
-from ..generic import split_line, wrap_longitude, build_index
+from ..generic import split_line, wrap_longitude, build_index, distance, cumsum_by_track
 from ..poly import polygon_overlap, create_vertice_from_2darray
 
 
@@ -56,7 +56,7 @@ class TrackEddiesObservations(EddiesObservations):
     """Class to practice Tracking on observations
     """
 
-    __slots__ = ("__obs_by_track", "__first_index_of_track")
+    __slots__ = ("__obs_by_track", "__first_index_of_track", "__nb_track")
 
     ELEMENTS = [
         "lon",
@@ -85,6 +85,16 @@ class TrackEddiesObservations(EddiesObservations):
         super().__init__(*args, **kwargs)
         self.__first_index_of_track = None
         self.__obs_by_track = None
+        self.__nb_track = None
+
+    @property
+    def nb_tracks(self):
+        """
+        Will count and send number of track
+        """
+        if self.__nb_track is None:
+            self.__nb_track = (self.nb_obs_by_track != 0).sum()
+        return self.__nb_track
 
     def __repr__(self):
         content = super().__repr__()
@@ -94,22 +104,55 @@ class TrackEddiesObservations(EddiesObservations):
         nb_obs = self.observations.shape[0]
         m = self["virtual"].astype("bool")
         nb_m = m.sum()
-        bins_t = (0, 20, 50, 100, 200, 1000, 10000)
+        bins_t = (1, 20, 50, 100, 200, 1000, 10000)
         nb_tracks_by_t = histogram(nb, bins=bins_t)[0]
         nb_obs_by_t = histogram(nb, bins=bins_t, weights=nb)[0]
-        pct_tracks_by_t = nb_tracks_by_t / nb_tracks_by_t.sum() * 100.
-        pct_obs_by_t = nb_obs_by_t / nb_obs_by_t.sum() * 100.
+        pct_tracks_by_t = nb_tracks_by_t / nb_tracks_by_t.sum() * 100.0
+        pct_obs_by_t = nb_obs_by_t / nb_obs_by_t.sum() * 100.0
+        d = self.distance_to_next() / 1000.0
+        cum_d = cumsum_by_track(d, self.tracks)
+        m_last = ones(d.shape, dtype="bool")
+        m_last[-1] = False
+        m_last[self.index_from_track[1:] - 1] = False
         content += f"""
-    | {nb.shape[0]} tracks ({nb.mean():.2f} obs/tracks, shorter {nb.min()} obs, longer {nb.max()} obs)
-    |   {nb_m} filled observations ({nb_m / nb.shape[0]:.2f} obs/tracks, {nb_m / nb_obs * 100:.2f} % of total)
-    |   Intepolated speed area : {self["speed_area"][m].sum() / period / 1e12:.2f} Mkm²/day
-    |   Intepolated effective area : {self["effective_area"][m].sum() / period / 1e12:.2f} Mkm²/day
+    | {self.nb_tracks} tracks ({
+        nb_obs / self.nb_tracks:.2f} obs/tracks, shorter {nb[nb!=0].min()} obs, longer {nb.max()} obs)
+    |   {nb_m} filled observations ({nb_m / self.nb_tracks:.2f} obs/tracks, {nb_m / nb_obs * 100:.2f} % of total)
+    |   Intepolated speed area      : {self["speed_area"][m].sum() / period / 1e12:.2f} Mkm²/day
+    |   Intepolated effective area  : {self["effective_area"][m].sum() / period / 1e12:.2f} Mkm²/day
+    |   Distance by day             : Mean {d[m_last].mean():.2f} , Median {median(d[m_last]):.2f} km/day
+    |   Distance by track           : Mean {cum_d[~m_last].mean():.2f} , Median {median(cum_d[~m_last]):.2f} km/track
     ----Distribution in lifetime:
     |   Lifetime (days  )      {self.box_display(bins_t)}
     |   Percent of tracks         : {self.box_display(pct_tracks_by_t)}
-    |   Percent of eddies         : {self.box_display(pct_obs_by_t)}
-"""
+    |   Percent of eddies         : {self.box_display(pct_obs_by_t)}"""
         return content
+
+    def add_distance(self):
+        """Add a field of distance (m) between to consecutive observation, 0 for the last observation of each track
+        """
+        if "distance_next" in self.observations.dtype.descr:
+            return self
+        new = self.add_fields(("distance_next",))
+        new["distance_next"][:1] = self.distance_to_next()
+        return new
+
+    def distance_to_next(self):
+        """
+        :return: array of distance in m, 0 when next obs if from another track
+        :rtype: array
+        """
+        d = distance(
+            self.longitude[:-1],
+            self.latitude[:-1],
+            self.longitude[1:],
+            self.latitude[1:],
+        )
+        d[self.index_from_track[1:] - 1] = 0
+        d_ = empty(d.shape[0] + 1, dtype=d.dtype)
+        d_[:-1] = d
+        d_[-1] = 0
+        return d_
 
     def filled_by_interpolation(self, mask):
         """Filled selected values by interpolation
@@ -329,15 +372,14 @@ class TrackEddiesObservations(EddiesObservations):
     ):
         """
         Extract a subset of observations
-        Args:
-            mask: mask to select observations
-            full_path: extract full path if only one part is selected
-            remove_incomplete: delete path which are not fully selected
-            compress_id: resample track number to use a little range
-            reject_virtual: if track are only virtual in selection we remove track
 
-        Returns:
-            same object with selected observations
+        :param array(bool) mask: mask to select observations
+        :param full_path: extract full path if only one part is selected
+        :param remove_incomplete: delete path which are not fully selected
+        :param compress_id: resample track number to use a little range
+        :param reject_virtual: if track are only virtual in selection we remove track
+        :return: same object with selected observations
+        :rtype: self
         """
         if full_path and remove_incomplete:
             logger.warning(
@@ -373,6 +415,14 @@ class TrackEddiesObservations(EddiesObservations):
         return new
 
     def plot(self, ax, ref=None, **kwargs):
+        """
+        This function will draw path of each track
+
+        :param matplotlib.axes.Axes ax: ax where drawed
+        :param float,int ref: if defined all coordinates will be wrapped with ref like west boundary
+        :param dict kwargs: keyword arguments for Axes.plot
+        :return: matplotlib mappable
+        """
         if "label" in kwargs:
             kwargs["label"] += " (%s eddies)" % (self.nb_obs_by_track != 0).sum()
         x, y = split_line(self.longitude, self.latitude, self.tracks)
@@ -436,7 +486,15 @@ class TrackEddiesObservations(EddiesObservations):
         # )
 
     def set_tracks(self, x, y, ids, window):
-        # Will split one group in tracks
+        """
+        Will split one group in tracks
+
+        :param array x: coordinates of group
+        :param array y: coordinates of group
+        :param ndarray ids: several fields like time, group, ...
+        :param int windows: number of days where observations could missed
+        """
+
         time_index = build_index(ids["time"])
         nb = x.shape[0]
         used = zeros(nb, dtype="bool")

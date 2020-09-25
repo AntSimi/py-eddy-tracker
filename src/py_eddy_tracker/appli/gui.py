@@ -58,7 +58,7 @@ class Anim:
         # plot
         self.fig = pyplot.figure(figsize=figsize)
         t0, t1 = self.period
-        self.fig.suptitle(f'{t0} -> {t1}')
+        self.fig.suptitle(f"{t0} -> {t1}")
         self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9))
         self.ax.set_xlim(x_min, x_max), self.ax.set_ylim(y_min, y_max)
         self.ax.set_aspect("equal")
