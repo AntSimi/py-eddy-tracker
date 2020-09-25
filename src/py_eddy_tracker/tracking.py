@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-===========================================================================
 This file is part of py-eddy-tracker.
 
     py-eddy-tracker is free software: you can redistribute it and/or modify
@@ -78,6 +77,10 @@ class Correspondances(list):
         self, datasets, virtual=0, class_method=None, previous_correspondance=None
     ):
         """Initiate tracking
+
+        :param list(str) datasets: A sorted list of filename which contains eddy observations to track
+        :param class class_method: A class which tell how to track
+        :param Correspondances previous_correspondance: A previous correspondance object if you want continue tracking
         """
         super().__init__()
         # Correspondance dtype
