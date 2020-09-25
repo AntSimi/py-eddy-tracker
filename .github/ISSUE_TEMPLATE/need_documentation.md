@@ -1,7 +1,7 @@
 ---
 name: Documentation improvement
 about: Create a report to help us improve the documentation
-labels: Documentation
+labels: documentation
 # This template is based on the matplotlib template
 ---
 

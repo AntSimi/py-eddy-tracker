@@ -1293,7 +1293,12 @@ class EddiesObservations(object):
     def write_file(
         self, path="./", filename="%(path)s/%(sign_type)s.nc", zarr_flag=False
     ):
-        """Write a netcdf with eddy obs
+        """Write a netcdf or zarr with eddy obs.
+        Zarr is usefull for large dataset > 10M observations
+
+        :param str path: set path variable
+        :param str filename: model to store file
+        :param bool zarr_flag: If True, method will use zarr format instead of netcdf
         """
         filename = filename % dict(
             path=path,
