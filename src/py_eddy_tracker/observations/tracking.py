@@ -237,7 +237,7 @@ class TrackEddiesObservations(EddiesObservations):
         :return: Return all eddy tracks which are in bounds
         :rtype: TrackEddiesObservations
 
-        .. minigallery:: py_eddy_tracker.observations.tracking.TrackEddiesObservations.extract_with_area
+        .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_with_area
         """
         mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
         lon0 = area["llcrnrlon"]
@@ -254,7 +254,7 @@ class TrackEddiesObservations(EddiesObservations):
         :return: Return all eddy tracks which are in bounds
         :rtype: TrackEddiesObservations
 
-        .. minigallery:: py_eddy_tracker.observations.tracking.TrackEddiesObservations.extract_with_period
+        .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_with_period
         """
         dataset_period = self.period
         p_min, p_max = period
@@ -336,7 +336,7 @@ class TrackEddiesObservations(EddiesObservations):
         :return: Return all eddy tracks which have length between bounds
         :rtype: TrackEddiesObservations
 
-        .. minigallery:: py_eddy_tracker.observations.tracking.TrackEddiesObservations.extract_with_length
+        .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_with_length
         """
         b0, b1 = bounds
         if b0 >= 0 and b1 >= 0:

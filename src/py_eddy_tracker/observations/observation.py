@@ -60,6 +60,9 @@ from pint.errors import UndefinedUnitError
 from tokenize import TokenError
 from tarfile import ExFileObject
 from matplotlib.path import Path as BasePath
+from matplotlib.collections import PolyCollection
+from matplotlib.cm import get_cmap
+from matplotlib.colors import Normalize
 from .. import VAR_DESCR, VAR_DESCR_inv, __version__
 from ..generic import (
     distance_grid,
@@ -1342,9 +1345,62 @@ class EddiesObservations(object):
             x = (x - ref) % 360 + ref
         return ax.scatter(x, self.latitude, c=self[name] * factor, **kwargs)
 
+    def filled(
+        self,
+        ax,
+        varname,
+        intern=False,
+        cmap="magma_r",
+        lut=10,
+        vmin=None,
+        vmax=None,
+        **kwargs,
+    ):
+        """
+        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
+        :param str varname: var which will be use to fill contour
+        :param bool intern: if True draw speed contour instead of effective contour
+        :param str cmap: matplotlib colormap name
+        :param int,None lut: Number of division of colormaps
+        :param float,None vmin:
+        :param float,None vmax:
+        :return: Collection drawed
+        :rtype: matplotlib.collections.PolyCollection
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.filled
+        """
+        cmap = get_cmap(cmap, lut)
+        x_name, y_name = self.intern(intern)
+        x, y, v = self[x_name], self[y_name], self[varname]
+        if vmin is None:
+            vmin = v.min()
+        if vmax is None:
+            vmax = v.max()
+        v = (v - vmin) / (vmax - vmin)
+        verts = list()
+        colors = list()
+        for x_, y_, v_ in zip(x, y, v):
+            verts.append(create_vertice(x_, y_))
+            colors.append(cmap(v_))
+        c = PolyCollection(verts, facecolors=colors, **kwargs)
+        ax.add_collection(c)
+        c.cmap = cmap
+        c.norm = Normalize(vmin=vmin, vmax=vmax)
+        return c
+
     def display(
         self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs
     ):
+        """
+        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
+        :param float,None ref: if define use like west bound
+        :param bool extern_only: if True draw effective contour only
+        :param bool intern_only: if True draw speed contour only
+        :param bool nobs: if True add number of eddies in label
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.plot`
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.display
+        """
         if not extern_only:
             lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
             lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
