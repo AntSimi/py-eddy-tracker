@@ -9,15 +9,20 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
 
 # %%
-# Load experimental atlas, and keep only eddies longer than 20 weeks
+# Load experimental atlas
 a = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
 )
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
+print(a)
+
+# %%
+# keep only eddies longer than 20 weeks, use -1 to have no upper limit
 a = a.extract_with_length((7 * 20, -1))
 c = c.extract_with_length((7 * 20, -1))
+print(a)
 
 # %%
 # Position filtering for nice display

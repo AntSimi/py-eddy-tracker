@@ -233,7 +233,11 @@ class TrackEddiesObservations(EddiesObservations):
         Extract with a bounding box
 
         :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
+        :param dict kwargs: look at :py:meth:`__extract_with_mask`
+        :return: Return all eddy tracks which are in bounds
+        :rtype: TrackEddiesObservations
 
+        .. minigallery:: py_eddy_tracker.observations.tracking.TrackEddiesObservations.extract_with_area
         """
         mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
         lon0 = area["llcrnrlon"]
@@ -246,8 +250,11 @@ class TrackEddiesObservations(EddiesObservations):
         Extract with a period
 
         :param (datetime.datetime,datetime.datetime) period: two date to define period, must be specify from 1/1/1950
+        :param dict kwargs: look at :py:meth:`__extract_with_mask`
+        :return: Return all eddy tracks which are in bounds
+        :rtype: TrackEddiesObservations
 
-        :return: same object with selected data
+        .. minigallery:: py_eddy_tracker.observations.tracking.TrackEddiesObservations.extract_with_period
         """
         dataset_period = self.period
         p_min, p_max = period
@@ -324,6 +331,13 @@ class TrackEddiesObservations(EddiesObservations):
         return self.__extract_with_mask(mask)
 
     def extract_with_length(self, bounds):
+        """
+        :param (int,int) bounds: length min and max of selected eddies, if use of -1 this bound is not used
+        :return: Return all eddy tracks which have length between bounds
+        :rtype: TrackEddiesObservations
+
+        .. minigallery:: py_eddy_tracker.observations.tracking.TrackEddiesObservations.extract_with_length
+        """
         b0, b1 = bounds
         if b0 >= 0 and b1 >= 0:
             track_mask = (self.nb_obs_by_track >= b0) * (self.nb_obs_by_track <= b1)
