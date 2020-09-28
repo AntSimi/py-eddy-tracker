@@ -104,7 +104,7 @@ class TrackEddiesObservations(EddiesObservations):
         nb_obs = self.observations.shape[0]
         m = self["virtual"].astype("bool")
         nb_m = m.sum()
-        bins_t = (1, 20, 50, 100, 200, 1000, 10000)
+        bins_t = (1, 30, 90, 180, 270, 365, 1000, 10000)
         nb_tracks_by_t = histogram(nb, bins=bins_t)[0]
         nb_obs_by_t = histogram(nb, bins=bins_t, weights=nb)[0]
         pct_tracks_by_t = nb_tracks_by_t / nb_tracks_by_t.sum() * 100.0
@@ -156,6 +156,10 @@ class TrackEddiesObservations(EddiesObservations):
 
     def filled_by_interpolation(self, mask):
         """Filled selected values by interpolation
+
+        :param array(bool) mask: True if must be filled by interpolation
+
+        .. minigallery:: py_eddy_tracker.TrackEddiesObservations.filled_by_interpolation
         """
         nb_filled = mask.sum()
         logger.info("%d obs will be filled (unobserved)", nb_filled)

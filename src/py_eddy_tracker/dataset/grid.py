@@ -1317,6 +1317,15 @@ class RegularGridDataset(GridDataset):
     def convolve_filter_with_dynamic_kernel(
         self, grid, kernel_func, lat_max=85, extend=False, **kwargs_func
     ):
+        """
+        :param str grid: grid name
+        :param func kernel_func: function of kernel to use
+        :param float lat_max: absolute latitude above no filtering apply
+        :param bool extend: if False, only non masked value will return a filtered value
+        :param dict kwargs_func: look at kernel_func
+        :return: filtered value
+        :rtype: array
+        """
         if (abs(self.y_c) > lat_max).any():
             logger.warning("No filtering above %f degrees of latitude", lat_max)
         if isinstance(grid, str):
@@ -1409,7 +1418,7 @@ class RegularGridDataset(GridDataset):
             lat_max=lat_max,
             wave_length=wave_length,
             order=order,
-            **kwargs
+            **kwargs,
         )
         self.vars[grid_name] -= data_out
 
@@ -1421,7 +1430,7 @@ class RegularGridDataset(GridDataset):
             lat_max=lat_max,
             wave_length=wave_length,
             order=order,
-            **kwargs
+            **kwargs,
         )
         self.vars[grid_name] = data_out
 
@@ -1436,6 +1445,15 @@ class RegularGridDataset(GridDataset):
         self.vars[grid_name] -= data_out
 
     def bessel_high_filter(self, grid_name, wave_length, order=1, lat_max=85, **kwargs):
+        """
+        :param str grid_name: grid to filter, data will replace original one
+        :param float wave_length: in km
+        :param int order: order to use, if > 1 negativ value will be present in kernel
+        :param float lat_max: absolute latitude above no filtering apply
+        :param dict kwargs: look at :py:meth:`RegularGridDataset.convolve_filter_with_dynamic_kernel`
+
+        .. minigallery:: py_eddy_tracker.RegularGridDataset.bessel_high_filter
+        """
         logger.debug(
             "Run filtering with wave of %(wave_length)s km and order of %(order)s ...",
             dict(wave_length=wave_length, order=order),
@@ -1446,7 +1464,7 @@ class RegularGridDataset(GridDataset):
             lat_max=lat_max,
             wave_length=wave_length,
             order=order,
-            **kwargs
+            **kwargs,
         )
         logger.debug("Filtering done")
         self.vars[grid_name] -= data_out
@@ -1458,7 +1476,7 @@ class RegularGridDataset(GridDataset):
             lat_max=lat_max,
             wave_length=wave_length,
             order=order,
-            **kwargs
+            **kwargs,
         )
         self.vars[grid_name] = data_out
 
@@ -1688,7 +1706,14 @@ class RegularGridDataset(GridDataset):
 
     def add_uv(self, grid_height, uname="u", vname="v", stencil_halfwidth=4):
         """Compute a u and v grid
-               """
+
+        :param str grid_height: grid name where funtion will apply stencil method
+        :param str uname: future name of u
+        :param str vname: future name of v
+        :param int stencil_halfwidth: largest stencil could be apply
+
+        .. minigallery:: py_eddy_tracker.RegularGridDataset.add_uv
+        """
         logger.info("Add u/v variable with stencil method")
         data = self.grid(grid_height)
         h_dict = self.variables_description[grid_height]

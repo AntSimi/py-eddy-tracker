@@ -492,6 +492,7 @@ class EddiesObservations(object):
             size = len(index)
         eddies = self.new_like(self, size)
         eddies.obs[:] = self.obs[index]
+        eddies.sign_type = self.sign_type
         return eddies
 
     @staticmethod
@@ -817,6 +818,14 @@ class EddiesObservations(object):
 
     def match(self, other, intern=False, cmin=0):
         """return index and score compute with area
+
+        :param EddiesObservations other: Observations to compare
+        :param bool intern: if True, speed contour will be used
+        :param float cmin: 0 < cmin < 1, return only couple above cmin
+        :return: return index of couple in self and other and cost value
+        :rtype: (array(int), array(int), array(float))
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.match
         """
         x_name, y_name = self.intern(intern)
         i, j = bbox_intersection(
@@ -1345,6 +1354,15 @@ class EddiesObservations(object):
             h_nc.setncattr(key, item)
 
     def scatter(self, ax, name, ref=None, factor=1, **kwargs):
+        """
+        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
+        :param str name: var which will be use to fill contour
+        :param float,None ref: if define use like west bound
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
+        :return: scatter mappable
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.scatter
+        """
         x = self.longitude
         if ref is not None:
             x = (x - ref) % 360 + ref
@@ -1478,6 +1496,16 @@ class EddiesObservations(object):
         return regular_grid
 
     def grid_stat(self, bins, varname):
+        """
+        Compute mean of eddies in each bin
+
+        :param (numpy.array,numpy.array) bins: bins to compute count
+        :param str varname: name of variable to compute mean
+        :return: return grid of mean
+        :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.grid_stat
+        """
         x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
         x0 = bins[0][0]
         x, y = (self.longitude - x0) % 360 + x0, self.latitude
