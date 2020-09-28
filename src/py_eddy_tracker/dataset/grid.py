@@ -593,6 +593,7 @@ class GridDataset(object):
         :return: Return a list of 2 elements: Anticyclone and Cyclone
         :rtype: py_eddy_tracker.observations.observation.EddiesObservations
 
+        .. minigallery:: py_eddy_tracker.GridDataset.eddy_identification
         """
         if not isinstance(date, datetime):
             raise Exception("Date argument be a datetime object")

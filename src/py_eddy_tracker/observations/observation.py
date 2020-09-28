@@ -322,6 +322,11 @@ class EddiesObservations(object):
         return new
 
     def circle_contour(self):
+        """
+        Set contour like a circle with radius and center data
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.circle_contour
+        """
         angle = radians(linspace(0, 360, self.track_array_variables))
         x_norm, y_norm = cos(angle), sin(angle)
         for i, obs in enumerate(self):
@@ -1423,6 +1428,17 @@ class EddiesObservations(object):
             ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
 
     def grid_count(self, bins, intern=False, center=False):
+        """
+        Compute count of eddies in each bin (use of all pixel in each contour)
+
+        :param (numpy.array,numpy.array) bins: bins to compute count
+        :param bool intern: if True use speed contour only
+        :param bool center: if True use of center to count
+        :return: return grid of count
+        :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.grid_count
+        """
         x_name, y_name = self.intern(intern)
         x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
         x0 = bins[0][0]
