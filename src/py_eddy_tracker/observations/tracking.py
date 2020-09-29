@@ -232,29 +232,12 @@ class TrackEddiesObservations(EddiesObservations):
         h_nc.time_coverage_start = d_start.strftime("%Y-%m-%dT00:00:00Z")
         h_nc.time_coverage_end = d_end.strftime("%Y-%m-%dT00:00:00Z")
 
-    def extract_with_area(self, area, **kwargs):
-        """
-        Extract with a bounding box
-
-        :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
-        :param dict kwargs: look at :py:meth:`__extract_with_mask`
-        :return: Return all eddy tracks which are in bounds
-        :rtype: TrackEddiesObservations
-
-        .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_with_area
-        """
-        mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
-        lon0 = area["llcrnrlon"]
-        lon = (self.longitude - lon0) % 360 + lon0
-        mask *= (lon > lon0) * (lon < area["urcrnrlon"])
-        return self.__extract_with_mask(mask, **kwargs)
-
     def extract_with_period(self, period, **kwargs):
         """
         Extract with a period
 
-        :param (datetime.datetime,datetime.datetime) period: two date to define period, must be specify from 1/1/1950
-        :param dict kwargs: look at :py:meth:`__extract_with_mask`
+        :param (int,int) period: two date to define period, must be specify from 1/1/1950
+        :param dict kwargs: look at :py:meth:`extract_with_mask`
         :return: Return all eddy tracks which are in bounds
         :rtype: TrackEddiesObservations
 
@@ -272,7 +255,8 @@ class TrackEddiesObservations(EddiesObservations):
             mask *= self.time <= p_max
         elif p_max < 0:
             mask *= self.time <= (dataset_period[1] + p_max)
-        return self.__extract_with_mask(mask, **kwargs)
+        return self.extract_with_mask(mask, **kwargs)
+
 
     def get_mask_from_id(self, tracks):
         mask = zeros(self.tracks.shape, dtype=bool_)
@@ -303,7 +287,7 @@ class TrackEddiesObservations(EddiesObservations):
 
     def extract_ids(self, tracks):
         mask = self.get_mask_from_id(array(tracks))
-        return self.__extract_with_mask(mask)
+        return self.extract_with_mask(mask)
 
     def extract_first_obs_in_box(self, res):
         data = empty(
@@ -315,7 +299,7 @@ class TrackEddiesObservations(EddiesObservations):
         _, indexs = unique(data, return_index=True)
         mask = zeros(self.obs.shape, dtype="bool")
         mask[indexs] = True
-        return self.__extract_with_mask(mask)
+        return self.extract_with_mask(mask)
 
     def extract_in_direction(self, direction, value=0):
         nb_obs = self.nb_obs_by_track
@@ -332,7 +316,7 @@ class TrackEddiesObservations(EddiesObservations):
             mask = d_lon < 0 if "W" == direction else d_lon > 0
             mask &= abs(d_lon) > value
         mask = mask.repeat(nb_obs)
-        return self.__extract_with_mask(mask)
+        return self.extract_with_mask(mask)
 
     def extract_with_length(self, bounds):
         """
@@ -352,7 +336,7 @@ class TrackEddiesObservations(EddiesObservations):
         else:
             logger.warning("No valid value for bounds")
             raise Exception("One bounds must be positiv")
-        return self.__extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
+        return self.extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
 
     def loess_filter(self, half_window, xfield, yfield, inplace=True):
         track = self.obs["track"]
@@ -380,7 +364,7 @@ class TrackEddiesObservations(EddiesObservations):
             loess_half_window, "time", "lat"
         )
 
-    def __extract_with_mask(
+    def extract_with_mask(
         self,
         mask,
         full_path=False,
@@ -392,12 +376,12 @@ class TrackEddiesObservations(EddiesObservations):
         Extract a subset of observations
 
         :param array(bool) mask: mask to select observations
-        :param full_path: extract full path if only one part is selected
-        :param remove_incomplete: delete path which are not fully selected
-        :param compress_id: resample track number to use a little range
-        :param reject_virtual: if track are only virtual in selection we remove track
+        :param bool full_path: extract full path if only one part is selected
+        :param bool remove_incomplete: delete path which are not fully selected
+        :param bool compress_id: resample track number to use a little range
+        :param bool reject_virtual: if track are only virtual in selection we remove track
         :return: same object with selected observations
-        :rtype: self
+        :rtype: self.__class__
         """
         if full_path and remove_incomplete:
             logger.warning(

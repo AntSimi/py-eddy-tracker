@@ -1353,6 +1353,43 @@ class EddiesObservations(object):
         for key, item in self.global_attr.items():
             h_nc.setncattr(key, item)
 
+    def extract_with_area(self, area, **kwargs):
+        """
+        Extract with a bounding box
+
+        :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
+        :param dict kwargs: look at :py:meth:`extract_with_mask`
+        :return: Return all eddy tracks which are in bounds
+        :rtype: EddiesObservations
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.extract_with_area
+        """
+        mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
+        lon0 = area["llcrnrlon"]
+        lon = (self.longitude - lon0) % 360 + lon0
+        mask *= (lon > lon0) * (lon < area["urcrnrlon"])
+        return self.extract_with_mask(mask, **kwargs)
+
+    def extract_with_mask(self, mask):
+        """
+        Extract a subset of observations
+
+        :param array(bool) mask: mask to select observations
+        :return: same object with selected observations
+        :rtype: self
+        """
+        nb_obs = mask.sum()
+        new = self.__class__.new_like(self, nb_obs)
+        new.sign_type = self.sign_type
+        if nb_obs == 0:
+            logger.warning("Empty dataset will be created")
+        else:
+            for field in self.obs.dtype.descr:
+                logger.debug("Copy of field %s ...", field)
+                var = field[0]
+                new.obs[var] = self.obs[var][mask]
+        return new
+
     def scatter(self, ax, name, ref=None, factor=1, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
@@ -1448,6 +1485,29 @@ class EddiesObservations(object):
             if ref is not None:
                 lon_e, lat_e = wrap_longitude(lon_e, lat_e, ref, cut=True)
             ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
+
+    def first_obs(self):
+        """
+        Get first obs of each tracks.
+
+        :rtype: __class__
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.first_obs
+        """
+        return self.extract_with_mask(self["n"] == 0)
+
+    def last_obs(self):
+        """
+        Get Last obs of each tracks.
+
+        :rtype: __class__
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.last_obs
+        """
+        m = zeros(len(self), dtype="bool")
+        m[-1] = True
+        m[:-1][self["n"][1:] == 0] = True
+        return self.extract_with_mask(m)
 
     def grid_count(self, bins, intern=False, center=False):
         """

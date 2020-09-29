@@ -1,6 +1,6 @@
 """
 Count center
-======================
+============
 
 """
 from matplotlib import pyplot as plt
