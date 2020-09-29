@@ -442,6 +442,10 @@ class GridDataset(object):
             if hasattr(var, "units"):
                 return var.units
 
+    @property
+    def variables(self):
+        return self.variables_description.keys()
+
     def copy(self, grid_in, grid_out):
         """
         Duplicate a variable
@@ -1774,11 +1778,30 @@ class RegularGridDataset(GridDataset):
         self._speed_ev = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** 0.5
 
     def display(self, ax, name, factor=1, **kwargs):
+        """
+        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
+        :param str name: variable to display
+        :param float factor: multiply grid by
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolormesh`
+
+        .. minigallery:: py_eddy_tracker.RegularGridDataset.display
+        """
         if "cmap" not in kwargs:
             kwargs["cmap"] = "coolwarm"
         return ax.pcolormesh(
             self.x_bounds, self.y_bounds, self.grid(name).T * factor, **kwargs
         )
+
+    def contour(self, ax, name, factor=1, **kwargs):
+        """
+        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
+        :param str name: variable to display
+        :param float factor: multiply grid by
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.contour`
+
+        .. minigallery:: py_eddy_tracker.RegularGridDataset.contour
+        """
+        return ax.contour(self.x_c, self.y_c, self.grid(name).T * factor, **kwargs)
 
     def interp(self, grid_name, lons, lats):
         """

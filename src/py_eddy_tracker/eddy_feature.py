@@ -419,17 +419,14 @@ class Contours(object):
                 # Contour with less vertices than 4 are popped
                 if contour.vertices.shape[0] < 4:
                     continue
-                if keep_unclose:
-                    keep_path.append(contour)
-                    continue
                 # Remove unclosed path
                 d_closed = (
                     (contour.vertices[0, 0] - contour.vertices[-1, 0]) ** 2
                     + (contour.vertices[0, 1] - contour.vertices[-1, 1]) ** 2
                 ) ** 0.5
-                if d_closed > self.DELTA_SUP:
+                if d_closed > self.DELTA_SUP and not keep_unclose:
                     continue
-                elif d_closed != 0:
+                elif d_closed != 0 and d_closed <= self.DELTA_SUP:
                     # Repair almost closed contour
                     if d_closed > self.DELTA_PREC:
                         almost_closed_contours += 1
