@@ -188,10 +188,11 @@ class GUI:
             if len(i) == 0:
                 self.m[name]["contour_s"].set_data([], [])
             else:
-                self.m[name]["contour_s"].set_data(
-                    flatten_line_matrix(dataset["contour_lon_s"][i]),
-                    flatten_line_matrix(dataset["contour_lat_s"][i]),
-                )
+                if 'contour_lon_s' in dataset.elements:
+                    self.m[name]["contour_s"].set_data(
+                        flatten_line_matrix(dataset["contour_lon_s"][i]),
+                        flatten_line_matrix(dataset["contour_lat_s"][i]),
+                    )
             # text.append(f"{i.shape[0]}")
             local_path = dataset.extract_ids(dataset["track"][i])
             x, y, t, n, tr = (
