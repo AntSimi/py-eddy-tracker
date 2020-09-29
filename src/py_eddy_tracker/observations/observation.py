@@ -1358,6 +1358,7 @@ class EddiesObservations(object):
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
         :param str name: var which will be use to fill contour
         :param float,None ref: if define use like west bound
+        :param float factor: multiply value by
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
         :return: scatter mappable
 
@@ -1377,16 +1378,18 @@ class EddiesObservations(object):
         lut=10,
         vmin=None,
         vmax=None,
+        factor=1,
         **kwargs,
     ):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param str varname: var which will be use to fill contour
+        :param str,array varname: var which will be use to fill contour, or an array of same size of obs
         :param bool intern: if True draw speed contour instead of effective contour
         :param str cmap: matplotlib colormap name
         :param int,None lut: Number of division of colormaps
         :param float,None vmin:
         :param float,None vmax:
+        :param float factor: multiply value by
         :return: Collection drawed
         :rtype: matplotlib.collections.PolyCollection
 
@@ -1394,7 +1397,8 @@ class EddiesObservations(object):
         """
         cmap = get_cmap(cmap, lut)
         x_name, y_name = self.intern(intern)
-        x, y, v = self[x_name], self[y_name], self[varname]
+        v = (self[varname] if isinstance(varname, str) else varname) * factor
+        x, y = self[x_name], self[y_name]
         if vmin is None:
             vmin = v.min()
         if vmax is None:
