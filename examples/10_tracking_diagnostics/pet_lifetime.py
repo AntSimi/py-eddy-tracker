@@ -6,7 +6,7 @@ Lifetime Histogram
 from matplotlib import pyplot as plt
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
-from numpy import arange
+from numpy import arange, ones
 
 # %%
 # Load an experimental med atlas over a period of 26 years (1993-2019)
@@ -16,39 +16,41 @@ a = TrackEddiesObservations.load_file(
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
+nb_year = (a.period[1] - a.period[0] + 1) / 365.25
 
 # %%
-# Plot
-fig = plt.figure()
-ax_lifetime = fig.add_axes([0.05, 0.55, 0.4, 0.4])
-ax_cum_lifetime = fig.add_axes([0.55, 0.55, 0.4, 0.4])
-ax_ratio_lifetime = fig.add_axes([0.05, 0.05, 0.4, 0.4])
-ax_ratio_cum_lifetime = fig.add_axes([0.55, 0.05, 0.4, 0.4])
-
-cum_a, bins, _ = ax_cum_lifetime.hist(
-    a["n"], histtype="step", bins=arange(0, 800, 1), label="Anticyclonic", color="r"
-)
-cum_c, bins, _ = ax_cum_lifetime.hist(
-    c["n"], histtype="step", bins=arange(0, 800, 1), label="Cyclonic", color="b"
-)
-
-x = (bins[1:] + bins[:-1]) / 2.0
-ax_ratio_cum_lifetime.plot(x, cum_c / cum_a)
-
-nb_a, nb_c = cum_a[:-1] - cum_a[1:], cum_c[:-1] - cum_c[1:]
-ax_lifetime.plot(x[1:], nb_a, label="Anticyclonic", color="r")
-ax_lifetime.plot(x[1:], nb_c, label="Cyclonic", color="b")
-
-ax_ratio_lifetime.plot(x[1:], nb_c / nb_a)
-
-for ax in (ax_lifetime, ax_cum_lifetime, ax_ratio_cum_lifetime, ax_ratio_lifetime):
-    ax.set_xlim(0, 365)
-    if ax in (ax_lifetime, ax_cum_lifetime):
-        ax.set_ylim(1, None)
-        ax.set_yscale("log")
-        ax.legend()
+# Setup axes
+figure = plt.figure(figsize=(12, 8))
+ax_ratio_cum = figure.add_axes([0.55, 0.06, 0.42, 0.34])
+ax_ratio = figure.add_axes([0.07, 0.06, 0.46, 0.34])
+ax_cum = figure.add_axes([0.55, 0.43, 0.42, 0.54])
+ax = figure.add_axes([0.07, 0.43, 0.46, 0.54])
+ax.set_ylabel("Eddies by year")
+ax_ratio.set_ylabel("Ratio Cyclonic/Anticyclonic")
+for ax_ in (ax, ax_cum, ax_ratio_cum, ax_ratio):
+    ax_.set_xlim(0, 400)
+    if ax_ in (ax, ax_cum):
+        ax_.set_ylim(1e-1, 1e4), ax_.set_yscale("log")
     else:
-        ax.set_ylim(0, 2)
-        ax.set_ylabel("Ratio Cyclonic/Anticyclonic")
-    ax.set_xlabel("Lifetime (days)")
-    ax.grid()
+        ax_.set_xlabel("Lifetime in days (by week bins)")
+        ax_.set_ylim(0, 2)
+        ax_.axhline(1, color="g", lw=2)
+    ax_.grid()
+ax_cum.xaxis.set_ticklabels([]), ax_cum.yaxis.set_ticklabels([])
+ax.xaxis.set_ticklabels([]), ax_ratio_cum.yaxis.set_ticklabels([])
+
+# plot data
+bin_hist = arange(7, 2000, 7)
+x = (bin_hist[1:] + bin_hist[:-1]) / 2.0
+a_nb, c_nb = a.nb_obs_by_track, c.nb_obs_by_track
+a_nb, c_nb = a_nb[a_nb != 0], c_nb[c_nb != 0]
+w_a, w_c = ones(a_nb.shape) / nb_year, ones(c_nb.shape) / nb_year
+kwargs_a = dict(histtype="step", bins=bin_hist, x=a_nb, color="r", weights=w_a)
+kwargs_c = dict(histtype="step", bins=bin_hist, x=c_nb, color="b", weights=w_c)
+cum_a, _, _ = ax_cum.hist(cumulative=-1, **kwargs_a)
+cum_c, _, _ = ax_cum.hist(cumulative=-1, **kwargs_c)
+nb_a, _, _ = ax.hist(label="Anticyclonic", **kwargs_a)
+nb_c, _, _ = ax.hist(label="Cyclonic", **kwargs_c)
+ax_ratio_cum.plot(x, cum_c / cum_a)
+ax_ratio.plot(x, nb_c / nb_a)
+ax.legend()
