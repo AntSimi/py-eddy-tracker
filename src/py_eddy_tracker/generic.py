@@ -48,6 +48,8 @@ from .poly import winding_number_grid_in_poly
 @njit(cache=True)
 def reverse_index(index, nb):
     """
+    Compute a list of index, which are not in index.
+
     :param array index: index of group which will be set to False
     :param array nb: Count for each group
     :return: mask of value selected
@@ -61,7 +63,7 @@ def reverse_index(index, nb):
 
 @njit(cache=True)
 def build_index(groups):
-    """We expected that variable is monotonous, and return index for each step change
+    """We expected that variable is monotonous, and return index for each step change.
 
     :param array groups: array which contain group to be separated
     :return: (first_index of each group, last_index of each group, value to shift group)
@@ -85,12 +87,15 @@ def build_index(groups):
 
 @njit(cache=True)
 def hist_numba(x, bins):
+    """Call numba histogram  to speed up."""
     return histogram(x, bins)
 
 
 @njit(cache=True, fastmath=True, parallel=False)
 def distance_grid(lon0, lat0, lon1, lat1):
     """
+    Get distance for every couple of point.
+
     :param array lon0:
     :param array lat0:
     :param array lon1:
@@ -127,7 +132,7 @@ def distance_grid(lon0, lat0, lon1, lat1):
 @njit(cache=True, fastmath=True)
 def distance(lon0, lat0, lon1, lat1):
     """
-    Compute distance between points from each line
+    Compute distance between points from each line.
 
     :param float lon0:
     :param float lat0:
@@ -148,7 +153,7 @@ def distance(lon0, lat0, lon1, lat1):
 @njit(cache=True)
 def cumsum_by_track(field, track):
     """
-    Cumsum by track
+    Cumsum by track.
 
     :param array field: data to sum
     :pram array(int) track: id of track to separate data
@@ -172,7 +177,7 @@ def cumsum_by_track(field, track):
 @njit(cache=True, fastmath=True)
 def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
     """
-    For geographic grid, test of cicularity
+    For geographic grid, test of cicularity.
 
     :param array x_g: coordinates of grid
     :param array y_g: coordinates of grid
@@ -189,6 +194,7 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
     x_step = x_g[1] - x_ref
     y_step = y_g[1] - y_ref
     nb_x = x_g.shape[0]
+    nb_y = y_g.shape[0]
     is_circular = (x_g[-1] + x_step) % 360 == x_g[0] % 360
     z = empty(x.shape, dtype=z_g.dtype)
     for i in prange(x.size):
@@ -197,11 +203,16 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
         i0 = int(floor(x_))
         i1 = i0 + 1
         xd = x_ - i0
+        j0 = int(floor(y_))
+        j1 = j0 + 1
         if is_circular:
             i0 %= nb_x
             i1 %= nb_x
-        j0 = int(floor(y_))
-        j1 = j0 + 1
+        else:
+            if i1 >= nb_x or i0 < 0 or j0 < 0 or j1 >= nb_y:
+                z[i] = nan
+                continue
+
         yd = y_ - j0
         z00 = z_g[i0, j0]
         z01 = z_g[i0, j1]
@@ -219,7 +230,7 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
 @njit(cache=True, fastmath=True)
 def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     """
-    Resample contours to have (nearly) equal spacing
+    Resample contours to have (nearly) equal spacing.
 
     :param array_like x_val: input x contour coordinates
     :param array_like y_val: input y contour coordinates
@@ -246,7 +257,7 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
 @njit(cache=True)
 def flatten_line_matrix(l_matrix):
     """
-    Flat matrix and add on between each line
+    Flat matrix and add on between each line.
 
     :param l_matrix: matrix of position
     :return: array with nan between line
@@ -267,7 +278,7 @@ def flatten_line_matrix(l_matrix):
 @njit(cache=True)
 def simplify(x, y, precision=0.1):
     """
-    Will remove all middle point which are closer than precision
+    Will remove all middle point which are closer than precision.
 
     :param array x:
     :param array y:
@@ -307,7 +318,7 @@ def simplify(x, y, precision=0.1):
 @njit(cache=True)
 def split_line(x, y, i):
     """
-    Split x and y at each i change
+    Split x and y at each i change.
 
     :param x: array
     :param y: array
@@ -335,7 +346,7 @@ def split_line(x, y, i):
 @njit(cache=True)
 def wrap_longitude(x, y, ref, cut=False):
     """
-    Will wrap contiguous longitude with reference like west bound
+    Will wrap contiguous longitude with reference like west bound.
 
     :param array x:
     :param array y:
@@ -391,7 +402,7 @@ def wrap_longitude(x, y, ref, cut=False):
 @njit(cache=True, fastmath=True)
 def coordinates_to_local(lon, lat, lon0, lat0):
     """
-    Take latlong coordinates to transform in local coordinates (in m)
+    Take latlong coordinates to transform in local coordinates (in m).
 
     :param array x: coordinates to transform
     :param array y: coordinates to transform
@@ -420,7 +431,7 @@ def coordinates_to_local(lon, lat, lon0, lat0):
 @njit(cache=True, fastmath=True)
 def local_to_coordinates(x, y, lon0, lat0):
     """
-    Take local coordinates (in m) to transform to latlong
+    Take local coordinates (in m) to transform to latlong.
 
     :param array x: coordinates to transform
     :param array y: coordinates to transform
@@ -447,7 +458,7 @@ def local_to_coordinates(x, y, lon0, lat0):
 @njit(cache=True, fastmath=True)
 def nearest_grd_indice(x, y, x0, y0, xstep, ystep):
     """
-    Get nearest grid indice from a position
+    Get nearest grid indice from a position.
 
     :param x: longitude
     :param y: latitude
@@ -465,7 +476,7 @@ def nearest_grd_indice(x, y, x0, y0, xstep, ystep):
 @njit(cache=True)
 def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
     """
-    Get bbox indice of a contour in a regular grid
+    Get bbox indice of a contour in a regular grid.
 
     :param vertices: vertice of contour
     :param float x0: first grid longitude
@@ -492,7 +503,7 @@ def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
 @njit(cache=True, fastmath=True)
 def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
     """
-    Get a pixel list of a regular grid contain in a contour
+    Get a pixel list of a regular grid contain in a contour.
 
     :param array_like vertices: contour vertice (N,2)
     :param array_like x_c: longitude coordinate of grid
@@ -532,7 +543,7 @@ def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
 
 def build_circle(x0, y0, r):
     """
-    Method to built circle from center coordinates
+    Build circle from center coordinates.
 
     :param float x0: center coordinate
     :param float y0: center coordinate

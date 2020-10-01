@@ -29,8 +29,9 @@ from Polygon import Polygon
 @njit(cache=True)
 def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
     """
+    Test if point is left of an infinit line.
+
     http://geomalgorithms.com/a03-_inclusion.html
-    isLeft(): tests if a point is Left|On|Right of an infinite line.
     See: Algorithm 1 "Area of Triangles and Polygons"
 
     :param float x_line_0:
@@ -55,6 +56,8 @@ def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
 @njit(cache=True)
 def poly_contain_poly(xy_poly_out, xy_poly_in):
     """
+    Check if poly_in is include in poly_out.
+
     :param vertice xy_poly_out:
     :param vertice xy_poly_in:
     :return: True if poly_in is in poly_out
@@ -76,6 +79,8 @@ def poly_contain_poly(xy_poly_out, xy_poly_in):
 @njit(cache=True)
 def poly_area_vertice(v):
     """
+    Compute area from vertice.
+
     :param vertice v: polygon vertice
     :return: area of polygon in coordinates unit
     :rtype: float
@@ -86,7 +91,7 @@ def poly_area_vertice(v):
 @njit(cache=True)
 def poly_area(x, y):
     """
-    Must be call with local coordinates (in m, to get an area in m²)
+    Must be call with local coordinates (in m, to get an area in m²).
 
     :param array x:
     :param array y:
@@ -103,7 +108,7 @@ def poly_area(x, y):
 @njit(cache=True)
 def winding_number_poly(x, y, xy_poly):
     """
-    Check if x,y is in poly
+    Check if x,y is in poly.
 
     :param float x: x to test
     :param float y: y to test
@@ -137,6 +142,8 @@ def winding_number_poly(x, y, xy_poly):
 @njit(cache=True)
 def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
     """
+    Return index for each grid coordinates within contour.
+
     http://geomalgorithms.com/a03-_inclusion.html
 
     :param array x_1d: x of local grid
@@ -167,7 +174,7 @@ def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
 @njit(cache=True, fastmath=True)
 def bbox_intersection(x0, y0, x1, y1):
     """
-    Compute bbox to check if there are a bbox intersection
+    Compute bbox to check if there are a bbox intersection.
 
     :param array x0: x for polygon list 0
     :param array y0: y for polygon list 0
@@ -207,9 +214,11 @@ def bbox_intersection(x0, y0, x1, y1):
 @njit(cache=True)
 def create_vertice(x, y):
     """
+    Return polygon vertice.
+
     :param array x:
     :param array y:
-    :return: Return the vertice of polygon
+    :return: Return polygon vertice
     :rtype: vertice
     """
     nb = x.shape[0]
@@ -223,7 +232,7 @@ def create_vertice(x, y):
 @njit(cache=True)
 def create_vertice_from_2darray(x, y, index):
     """
-    Choose a polygon in x,y list and return vertice
+    Choose a polygon in x,y list and return vertice.
 
     :param array x:
     :param array y:
@@ -242,7 +251,7 @@ def create_vertice_from_2darray(x, y, index):
 @njit(cache=True)
 def get_wrap_vertice(x0, y0, x1, y1, i):
     """
-    Return a vertice for each polygon and check that use same reference coordinates
+    Return a vertice for each polygon and check that use same reference coordinates.
 
     :param array x0: x for polygon list 0
     :param array y0: y for polygon list 0
@@ -261,6 +270,8 @@ def get_wrap_vertice(x0, y0, x1, y1, i):
 
 def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
     """
+    Return percent of overlap for each item.
+
     :param array x0: x for polygon list 0
     :param array y0: y for polygon list 0
     :param array x1: x for polygon list 1
@@ -289,6 +300,8 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
 
 def polygon_overlap(p0, p1, minimal_area=False):
     """
+    Return percent of overlap for each item.
+
     :param list(Polygon) p0: List of polygon to compare with p1 list
     :param list(Polygon) p1: List of polygon to compare with p0 list
     :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union
@@ -313,8 +326,9 @@ def polygon_overlap(p0, p1, minimal_area=False):
 @njit(cache=True)
 def fit_circle(x, y):
     """
-    From a polygon, function will fit a circle
-    Must be call with local coordinates (in m, to get a radius in m)
+    From a polygon, function will fit a circle.
+
+    Must be call with local coordinates (in m, to get a radius in m).
 
     :param array x: x of polygon
     :param array y: y of polygon
@@ -357,7 +371,7 @@ def fit_circle(x, y):
 
 @njit(cache=True)
 def fit_circle_(x, y):
-    """
+    r"""
     From a polygon, function will fit a circle.
 
     Must be call with local coordinates (in m, to get a radius in m).
@@ -377,7 +391,7 @@ def fit_circle_(x, y):
 
     Solutions:
 
-    .. math:: x_0 = a / 2 , y_0 = b / 2 , r = \\sqrt{c + x_0^2 + y_0^2}
+    .. math:: x_0 = a / 2 , y_0 = b / 2 , r = \sqrt{c + x_0^2 + y_0^2}
 
 
     :param array x: x of polygon
@@ -415,11 +429,12 @@ def fit_circle_(x, y):
 
 @njit(cache=True, fastmath=True)
 def shape_error(x, y, x0, y0, r):
-    """
-    With a polygon(x,y) in local coordinates
+    r"""
+    With a polygon(x,y) in local coordinates.
+
     and circle properties(x0, y0, r), function compute a shape error:
 
-    .. math:: ShapeError = \\frac{Polygon_{area} + Circle_{area} - 2 * Intersection_{area}}{Circle_{area}} * 100
+    .. math:: ShapeError = \frac{Polygon_{area} + Circle_{area} - 2 * Intersection_{area}}{Circle_{area}} * 100
 
     When error > 100, area of difference is bigger than circle area
 
