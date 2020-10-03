@@ -709,6 +709,7 @@ class GridDataset(object):
 
                     # Filter for shape
                     if aerr < 0 or aerr > shape_error or isnan(aerr):
+                        contour.reject = 1
                         continue
 
                     # Find all pixels in the contour
@@ -716,6 +717,8 @@ class GridDataset(object):
 
                     # Check if pixels in contour are masked
                     if has_masked_value(data.mask, i_x_in, i_y_in):
+                        if contour.reject == 0:
+                            contour.reject = 2
                         continue
 
                     # Test to know cyclone or anticyclone
@@ -729,6 +732,7 @@ class GridDataset(object):
                         contour.nb_pixel < pixel_limit[0]
                         or contour.nb_pixel > pixel_limit[1]
                     ):
+                        contour.reject = 3
                         continue
 
                     # Compute amplitude
@@ -742,8 +746,8 @@ class GridDataset(object):
                     )
                     # If we have a valid amplitude
                     if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
+                        contour.reject = 4
                         continue
-
                     if reset_centroid:
 
                         if self.is_circular():
@@ -1802,6 +1806,28 @@ class RegularGridDataset(GridDataset):
         .. minigallery:: py_eddy_tracker.RegularGridDataset.contour
         """
         return ax.contour(self.x_c, self.y_c, self.grid(name).T * factor, **kwargs)
+
+    def regrid(self, other, grid_name, new_name=None):
+        """
+        Interpolate another grid on current grid position
+
+        :param RegularGridDataset other:
+        :param str grid_name: var name to interpolate
+        :param str new_name: name use to store, if None method will use current ont
+
+        .. minigallery:: py_eddy_tracker.RegularGridDataset.regrid
+        """
+        if new_name is None:
+            new_name = grid_name
+        x, y = meshgrid(self.x_c, self.y_c)
+        # interp and reshape
+        v_interp = other.interp(grid_name, x.reshape(-1), y.reshape(-1)).reshape(x.shape).T
+        v_interp = ma.array(v_interp, mask=isnan(v_interp))
+        # and add it to self
+        self.add_grid(new_name, v_interp)
+        self.variables_description[new_name] = other.variables_description[grid_name]
+        # self.variables_description[new_name]['infos'] = False
+        # self.variables_description[new_name]['kwargs']['dimensions'] = ...
 
     def interp(self, grid_name, lons, lats):
         """

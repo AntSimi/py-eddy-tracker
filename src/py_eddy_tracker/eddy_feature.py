@@ -21,8 +21,21 @@ Email: evanmason@gmail.com
 """
 
 import logging
-from numpy import empty, array, concatenate, ma, zeros, unique, round, ones, int_
+from numpy import (
+    empty,
+    array,
+    concatenate,
+    ma,
+    zeros,
+    unique,
+    round,
+    ones,
+    int_,
+    digitize,
+)
+from matplotlib.colors import Normalize
 from matplotlib.figure import Figure
+from matplotlib.cm import get_cmap
 from numba import njit, types as numba_types
 from .poly import winding_number_poly
 
@@ -447,6 +460,7 @@ class Contours(object):
             collection._paths = keep_path
             for contour in collection.get_paths():
                 contour.used = False
+                contour.reject = 0
                 nb_contour += 1
                 nb_pt += contour.vertices.shape[0]
         logger.info(
@@ -551,12 +565,51 @@ class Contours(object):
         only_used=False,
         only_unused=False,
         only_contain_eddies=False,
+        display_criterion=False,
+        field=None,
+        bins=None,
+        cmap="Spectral_r",
         **kwargs
     ):
+        """
+        Display contour
+
+        :param matplotlib.axes.Axes ax:
+        :param int step: display only contour every step
+        :param bool only_used: display only contour used in an eddy
+        :param bool only_unused: display only contour unused in an eddy
+        :param bool only_contain_eddies: display only contour which enclosed an eddiy
+        :param bool display_criterion:
+            display only unused contour with criterion color
+
+            0. - Accepted (green)
+            1. - Reject for shape error (red)
+            2. - Masked value in contour (blue)
+            3. - Under or over pixel limit bound (black)
+            4. - Amplitude criterion (yellow)
+        :param str field:
+            Must be 'shape_error', 'x', 'y' or 'radius'.
+            If define display_criterion is not use.
+            bins argument must be define
+        :param array bins: bins use to colorize contour
+        :param str cmap: Name of cmap to use for field display
+        :param dict kwargs: look at :py:method:`matplotlib.collections.LineCollection`
+
+        .. minigallery:: py_eddy_tracker.Contours.display
+        """
         from matplotlib.collections import LineCollection
 
+        overide_color = display_criterion or field is not None
+        if display_criterion:
+            paths = {0: list(), 1: list(), 2: list(), 3: list(), 4: list()}
+        elif field is not None:
+            paths = dict()
+            for i in range(len(bins)):
+                paths[i] = list()
+            paths[i + 1] = list()
         for j, collection in enumerate(self.contours.collections[::step]):
-            paths = list()
+            if not overide_color:
+                paths = list()
             for i in collection.get_paths():
                 if only_used and not i.used:
                     continue
@@ -564,18 +617,58 @@ class Contours(object):
                     continue
                 elif only_contain_eddies and not i.contain_eddies:
                     continue
-                paths.append(i.vertices)
+                if display_criterion:
+                    paths[i.reject].append(i.vertices)
+                elif field is not None:
+                    x, y, radius, shape_error = i.fit_circle()
+                    if field == "shape_error":
+                        i_ = digitize(shape_error, bins)
+                    elif field == "radius":
+                        i_ = digitize(radius, bins)
+                    elif field == "x":
+                        i_ = digitize(x, bins)
+                    elif field == "y":
+                        i_ = digitize(y, bins)
+                    paths[i_].append(i.vertices)
+                else:
+                    paths.append(i.vertices)
             local_kwargs = kwargs.copy()
             if "color" not in kwargs:
                 local_kwargs["color"] = collection.get_color()
                 local_kwargs.pop("label", None)
             elif j != 0:
                 local_kwargs.pop("label", None)
-            ax.add_collection(LineCollection(paths, **local_kwargs))
-
-        if hasattr(self.contours, "_mins"):
-            ax.update_datalim([self.contours._mins, self.contours._maxs])
-        ax.autoscale_view()
+            if not overide_color:
+                ax.add_collection(LineCollection(paths, **local_kwargs))
+        if display_criterion:
+            colors = {0: "g", 1: "r", 2: "b", 3: "k", 4: "y"}
+            for k, v in paths.items():
+                local_kwargs = kwargs.copy()
+                local_kwargs.pop("label", None)
+                local_kwargs["colors"] = colors[k]
+                ax.add_collection(LineCollection(v, **local_kwargs))
+        elif field is not None:
+            nb_bins = len(bins) - 1
+            cmap = get_cmap(cmap, lut=nb_bins)
+            for k, v in paths.items():
+                local_kwargs = kwargs.copy()
+                local_kwargs.pop("label", None)
+                if k == 0:
+                    local_kwargs["colors"] = cmap(0.0)
+                elif k > nb_bins:
+                    local_kwargs["colors"] = cmap(1.0)
+                else:
+                    local_kwargs["colors"] = cmap((k - 1.0) / nb_bins)
+                mappable = LineCollection(v, **local_kwargs)
+                ax.add_collection(mappable)
+            mappable.cmap = cmap
+            mappable.norm = Normalize(vmin=bins[0], vmax=bins[-1])
+            # TODO : need to create an object with all collections
+            return mappable
+        else:
+            if hasattr(self.contours, "_mins"):
+                ax.update_datalim([self.contours._mins, self.contours._maxs])
+            ax.autoscale_view()
 
     def label_contour_unused_which_contain_eddies(self, eddies):
         """Select contour which contain several eddies"""

@@ -20,6 +20,7 @@ Copyright (c) 2014-2020 by Evan Mason
 Email: evanmason@gmail.com
 ===========================================================================
 """
+import argparse
 from netCDF4 import Dataset
 from .. import EddyParser
 from ..observations.tracking import TrackEddiesObservations
@@ -93,24 +94,46 @@ def display_infos():
     parser.add_argument(
         "observations", nargs="+", help="Input observations to compute frequency"
     )
+    parser.add_argument("--vars", nargs="+", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--area",
+        nargs=4,
+        type=float,
+        metavar=("llcrnrlon", "llcrnrlat", "urcrnrlon", "urcrnrlat"),
+        help="Bounding box",
+    )
     args = parser.parse_args()
-    vars = [
-        "amplitude",
-        "speed_radius",
-        "speed_area",
-        "effective_radius",
-        "effective_area",
-        "time",
-        "latitude",
-    ]
-    for filename in args.observations:
+    if args.vars:
+        vars = args.vars
+    else:
+        vars = [
+            "amplitude",
+            "speed_radius",
+            "speed_area",
+            "effective_radius",
+            "effective_area",
+            "time",
+            "latitude",
+            "longitude",
+        ]
+    filenames = args.observations
+    filenames.sort()
+    for filename in filenames:
         with Dataset(filename) as h:
-            track = 'track' in h.variables
+            track = "track" in h.variables
         print(f"-- {filename} -- ")
         if track:
             vars_ = vars.copy()
-            vars_.extend(('track', 'observation_number', 'observation_flag', 'longitude'))
+            vars_.extend(("track", "observation_number", "observation_flag"))
             e = TrackEddiesObservations.load_file(filename, include_vars=vars_)
         else:
             e = EddiesObservations.load_file(filename, include_vars=vars)
+        if args.area is not None:
+            area = dict(
+                llcrnrlon=args.area[0],
+                llcrnrlat=args.area[1],
+                urcrnrlon=args.area[2],
+                urcrnrlat=args.area[3],
+            )
+            e = e.extract_with_area(area)
         print(e)

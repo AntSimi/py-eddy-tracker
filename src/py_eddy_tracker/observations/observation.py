@@ -270,6 +270,9 @@ class EddiesObservations(object):
     |   Speed radius (km)      {self.box_display(bins_radius)}
     |   Percent of eddies         : {
         self.box_display(self.hist('time', 'radius_s', bins_radius * 1000., percent=True, nb=True))}
+    |   Effective radius (km)  {self.box_display(bins_radius)}
+    |   Percent of eddies         : {
+        self.box_display(self.hist('time', 'radius_e', bins_radius * 1000., percent=True, nb=True))}
     ----Distribution in Latitude
         Latitude bounds        {self.box_display(bins_lat)}
         Percent of eddies         : {self.box_display(self.hist('time', 'lat', bins_lat, percent=True, nb=True))}
@@ -1410,6 +1413,7 @@ class EddiesObservations(object):
         self,
         ax,
         varname,
+        ref=None,
         intern=False,
         cmap="magma_r",
         lut=10,
@@ -1421,6 +1425,7 @@ class EddiesObservations(object):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
         :param str,array varname: var which will be use to fill contour, or an array of same size of obs
+        :param float,None ref: if define use like west bound
         :param bool intern: if True draw speed contour instead of effective contour
         :param str cmap: matplotlib colormap name
         :param int,None lut: Number of division of colormaps
@@ -1436,6 +1441,11 @@ class EddiesObservations(object):
         x_name, y_name = self.intern(intern)
         v = (self[varname] if isinstance(varname, str) else varname) * factor
         x, y = self[x_name], self[y_name]
+        if ref is not None:
+            # TODO : maybe buggy with global display
+            shape_out = x.shape
+            x, y = wrap_longitude(x.reshape(-1), y.reshape(-1), ref)
+            x, y = x.reshape(shape_out), y.reshape(shape_out)
         if vmin is None:
             vmin = v.min()
         if vmax is None:

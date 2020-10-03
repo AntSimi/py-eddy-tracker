@@ -1,12 +1,13 @@
 """
-Eddy detection Gulf stream
-==========================
+Eddy detection : Gulf stream
+============================
 
 Script will detect eddies on adt field, and compute u,v with method add_uv(which could use, only if equator is avoid)
 
 Figures will show different step to detect eddies.
 
 """
+from numpy import arange
 from datetime import datetime
 from matplotlib import pyplot as plt
 from py_eddy_tracker.dataset.grid import RegularGridDataset
@@ -72,7 +73,7 @@ update_axes(ax, m)
 # --------------
 # run identification with slice of 2 mm
 date = datetime(2016, 5, 15)
-a, c = g.eddy_identification("adt", "u", "v", date, 0.002)
+a, c = g.eddy_identification("adt", "u", "v", date, 0.002, shape_error=55)
 
 # %%
 # All closed contour found in this input grid (Display only 1 contour every 5)
@@ -89,11 +90,33 @@ great_current.display(ax, color="k")
 update_axes(ax)
 
 # %%
+# Post analyse
+# ------------
 # Contours reject from several origin (shape error to high, several extremum in contour, ...)
 ax = start_axes("ADT contour reject")
 g.contours.display(ax, only_unused=True, lw=0.25)
 great_current.display(ax, color="k")
 update_axes(ax)
+
+# %%
+# Contours reject criterion
+#
+# 0. - Accepted (green)
+# 1. - Reject for shape error (red)
+# 2. - Masked value in contour (blue)
+# 3. - Under or over pixel limit bound (black)
+# 4. - Amplitude criterion (yellow)
+ax = start_axes("Contour reject criterion")
+g.contours.display(ax, only_unused=True, lw=0.25, display_criterion=True)
+update_axes(ax)
+
+# %%
+# Display shape error of each tested contour, the limit of shape error is set to 55 %
+ax = start_axes("Contour shape error")
+m = g.contours.display(
+    ax, lw=0.5, field="shape_error", bins=arange(20, 90.1, 5), cmap="seismic"
+)
+update_axes(ax, m)
 
 # %%
 # Contours closed which contains several eddies
