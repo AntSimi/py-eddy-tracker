@@ -269,7 +269,7 @@ def get_wrap_vertice(x0, y0, x1, y1, i):
 
 
 def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
-    """
+    r"""
     Return percent of overlap for each item.
 
     :param array x0: x for polygon list 0
@@ -279,6 +279,14 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
     :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union
     :return: Result of cost function
     :rtype: array
+
+    By default
+
+        .. math:: Score = \frac{Intersection(P_0,P_1)_{area}}{Union(P_0,P_1)_{area}}
+
+    If minimal area:
+
+        .. math:: Score = \frac{Intersection(P_0,P_1)_{area}}{min(P_{0 area},P_{1 area})}
     """
     nb = x0.shape[0]
     cost = empty(nb)

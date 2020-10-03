@@ -93,7 +93,10 @@ class TrackEddiesObservations(EddiesObservations):
         Will count and send number of track
         """
         if self.__nb_track is None:
-            self.__nb_track = (self.nb_obs_by_track != 0).sum()
+            if len(self) == 0:
+                self.__nb_track = 0
+            else:
+                self.__nb_track = (self.nb_obs_by_track != 0).sum()
         return self.__nb_track
 
     def __repr__(self):
@@ -326,17 +329,22 @@ class TrackEddiesObservations(EddiesObservations):
 
         .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_with_length
         """
+        if len(self) == 0:
+            return self.empty_dataset()
         b0, b1 = bounds
-        if b0 >= 0 and b1 >= 0:
+        if b0 >= 0 and b1 != -1:
             track_mask = (self.nb_obs_by_track >= b0) * (self.nb_obs_by_track <= b1)
-        elif b0 < 0 and b1 >= 0:
+        elif b0 == -1 and b1 >= 0:
             track_mask = self.nb_obs_by_track <= b1
-        elif b0 >= 0 and b1 < 0:
+        elif b0 >= 0 and b1 == -1:
             track_mask = self.nb_obs_by_track > b0
         else:
             logger.warning("No valid value for bounds")
             raise Exception("One bounds must be positiv")
         return self.extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
+
+    def empty_dataset(self):
+        return self.new_like(self, 0)
 
     def loess_filter(self, half_window, xfield, yfield, inplace=True):
         track = self.obs["track"]
@@ -427,6 +435,8 @@ class TrackEddiesObservations(EddiesObservations):
         """
         if "label" in kwargs:
             kwargs["label"] += " (%s eddies)" % (self.nb_obs_by_track != 0).sum()
+        if len(self) == 0:
+            return ax.plot([], [], **kwargs)
         x, y = split_line(self.longitude, self.latitude, self.tracks)
         if ref is not None:
             x, y = wrap_longitude(x, y, ref, cut=True)
