@@ -21,7 +21,7 @@ Email: evanmason@gmail.com
 ===========================================================================
 """
 
-from numpy import arange, empty
+from numpy import arange, empty, where
 from matplotlib import pyplot
 from matplotlib.collections import LineCollection
 from datetime import datetime
@@ -36,10 +36,11 @@ class Anim:
         self.eddy = eddy
         x_name, y_name = eddy.intern(intern)
         self.t, self.x, self.y = eddy.time, eddy[x_name], eddy[y_name]
-        self.x_core, self.y_core = eddy["lon"], eddy["lat"]
+        self.x_core, self.y_core, self.track = eddy["lon"], eddy["lat"], eddy["track"]
         self.pause = False
         self.period = self.eddy.period
         self.sleep_event = sleep_event
+        self.mappables = list()
         self.setup(**kwargs)
 
     def setup(self, cmap="jet", nb_step=25, figsize=(8, 6)):
@@ -66,6 +67,19 @@ class Anim:
 
         self.fig.canvas.draw()
         self.fig.canvas.mpl_connect("key_press_event", self.keyboard)
+        self.fig.canvas.mpl_connect("resize_event", self.reset_bliting)
+
+    def reset_bliting(self, event):
+        self.contour.set_visible(False)
+        self.txt.set_visible(False)
+        for m in self.mappables:
+            m.set_visible(False)
+        self.fig.canvas.draw()
+        self.bg_cache = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        self.contour.set_visible(True)
+        self.txt.set_visible(True)
+        for m in self.mappables:
+            m.set_visible(True)
 
     def show(self, infinity_loop=False):
         pyplot.show(block=False)
@@ -107,6 +121,8 @@ class Anim:
     def draw_contour(self):
         # t0, t1 = self.period
         # select contour for this time step
+        while self.mappables:
+            self.mappables.pop().remove()
         m = self.t == self.now
         self.ax.figure.canvas.restore_region(self.bg_cache)
         if m.sum():
@@ -121,6 +137,12 @@ class Anim:
         self.contour.set_color(self.colors[-len(self.segs) :])
         self.contour.set_lw(arange(len(self.segs)) / len(self.segs) * 2.5)
         self.txt.set_text(f"{self.now} - {1/self.sleep_event:.0f} frame/s")
+        for i in where(m)[0]:
+            mappable = self.ax.text(
+                self.x_core[i], self.y_core[i], self.track[i], fontsize=8
+            )
+            self.mappables.append(mappable)
+            self.ax.draw_artist(mappable)
         self.ax.draw_artist(self.contour)
         self.ax.draw_artist(self.txt)
         # Remove first segment to keep only T contour
@@ -162,7 +184,7 @@ def anim():
         "--keep_step", default=25, help="number maximal of step displayed", type=int
     )
     parser.add_argument("--cmap", help="matplotlib colormap used")
-    parser.add_argument("--all", help="All eddies will be drawed", action='store_true')
+    parser.add_argument("--all", help="All eddies will be drawed", action="store_true")
     parser.add_argument(
         "--time_sleep",
         type=float,
@@ -179,7 +201,9 @@ def anim():
     eddies = TrackEddiesObservations.load_file(args.filename, include_vars=variables)
     if not args.all:
         if len(args.id) == 0:
-            raise Exception('You need to specify id to display or ask explicity all with --all option')
+            raise Exception(
+                "You need to specify id to display or ask explicity all with --all option"
+            )
         eddies = eddies.extract_ids(args.id)
     a = Anim(
         eddies,

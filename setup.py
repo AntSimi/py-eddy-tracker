@@ -42,6 +42,7 @@ setup(
             "MergeEddies = py_eddy_tracker.appli.eddies:merge_eddies",
             "EddyFrequency = py_eddy_tracker.appli.eddies:get_frequency_grid",
             "EddyInfos = py_eddy_tracker.appli.eddies:display_infos",
+            "EddyCircle = py_eddy_tracker.appli.eddies:eddies_add_circle",
             # network
             "EddyNetworkGroup = py_eddy_tracker.appli.network:build_network",
             "EddyNetworkBuildPath = py_eddy_tracker.appli.network:divide_network",

@@ -27,6 +27,26 @@ from ..observations.tracking import TrackEddiesObservations
 from ..observations.observation import EddiesObservations
 
 
+def eddies_add_circle():
+    parser = EddyParser("Add or replace contour with radius parameter")
+    parser.add_argument("filename", help="all file to merge")
+    parser.add_argument("out", help="output file")
+    args = parser.parse_args()
+    obs = EddiesObservations.load_file(args.filename)
+    if obs.track_array_variables == 0:
+        obs.track_array_variables = 50
+        obs = obs.add_fields(
+            array_fields=(
+                "contour_lon_e",
+                "contour_lat_e",
+                "contour_lon_s",
+                "contour_lat_s",
+            )
+        )
+    obs.circle_contour()
+    obs.write_file(filename=args.out)
+
+
 def merge_eddies():
     parser = EddyParser("Merge eddies")
     parser.add_argument("filename", nargs="+", help="all file to merge")
