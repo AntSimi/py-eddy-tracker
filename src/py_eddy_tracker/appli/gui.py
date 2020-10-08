@@ -36,6 +36,7 @@ class Anim:
         self.eddy = eddy
         x_name, y_name = eddy.intern(intern)
         self.t, self.x, self.y = eddy.time, eddy[x_name], eddy[y_name]
+        self.x_core, self.y_core = eddy["lon"], eddy["lat"]
         self.pause = False
         self.period = self.eddy.period
         self.sleep_event = sleep_event
@@ -46,15 +47,10 @@ class Anim:
         self.colors = cmap(arange(nb_step + 1) / nb_step)
         self.nb_step = nb_step
 
-        x_min, x_max = self.x.min(), self.x.max()
+        x_min, x_max = self.x_core.min() - 2, self.x_core.max() + 2
         d_x = x_max - x_min
-        x_min -= 0.05 * d_x
-        x_max += 0.05 * d_x
-        y_min, y_max = self.y.min(), self.y.max()
+        y_min, y_max = self.y_core.min() - 2, self.y_core.max() + 2
         d_y = y_max - y_min
-        y_min -= 0.05 * d_y
-        y_max += 0.05 * d_y
-
         # plot
         self.fig = pyplot.figure(figsize=figsize)
         t0, t1 = self.period
@@ -156,7 +152,7 @@ def anim():
         left arrow => t - 1, right arrow => t + 1, + => speed increase of 10 %, - => speed decrease of 10 %"""
     )
     parser.add_argument("filename", help="eddy atlas")
-    parser.add_argument("id", help="Track id to anim", type=int)
+    parser.add_argument("id", help="Track id to anim", type=int, nargs="*")
     parser.add_argument(
         "--intern",
         action="store_true",
@@ -166,6 +162,7 @@ def anim():
         "--keep_step", default=25, help="number maximal of step displayed", type=int
     )
     parser.add_argument("--cmap", help="matplotlib colormap used")
+    parser.add_argument("--all", help="All eddies will be drawed", action='store_true')
     parser.add_argument(
         "--time_sleep",
         type=float,
@@ -176,13 +173,16 @@ def anim():
         "--infinity_loop", action="store_true", help="Press Escape key to stop loop"
     )
     args = parser.parse_args()
-    variables = ["time", "track"]
+    variables = ["time", "track", "longitude", "latitude"]
     variables.extend(TrackEddiesObservations.intern(args.intern, public_label=True))
 
-    atlas = TrackEddiesObservations.load_file(args.filename, include_vars=variables)
-    eddy = atlas.extract_ids([args.id])
+    eddies = TrackEddiesObservations.load_file(args.filename, include_vars=variables)
+    if not args.all:
+        if len(args.id) == 0:
+            raise Exception('You need to specify id to display or ask explicity all with --all option')
+        eddies = eddies.extract_ids(args.id)
     a = Anim(
-        eddy,
+        eddies,
         intern=args.intern,
         sleep_event=args.time_sleep,
         cmap=args.cmap,
