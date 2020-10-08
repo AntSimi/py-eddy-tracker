@@ -53,7 +53,6 @@ from ..generic import (
     uniform_resample,
     coordinates_to_local,
     local_to_coordinates,
-    get_pixel_in_regular,
     nearest_grd_indice,
     bbox_indice_regular,
 )
@@ -63,6 +62,7 @@ from ..poly import (
     create_vertice,
     poly_area,
     fit_circle,
+    get_pixel_in_regular,
 )
 
 logger = logging.getLogger("pet")
@@ -577,6 +577,7 @@ class GridDataset(object):
         precision=None,
         force_height_unit=None,
         force_speed_unit=None,
+        mle=1,
     ):
         """
         Compute eddy identification on specified grid
@@ -743,6 +744,7 @@ class GridDataset(object):
                         anticyclonic_search=anticyclonic_search,
                         level=self.contours.levels[corrected_coll_index],
                         step=step,
+                        mle=mle,
                     )
                     # If we have a valid amplitude
                     if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
@@ -971,7 +973,13 @@ class GridDataset(object):
 
     @staticmethod
     def get_amplitude(
-        contour, contour_height, data, anticyclonic_search=True, level=None, step=None
+        contour,
+        contour_height,
+        data,
+        anticyclonic_search=True,
+        level=None,
+        step=None,
+        mle=1,
     ):
         # Instantiate Amplitude object
         amp = Amplitude(
@@ -983,6 +991,8 @@ class GridDataset(object):
             data=data,
             # Step by level
             interval=step,
+            # Set number max of local maxima
+            mle=mle,
         )
 
         if anticyclonic_search:
@@ -1821,7 +1831,9 @@ class RegularGridDataset(GridDataset):
             new_name = grid_name
         x, y = meshgrid(self.x_c, self.y_c)
         # interp and reshape
-        v_interp = other.interp(grid_name, x.reshape(-1), y.reshape(-1)).reshape(x.shape).T
+        v_interp = (
+            other.interp(grid_name, x.reshape(-1), y.reshape(-1)).reshape(x.shape).T
+        )
         v_interp = ma.array(v_interp, mask=isnan(v_interp))
         # and add it to self
         self.add_grid(new_name, v_interp)

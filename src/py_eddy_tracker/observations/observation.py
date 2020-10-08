@@ -50,6 +50,7 @@ from numpy import (
     linspace,
     sin,
     histogram,
+    digitize,
 )
 from netCDF4 import Dataset
 from datetime import datetime
@@ -71,11 +72,16 @@ from ..generic import (
     wrap_longitude,
     local_to_coordinates,
     reverse_index,
-    get_pixel_in_regular,
     bbox_indice_regular,
     hist_numba,
 )
-from ..poly import bbox_intersection, vertice_overlap, create_vertice
+from ..poly import (
+    bbox_intersection,
+    vertice_overlap,
+    create_vertice,
+    close_center,
+    get_pixel_in_regular,
+)
 
 logger = logging.getLogger("pet")
 
@@ -297,7 +303,7 @@ class EddiesObservations(object):
             if candidate in handler.dimensions.keys():
                 return candidate
 
-    def add_fields(self, fields):
+    def add_fields(self, fields=list(), array_fields=list()):
         """
         Add a new field
         """
@@ -308,8 +314,10 @@ class EddiesObservations(object):
                 concatenate((self.track_extra_variables, fields))
             ),
             track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables,
-            only_variables=list(concatenate((self.obs.dtype.names, fields))),
+            array_variables=list(concatenate((self.array_variables, array_fields))),
+            only_variables=list(
+                concatenate((self.obs.dtype.names, fields, array_fields))
+            ),
             raw_data=self.raw_data,
         )
         new.sign_type = self.sign_type
@@ -332,19 +340,20 @@ class EddiesObservations(object):
         """
         angle = radians(linspace(0, 360, self.track_array_variables))
         x_norm, y_norm = cos(angle), sin(angle)
+        radius_s = "contour_lon_s" in self.obs.dtype.names
+        radius_e = "contour_lon_e" in self.obs.dtype.names
         for i, obs in enumerate(self):
-            r_s, r_e, x, y = (
-                obs["radius_s"],
-                obs["radius_e"],
-                obs["lon"],
-                obs["lat"],
-            )
-            obs["contour_lon_s"], obs["contour_lat_s"] = local_to_coordinates(
-                x_norm * r_s, y_norm * r_s, x, y
-            )
-            obs["contour_lon_e"], obs["contour_lat_e"] = local_to_coordinates(
-                x_norm * r_e, y_norm * r_e, x, y
-            )
+            x, y = obs["lon"], obs["lat"]
+            if radius_s:
+                r_s = obs["radius_s"]
+                obs["contour_lon_s"], obs["contour_lat_s"] = local_to_coordinates(
+                    x_norm * r_s, y_norm * r_s, x, y
+                )
+            if radius_e:
+                r_e = obs["radius_e"]
+                obs["contour_lon_e"], obs["contour_lat_e"] = local_to_coordinates(
+                    x_norm * r_e, y_norm * r_e, x, y
+                )
 
     @property
     def dtype(self):
@@ -437,6 +446,53 @@ class EddiesObservations(object):
         for obs in self.obs:
             yield obs
 
+    def iter_on(self, xname, bins=None):
+        """
+        Yield observation group for each bins
+
+        :param str varname:
+        :param array bins: bounds og each bins ,
+        :return: Group observations
+        :rtype: self.__class__
+        """
+        x = self[xname]
+        d = x[1:] - x[:-1]
+        if bins is None:
+            bins = arange(x.min(), x.max() + 2)
+        nb_bins = len(bins) - 1
+        i = digitize(x, bins) - 1
+        # Not monotonous
+        if (d < 0).any():
+            for i_ in unique(i):
+                if i_ == -1 or i_ == nb_bins:
+                    continue
+                index = where(i_ == i)[0]
+                yield index, bins[i_], bins[i_ + 1]
+        else:
+            # TODO : need improvement
+            for i_ in unique(i):
+                if i_ == -1 or i_ == nb_bins:
+                    continue
+                index = where(i_ == i)[0]
+                yield slice(index[0], index[-1] + 1), bins[i_], bins[i_ + 1]
+
+    def align_on(self, other, var_name="time", **kwargs):
+        iter_self, iter_other = (
+            self.iter_on(var_name, **kwargs),
+            other.iter_on(var_name, **kwargs),
+        )
+        indexs_other, b0_other, b1_other = iter_other.__next__()
+        for indexs_self, b0_self, b1_self in iter_self:
+            if b0_self > b0_other:
+                try:
+                    while b0_other < b0_self:
+                        indexs_other, b0_other, b1_other = iter_other.__next__()
+                except StopIteration:
+                    break
+            if b0_self < b0_other:
+                continue
+            yield indexs_self, indexs_other, b0_self, b1_self
+
     def insert_observations(self, other, index):
         """Insert other obs in self at the index
         """
@@ -493,6 +549,8 @@ class EddiesObservations(object):
         size = 1
         if hasattr(index, "__iter__"):
             size = len(index)
+        elif isinstance(index, slice):
+            size = index.stop - index.start
         eddies = self.new_like(self, size)
         eddies.obs[:] = self.obs[index]
         eddies.sign_type = self.sign_type
@@ -616,7 +674,7 @@ class EddiesObservations(object):
 
     @classmethod
     def load_from_netcdf(
-        cls, filename, raw_data=False, remove_vars=None, include_vars=None
+        cls, filename, raw_data=False, remove_vars=None, include_vars=None, indexs=None
     ):
         array_dim = "NbSample"
         if isinstance(filename, bytes):
@@ -633,7 +691,17 @@ class EddiesObservations(object):
             elif remove_vars is not None:
                 var_list = [i for i in var_list if i not in remove_vars]
 
-            nb_obs = len(h_nc.dimensions[cls.obs_dimension(h_nc)])
+            obs_dim = cls.obs_dimension(h_nc)
+            nb_obs = len(h_nc.dimensions[obs_dim])
+            if indexs is not None and obs_dim in indexs:
+                sl = indexs[obs_dim]
+                if sl.stop is not None:
+                    nb_obs = sl.stop
+                if sl.start is not None:
+                    nb_obs -= sl.start
+                if sl.step is not None:
+                    indexs[obs_dim] = slice(sl.start, sl.stop)
+                    logger.warning("step of slice won't be use")
             logger.debug("%d observations will be load", nb_obs)
             kwargs = dict()
             if array_dim in h_nc.dimensions:
@@ -700,10 +768,16 @@ class EddiesObservations(object):
                                     input_unit,
                                     output_unit,
                                 )
+                if indexs is None:
+                    indexs = dict()
+                var_sl = [
+                    indexs.get(dim, slice(None))
+                    for dim in h_nc.variables[variable].dimensions
+                ]
                 if factor != 1:
-                    eddies.obs[var_inv] = h_nc.variables[variable][:] * factor
+                    eddies.obs[var_inv] = h_nc.variables[variable][var_sl] * factor
                 else:
-                    eddies.obs[var_inv] = h_nc.variables[variable][:]
+                    eddies.obs[var_inv] = h_nc.variables[variable][var_sl]
 
             for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
@@ -1393,10 +1467,11 @@ class EddiesObservations(object):
                 new.obs[var] = self.obs[var][mask]
         return new
 
-    def scatter(self, ax, name, ref=None, factor=1, **kwargs):
+    def scatter(self, ax, name=None, ref=None, factor=1, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param str name: var which will be use to fill contour
+        :param str,None name:
+            var which will be use to fill contour, if None all element of collection will have same color
         :param float,None ref: if define use like west bound
         :param float factor: multiply value by
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
@@ -1407,7 +1482,10 @@ class EddiesObservations(object):
         x = self.longitude
         if ref is not None:
             x = (x - ref) % 360 + ref
-        return ax.scatter(x, self.latitude, c=self[name] * factor, **kwargs)
+        kwargs = kwargs.copy()
+        if name is not None:
+            kwargs['c'] = self[name] * factor
+        return ax.scatter(x, self.latitude, **kwargs)
 
     def filled(
         self,
@@ -1461,6 +1539,22 @@ class EddiesObservations(object):
         c.cmap = cmap
         c.norm = Normalize(vmin=vmin, vmax=vmax)
         return c
+
+    def bins_stat(self, name, bins=None):
+        """
+        :param str name: var which will be use
+        :param array, None bins: bins to perform statistics,if None method will get min and max of variable
+        :return: x array and y array
+        :rtype: array,array
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.bins_stat
+        """
+        v = self[name]
+        if bins is None:
+            bins = arange(v.min(), v.max() + 2)
+        y, x = hist_numba(v, bins=bins)
+        x = (x[1:] + x[:-1]) / 2
+        return x, y
 
     def display(
         self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs
@@ -1606,29 +1700,31 @@ class EddiesObservations(object):
         :param grid_object: Handler of grid to interp
         :type grid_object: py_eddy_tracker.dataset.grid.RegularGridDataset
         :param str varname: Name of variable to use
-        :param str method: 'center','mean'
+        :param str method: 'center', 'mean', 'max', 'min'
         :param str dtype: if None we use var dtype
         :param bool intern: Use extern or intern contour
         """
         if method == "center":
             return grid_object.interp(varname, self.longitude, self.latitude)
-        elif method in ("min", "max", "mean"):
+        elif method in ("min", "max", "mean", 'count'):
             x0 = grid_object.x_bounds[0]
             x_name, y_name = self.intern(False if intern is None else intern)
             x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
             x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
             grid = grid_object.grid(varname)
             result = empty(self.shape, dtype=grid.dtype if dtype is None else dtype)
-            grid_mean(
+            min_method = method == 'min'
+            grid_stat(
                 grid_object.x_c,
                 grid_object.y_c,
-                grid,
+                -grid if min_method else grid,
                 x,
                 y,
                 result,
                 grid_object.is_circular(),
+                method='max' if min_method else method
             )
-            return result
+            return -result if min_method else result
         else:
             raise Exception(f'method "{method}" unknown')
 
@@ -1650,7 +1746,7 @@ def grid_count_(grid, i, j):
 
 
 @njit(cache=True)
-def grid_mean(x_c, y_c, grid, x, y, result, circular=False):
+def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method='mean'):
     """
     Compute mean of grid for each contour
 
@@ -1661,11 +1757,14 @@ def grid_mean(x_c, y_c, grid, x, y, result, circular=False):
     :param array_like y: latitude of contours
     :param array_like result: return values
     :param bool circular: True if grid is wrappable
+    :param str method: 'mean', 'max'
     """
     nb = result.shape[0]
     xstep, ystep = x_c[1] - x_c[0], y_c[1] - y_c[0]
     x0, y0 = x_c - xstep / 2.0, y_c - ystep / 2.0
     nb_x = x_c.shape[0]
+    max_method = 'max' == method
+    mean_method = 'mean' == method
     for elt in range(nb):
         v = create_vertice(x[elt], y[elt],)
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
@@ -1673,10 +1772,16 @@ def grid_mean(x_c, y_c, grid, x, y, result, circular=False):
         )
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
 
-        v_sum = 0
-        for i_, j_ in zip(i, j):
-            v_sum += grid[i_, j_]
-        result[elt] = v_sum / i.shape[0]
+        if mean_method:
+            v_sum = 0
+            for i_, j_ in zip(i, j):
+                v_sum += grid[i_, j_]
+            result[elt] = v_sum / i.shape[0]
+        elif max_method:
+            v_max = -1e40
+            for i_, j_ in zip(i, j):
+                v_max = max(v_max, grid[i_, j_])
+            result[elt] = v_max
 
 
 class VirtualEddiesObservations(EddiesObservations):

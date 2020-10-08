@@ -61,7 +61,7 @@ class Amplitude(object):
         "mle",
     )
 
-    def __init__(self, contour, contour_height, data, interval):
+    def __init__(self, contour, contour_height, data, interval, mle=1):
         # Height of the contour
         self.h_0 = contour_height
         # Step minimal to consider amplitude
@@ -97,7 +97,7 @@ class Amplitude(object):
         # Amplitude which will be provide
         self.amplitude = 0
         # Maximum local extrema accepted
-        self.mle = 1
+        self.mle = mle
 
     def within_amplitude_limits(self):
         """Need update

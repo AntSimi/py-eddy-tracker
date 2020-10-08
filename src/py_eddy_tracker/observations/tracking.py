@@ -267,6 +267,9 @@ class TrackEddiesObservations(EddiesObservations):
         return mask
 
     def compute_index(self):
+        """
+        If obs are not sorted by track, __first_index_of_track will be unusable
+        """
         if self.__first_index_of_track is None:
             s = self.tracks.max() + 1
             # Doesn't work => core dump with numba, maybe he wait i8 instead of u4
@@ -291,6 +294,27 @@ class TrackEddiesObservations(EddiesObservations):
     def extract_ids(self, tracks):
         mask = self.get_mask_from_id(array(tracks))
         return self.extract_with_mask(mask)
+
+    def extract_toward_direction(self, west=True, delta_lon=None):
+        """
+        Get eddy which go in same direction
+
+        :param bool west: Only eastward eddy if True return westward
+        :param None,float delta_lon: Only eddy with more than delta_lon span in longitude
+        :return: Only eastern eddy
+        :rtype: __class__
+
+        .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_toward_direction
+        """
+        lon = self.longitude
+        i0, nb = self.index_from_track, self.nb_obs_by_track
+        i1 = i0 - 1 + nb
+        d_lon = lon[i1] - lon[i0]
+        m = d_lon < 0 if west else d_lon > 0
+        if delta_lon is not None:
+            m *= delta_lon < d_lon
+        m = m.repeat(nb)
+        return self.extract_with_mask(m)
 
     def extract_first_obs_in_box(self, res):
         data = empty(
@@ -323,6 +347,8 @@ class TrackEddiesObservations(EddiesObservations):
 
     def extract_with_length(self, bounds):
         """
+        Return all observations in [b0:b1]
+
         :param (int,int) bounds: length min and max of selected eddies, if use of -1 this bound is not used
         :return: Return all eddy tracks which have length between bounds
         :rtype: TrackEddiesObservations
@@ -337,7 +363,7 @@ class TrackEddiesObservations(EddiesObservations):
         elif b0 == -1 and b1 >= 0:
             track_mask = self.nb_obs_by_track <= b1
         elif b0 >= 0 and b1 == -1:
-            track_mask = self.nb_obs_by_track > b0
+            track_mask = self.nb_obs_by_track >= b0
         else:
             logger.warning("No valid value for bounds")
             raise Exception("One bounds must be positiv")

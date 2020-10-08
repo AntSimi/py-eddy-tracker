@@ -37,12 +37,10 @@ from numpy import (
     zeros,
     isnan,
     bool_,
-    concatenate,
     radians,
     histogram,
 )
 from numba import njit, prange, types as numba_types
-from .poly import winding_number_grid_in_poly
 
 
 @njit(cache=True)
@@ -498,47 +496,6 @@ def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
         slice_x = max(i_x0 - N, 0), i_x1 + N + 1
     slice_y = i_y0 - N, i_y1 + N + 1
     return slice_x, slice_y
-
-
-@njit(cache=True, fastmath=True)
-def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
-    """
-    Get a pixel list of a regular grid contain in a contour.
-
-    :param array_like vertices: contour vertice (N,2)
-    :param array_like x_c: longitude coordinate of grid
-    :param array_like y_c: latitude coordinate of grid
-    :param int x_start: west index of contour
-    :param int y_start: east index of contour
-    :param int x_stop: south index of contour
-    :param int y_stop: north index of contour
-    """
-    if x_stop < x_start:
-        x_ref = vertices[0, 0]
-        x_array = (
-            (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360
-            + x_ref
-            - 180
-        )
-        return winding_number_grid_in_poly(
-            x_array,
-            y_c[y_start:y_stop],
-            x_start,
-            x_stop,
-            x_c.shape[0],
-            y_start,
-            vertices,
-        )
-    else:
-        return winding_number_grid_in_poly(
-            x_c[x_start:x_stop],
-            y_c[y_start:y_stop],
-            x_start,
-            x_stop,
-            x_c.shape[0],
-            y_start,
-            vertices,
-        )
 
 
 def build_circle(x0, y0, r):

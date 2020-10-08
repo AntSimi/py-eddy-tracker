@@ -20,7 +20,7 @@ Email: evanmason@gmail.com
 ===========================================================================
 """
 
-from numpy import empty, where, array, ones, pi
+from numpy import empty, where, array, ones, pi, concatenate
 from numpy.linalg import lstsq
 from numba import njit, prange, types as numba_types
 from Polygon import Polygon
@@ -467,3 +467,44 @@ def shape_error(x, y, x0, y0, r):
             x[i] = x0 + dx * rd
             y[i] = y0 + dy * rd
     return 100 + (p_area - 2 * poly_area(x, y)) / c_area * 100
+
+
+@njit(cache=True, fastmath=True)
+def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
+    """
+    Get a pixel list of a regular grid contain in a contour.
+
+    :param array_like vertices: contour vertice (N,2)
+    :param array_like x_c: longitude coordinate of grid
+    :param array_like y_c: latitude coordinate of grid
+    :param int x_start: west index of contour
+    :param int y_start: east index of contour
+    :param int x_stop: south index of contour
+    :param int y_stop: north index of contour
+    """
+    if x_stop < x_start:
+        x_ref = vertices[0, 0]
+        x_array = (
+            (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360
+            + x_ref
+            - 180
+        )
+        return winding_number_grid_in_poly(
+            x_array,
+            y_c[y_start:y_stop],
+            x_start,
+            x_stop,
+            x_c.shape[0],
+            y_start,
+            vertices,
+        )
+    else:
+        return winding_number_grid_in_poly(
+            x_c[x_start:x_stop],
+            y_c[y_start:y_stop],
+            x_start,
+            x_stop,
+            x_c.shape[0],
+            y_start,
+            vertices,
+        )
