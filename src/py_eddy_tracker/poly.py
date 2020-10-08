@@ -172,6 +172,31 @@ def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
 
 
 @njit(cache=True, fastmath=True)
+def close_center(x0, y0, x1, y1, delta=.1):
+    """
+    Compute an overlap with circle parameter and return a percentage
+
+    :param array x0: x centers of dataset 0
+    :param array y0: y centers of dataset 0
+    :param array x1: x centers of dataset 1
+    :param array y1: y centers of dataset 1
+    :return: Result of cost function
+    :rtype: array
+    """
+    nb0, nb1 = x0.shape[0], x1.shape[0]
+    i, j, c = list(), list(), list()
+    for i0 in range(nb0):
+        xi0, yi0 = x0[i0], y0[i0]
+        for i1 in range(nb1):
+            if abs(x1[i1] - xi0) > delta:
+                continue
+            if abs(y1[i1] - yi0) > delta:
+                continue
+            i.append(i0), j.append(i1), c.append(1)
+    return array(i), array(j), array(c)
+
+
+@njit(cache=True, fastmath=True)
 def bbox_intersection(x0, y0, x1, y1):
     """
     Compute bbox to check if there are a bbox intersection.

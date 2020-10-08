@@ -893,24 +893,38 @@ class EddiesObservations(object):
             labels = [VAR_DESCR[label]["nc_name"] for label in labels]
         return labels
 
-    def match(self, other, intern=False, cmin=0):
+    def match(self, other, method="overlap", intern=False, cmin=0, **kwargs):
         """return index and score compute with area
 
         :param EddiesObservations other: Observations to compare
+        :param str method:
+            if method is "overlap" method will use contour to compute score,
+            if method is "circle" method will apply a formula of circle overlap
         :param bool intern: if True, speed contour will be used
         :param float cmin: 0 < cmin < 1, return only couple above cmin
+        :param dict kwargs: look at :py:meth:`vertice_overlap`
         :return: return index of couple in self and other and cost value
         :rtype: (array(int), array(int), array(float))
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.match
         """
         x_name, y_name = self.intern(intern)
-        i, j = bbox_intersection(
-            self[x_name], self[y_name], other[x_name], other[y_name]
-        )
-        c = vertice_overlap(
-            self[x_name][i], self[y_name][i], other[x_name][j], other[y_name][j]
-        )
+        if method == "overlap":
+            i, j = bbox_intersection(
+                self[x_name], self[y_name], other[x_name], other[y_name]
+            )
+            c = vertice_overlap(
+                self[x_name][i],
+                self[y_name][i],
+                other[x_name][j],
+                other[y_name][j],
+                **kwargs,
+            )
+        elif method == "close_center":
+            i, j, c = close_center(
+                self.latitude, self.longitude, other.latitude, other.longitude, **kwargs
+            )
+
         m = c > cmin
         return i[m], j[m], c[m]
 
