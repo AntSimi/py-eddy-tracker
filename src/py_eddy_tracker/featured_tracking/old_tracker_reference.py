@@ -83,6 +83,7 @@ class CheltonTracker(Model):
 def check_ratio(current_mask, self_amplitude, other_amplitude, self_radius, other_radius):
     """
     Only very few case are remove with selection
+
     :param current_mask:
     :param self_amplitude:
     :param other_amplitude:

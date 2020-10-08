@@ -355,8 +355,8 @@ VAR_DESCR = dict(
         nc_attr=dict(
             long_name="Speed Radius",
             units="m",
-            comment="Radius of a circle whose area is equal to that \
-                enclosed by the contour of maximum circum-average speed",
+            comment="Radius of a circle whose area is equal to that "
+                    "enclosed by the contour of maximum circum-average speed",
         ),
     ),
     track=dict(

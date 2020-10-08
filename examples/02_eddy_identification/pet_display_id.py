@@ -27,8 +27,6 @@ m = c.filled(ax, "amplitude", cmap="magma_r", vmin=0, vmax=.5)
 colorbar = plt.colorbar(m, cax=ax.figure.add_axes([0.95, 0.05, 0.01, 0.9]))
 colorbar.set_label('Amplitude (m)')
 
-plt.show()
-
 # %%
 # draw contour
 fig = plt.figure(figsize=(15, 8))
