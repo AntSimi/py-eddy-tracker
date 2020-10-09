@@ -42,12 +42,25 @@ extensions = [
 # autodoc conf
 autoclass_content = "both"
 
+# Example configuration for intersphinx: refer to the Python standard library.
+intersphinx_mapping = {
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "python": ("https://docs.python.org/3/", None),
+    "matplotlib": ("https://matplotlib.org/", None),
+}
+
+
 sphinx_gallery_conf = {
     "examples_dirs": "../examples",  # path to your example scripts
     "gallery_dirs": "python_module",
     "capture_repr": ("_repr_html_",),
     "backreferences_dir": "gen_modules/backreferences",
     "doc_module": ("py_eddy_tracker",),
+    "reference_url": {
+        "py_eddy_tracker": None,
+        "matplotlib": "https://matplotlib.org/",
+        "numpy": "https://docs.scipy.org/doc/numpy/",
+    },
     "line_numbers": False,
     "filename_pattern": "/pet",
     "binder": {
@@ -323,11 +336,3 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 # texinfo_no_detailmenu = False
-
-
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {
-    "numpy": ("https://numpy.org/doc/stable/", None),
-    "python": ("https://docs.python.org/3/", None),
-    "matplotlib": ("https://matplotlib.org/", None),
-}
