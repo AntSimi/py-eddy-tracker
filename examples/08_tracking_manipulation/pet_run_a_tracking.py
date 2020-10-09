@@ -14,7 +14,9 @@ from py_eddy_tracker.gui import GUI
 
 
 # %%
-# Get remote data, we will keep only 180 first days
+# Get remote data, we will keep only 180 first days,
+# `get_remote_sample` function is only to get demo dataset, in your own case give a list of identification filename
+# and don't mix cyclonic and anticyclonic files.
 file_objects = get_remote_sample(
     "eddies_med_adt_allsat_dt2018/Anticyclonic_2010_2011_2012"
 )[:180]

@@ -45,6 +45,7 @@ Welcome to py-eddy-tracker's documentation!
    autodoc/tracking
    autodoc/poly
    autodoc/generic
+   Source (Git) <https://github.com/AntSimi/py-eddy-tracker>
 
 
 Indices and tables
