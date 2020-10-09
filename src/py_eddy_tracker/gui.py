@@ -22,12 +22,10 @@ Email: evanmason@gmail.com
 """
 
 import numpy as np
-from datetime import datetime
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 from matplotlib.projections import register_projection
-import py_eddy_tracker_sample as sample
 from .generic import flatten_line_matrix, split_line
-from .observations.tracking import TrackEddiesObservations
 
 
 try:
@@ -65,10 +63,6 @@ class GUIAxes(PlatCarreAxes):
 register_projection(GUIAxes)
 
 
-class A(TrackEddiesObservations):
-    pass
-
-
 def no(*args, **kwargs):
     return False
 
@@ -81,6 +75,7 @@ class GUI:
         "time_ax",
         "param_ax",
         "settings",
+        "d_indexs",
         "m",
         "last_event",
     )
@@ -89,6 +84,7 @@ class GUI:
 
     def __init__(self, **datasets):
         self.datasets = datasets
+        self.d_indexs = dict()
         self.m = dict()
         self.set_initial_values()
         self.setup()
@@ -140,8 +136,9 @@ class GUI:
         # map
         self.map = self.figure.add_axes((0, 0.25, 1, 0.75), projection="full_axes")
         self.map.grid()
-        self.map.tick_params("x", pad=-12)
-        self.map.tick_params("y", pad=-22)
+        self.map.tick_params("both", pad=-22)
+        # self.map.tick_params("y", pad=-22)
+        self.map.bg_cache = None
         # time ax
         self.time_ax = self.figure.add_axes((0, 0.15, 1, 0.1), facecolor=".95")
         self.time_ax.can_pan
@@ -159,41 +156,65 @@ class GUI:
         self.param_ax = self.figure.add_axes((0, 0, 1, 0.15), facecolor="0.2")
 
     def draw(self):
+        self.m["mini_ax"] = self.figure.add_axes((0.3, 0.85, 0.4, 0.15), zorder=80)
+        self.m["mini_ax"].grid()
         # map
         for i, (name, dataset) in enumerate(self.datasets.items()):
+            kwargs = dict(color=self.COLORS[i])
             self.m[name] = dict(
-                contour_s=self.map.plot(
-                    [], [], color=self.COLORS[i], lw=0.5, label=name
-                )[0],
-                contour_e=self.map.plot([], [], color=self.COLORS[i], lw=0.5)[0],
-                path_previous=self.map.plot([], [], color=self.COLORS[i], lw=0.5)[0],
-                path_future=self.map.plot([], [], color=self.COLORS[i], lw=0.2, ls=":")[
-                    0
-                ],
+                contour_s=self.map.plot([], [], lw=1, label=name, **kwargs)[0],
+                contour_e=self.map.plot([], [], lw=0.5, ls="-.", **kwargs)[0],
+                path_previous=self.map.plot([], [], lw=0.5, **kwargs)[0],
+                path_future=self.map.plot([], [], lw=0.2, ls=":", **kwargs)[0],
+                mini_line=self.m["mini_ax"].plot([], [], **kwargs, lw=1)[0]
             )
-        self.m["title"] = self.map.set_title("")
         # time_ax
+        self.m["annotate"] = self.map.annotate(
+            "",
+            (0, 0),
+            xycoords="figure pixels",
+            zorder=100,
+            fontsize=9,
+            bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.85),
+        )
+        self.m["mini_ax"].set_visible(False)
+        self.m["annotate"].set_visible(False)
+
         self.m["time_vline"] = self.time_ax.axvline(0, color="k", lw=1)
         self.m["time_text"] = self.time_ax.text(
-            0, 0, "", fontsize=8, bbox=dict(facecolor="w", alpha=0.75)
+            0,
+            0,
+            "",
+            fontsize=8,
+            bbox=dict(facecolor="w", alpha=0.75),
+            verticalalignment="bottom",
         )
 
     def update(self):
-        # text = []
+        time_text = [
+            (timedelta(days=int(self.now)) + datetime(1950, 1, 1)).strftime("%d/%m/%Y")
+        ]
         # map
         xs, ys, ns = list(), list(), list()
         for j, (name, dataset) in enumerate(self.datasets.items()):
             i = self.indexs(dataset)
+            self.d_indexs[name] = i
             self.m[name]["contour_s"].set_label(f"{name} {len(i)} eddies")
             if len(i) == 0:
                 self.m[name]["contour_s"].set_data([], [])
+                self.m[name]["contour_e"].set_data([], [])
             else:
-                if 'contour_lon_s' in dataset.elements:
+                if "contour_lon_s" in dataset.elements:
                     self.m[name]["contour_s"].set_data(
                         flatten_line_matrix(dataset["contour_lon_s"][i]),
                         flatten_line_matrix(dataset["contour_lat_s"][i]),
                     )
-            # text.append(f"{i.shape[0]}")
+                if "contour_lon_e" in dataset.elements:
+                    self.m[name]["contour_e"].set_data(
+                        flatten_line_matrix(dataset["contour_lon_e"][i]),
+                        flatten_line_matrix(dataset["contour_lat_e"][i]),
+                    )
+            time_text.append(f"{i.shape[0]}")
             local_path = dataset.extract_ids(dataset["track"][i])
             x, y, t, n, tr = (
                 local_path.longitude,
@@ -229,12 +250,11 @@ class GUI:
             self.map.text(x_, y_, n_) for x_, y_, n_ in zip(x, y, n) if n_ >= n_min
         ]
 
-        self.m["title"].set_text(self.now)
         self.map.legend()
         # time ax
         x, y = self.m["time_vline"].get_data()
         self.m["time_vline"].set_data(self.now, y)
-        # self.m["time_text"].set_text("\n".join(text))
+        self.m["time_text"].set_text("\n".join(time_text))
         self.m["time_text"].set_position((self.now, 0))
         # force update
         self.map.figure.canvas.draw()
@@ -263,6 +283,30 @@ class GUI:
             self.time_ax.press = True
             self.time_ax.bg_cache = self.figure.canvas.copy_from_bbox(self.time_ax.bbox)
 
+    def get_infos(self, name, index):
+        i = self.d_indexs[name][index]
+        d = self.datasets[name]
+        now = d.obs[i]
+        tr = now["track"]
+        nb = d.nb_obs_by_track[tr]
+        i_first = d.index_from_track[tr]
+        track = d.obs[i_first : i_first + nb]
+        nb -= 1
+        t0 = timedelta(days=int(track[0]["time"])) + datetime(1950, 1, 1)
+        t1 = timedelta(days=int(track[-1]["time"])) + datetime(1950, 1, 1)
+        txt = f"--{name}--\n"
+        txt += f"    {t0} -> {t1}\n"
+        txt += f"    Tracks : {tr}  {now['n']}/{nb} ({now['n'] / nb * 100:.2f} %)\n"
+        for label, n, f, u in (
+            ("Amp.", "amplitude", 100, "cm"),
+            ("S. radius", "radius_s", 1e-3, "km"),
+            ("E. radius", "radius_e", 1e-3, "km"),
+        ):
+            v = track[n] * f
+            min_, max_, mean_, std_ = v.min(), v.max(), v.mean(), v.std()
+            txt += f"    {label} : {now[n] * f:.1f} {u} ({min_:.1f} <-{mean_:.1f}+-{std_:.1f}-> {max_:.1f})\n"
+        return track, txt.strip()
+
     def move(self, event):
         if event.inaxes == self.time_ax and self.time_ax.press:
             x, y = self.m["time_vline"].get_data()
@@ -270,6 +314,49 @@ class GUI:
             self.figure.canvas.restore_region(self.time_ax.bg_cache)
             self.time_ax.draw_artist(self.m["time_vline"])
             self.figure.canvas.blit(self.time_ax.bbox)
+
+        if event.inaxes == self.map:
+            touch = dict()
+            for name in self.datasets.keys():
+                flag, data = self.m[name]["contour_s"].contains(event)
+                if flag:
+                    # 51 is for contour on 50 point must be rewrote
+                    touch[name] = data["ind"][0] // 51
+            a = self.m["annotate"]
+            ax = self.m["mini_ax"]
+            if touch:
+                if not a.get_visible():
+                    self.map.bg_cache = self.figure.canvas.copy_from_bbox(self.map.bbox)
+                    a.set_visible(True)
+                    ax.set_visible(True)
+                else:
+                    self.figure.canvas.restore_region(self.map.bg_cache)
+                a.set_x(event.x), a.set_y(event.y)
+                txt = list()
+                x0_, x1_, y1_ = list(), list(), list()
+                for name in self.datasets.keys():
+                    if name in touch:
+                        track, txt_ = self.get_infos(name, touch[name])
+                        txt.append(txt_)
+                        x, y = track["time"], track["radius_s"] / 1e3
+                        self.m[name]["mini_line"].set_data(x, y)
+                        x0_.append(x.min()), x1_.append(x.max()), y1_.append(y.max())
+                    else:
+                        self.m[name]["mini_line"].set_data([], [])
+                ax.set_xlim(min(x0_), max(x1_)), ax.set_ylim(0, max(y1_))
+                a.set_text("\n".join(txt))
+
+                self.map.draw_artist(a)
+                self.map.draw_artist(ax)
+                self.figure.canvas.blit(self.map.bbox)
+            if not flag and self.map.bg_cache is not None and a.get_visible():
+                a.set_visible(False)
+                ax.set_visible(False)
+                self.figure.canvas.restore_region(self.map.bg_cache)
+                self.map.draw_artist(a)
+                self.map.draw_artist(ax)
+                self.figure.canvas.blit(self.map.bbox)
+                self.map.bg_cache = None
 
     def release(self, event):
         if self.time_ax.press:
@@ -293,21 +380,3 @@ class GUI:
     def show(self):
         self.update()
         plt.show()
-
-
-if __name__ == "__main__":
-
-    # a_ = A.load_file(
-    # "/home/toto/dev/work/pet/20200611_example_dataset/tracking/Anticyclonic_track_too_short.nc"
-    # )
-    # c_ = A.load_file(
-    #     "/home/toto/dev/work/pet/20200611_example_dataset/tracking/Cyclonic_track_too_short.nc"
-    # )
-    a = A.load_file(sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr"))
-    # c = A.load_file(sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr"))
-    # g = GUI(Acyc=a, Cyc=c, Acyc_short=a_, Cyc_short=c_)
-    g = GUI(Acyc=a)
-    # g = GUI(Acyc_short=a_)
-    # g = GUI(Acyc_short=a_, Cyc_short=c_)
-    g.med()
-    g.show()

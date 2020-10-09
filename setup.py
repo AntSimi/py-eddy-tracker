@@ -30,7 +30,6 @@ setup(
         "src/scripts/EddyTracking",
         "src/scripts/EddyFinalTracking",
         "src/scripts/EddyMergeCorrespondances",
-        "src/scripts/GUIEddy",
     ],
     zip_safe=False,
     entry_points=dict(
@@ -48,6 +47,7 @@ setup(
             "EddyNetworkBuildPath = py_eddy_tracker.appli.network:divide_network",
             # anim/gui
             "EddyAnim = py_eddy_tracker.appli.gui:anim",
+            "GUIEddy = py_eddy_tracker.appli.gui:guieddy",
             # misc
             "ZarrDump = py_eddy_tracker.appli.misc:zarrdump",
         ]

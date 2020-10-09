@@ -29,6 +29,7 @@ from ..poly import create_vertice
 from ..generic import flatten_line_matrix
 from .. import EddyParser
 from ..observations.tracking import TrackEddiesObservations
+from ..gui import GUI
 
 
 class Anim:
@@ -213,3 +214,21 @@ def anim():
         nb_step=args.keep_step,
     )
     a.show(infinity_loop=args.infinity_loop)
+
+
+def gui_parser():
+    parser = EddyParser("Eddy atlas GUI")
+    parser.add_argument("atlas", nargs="+")
+    parser.add_argument("--med", action="store_true")
+    return parser.parse_args()
+
+
+def guieddy():
+    args = gui_parser()
+    atlas = {
+        dataset: TrackEddiesObservations.load_file(dataset) for dataset in args.atlas
+    }
+    g = GUI(**atlas)
+    if args.med:
+        g.med()
+    g.show()
