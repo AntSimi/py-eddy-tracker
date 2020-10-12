@@ -290,6 +290,8 @@ def simplify(x, y, precision=0.1):
     mask = ones(nb, dtype=bool_)
     for i in range(1, nb):
         x_, y_ = x[i], y[i]
+        if isnan(x_) or isnan(y_):
+            continue
         d_x = x_ - x_previous
         if d_x > precision:
             x_previous, y_previous = x_, y_

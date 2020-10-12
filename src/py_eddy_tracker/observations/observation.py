@@ -81,6 +81,7 @@ from ..poly import (
     create_vertice,
     close_center,
     get_pixel_in_regular,
+    winding_number_poly,
 )
 
 logger = logging.getLogger("pet")
@@ -1497,14 +1498,14 @@ class EddiesObservations(object):
         if ref is not None:
             x = (x - ref) % 360 + ref
         kwargs = kwargs.copy()
-        if name is not None and 'c' not in kwargs:
-            kwargs['c'] = self[name] * factor
+        if name is not None and "c" not in kwargs:
+            kwargs["c"] = self[name] * factor
         return ax.scatter(x, self.latitude, **kwargs)
 
     def filled(
         self,
         ax,
-        varname,
+        varname=None,
         ref=None,
         intern=False,
         cmap="magma_r",
@@ -1516,7 +1517,7 @@ class EddiesObservations(object):
     ):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param str,array varname: var which will be use to fill contour, or an array of same size of obs
+        :param str,array varname, None: var which will be use to fill contour, or an array of same size of obs
         :param float,None ref: if define use like west bound
         :param bool intern: if True draw speed contour instead of effective contour
         :param str cmap: matplotlib colormap name
@@ -1529,26 +1530,28 @@ class EddiesObservations(object):
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.filled
         """
-        cmap = get_cmap(cmap, lut)
         x_name, y_name = self.intern(intern)
-        v = (self[varname] if isinstance(varname, str) else varname) * factor
         x, y = self[x_name], self[y_name]
         if ref is not None:
             # TODO : maybe buggy with global display
             shape_out = x.shape
             x, y = wrap_longitude(x.reshape(-1), y.reshape(-1), ref)
             x, y = x.reshape(shape_out), y.reshape(shape_out)
-        if vmin is None:
-            vmin = v.min()
-        if vmax is None:
-            vmax = v.max()
-        v = (v - vmin) / (vmax - vmin)
         verts = list()
-        colors = list()
-        for x_, y_, v_ in zip(x, y, v):
+        for x_, y_ in zip(x, y):
             verts.append(create_vertice(x_, y_))
-            colors.append(cmap(v_))
-        c = PolyCollection(verts, facecolors=colors, **kwargs)
+        if "facecolors" not in kwargs:
+            kwargs = kwargs.copy()
+            cmap = get_cmap(cmap, lut)
+            v = (self[varname] if isinstance(varname, str) else varname) * factor
+            if vmin is None:
+                vmin = v.min()
+            if vmax is None:
+                vmax = v.max()
+            v = (v - vmin) / (vmax - vmin)
+            colors = [cmap(v_) for v_ in v]
+            kwargs["facecolors"] = colors
+        c = PolyCollection(verts, **kwargs)
         ax.add_collection(c)
         c.cmap = cmap
         c.norm = Normalize(vmin=vmin, vmax=vmax)
@@ -1626,6 +1629,19 @@ class EddiesObservations(object):
         m[-1] = True
         m[:-1][self["n"][1:] == 0] = True
         return self.extract_with_mask(m)
+
+    def inside(self, x, y, intern=False):
+        """
+        True for each postion inside an eddy
+
+        :param array x: longitude
+        :param array y: latitude
+        :param bool intern: If true use speed contour instead of effective contour
+        :return: flag
+        :rtype: array[bool]
+        """
+        xname, yname = self.intern(intern)
+        return insidepoly(x, y, self[xname], self[yname])
 
     def grid_count(self, bins, intern=False, center=False):
         """
@@ -1720,14 +1736,14 @@ class EddiesObservations(object):
         """
         if method == "center":
             return grid_object.interp(varname, self.longitude, self.latitude)
-        elif method in ("min", "max", "mean", 'count'):
+        elif method in ("min", "max", "mean", "count"):
             x0 = grid_object.x_bounds[0]
             x_name, y_name = self.intern(False if intern is None else intern)
             x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
             x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
             grid = grid_object.grid(varname)
             result = empty(self.shape, dtype=grid.dtype if dtype is None else dtype)
-            min_method = method == 'min'
+            min_method = method == "min"
             grid_stat(
                 grid_object.x_c,
                 grid_object.y_c,
@@ -1736,7 +1752,7 @@ class EddiesObservations(object):
                 y,
                 result,
                 grid_object.is_circular(),
-                method='max' if min_method else method
+                method="max" if min_method else method,
             )
             return -result if min_method else result
         else:
@@ -1760,7 +1776,34 @@ def grid_count_(grid, i, j):
 
 
 @njit(cache=True)
-def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method='mean'):
+def insidepoly(x_p, y_p, x_c, y_c):
+    """
+    True for each postion inside an contour
+
+    :param array x_p: longitude to test
+    :param array y_p: latitude to test
+    :param array x_c: longitude of contours
+    :param array y_c: latitude of contours
+    """
+    nb_p = x_p.shape[0]
+    nb_c = x_c.shape[0]
+    flag = zeros(nb_p, dtype=numba_types.bool_)
+    for i in range(nb_c):
+        x_c_min, y_c_min = x_c[i].min(), y_c[i].min()
+        x_c_max, y_c_max = x_c[i].max(), y_c[i].max()
+        v = create_vertice(x_c[i], y_c[i])
+        for j in range(nb_p):
+            x, y = x_p[j], y_p[j]
+            if flag[j]:
+                continue
+            if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
+                if winding_number_poly(x, y, v) != 0:
+                    flag[j] = True
+    return flag
+
+
+@njit(cache=True)
+def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
     """
     Compute mean of grid for each contour
 
@@ -1777,8 +1820,8 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method='mean'):
     xstep, ystep = x_c[1] - x_c[0], y_c[1] - y_c[0]
     x0, y0 = x_c - xstep / 2.0, y_c - ystep / 2.0
     nb_x = x_c.shape[0]
-    max_method = 'max' == method
-    mean_method = 'mean' == method
+    max_method = "max" == method
+    mean_method = "mean" == method
     for elt in range(nb):
         v = create_vertice(x[elt], y[elt],)
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
