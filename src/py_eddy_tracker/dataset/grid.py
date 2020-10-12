@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+Class to load and manipulate RegularGrid and UnRegularGrid
 """
 import logging
 from numpy import (

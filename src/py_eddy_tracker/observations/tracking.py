@@ -665,7 +665,7 @@ def track_loess_filter(half_window, x, y, track):
 @njit(cache=True)
 def track_median_filter(half_window, x, y, track):
     """
-    Apply a loess filter on y field
+    Apply a median filter on y field
 
     :param int,float half_window: parameter of smoother
     :param array_like x: must be growing for each track but could be irregular

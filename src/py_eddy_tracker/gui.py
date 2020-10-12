@@ -34,12 +34,20 @@ except ImportError:
     from matplotlib.axes import Axes
 
     class PlatCarreAxes(Axes):
+        """
+        Class to replace missing pylook class
+        """
+
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.set_aspect("equal")
 
 
 class GUIAxes(PlatCarreAxes):
+    """
+    Axes which will use full space available
+    """
+
     name = "full_axes"
 
     def end_pan(self, *args, **kwargs):
@@ -166,7 +174,7 @@ class GUI:
                 contour_e=self.map.plot([], [], lw=0.5, ls="-.", **kwargs)[0],
                 path_previous=self.map.plot([], [], lw=0.5, **kwargs)[0],
                 path_future=self.map.plot([], [], lw=0.2, ls=":", **kwargs)[0],
-                mini_line=self.m["mini_ax"].plot([], [], **kwargs, lw=1)[0]
+                mini_line=self.m["mini_ax"].plot([], [], **kwargs, lw=1)[0],
             )
         # time_ax
         self.m["annotate"] = self.map.annotate(

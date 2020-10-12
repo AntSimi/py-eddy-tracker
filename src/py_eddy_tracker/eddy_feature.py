@@ -593,7 +593,7 @@ class Contours(object):
             bins argument must be define
         :param array bins: bins use to colorize contour
         :param str cmap: Name of cmap to use for field display
-        :param dict kwargs: look at :py:method:`matplotlib.collections.LineCollection`
+        :param dict kwargs: look at :py:meth:`matplotlib.collections.LineCollection`
 
         .. minigallery:: py_eddy_tracker.Contours.display
         """

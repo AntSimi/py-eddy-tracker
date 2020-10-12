@@ -54,11 +54,11 @@ update_axes(ax, m)
 # %%
 # Get mean of eke in each effective contour
 
-ax = start_axes("EKE (cm²/s²)")
+ax = start_axes("EKE mean (cm²/s²)")
 a.display(ax, color="r", linewidth=0.5, label="Anticyclonic", ref=-10)
 c.display(ax, color="b", linewidth=0.5, label="Cyclonic", ref=-10)
 eke = a.interp_grid(aviso_map, "eke", method="mean", intern=False)
-ax.scatter((a.longitude + 10) % 360 - 10, a.latitude, c=eke, **eke_kwargs)
+a.filled(ax, eke, ref=-10, **eke_kwargs)
 eke = c.interp_grid(aviso_map, "eke", method="mean", intern=False)
-m = ax.scatter((c.longitude + 10) % 360 - 10, c.latitude, c=eke, **eke_kwargs)
+m = c.filled(ax, eke, ref=-10, **eke_kwargs)
 update_axes(ax, m)

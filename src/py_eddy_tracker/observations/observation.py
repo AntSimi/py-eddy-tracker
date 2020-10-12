@@ -1497,7 +1497,7 @@ class EddiesObservations(object):
         if ref is not None:
             x = (x - ref) % 360 + ref
         kwargs = kwargs.copy()
-        if name is not None:
+        if name is not None and 'c' not in kwargs:
             kwargs['c'] = self[name] * factor
         return ax.scatter(x, self.latitude, **kwargs)
 

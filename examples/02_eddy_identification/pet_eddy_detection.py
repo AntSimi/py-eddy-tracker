@@ -141,11 +141,10 @@ m = c.scatter(ax, "radius_s", vmin=10, vmax=50, s=80, ref=-10, cmap="jet", facto
 update_axes(ax, m)
 
 # %%
-# Display speed radius of eddies detected
+# Display speed radius of eddies detected with filled eddy contours
 ax = start_axes("Eddies speed radius (km)")
-a.filled(
-    ax, "radius_e", vmin=10, vmax=80, cmap="magma_r", factor=0.001, lut=14, ref=-10
-)
+kwargs = dict(vmin=10, vmax=80, cmap="magma_r", factor=0.001, lut=14, ref=-10)
+a.filled(ax, "radius_e", **kwargs)
 m = c.filled(
     ax, "radius_e", vmin=10, vmax=80, cmap="magma_r", factor=0.001, lut=14, ref=-10
 )
