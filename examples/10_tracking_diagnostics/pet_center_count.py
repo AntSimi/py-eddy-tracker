@@ -19,7 +19,7 @@ c = TrackEddiesObservations.load_file(
 
 # Parameters
 t0, t1 = a.period
-step = 0.1
+step = 0.125
 bins = ((-10, 37, step), (30, 46, step))
 kwargs_pcolormesh = dict(
     cmap="terrain_r", vmin=0, vmax=2, factor=1 / (step ** 2 * (t1 - t0)), name="count"

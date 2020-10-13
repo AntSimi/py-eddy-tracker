@@ -17,7 +17,7 @@ c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 t0, t1 = a.period
-step = 0.1
+step = 0.125
 bins = ((-10, 37, step), (30, 46, step))
 kwargs_pcolormesh = dict(
     cmap="terrain_r", vmin=0, vmax=0.75, factor=1 / (t1 - t0), name="count"

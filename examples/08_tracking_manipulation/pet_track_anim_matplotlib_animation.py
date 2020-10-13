@@ -1,6 +1,6 @@
 """
-Track animation
-===============
+Track animation with standard matplotlib
+========================================
 
 Run in a terminal this script, which allow to watch eddy evolution
 
