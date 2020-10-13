@@ -12,3 +12,4 @@ zarr
 sphinx-gallery
 pyeddytrackersample
 sphinx_rtd_theme
+sphinx>=3.1

@@ -1754,7 +1754,7 @@ def grid_count_(grid, i, j):
 @njit(cache=True)
 def insidepoly(x_p, y_p, x_c, y_c):
     """
-    True for each postion inside an contour
+    True for each postion inside a contour
 
     :param array x_p: longitude to test
     :param array y_p: latitude to test
