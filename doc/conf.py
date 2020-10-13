@@ -63,6 +63,7 @@ sphinx_gallery_conf = {
     },
     "line_numbers": False,
     "filename_pattern": "/pet",
+    "matplotlib_animations": True,
     "binder": {
         # Required keys
         "org": "AntSimi",

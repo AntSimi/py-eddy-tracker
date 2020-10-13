@@ -33,18 +33,19 @@ from ..gui import GUI
 
 
 class Anim:
-    def __init__(self, eddy, intern=False, sleep_event=0.1, **kwargs):
+    def __init__(self, eddy, intern=False, sleep_event=0.1, graphic_information=False, **kwargs):
         self.eddy = eddy
         x_name, y_name = eddy.intern(intern)
         self.t, self.x, self.y = eddy.time, eddy[x_name], eddy[y_name]
         self.x_core, self.y_core, self.track = eddy["lon"], eddy["lat"], eddy["track"]
+        self.graphic_informations = graphic_information
         self.pause = False
         self.period = self.eddy.period
         self.sleep_event = sleep_event
         self.mappables = list()
         self.setup(**kwargs)
 
-    def setup(self, cmap="jet", nb_step=25, figsize=(8, 6)):
+    def setup(self, cmap="jet", nb_step=25, figsize=(8, 6), **kwargs):
         cmap = pyplot.get_cmap(cmap)
         self.colors = cmap(arange(nb_step + 1) / nb_step)
         self.nb_step = nb_step
@@ -54,7 +55,7 @@ class Anim:
         y_min, y_max = self.y_core.min() - 2, self.y_core.max() + 2
         d_y = y_max - y_min
         # plot
-        self.fig = pyplot.figure(figsize=figsize)
+        self.fig = pyplot.figure(figsize=figsize, **kwargs)
         t0, t1 = self.period
         self.fig.suptitle(f"{t0} -> {t1}")
         self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9))
@@ -63,6 +64,7 @@ class Anim:
         self.ax.grid()
         # init mappable
         self.txt = self.ax.text(x_min + 0.05 * d_x, y_min + 0.05 * d_y, "", zorder=10)
+        self.segs = list()
         self.contour = LineCollection([], zorder=1)
         self.ax.add_collection(self.contour)
 
@@ -90,7 +92,6 @@ class Anim:
         loop = True
         t0, t1 = self.period
         while loop:
-            self.segs = list()
             self.now = t0
             while True:
                 dt = self.sleep_event
@@ -119,13 +120,17 @@ class Anim:
         self.now -= 1
         return self.draw_contour()
 
-    def draw_contour(self):
-        # t0, t1 = self.period
-        # select contour for this time step
+    def func_animation(self, frame):
         while self.mappables:
             self.mappables.pop().remove()
+        self.now = frame
+        self.update()
+        artists = [self.contour, self.txt]
+        artists.extend(self.mappables)
+        return artists
+
+    def update(self):
         m = self.t == self.now
-        self.ax.figure.canvas.restore_region(self.bg_cache)
         if m.sum():
             self.segs.append(
                 create_vertice(
@@ -137,7 +142,10 @@ class Anim:
         self.contour.set_paths(self.segs)
         self.contour.set_color(self.colors[-len(self.segs) :])
         self.contour.set_lw(arange(len(self.segs)) / len(self.segs) * 2.5)
-        self.txt.set_text(f"{self.now} - {1/self.sleep_event:.0f} frame/s")
+        txt = f"{self.now}"
+        if self.graphic_informations:
+            txt += f"- {1/self.sleep_event:.0f} frame/s"
+        self.txt.set_text(txt)
         for i in where(m)[0]:
             mappable = self.ax.text(
                 self.x_core[i], self.y_core[i], self.track[i], fontsize=8
@@ -149,6 +157,14 @@ class Anim:
         # Remove first segment to keep only T contour
         if len(self.segs) > self.nb_step:
             self.segs.pop(0)
+
+    def draw_contour(self):
+        # t0, t1 = self.period
+        # select contour for this time step
+        while self.mappables:
+            self.mappables.pop().remove()
+        self.ax.figure.canvas.restore_region(self.bg_cache)
+        self.update()
         # paint updated artist
         self.ax.figure.canvas.blit(self.ax.bbox)
 
