@@ -1,30 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-This file is part of py-eddy-tracker.
-
-    py-eddy-tracker is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    py-eddy-tracker is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
-
-Copyright (c) 2014-2017 by Evan Mason and Antoine Delepoulle
-Email: emason@imedea.uib-csic.es
-===========================================================================
-
-tracking.py
-
-Version 3.0.0
-
-===========================================================================
-
+Class to manage observations gathered in track
 """
 import logging
 from numpy import (
@@ -260,6 +236,18 @@ class TrackEddiesObservations(EddiesObservations):
             mask *= self.time <= (dataset_period[1] + p_max)
         return self.extract_with_mask(mask, **kwargs)
 
+    def get_azimuth(self):
+        """
+        Return azimuth for each tracks.
+
+        Azimuth is compute with first and last observation
+
+        :rtype: array
+        """
+        i0 = self.index_from_track
+        i1 = i0 - 1 + self.nb_obs_by_track
+        lat0, lon0 = self.latitude[i0], self.longitude[i0]
+        lat1, lon1 = self.latitude[i1], self.longitude[i1]
 
     def get_mask_from_id(self, tracks):
         mask = zeros(self.tracks.shape, dtype=bool_)

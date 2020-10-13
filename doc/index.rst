@@ -35,16 +35,10 @@ Welcome to py-eddy-tracker's documentation!
    custom_tracking
 
 .. toctree::
-   :maxdepth: 2
-   :caption: code
+   :maxdepth: 1
+   :caption: Code
 
-   autodoc/grid
-   autodoc/observations
-   autodoc/eddy_feature
-   autodoc/featured_tracking
-   autodoc/tracking
-   autodoc/poly
-   autodoc/generic
+   api
    Source (Git) <https://github.com/AntSimi/py-eddy-tracker>
 
 

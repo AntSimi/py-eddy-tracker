@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-===========================================================================
 This file is part of py-eddy-tracker.
 
     py-eddy-tracker is free software: you can redistribute it and/or modify
@@ -16,9 +15,9 @@ This file is part of py-eddy-tracker.
     You should have received a copy of the GNU General Public License
     along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright (c) 2014-2020 by Evan Mason
+Copyright (c) 2014-2020 by Evan Mason and Antoine Delepoulle
 Email: evanmason@gmail.com
-===========================================================================
+
 """
 
 from argparse import ArgumentParser

@@ -1,24 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-===========================================================================
-This file is part of py-eddy-tracker.
-
-    py-eddy-tracker is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    py-eddy-tracker is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with py-eddy-tracker.  If not, see <http://www.gnu.org/licenses/>.
-
-Copyright (c) 2014-2020 by Evan Mason
-Email: evanmason@gmail.com
-===========================================================================
+Entry point of graphic user interface
 """
 
 from numpy import arange, empty, where
@@ -159,7 +141,6 @@ class Anim:
             self.segs.pop(0)
 
     def draw_contour(self):
-        # t0, t1 = self.period
         # select contour for this time step
         while self.mappables:
             self.mappables.pop().remove()

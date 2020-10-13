@@ -33,6 +33,7 @@ import py_eddy_tracker
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
+    "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx_gallery.gen_gallery",
@@ -78,6 +79,9 @@ sphinx_gallery_conf = {
 
 # matplotlib conf
 plot_include_source = True
+
+# Active autosummary
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = [".templates"]
