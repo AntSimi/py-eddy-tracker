@@ -58,6 +58,7 @@ from ..poly import (
     close_center,
     get_pixel_in_regular,
     winding_number_poly,
+    convexs,
 )
 
 logger = logging.getLogger("pet")
@@ -101,9 +102,7 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
 
 class EddiesObservations(object):
     """
-    Class to hold eddy properties *amplitude* and counts of
-    *local maxima/minima* within a closed region of a sea level anomaly field.
-
+    Class to store eddy observations.
     """
 
     __slots__ = (
@@ -1606,6 +1605,17 @@ class EddiesObservations(object):
         m[:-1][self["n"][1:] == 0] = True
         return self.extract_with_mask(m)
 
+    def is_convex(self, intern=False):
+        """
+        Get flag of eddy convexity
+
+        :param bool intern: If true use speed contour instead of effective contour
+        :return: true if contour is convex
+        :rtype: array[bool]
+        """
+        xname, yname = self.intern(intern)
+        return convexs(self[xname], self[yname])
+
     def inside(self, x, y, intern=False):
         """
         True for each postion inside an eddy
@@ -1769,9 +1779,9 @@ def insidepoly(x_p, y_p, x_c, y_c):
         x_c_max, y_c_max = x_c[i].max(), y_c[i].max()
         v = create_vertice(x_c[i], y_c[i])
         for j in range(nb_p):
-            x, y = x_p[j], y_p[j]
             if flag[j]:
                 continue
+            x, y = x_p[j], y_p[j]
             if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
                 if winding_number_poly(x, y, v) != 0:
                     flag[j] = True

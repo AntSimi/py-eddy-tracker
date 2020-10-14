@@ -89,6 +89,101 @@ def poly_area(x, y):
 
 
 @njit(cache=True)
+def convexs(x, y):
+    """
+    Check if polygons are convex
+
+    :param array[float] x:
+    :param array[float] y:
+    :return: True if convex
+    :rtype: array[bool]
+    """
+    nb_poly = x.shape[0]
+    flag = empty(nb_poly, dtype=numba_types.bool_)
+    for i in range(nb_poly):
+        flag[i] = convex(x[i], y[i])
+    return flag
+
+
+@njit(cache=True)
+def convex(x, y):
+    """
+    Check if polygon is convex
+
+    :param array[float] x:
+    :param array[float] y:
+    :return: True if convex
+    :rtype: bool
+    """
+    nb = x.shape[0]
+    x0, y0, x1, y1, x2, y2 = x[-2], y[-2], x[-1], y[-1], x[1], y[1]
+    # if first is left it must be always left if it's right it must be always right
+    ref = is_left(x0, y0, x1, y1, x2, y2)
+    # We skip 0 because it's same than -1
+    # We skip 1 because we tested previously
+    for i in range(2, nb):
+        # shift position
+        x0, y0, x1, y1 = x1, y1, x2, y2
+        x2, y2 = x[i], y[i]
+        # test
+        if ref != is_left(x0, y0, x1, y1, x2, y2):
+            return False
+    return True
+
+
+@njit(cache=True)
+def get_convex_hull(x, y):
+    """
+    Get convex polygon which enclosed current polygon
+
+    Work only if contour is describe anti-clockwise
+
+    :param array[float] x:
+    :param array[float] y:
+    :return: a convex polygon
+    :rtype: array,array
+    """
+    nb = x.shape[0] - 1
+    indices = list()
+    # leftmost point
+    i_first = x[:-1].argmin()
+    indices.append(i_first)
+    i_next = (i_first + 1) % nb
+    # Will define bounds line
+    x0, y0, x1, y1 = x[i_first], y[i_first], x[i_next], y[i_next]
+    xf, yf = x0, y0
+    # we will check if no point are right
+    while True:
+        i_test = (i_next + 1) % nb
+        # value to test
+        xt, yt = x[i_test], y[i_test]
+        # We will test all the position until we touch first one,
+        # If all next position are on the left we keep x1, y1
+        # if not we will replace by xt,yt which are more outter
+        while is_left(x0, y0, x1, y1, xt, yt):
+            i_test += 1
+            i_test %= nb
+            if i_test == i_first:
+                x0, y0 = x1, y1
+                indices.append(i_next)
+                i_next += 1
+                i_next %= nb
+                x1, y1 = x[i_next], y[i_next]
+                break
+            xt, yt = x[i_test], y[i_test]
+        if i_test != i_first:
+            i_next = i_test
+            x1, y1 = x[i_next], y[i_next]
+        if i_next == (i_first - 1) % nb:
+            if is_left(x0, y0, x1, y1, xf, yf):
+                indices.append(i_next)
+            break
+    indices.append(i_first)
+    indices = array(indices)
+    return x[indices], y[indices]
+
+
+@njit(cache=True)
 def winding_number_poly(x, y, xy_poly):
     """
     Check if x,y is in poly.
@@ -155,7 +250,7 @@ def winding_number_grid_in_poly(x_1d, y_1d, i_x0, i_x1, x_size, i_y0, xy_poly):
 
 
 @njit(cache=True, fastmath=True)
-def close_center(x0, y0, x1, y1, delta=.1):
+def close_center(x0, y0, x1, y1, delta=0.1):
     """
     Compute an overlap with circle parameter and return a percentage
 
