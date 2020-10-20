@@ -1532,20 +1532,26 @@ class EddiesObservations(object):
         c.norm = Normalize(vmin=vmin, vmax=vmax)
         return c
 
-    def bins_stat(self, name, bins=None):
+    def bins_stat(self, xname, bins=None, yname=None, method=None):
         """
-        :param str name: var which will be use
+        :param str,array xname: var which will be use
         :param array, None bins: bins to perform statistics,if None method will get min and max of variable
+        :param None,str yname: var which will be use to apply method
+        :param None,str method: If None method count in each bin, could also do mean, std
         :return: x array and y array
         :rtype: array,array
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.bins_stat
         """
-        v = self[name]
+        v = self[xname] if isinstance(xname, str) else xname
         if bins is None:
             bins = arange(v.min(), v.max() + 2)
         y, x = hist_numba(v, bins=bins)
         x = (x[1:] + x[:-1]) / 2
+        if method == "mean":
+            y_v = self[yname]
+            y_, _ = histogram(v, bins=bins, weights=y_v)
+            y = y_ / y
         return x, y
 
     def display(
@@ -1679,12 +1685,13 @@ class EddiesObservations(object):
             grid.mask = grid == 0
         return regular_grid
 
-    def grid_stat(self, bins, varname):
+    def grid_stat(self, bins, varname, data=None):
         """
         Compute mean of eddies in each bin
 
         :param (numpy.array,numpy.array) bins: bins to compute count
         :param str varname: name of variable to compute mean
+        :param array data: Array used to compute stat if defined
         :return: return grid of mean
         :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
 
@@ -1693,8 +1700,14 @@ class EddiesObservations(object):
         x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
         x0 = bins[0][0]
         x, y = (self.longitude - x0) % 360 + x0, self.latitude
-        sum_obs = histogram2d(x, y, (x_bins, y_bins), weights=self[varname])[0]
-        nb_obs = histogram2d(x, y, (x_bins, y_bins))[0]
+        data = self[varname] if data is None else data
+        if hasattr(data, 'mask'):
+            m = ~data.mask
+            sum_obs = histogram2d(x[m], y[m], (x_bins, y_bins), weights=data[m])[0]
+            nb_obs = histogram2d(x[m], y[m], (x_bins, y_bins))[0]
+        else:
+            sum_obs = histogram2d(x, y, (x_bins, y_bins), weights=data)[0]
+            nb_obs = histogram2d(x, y, (x_bins, y_bins))[0]
         from ..dataset.grid import RegularGridDataset
 
         regular_grid = RegularGridDataset.with_array(

@@ -15,6 +15,12 @@ from numpy import (
     array,
     median,
     histogram,
+    sin,
+    cos,
+    arctan2,
+    radians,
+    degrees,
+    tan,
 )
 from datetime import datetime, timedelta
 from numba import njit
@@ -236,18 +242,30 @@ class TrackEddiesObservations(EddiesObservations):
             mask *= self.time <= (dataset_period[1] + p_max)
         return self.extract_with_mask(mask, **kwargs)
 
-    def get_azimuth(self):
+    def get_azimuth(self, equatorward=False):
         """
         Return azimuth for each tracks.
 
         Azimuth is compute with first and last observation
 
+        :param bool equatorward: If True,  Poleward are positive and equatorward negative
         :rtype: array
         """
-        i0 = self.index_from_track
-        i1 = i0 - 1 + self.nb_obs_by_track
+        i0, nb = self.index_from_track, self.nb_obs_by_track
+        i0 = i0[nb != 0]
+        i1 = i0 - 1 + nb[nb != 0]
         lat0, lon0 = self.latitude[i0], self.longitude[i0]
         lat1, lon1 = self.latitude[i1], self.longitude[i1]
+        lat0, lon0 = radians(lat0), radians(lon0)
+        lat1, lon1 = radians(lat1), radians(lon1)
+        dlon = lon1 - lon0
+        x = cos(lat0) * sin(lat1) - sin(lat0) * cos(lat1) * cos(dlon)
+        y = sin(dlon) * cos(lat1)
+        azimuth = degrees(arctan2(y, x)) + 90
+        if equatorward:
+            south = lat0 < 0
+            azimuth[south] *= -1
+        return azimuth
 
     def get_mask_from_id(self, tracks):
         mask = zeros(self.tracks.shape, dtype=bool_)
@@ -268,6 +286,19 @@ class TrackEddiesObservations(EddiesObservations):
             logger.debug("Start computing index ...")
             compute_index(self.tracks, self.__first_index_of_track, self.__obs_by_track)
             logger.debug("... OK")
+
+    def count_by_track(self, mask):
+        """
+        Count by track
+
+        :param array[bool] mask: Mask of boolean count +1 if true
+        :return: Return count by track
+        :rtype: array
+        """
+        s = self.tracks.max() + 1
+        obs_by_track = zeros(s, "i4")
+        count_by_track(self.tracks, mask, obs_by_track)
+        return obs_by_track
 
     @property
     def index_from_track(self):
@@ -597,6 +628,13 @@ def compute_index(tracks, index, number):
             index[track] = i
         number[track] += 1
         previous_track = track
+
+
+@njit(cache=True)
+def count_by_track(tracks, mask, number):
+    for track, test in zip(tracks, mask):
+        if test:
+            number[track] += 1
 
 
 @njit(cache=True)
