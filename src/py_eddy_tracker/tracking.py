@@ -616,7 +616,7 @@ class Correspondances(list):
         # Set type of eddy with first file
         eddies.sign_type = self.current_obs.sign_type
         # Fields to copy
-        fields = self.current_obs.obs.dtype.descr
+        fields = self.current_obs.obs.dtype.names
 
         # To know if the track start
         first_obs_save_in_tracks = zeros(self.i_current_by_tracks.shape, dtype=bool_)
@@ -639,10 +639,9 @@ class Correspondances(list):
                 index_in = self[i]["in"][m_first_obs]
                 # Copy all variable
                 for field in fields:
-                    var = field[0]
-                    if var == "cost_association":
+                    if field == "cost_association":
                         continue
-                    eddies[var][index_final[m_first_obs]] = self.previous_obs[var][
+                    eddies[field][index_final[m_first_obs]] = self.previous_obs[field][
                         index_in
                     ]
                 # Increment
@@ -666,13 +665,11 @@ class Correspondances(list):
             # Index in the current file
             index_current = self[i]["out"]
 
+            if "cost_association" in eddies.obs.dtype.names:
+                eddies["cost_association"][index_final - 1] = self[i]["cost_value"]
             # Copy all variable
             for field in fields:
-                var = field[0]
-                if var == "cost_association":
-                    eddies[var][index_final - 1] = self[i]["cost_value"]
-                else:
-                    eddies[var][index_final] = self.current_obs[var][index_current]
+                eddies[field][index_final] = self.current_obs[field][index_current]
 
             # Add increment for each index used
             self.i_current_by_tracks[i_id] += 1
