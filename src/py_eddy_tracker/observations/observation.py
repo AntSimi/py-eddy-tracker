@@ -27,6 +27,7 @@ from numpy import (
     sin,
     histogram,
     digitize,
+    percentile,
 )
 from netCDF4 import Dataset
 from datetime import datetime
@@ -1685,6 +1686,51 @@ class EddiesObservations(object):
             grid.mask = grid == 0
         return regular_grid
 
+    def grid_box_stat(self, bins, varname, method=50, data=None):
+        """
+            Compute mean of eddies in each bin
+
+            :param (numpy.array,numpy.array) bins: bins to compute count
+            :param str varname: name of variable to compute mean
+            :param str,float method: method to apply at each set
+            :param array data: Array used to compute stat if defined
+            :return: return grid of method
+            :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
+
+            .. minigallery:: py_eddy_tracker.EddiesObservations.grid_box_stat
+        """
+        x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
+        x0 = bins[0][0]
+        x, y = (self.longitude - x0) % 360 + x0, self.latitude
+        data = self[varname] if data is None else data
+        if hasattr(data, "mask"):
+            m = ~data.mask
+            x, y, data = x[m], y[m], data[m]
+
+        from ..dataset.grid import RegularGridDataset
+
+        shape = (x_bins.shape[0] - 1, y_bins.shape[0] - 1)
+        grid = ma.empty(shape, dtype=data.dtype)
+        grid.mask = ones(shape, dtype="bool")
+        regular_grid = RegularGridDataset.with_array(
+            coordinates=("x", "y"),
+            datas={varname: grid, "x": x_bins[:-1], "y": y_bins[:-1]},
+            centered=False,
+        )
+        grid_box_stat(
+            regular_grid.x_c,
+            regular_grid.y_c,
+            grid.data,
+            grid.mask,
+            x,
+            y,
+            data,
+            regular_grid.is_circular(),
+            method,
+        )
+
+        return regular_grid
+
     def grid_stat(self, bins, varname, data=None):
         """
         Compute mean of eddies in each bin
@@ -1701,7 +1747,7 @@ class EddiesObservations(object):
         x0 = bins[0][0]
         x, y = (self.longitude - x0) % 360 + x0, self.latitude
         data = self[varname] if data is None else data
-        if hasattr(data, 'mask'):
+        if hasattr(data, "mask"):
             m = ~data.mask
             sum_obs = histogram2d(x[m], y[m], (x_bins, y_bins), weights=data[m])[0]
             nb_obs = histogram2d(x[m], y[m], (x_bins, y_bins))[0]
@@ -1717,6 +1763,7 @@ class EddiesObservations(object):
                 "x": x_bins[:-1],
                 "y": y_bins[:-1],
             },
+            centered=False,
         )
         return regular_grid
 
@@ -1770,6 +1817,9 @@ class EddiesObservations(object):
 
 @njit(cache=True)
 def grid_count_(grid, i, j):
+    """
+    Add one for each indice
+    """
     for i_, j_ in zip(i, j):
         grid[i_, j_] += 1
 
@@ -1799,6 +1849,59 @@ def insidepoly(x_p, y_p, x_c, y_c):
                 if winding_number_poly(x, y, v) != 0:
                     flag[j] = True
     return flag
+
+
+@njit(cache=True)
+def grid_box_stat(x_c, y_c, grid, mask, x, y, value, circular=False, method=50):
+    """
+    Compute method on each set (one set by box)
+
+    :param array_like x_c: longitude coordinate of grid
+    :param array_like y_c: latitude coordinate of grid
+    :param array_like grid: grid to store result of method
+    :param array[bool] mask: grid to store not used box
+    :param array_like x: longitude of positions
+    :param array_like y: latitude of positions
+    :param array_like value: value to group to apply method
+    :param bool circular: True if grid is wrappable
+    :param float method: percentile
+    """
+    xstep, ystep = x_c[1] - x_c[0], y_c[1] - y_c[0]
+    x0, y0 = x_c[0] - xstep / 2.0, y_c[0] - ystep / 2.0
+    nb_x = x_c.shape[0]
+    nb_y = y_c.shape[0]
+    i, j = (
+        ((x - x0) // xstep).astype(numba_types.int32),
+        ((y - y0) // ystep).astype(numba_types.int32),
+    )
+    if circular:
+        i %= nb_x
+    else:
+        if (i < 0).any():
+            raise Exception("x indices underflow")
+        if (i >= nb_x).any():
+            raise Exception("x indices overflow")
+        if (j < 0).any():
+            raise Exception("y indices underflow")
+        if (j >= nb_y).any():
+            raise Exception("y indices overflow")
+    abs_i = j * nb_x + i
+    k_sort = abs_i.argsort()
+    i0, j0 = i[k_sort[0]], j[k_sort[0]]
+    values = list()
+    for k in k_sort:
+        i_, j_ = i[k], j[k]
+        # group change
+        if i_ != i0 or j_ != j0:
+            # apply method and store result
+            grid[i_, j_] = percentile(values, method)
+            # grid[i_, j_] = len(values)
+            mask[i_, j_] = False
+            # start new group
+            i0, j0 = i_, j_
+            # reset list
+            values.clear()
+        values.append(value[k])
 
 
 @njit(cache=True)

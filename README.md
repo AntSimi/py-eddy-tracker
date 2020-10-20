@@ -35,7 +35,7 @@ python setup.py install
 ### Tools gallery ###
 Several examples based on py eddy tracker module are [here](https://py-eddy-tracker.readthedocs.io/en/latest/python_module/index.html).
 
-![](https://py-eddy-tracker.readthedocs.io/en/latest/_static/logo.png)
+[![](https://py-eddy-tracker.readthedocs.io/en/latest/_static/logo.png)](https://py-eddy-tracker.readthedocs.io/en/latest/python_module/index.html)
 
 ### Quick use ###
 
