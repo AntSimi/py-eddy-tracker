@@ -40,15 +40,29 @@ class Amplitude(object):
         "sla",
         "contour",
         "interval_min",
+        "interval_min_secondary",
         "amplitude",
         "mle",
     )
 
-    def __init__(self, contour, contour_height, data, interval, mle=1):
+    def __init__(self, contour, contour_height, data, interval, mle=1, nb_step_min=2, nb_step_to_be_mle=2):
+        """
+        Create amplitude object
+
+        :param Contours contour:
+        :param float contour_height:
+        :param array data:
+        :param float interval:
+        :param int mle: maximum number of local maxima in contour
+        :param int nb_step_min: number of interval to consider like an eddy
+        :param int nb_step_to_be_mle: number of interval to be consider like another maxima
+        """
+
         # Height of the contour
         self.h_0 = contour_height
         # Step minimal to consider amplitude
-        self.interval_min = interval * 2
+        self.interval_min = interval * nb_step_min
+        self.interval_min_secondary = interval * nb_step_to_be_mle
         # Indices of all pixels in contour
         self.contour = contour
         # Link on original grid (local view) or copy if it's on bound
@@ -118,7 +132,7 @@ class Amplitude(object):
             else:
                 # Verify if several extrema are seriously below contour
                 nb_real_extrema = (
-                    (level - self.grid_extract.data[lmi_i, lmi_j]) >= self.interval_min
+                    (level - self.grid_extract.data[lmi_i, lmi_j]) >= self.interval_min_secondary
                 ).sum()
                 if nb_real_extrema > self.mle:
                     return False
@@ -160,7 +174,7 @@ class Amplitude(object):
             else:
                 # Verify if several extrema are seriously above contour
                 nb_real_extrema = (
-                    (self.grid_extract.data[lmi_i, lmi_j] - level) >= self.interval_min
+                    (self.grid_extract.data[lmi_i, lmi_j] - level) >= self.interval_min_secondary
                 ).sum()
                 if nb_real_extrema > self.mle:
                     return False

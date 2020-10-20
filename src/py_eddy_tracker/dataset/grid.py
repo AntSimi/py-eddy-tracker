@@ -475,6 +475,13 @@ class GridDataset(object):
 
     def grid(self, varname, indexs=None):
         """give grid required
+
+        :param str varname: Variable to get
+        :param dict,None indexs: If defined dict must have dimensions name like key
+        :return: array asked reduce with indexs
+        :rtype: array
+
+        .. minigallery:: py_eddy_tracker.GridDataset.grid
         """
         if indexs is None:
             indexs = dict()
@@ -578,7 +585,7 @@ class GridDataset(object):
         precision=None,
         force_height_unit=None,
         force_speed_unit=None,
-        mle=1,
+        **kwargs,
     ):
         """
         Compute eddy identification on specified grid
@@ -595,6 +602,7 @@ class GridDataset(object):
         :param float,None precision: Truncate value at the defined precision in m
         :param str force_height_unit: Unit to used for height unit
         :param str force_speed_unit: Unit to used for speed unit
+        :param dict kwargs: Argument give to amplitude
 
         :return: Return a list of 2 elements: Anticyclone and Cyclone
         :rtype: py_eddy_tracker.observations.observation.EddiesObservations
@@ -744,8 +752,8 @@ class GridDataset(object):
                         data,
                         anticyclonic_search=anticyclonic_search,
                         level=self.contours.levels[corrected_coll_index],
-                        step=step,
-                        mle=mle,
+                        interval=step,
+                        **kwargs,
                     )
                     # If we have a valid amplitude
                     if (not amp.within_amplitude_limits()) or (amp.amplitude == 0):
@@ -974,13 +982,7 @@ class GridDataset(object):
 
     @staticmethod
     def get_amplitude(
-        contour,
-        contour_height,
-        data,
-        anticyclonic_search=True,
-        level=None,
-        step=None,
-        mle=1,
+        contour, contour_height, data, anticyclonic_search=True, level=None, **kwargs
     ):
         # Instantiate Amplitude object
         amp = Amplitude(
@@ -990,17 +992,12 @@ class GridDataset(object):
             contour_height=contour_height,
             # All grid
             data=data,
-            # Step by level
-            interval=step,
-            # Set number max of local maxima
-            mle=mle,
+            **kwargs,
         )
-
         if anticyclonic_search:
             reset_centroid = amp.all_pixels_above_h0(level)
         else:
             reset_centroid = amp.all_pixels_below_h0(level)
-
         return reset_centroid, amp
 
 
