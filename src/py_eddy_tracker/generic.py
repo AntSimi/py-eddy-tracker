@@ -27,6 +27,26 @@ from numba import njit, prange, types as numba_types
 
 
 @njit(cache=True)
+def count_consecutive(mask):
+    """
+    Count consecutive event every False flag count restart
+
+    :param array[bool] mask: event to count
+    :return: count when consecutive event
+    :rtype: array
+    """
+    count = 0
+    output = zeros(mask.shape, dtype=numba_types.int_)
+    for i in range(mask.shape[0]):
+        if not mask[i]:
+            count = 0
+            continue
+        count +=1
+        output[i] = count
+    return output
+
+
+@njit(cache=True)
 def reverse_index(index, nb):
     """
     Compute a list of index, which are not in index.
