@@ -14,7 +14,7 @@ a = EddiesObservations.load_file(data.get_path("Anticyclonic_20190223.nc"))
 c = EddiesObservations.load_file(data.get_path("Cyclonic_20190223.nc"))
 
 # %%
-# filled contour with amplitude field
+# Fill effective contour with amplitude 
 fig = plt.figure(figsize=(15, 8))
 ax = fig.add_axes([0.03, 0.03, 0.90, 0.94])
 ax.set_aspect("equal")
@@ -24,11 +24,11 @@ kwargs = dict(extern_only=True, color="k", lw=1)
 a.display(ax, **kwargs), c.display(ax, **kwargs)
 a.filled(ax, "amplitude", cmap="magma_r", vmin=0, vmax=.5)
 m = c.filled(ax, "amplitude", cmap="magma_r", vmin=0, vmax=.5)
-colorbar = plt.colorbar(m, cax=ax.figure.add_axes([0.95, 0.05, 0.01, 0.9]))
+colorbar = plt.colorbar(m, cax=ax.figure.add_axes([0.95, 0.03, 0.02, 0.94]))
 colorbar.set_label('Amplitude (m)')
 
 # %%
-# draw contour
+# Draw speed contours
 fig = plt.figure(figsize=(15, 8))
 ax = fig.add_axes([0.03, 0.03, 0.94, 0.94])
 ax.set_aspect("equal")
