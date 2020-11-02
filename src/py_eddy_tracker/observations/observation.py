@@ -319,7 +319,7 @@ class EddiesObservations(object):
         new.observations["type_cyc"] = self.sign_type
         return new
 
-    def circle_contour(self):
+    def circle_contour(self, only_virtual=False):
         """
         Set contour as a circle with radius and center data
 
@@ -330,6 +330,8 @@ class EddiesObservations(object):
         radius_s = "contour_lon_s" in self.obs.dtype.names
         radius_e = "contour_lon_e" in self.obs.dtype.names
         for i, obs in enumerate(self):
+            if only_virtual and not obs["virtual"]:
+                continue
             x, y = obs["lon"], obs["lat"]
             if radius_s:
                 r_s = obs["radius_s"]
