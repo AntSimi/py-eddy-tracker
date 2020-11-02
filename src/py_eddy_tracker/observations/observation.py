@@ -159,26 +159,10 @@ class EddiesObservations(object):
                 raise Exception("Unknown element : %s" % elt)
         self.observations = zeros(size, dtype=self.dtype)
         self.sign_type = None
-
-    @property
-    def longitude(self):
-        return self.observations["lon"]
-
-    @property
-    def latitude(self):
-        return self.observations["lat"]
-
-    @property
-    def time(self):
-        return self.observations["time"]
-
+ 
     @property
     def tracks(self):
         return self.observations["track"]
-
-    @property
-    def observation_number(self):
-        return self.observations["n"]
 
     @property
     def sign_legend(self):
@@ -267,10 +251,34 @@ class EddiesObservations(object):
         Mean effective radius (km): {self.box_display(self.hist('radius_e', 'lat', bins_lat, mean=True) / 1000.)}
         Mean amplitude (cm)       : {self.box_display(self.hist('amplitude', 'lat', bins_lat, mean=True) * 100.)}"""
 
+    def __dir__(self):
+        """Provide method name lookup and completion.
+        """
+        base = set(dir(type(self)))
+        intern_name = set(self.elements)
+        extern_name = set([VAR_DESCR[k]['nc_name'] for k in intern_name])
+        # Must be check in init not here
+        if base & intern_name:
+            logger.warning("Some variable name have a common name with class attrs: %s", base & intern_name)
+        if base & extern_name:
+            logger.warning("Some variable name have a common name with class attrs: %s", base & extern_name)
+        return sorted(base.union(intern_name).union(extern_name))
+
     def __getitem__(self, attr):
         if attr in self.elements:
             return self.observations[attr]
+        elif attr in VAR_DESCR_inv:
+            return self.observations[VAR_DESCR_inv[attr]]
         raise KeyError("%s unknown" % attr)
+
+    def __getattr__(self, attr):
+        if attr in self.elements:
+            return self.observations[attr]
+        elif attr in VAR_DESCR_inv:
+            return self.observations[VAR_DESCR_inv[attr]]
+        raise AttributeError(
+            "{!r} object has no attribute {!r}".format(type(self).__name__, attr)
+        )
 
     @classmethod
     def needed_variable(cls):

@@ -25,7 +25,7 @@ fig = plt.figure(figsize=(12, 7))
 
 for x0, name, title, xmax, factor, bins in zip(
     (0.4, 0.72, 0.08),
-    ("radius_s", "speed_average", "amplitude"),
+    ("speed_radius", "speed_average", "amplitude"),
     ("Speed radius (km)", "Speed average (cm/s)", "Amplitude (cm)"),
     (100, 50, 20),
     (0.001, 100, 100),

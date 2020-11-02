@@ -62,7 +62,6 @@ v_x = g.compute_stencil(g.grid("vgos"))
 v_y = g.compute_stencil(g.grid("vgos"), vertical=True)
 ow = g.vars["ow"] = (u_x - v_y) ** 2 + (v_x + u_y) ** 2 - (v_x - u_y) ** 2
 
-
 ax = start_axes("Okubo weis")
 m = g.display(ax, "ow", vmin=-1e-10, vmax=1e-10, cmap="bwr")
 update_axes(ax, m)
@@ -83,7 +82,6 @@ ow = ma.array(ow, mask=ow > threshold)
 m = g.display(ax, ow, vmin=-1e-10, vmax=1e-10, cmap="bwr")
 a.display(ax, **kw_ed), c.display(ax, **kw_ed)
 update_axes(ax, m)
-
 
 # %%
 # Get okubo-weiss mean/min/center in eddies

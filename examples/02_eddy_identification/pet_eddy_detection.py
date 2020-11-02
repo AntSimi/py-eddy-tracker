@@ -42,7 +42,7 @@ update_axes(ax, m)
 
 # %%
 # Get geostrophic speed u,v
-# -------
+# -------------------------
 # U/V are deduced from ADT, this algortihm is not ok near the equator (~+- 2°)
 g.add_uv("adt")
 ax = start_axes("U/V deduce from ADT (m)")
@@ -82,7 +82,7 @@ update_axes(ax)
 
 # %%
 # Post analysis
-# ------------
+# -------------
 # Contours can be rejected for several reasons (shape error to high, several extremum in contour, ...)
 ax = start_axes("ADT rejected contours")
 g.contours.display(ax, only_unused=True)
@@ -149,7 +149,7 @@ update_axes(ax, m)
 # Filling the effective radius contours with the effective radius values
 ax = start_axes("Effective Radius (km)")
 kwargs = dict(vmin=10, vmax=80, cmap="magma_r", factor=0.001, lut=14, ref=-10)
-a.filled(ax, "radius_e", **kwargs)
+a.filled(ax, "effective_radius", **kwargs)
 m = c.filled(
     ax, "radius_e", vmin=10, vmax=80, cmap="magma_r", factor=0.001, lut=14, ref=-10
 )
