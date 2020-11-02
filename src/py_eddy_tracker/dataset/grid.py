@@ -304,7 +304,7 @@ class GridDataset(object):
 
     @property
     def is_centered(self):
-        """Give information if pixel is describe with center position or
+        """Give True if pixel is described with its center's position or
         a corner
 
         :return: True if centered
@@ -316,7 +316,7 @@ class GridDataset(object):
             return self.centered
 
     def load_general_features(self):
-        """Load attrs to  be store in object
+        """Load attrs to  be stored in object
         """
         logger.debug(
             "Load general feature from %(filename)s", dict(filename=self.filename)
@@ -343,9 +343,9 @@ class GridDataset(object):
             self.global_attrs = {attr: getattr(h, attr) for attr in h.ncattrs()}
 
     def write(self, filename):
-        """Write dataset output with same format like input
+        """Write dataset output with same format as input
 
-        :param str filename: filename which will be used to save grid
+        :param str filename: filename used to save the grid
         """
         with Dataset(filename, "w") as h_out:
             for dimension, size in self.dimensions.items():
@@ -449,7 +449,7 @@ class GridDataset(object):
 
     def copy(self, grid_in, grid_out):
         """
-        Duplicate a variable
+        Duplicate the variable from grid_in in grid_out
 
         :param grid_in:
         :param grid_out:
@@ -468,17 +468,17 @@ class GridDataset(object):
         """
         Add a grid in handler
 
-        :param str varname: name of future grid
+        :param str varname: name of the future grid
         :param array grid: grid array
         """
         self.vars[varname] = grid
 
     def grid(self, varname, indexs=None):
-        """give grid required
+        """Give the grid required
 
         :param str varname: Variable to get
-        :param dict,None indexs: If defined dict must have dimensions name like key
-        :return: array asked reduce with indexs
+        :param dict,None indexs: If defined dict must have dimensions name as key
+        :return: array asked, reduced by the indexes
         :rtype: array
 
         .. minigallery:: py_eddy_tracker.GridDataset.grid
@@ -518,7 +518,7 @@ class GridDataset(object):
         return self.vars[varname]
 
     def grid_tiles(self, varname, slice_x, slice_y):
-        """give grid tiles required, without buffer system
+        """Give the grid tiles required, without buffer system
         """
         coordinates_dims = list(self.x_dim)
         coordinates_dims.extend(list(self.y_dim))
@@ -550,20 +550,25 @@ class GridDataset(object):
         return data
 
     def high_filter(self, grid_name, w_cut, **kwargs):
-        """create a high filter with a low one
+        """Return the grid high-pass filtered, by substracting to the grid the low-pass filter (default: order=1)
+        :param grid_name: the name of the grid
+        :param int, w_cut: the half-power wavelength cutoff (km)
+
         """
         result = self._low_filter(grid_name, w_cut, **kwargs)
         self.vars[grid_name] -= result
 
     def low_filter(self, grid_name, w_cut, **kwargs):
-        """low filtering
+        """Return the grid low-pass filtered (default: order=1)
+        :param grid_name: the name of the grid
+        :param int, w_cut: the half-power wavelength cutoff (km)
         """
         result = self._low_filter(grid_name, w_cut, **kwargs)
         self.vars[grid_name] -= self.vars[grid_name] - result
 
     @property
     def bounds(self):
-        """Give bound
+        """Give bounds
         """
         return (
             self.x_bounds.min(),
@@ -588,21 +593,21 @@ class GridDataset(object):
         **kwargs,
     ):
         """
-        Compute eddy identification on specified grid
+        Compute eddy identification on the pecified grid
 
-        :param str grid_height: Grid name of height
+        :param str grid_height: Grid name of Sea Surface Height
         :param str uname: Grid name of u speed component
         :param str vname: Grid name of v speed component
-        :param datetime.datetime date: Date which will be store in object to date data
+        :param datetime.datetime date: Date which will be stored in object to date data
         :param float,int step: Height between two layers in m
-        :param float,int shape_error: Maximal error allow for outter contour in %
-        :param int sampling: Sampling of contour and speed profile
+        :param float,int shape_error: Maximal error allowed for outter contour in %
+        :param int sampling: Number of points to store contours and speed profile
         :param (int,int),None pixel_limit:
-            Min and max of pixel which must be inside inner and outer contour to be considered like an eddy
-        :param float,None precision: Truncate value at the defined precision in m
-        :param str force_height_unit: Unit to used for height unit
-        :param str force_speed_unit: Unit to used for speed unit
-        :param dict kwargs: Argument give to amplitude
+            Min and max number of pixels inside the inner and the outer contour to be considered as an eddy
+        :param float,None precision: Truncate values at the defined precision in m
+        :param str force_height_unit: Unit used for height unit
+        :param str force_speed_unit: Unit used for speed unit
+        :param dict kwargs: Argument given to amplitude
 
         :return: Return a list of 2 elements: Anticyclone and Cyclone
         :rtype: py_eddy_tracker.observations.observation.EddiesObservations
@@ -635,7 +640,7 @@ class GridDataset(object):
             if precision is not None:
                 precision /= factor
 
-        # Get h grid
+        # Get ssh grid
         data = self.grid(grid_height).astype("f8")
         # In case of a reduce mask
         if len(data.mask.shape) == 0 and not data.mask:
@@ -686,7 +691,7 @@ class GridDataset(object):
             "contour_lat_s",
             "uavg_profile",
         ]
-        # Compute cyclonic and anticylonic research:
+        # Complete cyclonic and anticylonic research:
         a_and_c = list()
         for anticyclonic_search in [True, False]:
             eddies = list()
@@ -731,7 +736,7 @@ class GridDataset(object):
                             contour.reject = 2
                         continue
 
-                    # Test to know cyclone or anticyclone
+                    # Test of the rotating sense: cyclone or anticyclone
                     if has_value(
                         data, i_x_in, i_y_in, cvalues, below=anticyclonic_search
                     ):
@@ -774,7 +779,7 @@ class GridDataset(object):
                             centlon_e = x[centi, centj]
                             centlat_e = y[centi, centj]
 
-                    # centlat_e and centlon_e must be index of maximum, we will loose some inner contour, if it's not
+                    # centlat_e and centlon_e must be index of maximum, we will loose some inner contour if it's not
                     (
                         max_average_speed,
                         speed_contour,
@@ -792,7 +797,7 @@ class GridDataset(object):
                         pixel_min=pixel_limit[0],
                     )
 
-                    # FIXME : Instantiate new EddyObservation object (high cost need to be review)
+                    # FIXME : Instantiate new EddyObservation object (high cost need to be reviewed)
                     obs = EddiesObservations(
                         size=1,
                         track_extra_variables=track_extra_variables,
@@ -831,7 +836,7 @@ class GridDataset(object):
                     centlon_s, centlat_s, eddy_radius_s, aerr_s = _fit_circle_path(
                         create_vertice(*xy_s)
                     )
-                    # Computed again to use resample contour
+                    # Compute again to use resampled contour
                     _, _, eddy_radius_e, aerr_e = _fit_circle_path(
                         create_vertice(*xy_e)
                     )
@@ -939,7 +944,7 @@ class GridDataset(object):
             if not poly_contain_poly(original_contour.vertices, level_contour.vertices):
                 break
             # 3. Respect size range (for max speed)
-            # nb_pixel properties need call of pixels_in before with a grid of pixel
+            # nb_pixel properties need to call pixels_in before with a grid of pixel
             level_contour.pixels_in(self)
             # Interpolate uspd to seglon, seglat, then get mean
             level_average_speed = self.speed_coef_mean(level_contour)
@@ -1002,7 +1007,7 @@ class GridDataset(object):
 
 
 class UnRegularGridDataset(GridDataset):
-    """Class which manage unregular grid
+    """Class managing unregular grid
     """
 
     __slots__ = (
@@ -1218,7 +1223,7 @@ class RegularGridDataset(GridDataset):
         return self._y_step
 
     def compute_pixel_path(self, x0, y0, x1, y1):
-        """Give a series of index which describe the path between to position
+        """Give a series of indexes which describe the path between to position
         """
         return compute_pixel_path(
             x0,
@@ -1238,7 +1243,7 @@ class RegularGridDataset(GridDataset):
         pass
 
     def is_circular(self):
-        """Check if grid is circular
+        """Check if the grid is circular
         """
         if self._is_circular is None:
             self._is_circular = (
@@ -1464,7 +1469,7 @@ class RegularGridDataset(GridDataset):
         """
         :param str grid_name: grid to filter, data will replace original one
         :param float wave_length: in km
-        :param int order: order to use, if > 1 negativ value will be present in kernel
+        :param int order: order to use, if > 1 negative values of the cardinal sinus are present in kernel
         :param float lat_max: absolute latitude above no filtering apply
         :param dict kwargs: look at :py:meth:`RegularGridDataset.convolve_filter_with_dynamic_kernel`
 
@@ -1723,7 +1728,7 @@ class RegularGridDataset(GridDataset):
     def add_uv(self, grid_height, uname="u", vname="v", stencil_halfwidth=4):
         """Compute a u and v grid
 
-        :param str grid_height: grid name where funtion will apply stencil method
+        :param str grid_height: grid name where the funtion will apply stencil method
         :param str uname: future name of u
         :param str vname: future name of v
         :param int stencil_halfwidth: largest stencil could be apply
@@ -1772,7 +1777,7 @@ class RegularGridDataset(GridDataset):
         )
 
     def speed_coef_mean(self, contour):
-        """some nan can be compute over contour if we are near border,
+        """Some nan can be computed over contour if we are near border,
         something to explore
         """
         return mean_on_regular_contour(
@@ -1819,11 +1824,11 @@ class RegularGridDataset(GridDataset):
 
     def regrid(self, other, grid_name, new_name=None):
         """
-        Interpolate another grid on current grid position
+        Interpolate another grid at the current grid position
 
         :param RegularGridDataset other:
-        :param str grid_name: var name to interpolate
-        :param str new_name: name use to store, if None method will use current ont
+        :param str grid_name: variable name to interpolate
+        :param str new_name: name used to store, if None method will use current ont
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.regrid
         """
@@ -1845,7 +1850,7 @@ class RegularGridDataset(GridDataset):
         """
         Compute z over lons, lats
 
-        :param str grid_name: Grid which will be interp
+        :param str grid_name: Grid to be interpolated
         :param lons: new x
         :param lats: new y
 
@@ -1861,7 +1866,7 @@ class RegularGridDataset(GridDataset):
 
 @njit(cache=True, fastmath=True)
 def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
-    """Give a series of index which describe the path between to position
+    """Give a serie of indexes describing the path between two position
     """
     # index
     nx = x0.shape[0]

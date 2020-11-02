@@ -21,18 +21,18 @@ def start_axes(title):
     ax = fig.add_axes([0.03, 0.03, 0.90, 0.94])
     ax.set_xlim(279, 304), ax.set_ylim(29, 44)
     ax.set_aspect("equal")
-    ax.set_title(title)
+    ax.set_title(title, weight="bold")
     return ax
 
 
 def update_axes(ax, mappable=None):
     ax.grid()
     if mappable:
-        plt.colorbar(mappable, cax=ax.figure.add_axes([0.95, 0.05, 0.01, 0.9]))
+        plt.colorbar(mappable, cax=ax.figure.add_axes([0.94, 0.05, 0.01, 0.9]))
 
 
 # %%
-# Load Input grid, ADT will be used to detect eddies
+# Load Input grid, ADT is used to detect eddies
 margin = 30
 g = RegularGridDataset(
     data.get_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
@@ -46,108 +46,106 @@ g = RegularGridDataset(
 )
 
 ax = start_axes("ADT (m)")
-m = g.display(ax, "adt", vmin=-0.15, vmax=1)
+m = g.display(ax, "adt", vmin=-1, vmax=1, cmap="RdBu_r")
 # Draw line on the gulf stream front
 great_current = Contours(g.x_c, g.y_c, g.grid("adt"), levels=(0.35,), keep_unclose=True)
 great_current.display(ax, color="k")
 update_axes(ax, m)
 
 # %%
-# Get u/v
+# Get geostrophic speed u,v
 # -------
-# U/V are deduced from ADT, this algortihm are not usable around equator (~+- 2°)
+# U/V are deduced from ADT, this algortihm is not ok near the equator (~+- 2°)
 g.add_uv("adt")
 
 # %%
 # Pre-processings
 # ---------------
-# Apply high filter to remove long scale to highlight mesoscale
+# Apply a high-pass filter to remove the large scale and highlight the mesoscale
 g.bessel_high_filter("adt", 700)
 ax = start_axes("ADT (m) filtered (700km)")
-m = g.display(ax, "adt", vmin=-0.25, vmax=0.25)
+m = g.display(ax, "adt", vmin=-0.4, vmax=0.4, cmap="RdBu_r")
 great_current.display(ax, color="k")
 update_axes(ax, m)
 
 # %%
 # Identification
 # --------------
-# run identification with slice of 2 mm
+# Run the identification step with slices of 2 mm
 date = datetime(2016, 5, 15)
 a, c = g.eddy_identification("adt", "u", "v", date, 0.002, shape_error=55)
 
 # %%
-# All closed contour found in this input grid (Display only 1 contour every 5)
-ax = start_axes("ADT closed contour (only 1 / 5 levels)")
+# Display of all closed contours found in the grid (only 1 contour every 5)
+ax = start_axes("ADT closed contours (only 1 / 5 levels)")
 g.contours.display(ax, step=5, lw=1)
 great_current.display(ax, color="k")
 update_axes(ax)
 
 # %%
-# Contours include in eddies
-ax = start_axes("ADT contour used as eddies")
+# Contours included in eddies
+ax = start_axes("ADT contours used as eddies")
 g.contours.display(ax, only_used=True, lw=0.25)
 great_current.display(ax, color="k")
 update_axes(ax)
 
 # %%
-# Post analyse
+# Post analysis
 # ------------
-# Contours reject from several origin (shape error to high, several extremum in contour, ...)
-ax = start_axes("ADT contour reject")
+# Contours can be rejected for several reasons (shape error to high, several extremum in contour, ...)
+ax = start_axes("ADT rejected contours")
 g.contours.display(ax, only_unused=True, lw=0.25)
 great_current.display(ax, color="k")
 update_axes(ax)
 
 # %%
-# Contours reject criterion
-#
+# Criteria for rejecting a contour
 # 0. - Accepted (green)
-# 1. - Reject for shape error (red)
-# 2. - Masked value in contour (blue)
-# 3. - Under or over pixel limit bound (black)
+# 1. - Rejection for shape error (red)
+# 2. - Masked value within contour (blue)
+# 3. - Under or over the pixel limit bounds (black)
 # 4. - Amplitude criterion (yellow)
-ax = start_axes("Contour reject criterion")
-g.contours.display(ax, only_unused=True, lw=0.25, display_criterion=True)
+ax = start_axes("Contours' rejection criteria")
+g.contours.display(ax, only_unused=True, lw=0.5, display_criterion=True)
 update_axes(ax)
 
 # %%
-# Display shape error of each tested contour, the limit of shape error is set to 55 %
+# Display the shape error of each tested contour, the limit of shape error is set to 55 %
 ax = start_axes("Contour shape error")
 m = g.contours.display(
-    ax, lw=0.5, field="shape_error", bins=arange(20, 90.1, 5), cmap="seismic"
+    ax, lw=0.5, field="shape_error", bins=arange(20, 90.1, 5), cmap="PRGn_r"
 )
 update_axes(ax, m)
 
 # %%
-# Contours closed which contains several eddies
-ax = start_axes("ADT contour reject but which contain eddies")
+# Some closed contours contains several eddies (aka, more than one extremum)
+ax = start_axes("ADT rejected contours containing eddies")
 g.contours.label_contour_unused_which_contain_eddies(a)
 g.contours.label_contour_unused_which_contain_eddies(c)
 g.contours.display(
-    ax, only_contain_eddies=True, color="k", lw=1, label="Could be interaction contour"
+    ax, only_contain_eddies=True, color="k", lw=1, label="Could be a contour of interaction"
 )
-a.display(ax, color="r", linewidth=0.5, label="Anticyclonic", ref=-10)
-c.display(ax, color="b", linewidth=0.5, label="Cyclonic", ref=-10)
+a.display(ax, color="r", linewidth=0.75, label="Anticyclonic", ref=-10)
+c.display(ax, color="b", linewidth=0.75, label="Cyclonic", ref=-10)
 ax.legend()
 update_axes(ax)
 
 # %%
 # Output
 # ------
-# Display detected eddies, dashed lines represent effective contour
-# and solid lines represent contour of maximum of speed. See figure 1 of https://doi.org/10.1175/JTECH-D-14-00019.1
+# When displaying the detected eddies, dashed lines are for effective contour, solide lines for the contour of the maximum mean speed. See figure 1 of https://doi.org/10.1175/JTECH-D-14-00019.1
 
 ax = start_axes("Eddies detected")
-a.display(ax, color="r", linewidth=0.5, label="Anticyclonic", ref=-10)
-c.display(ax, color="b", linewidth=0.5, label="Cyclonic", ref=-10)
+a.display(ax, color="r", linewidth=0.75, label="Anticyclonic", ref=-10)
+c.display(ax, color="b", linewidth=0.75, label="Cyclonic", ref=-10)
 ax.legend()
 great_current.display(ax, color="k")
 update_axes(ax)
 
 
 # %%
-# Display speed radius of eddies detected
-ax = start_axes("Eddies speed radius (km)")
+# Display the effective radius of the detected eddies
+ax = start_axes("Effective radius (km)")
 a.filled(ax, "radius_e", vmin=10, vmax=150, cmap="magma_r", factor=0.001, lut=14)
 m = c.filled(ax, "radius_e", vmin=10, vmax=150, cmap="magma_r", factor=0.001, lut=14)
 great_current.display(ax, color="k")

@@ -209,7 +209,7 @@ class EddiesObservations(object):
             :param array bins:
             :param bool percent: normalize by sum of all bins
             :param bool mean: compute mean by bins
-            :param nb mean: only count by bins
+            :param bool nb: only count by bins
             :return: value by bins
             :rtype: array
             """
@@ -230,7 +230,7 @@ class EddiesObservations(object):
 
     def __repr__(self):
         """
-        return general informations on dataset as a string
+        Return general informations on dataset as a string
 
         :return: informations on datasets
         :rtype: str
@@ -311,7 +311,7 @@ class EddiesObservations(object):
 
     def circle_contour(self):
         """
-        Set contour like a circle with radius and center data
+        Set contour as a circle with radius and center data
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.circle_contour
         """
@@ -351,7 +351,7 @@ class EddiesObservations(object):
 
     @property
     def elements(self):
-        """Return all variable name
+        """Return all the names of the variables
         """
         elements = [i for i in self.ELEMENTS]
         if self.track_array_variables > 0:
@@ -412,7 +412,7 @@ class EddiesObservations(object):
 
     @property
     def obs(self):
-        """return an array observations
+        """Return an array observations
         """
         return self.observations
 
@@ -425,10 +425,10 @@ class EddiesObservations(object):
 
     def iter_on(self, xname, bins=None):
         """
-        Yield observation group for each bins
+        Yield observation group for each bin
 
         :param str varname:
-        :param array bins: bounds og each bins ,
+        :param array bins: bounds of each bin ,
         :return: Group observations
         :rtype: self.__class__
         """
@@ -454,6 +454,9 @@ class EddiesObservations(object):
                 yield slice(index[0], index[-1] + 1), bins[i_], bins[i_ + 1]
 
     def align_on(self, other, var_name="time", **kwargs):
+        """
+        Align the time indexes of two datasets
+        """
         iter_self, iter_other = (
             self.iter_on(var_name, **kwargs),
             other.iter_on(var_name, **kwargs),
@@ -543,6 +546,23 @@ class EddiesObservations(object):
 
     @classmethod
     def load_file(cls, filename, **kwargs):
+        """
+        Load the netcdf or the zarr file
+        Load only latitude and longitude on the first 300 obs :
+
+        ```python
+        kwargs_latlon_300 = dict(
+            include_vars=[
+            "longitude",
+            "latitude",
+            ],
+            indexs=dict(obs=slice(0, 300)),
+        )
+        small_dataset = TrackEddiesObservations.load_file(
+            nc_file.nc,
+            **kwargs_latlon_300)
+        ```
+        """
         filename_ = (
             filename.filename if isinstance(filename, ExFileObject) else filename
         )
@@ -871,20 +891,23 @@ class EddiesObservations(object):
         return labels
 
     def match(self, other, method="overlap", intern=False, cmin=0, **kwargs):
-        """return index and score compute with area
+        """Return index and score computed with the chosen method on the effective contour
 
         :param EddiesObservations other: Observations to compare
         :param str method:
-            if method is "overlap" method will use contour to compute score,
-            if method is "circle" method will apply a formula of circle overlap
-        :param bool intern: if True, speed contour will be used
-        :param float cmin: 0 < cmin < 1, return only couple above cmin
+            "overlap": the score is computed with contours;
+            "circle": circles are computed and used for score
+        :param bool intern: if True, speed contour is used (default = effective contour)
+        :param float cmin: 0 < cmin < 1, return only couples with score >= cmin
         :param dict kwargs: look at :py:meth:`vertice_overlap`
-        :return: return index of couple in self and other and cost value
+        :return: return the indexes of the eddies in self coupled with eddies in
+        other and their associated score
         :rtype: (array(int), array(int), array(float))
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.match
         """
+        # if method is "overlap" method will use contour to compute score,
+        # if method is "circle" method will apply a formula of circle overlap
         x_name, y_name = self.intern(intern)
         if method == "overlap":
             i, j = bbox_intersection(
@@ -902,7 +925,7 @@ class EddiesObservations(object):
                 self.latitude, self.longitude, other.latitude, other.longitude, **kwargs
             )
 
-        m = c > cmin
+        m = c >= cmin  # ajout >= pour garder la cmin dans la sélection
         return i[m], j[m], c[m]
 
     @classmethod
@@ -947,6 +970,18 @@ class EddiesObservations(object):
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
+        """Return cost function between obs to associate
+        ```python
+        CF = sqrt ( [( amplitude_in - amplitude_out)/amplitude_in]^2 +
+                    [( speed_radius_in - speed_radius_out)/speed_radius_in]^2 +
+                    [ distance / 125]^2 )
+        ```
+
+        :param records_in: starting observations
+        :param records_out: observations to associate
+        :param distance: computed between in and out
+
+        """
         cost = (
             (records_in["amplitude"] - records_out["amplitude"])
             / records_in["amplitude"]
@@ -1052,6 +1087,7 @@ class EddiesObservations(object):
 
     @staticmethod
     def solve_simultaneous(cost):
+        """Write something"""
         mask = ~cost.mask
         # Count number of link by self obs and other obs
         self_links = mask.sum(axis=1)
@@ -1423,9 +1459,12 @@ class EddiesObservations(object):
 
     def extract_with_area(self, area, **kwargs):
         """
-        Extract with a bounding box
+        Extract geographically with a bounding box
 
         :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
+        ```python
+        area = dict(llcrnrlon=x0, llcrnrlat=y0, urcrnrlon=x1, urcrnrlat=y1)
+        ```
         :param dict kwargs: look at :py:meth:`extract_with_mask`
         :return: Return all eddy tracks which are in bounds
         :rtype: EddiesObservations
@@ -1446,6 +1485,12 @@ class EddiesObservations(object):
         :return: same object with selected observations
         :rtype: self
         """
+        # ça n'existe plus ça??
+        # full_path=False,
+        # remove_incomplete=False,
+        # compress_id=False,
+        # reject_virtual=False
+
         nb_obs = mask.sum()
         new = self.__class__.new_like(self, nb_obs)
         new.sign_type = self.sign_type
@@ -1460,10 +1505,10 @@ class EddiesObservations(object):
 
     def scatter(self, ax, name=None, ref=None, factor=1, **kwargs):
         """
-        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param str,None name:
-            var which will be use to fill contour, if None all element of collection will have same color
-        :param float,None ref: if define use like west bound
+        :param matplotlib.axes.Axes ax: matplotlib axe used to draw
+        :param str, None name:
+            variable used to fill the contour, if None all elements have the same color
+        :param float, None ref: if define use like west bound ?
         :param float factor: multiply value by
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
         :return: scatter mappable
@@ -1492,14 +1537,14 @@ class EddiesObservations(object):
         **kwargs,
     ):
         """
-        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param str,array varname, None: var which will be use to fill contour, or an array of same size of obs
-        :param float,None ref: if define use like west bound
-        :param bool intern: if True draw speed contour instead of effective contour
+        :param matplotlib.axes.Axes ax: matplotlib axe used to draw
+        :param str,array varname, None: variable used to fill the contours, or an array of same size than obs
+        :param float,None ref: if define use like west bound?
+        :param bool intern: if True draw speed contours instead of effective contours
         :param str cmap: matplotlib colormap name
-        :param int,None lut: Number of division of colormaps
-        :param float,None vmin:
-        :param float,None vmax:
+        :param int,None lut: Number of colors in the colormap
+        :param float,None vmin: Min value of the colorbar
+        :param float,None vmax: Max value of the colorbar
         :param float factor: multiply value by
         :return: Collection drawed
         :rtype: matplotlib.collections.PolyCollection
@@ -1535,10 +1580,10 @@ class EddiesObservations(object):
 
     def bins_stat(self, xname, bins=None, yname=None, method=None):
         """
-        :param str,array xname: var which will be use
-        :param array, None bins: bins to perform statistics,if None method will get min and max of variable
-        :param None,str yname: var which will be use to apply method
-        :param None,str method: If None method count in each bin, could also do mean, std
+        :param str,array xname: variable to compute stats on
+        :param array, None bins: bins to perform statistics, if None bins = arange(variable.min(), variable.max() + 2)
+        :param None,str yname: variable used to apply method
+        :param None,str method: If None method counts the number of observations in each bin, can be "mean", "std"
         :return: x array and y array
         :rtype: array,array
 
@@ -1558,12 +1603,12 @@ class EddiesObservations(object):
     def display(
         self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs
     ):
-        """
-        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param float,None ref: if define use like west bound
-        :param bool extern_only: if True draw effective contour only
-        :param bool intern_only: if True draw speed contour only
-        :param bool nobs: if True add number of eddies in label
+        """Plot the speed and effective (dashed) contour of the eddies
+        :param matplotlib.axes.Axes ax: matplotlib axe used to draw
+        :param float,None ref: western longitude reference used
+        :param bool extern_only: if True, draw only the effective contour
+        :param bool intern_only: if True, draw only the speed contour
+        :param bool nobs: if True, add the number of eddies in label
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.plot`
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.display
@@ -1591,7 +1636,7 @@ class EddiesObservations(object):
 
     def first_obs(self):
         """
-        Get first obs of each tracks.
+        Get first obs of each trajectory.
 
         :rtype: __class__
 
@@ -1601,7 +1646,7 @@ class EddiesObservations(object):
 
     def last_obs(self):
         """
-        Get Last obs of each tracks.
+        Get Last obs of each trajectory.
 
         :rtype: __class__
 
@@ -1614,10 +1659,10 @@ class EddiesObservations(object):
 
     def is_convex(self, intern=False):
         """
-        Get flag of eddy convexity
+        Get flag of the eddy's convexity
 
-        :param bool intern: If true use speed contour instead of effective contour
-        :return: true if contour is convex
+        :param bool intern: If True use speed contour instead of effective contour
+        :return: True if the contour is convex
         :rtype: array[bool]
         """
         xname, yname = self.intern(intern)
@@ -1625,7 +1670,7 @@ class EddiesObservations(object):
 
     def inside(self, x, y, intern=False):
         """
-        True for each postion inside an eddy
+        True for each point inside the effective contour of an eddy
 
         :param array x: longitude
         :param array y: latitude
@@ -1638,12 +1683,12 @@ class EddiesObservations(object):
 
     def grid_count(self, bins, intern=False, center=False):
         """
-        Compute count of eddies in each bin (use of all pixel in each contour)
+        Count the eddies in each bin (use all pixels in each contour)
 
-        :param (numpy.array,numpy.array) bins: bins to compute count
+        :param (numpy.array,numpy.array) bins: bins (grid) to count
         :param bool intern: if True use speed contour only
         :param bool center: if True use of center to count
-        :return: return grid of count
+        :return: return the grid of counts
         :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.grid_count
@@ -1662,7 +1707,7 @@ class EddiesObservations(object):
                 lat=(y_bins[1:] + y_bins[:-1]) / 2,
             ),
             variables_description=dict(
-                count=dict(long_name="Number of times pixel is in eddies")
+                count=dict(long_name="Number of times the pixel is within an eddy")
             ),
             centered=True,
         )
@@ -1690,9 +1735,9 @@ class EddiesObservations(object):
         """
             Compute mean of eddies in each bin
 
-            :param (numpy.array,numpy.array) bins: bins to compute count
-            :param str varname: name of variable to compute mean
-            :param str,float method: method to apply at each set
+            :param (numpy.array,numpy.array) bins: bins (grid) to count
+            :param str varname: variable to apply the method
+            :param str,float method: method to apply. If float, use ?
             :param array data: Array used to compute stat if defined
             :return: return grid of method
             :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
@@ -1733,12 +1778,12 @@ class EddiesObservations(object):
 
     def grid_stat(self, bins, varname, data=None):
         """
-        Compute mean of eddies in each bin
+        Return the mean of the eddies' variable in each bin
 
-        :param (numpy.array,numpy.array) bins: bins to compute count
-        :param str varname: name of variable to compute mean
+        :param (numpy.array,numpy.array) bins: bins (grid) to compute the mean on
+        :param str varname: name of variable to compute the mean on
         :param array data: Array used to compute stat if defined
-        :return: return grid of mean
+        :return: return the gridde mean variable
         :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.grid_stat
@@ -1807,7 +1852,7 @@ class EddiesObservations(object):
     @property
     def period(self):
         """
-        Give time coverage
+        Give the time coverage
 
         :return: first and last date
         :rtype: (int,int)
@@ -1818,7 +1863,7 @@ class EddiesObservations(object):
 @njit(cache=True)
 def grid_count_(grid, i, j):
     """
-    Add one for each indice
+    Add one to each index
     """
     for i_, j_ in zip(i, j):
         grid[i_, j_] += 1
@@ -1856,12 +1901,12 @@ def grid_box_stat(x_c, y_c, grid, mask, x, y, value, circular=False, method=50):
     """
     Compute method on each set (one set by box)
 
-    :param array_like x_c: longitude coordinate of grid
-    :param array_like y_c: latitude coordinate of grid
-    :param array_like grid: grid to store result of method
-    :param array[bool] mask: grid to store not used box
-    :param array_like x: longitude of positions
-    :param array_like y: latitude of positions
+    :param array_like x_c: grid longitude coordinates
+    :param array_like y_c: grid latitude coordinates
+    :param array_like grid: grid to store the result
+    :param array[bool] mask: grid to store unused boxes
+    :param array_like x: longitude of observations
+    :param array_like y: latitude of observations
     :param array_like value: value to group to apply method
     :param bool circular: True if grid is wrappable
     :param float method: percentile
@@ -1907,10 +1952,10 @@ def grid_box_stat(x_c, y_c, grid, mask, x, y, value, circular=False, method=50):
 @njit(cache=True)
 def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
     """
-    Compute mean of grid for each contour
+    Compute the mean or the max of the grid for each contour
 
-    :param array_like x_c: longitude coordinate of grid
-    :param array_like y_c: latitude coordinate of grid
+    :param array_like x_c: the grid longitude coordinates
+    :param array_like y_c: the grid latitude coordinates
     :param array_like grid: grid value
     :param array_like x: longitude of contours
     :param array_like y: latitude of contours
