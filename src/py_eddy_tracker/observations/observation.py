@@ -3,7 +3,18 @@
 Base class to manage eddy observation
 """
 import logging
+from datetime import datetime
+from tarfile import ExFileObject
+from tokenize import TokenError
+
 import zarr
+from Polygon import Polygon
+from matplotlib.cm import get_cmap
+from matplotlib.collections import PolyCollection
+from matplotlib.colors import Normalize
+from matplotlib.path import Path as BasePath
+from netCDF4 import Dataset
+from numba import njit, types as numba_types
 from numpy import (
     zeros,
     where,
@@ -29,18 +40,9 @@ from numpy import (
     digitize,
     percentile,
 )
-from netCDF4 import Dataset
-from datetime import datetime
-from numba import njit, types as numba_types
-from Polygon import Polygon
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
-from tokenize import TokenError
-from tarfile import ExFileObject
-from matplotlib.path import Path as BasePath
-from matplotlib.collections import PolyCollection
-from matplotlib.cm import get_cmap
-from matplotlib.colors import Normalize
+
 from .. import VAR_DESCR, VAR_DESCR_inv, __version__
 from ..generic import (
     distance_grid,
@@ -548,20 +550,19 @@ class EddiesObservations(object):
     def load_file(cls, filename, **kwargs):
         """
         Load the netcdf or the zarr file
+
         Load only latitude and longitude on the first 300 obs :
 
-        ```python
-        kwargs_latlon_300 = dict(
-            include_vars=[
-            "longitude",
-            "latitude",
-            ],
-            indexs=dict(obs=slice(0, 300)),
-        )
-        small_dataset = TrackEddiesObservations.load_file(
-            nc_file.nc,
-            **kwargs_latlon_300)
-        ```
+        .. code-block:: python
+
+            kwargs_latlon_300 = dict(
+                include_vars=[
+                "longitude",
+                "latitude",
+                ],
+                indexs=dict(obs=slice(0, 300)),
+            )
+            small_dataset = TrackEddiesObservations.load_file(filename, **kwargs_latlon_300)
         """
         filename_ = (
             filename.filename if isinstance(filename, ExFileObject) else filename
@@ -895,13 +896,12 @@ class EddiesObservations(object):
 
         :param EddiesObservations other: Observations to compare
         :param str method:
-            "overlap": the score is computed with contours;
-            "circle": circles are computed and used for score
+            - "overlap": the score is computed with contours;
+            - "circle": circles are computed and used for score
         :param bool intern: if True, speed contour is used (default = effective contour)
         :param float cmin: 0 < cmin < 1, return only couples with score >= cmin
-        :param dict kwargs: look at :py:meth:`vertice_overlap`
-        :return: return the indexes of the eddies in self coupled with eddies in
-        other and their associated score
+        :param dict kwargs: look at :py:meth:`py_eddy_tracker.poly.vertice_overlap`
+        :return: return the indexes of the eddies in self coupled with eddies in other and their associated score
         :rtype: (array(int), array(int), array(float))
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.match
@@ -971,11 +971,12 @@ class EddiesObservations(object):
     @staticmethod
     def cost_function(records_in, records_out, distance):
         """Return cost function between obs to associate
-        ```python
-        CF = sqrt ( [( amplitude_in - amplitude_out)/amplitude_in]^2 +
-                    [( speed_radius_in - speed_radius_out)/speed_radius_in]^2 +
-                    [ distance / 125]^2 )
-        ```
+
+        .. code-block:: python
+
+            cost = sqrt(((amplitude_in - amplitude_out) / amplitude_in) ** 2 +
+                        ((speed_radius_in - speed_radius_out) / speed_radius_in) ** 2 +
+                        (distance / 125) ** 2)
 
         :param records_in: starting observations
         :param records_out: observations to associate
@@ -1462,12 +1463,13 @@ class EddiesObservations(object):
         Extract geographically with a bounding box
 
         :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
-        ```python
-        area = dict(llcrnrlon=x0, llcrnrlat=y0, urcrnrlon=x1, urcrnrlat=y1)
-        ```
         :param dict kwargs: look at :py:meth:`extract_with_mask`
         :return: Return all eddy tracks which are in bounds
         :rtype: EddiesObservations
+
+        .. code-block:: python
+
+            area = dict(llcrnrlon=x0, llcrnrlat=y0, urcrnrlon=x1, urcrnrlat=y1)
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.extract_with_area
         """
@@ -1604,6 +1606,7 @@ class EddiesObservations(object):
         self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs
     ):
         """Plot the speed and effective (dashed) contour of the eddies
+
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
         :param float,None ref: western longitude reference used
         :param bool extern_only: if True, draw only the effective contour

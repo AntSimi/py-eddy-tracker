@@ -41,7 +41,7 @@ def count_consecutive(mask):
         if not mask[i]:
             count = 0
             continue
-        count +=1
+        count += 1
         output[i] = count
     return output
 

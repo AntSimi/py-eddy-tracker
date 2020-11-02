@@ -133,8 +133,18 @@ for i, (label, field, factor, stop) in enumerate(
     ax.set_xlabel("Absolute Dynamic Topography")
     ax.set_ylabel("Sea Level Anomaly")
 
-    ax.plot(a_adt[field][i_a_adt] * factor, a_sla[field][i_a_sla] * factor, "r.", label='Anticyclonic')
-    ax.plot(c_adt[field][i_c_adt] * factor, c_sla[field][i_c_sla] * factor, "b.", label='Cyclonic')
+    ax.plot(
+        a_adt[field][i_a_adt] * factor,
+        a_sla[field][i_a_sla] * factor,
+        "r.",
+        label="Anticyclonic",
+    )
+    ax.plot(
+        c_adt[field][i_c_adt] * factor,
+        c_sla[field][i_c_sla] * factor,
+        "b.",
+        label="Cyclonic",
+    )
     ax.set_aspect("equal"), ax.grid()
     ax.plot((0, 1000), (0, 1000), "g")
     ax.set_xlim(0, stop), ax.set_ylim(0, stop)

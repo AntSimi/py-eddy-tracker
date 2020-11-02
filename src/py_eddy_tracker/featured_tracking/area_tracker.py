@@ -6,10 +6,9 @@ logger = logging.getLogger("pet")
 
 
 class AreaTracker(Model):
-
     @classmethod
     def needed_variable(cls):
-        vars = ['longitude', 'latitude']
+        vars = ["longitude", "latitude"]
         vars.extend(cls.intern(False, public_label=True))
         return vars
 
@@ -18,7 +17,7 @@ class AreaTracker(Model):
         i, j, c = self.match(other, intern=False)
         cost_mat = ma.empty(shape, dtype="f4")
         cost_mat.mask = ma.ones(shape, dtype="bool")
-        m = c > .2
+        m = c > 0.2
         i, j, c = i[m], j[m], c[m]
         cost_mat[i, j] = 1 - c
 
@@ -27,8 +26,12 @@ class AreaTracker(Model):
         logger.debug("%d matched with previous", i_self.shape[0])
         return i_self, i_other, cost_mat[i_self, i_other]
 
-    def propagate(self, previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model):
-        virtual = super().propagate(previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model)
+    def propagate(
+        self, previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model
+    ):
+        virtual = super().propagate(
+            previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model
+        )
         nb_dead = len(previous_obs)
         nb_virtual_extend = nb_next - nb_dead
         for key in model.elements:

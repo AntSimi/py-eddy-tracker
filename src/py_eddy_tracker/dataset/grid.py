@@ -1806,9 +1806,7 @@ class RegularGridDataset(GridDataset):
         if "cmap" not in kwargs:
             kwargs["cmap"] = "coolwarm"
         data = self.grid(name) if isinstance(name, str) else name
-        return ax.pcolormesh(
-            self.x_bounds, self.y_bounds, data.T * factor, **kwargs
-        )
+        return ax.pcolormesh(self.x_bounds, self.y_bounds, data.T * factor, **kwargs)
 
     def contour(self, ax, name, factor=1, **kwargs):
         """

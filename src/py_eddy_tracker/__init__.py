@@ -148,12 +148,9 @@ VAR_DESCR = dict(
         nc_name="distance_next",
         nc_type="float32",
         output_type="uint16",
-        scale_factor=50.,
+        scale_factor=50.0,
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Distance to next position",
-            units='m',
-        ),
+        nc_attr=dict(long_name="Distance to next position", units="m",),
     ),
     virtual=dict(
         attr_name=None,
@@ -305,18 +302,14 @@ VAR_DESCR = dict(
         nc_name="i",
         nc_type="uint16",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Longitude index in the grid of the detection",
-        ),
+        nc_attr=dict(long_name="Longitude index in the grid of the detection",),
     ),
     j=dict(
         attr_name="j",
         nc_name="j",
         nc_type="uint16",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Latitude index in the grid of the detection",
-        ),
+        nc_attr=dict(long_name="Latitude index in the grid of the detection",),
     ),
     eke=dict(
         attr_name="eke",
@@ -355,7 +348,7 @@ VAR_DESCR = dict(
             long_name="Speed Radius",
             units="m",
             comment="Radius of a circle whose area is equal to that "
-                    "enclosed by the contour of maximum circum-average speed",
+            "enclosed by the contour of maximum circum-average speed",
         ),
     ),
     track=dict(
@@ -365,8 +358,7 @@ VAR_DESCR = dict(
         nc_type="uint32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Trajectory number",
-            comment="Trajectory identification number",
+            long_name="Trajectory number", comment="Trajectory identification number",
         ),
     ),
     sub_track=dict(
@@ -375,8 +367,7 @@ VAR_DESCR = dict(
         nc_type="uint32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Segment Number",
-            comment="Segment number inside a group",
+            long_name="Segment Number", comment="Segment number inside a group",
         ),
     ),
     n=dict(

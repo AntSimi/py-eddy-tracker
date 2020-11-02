@@ -34,7 +34,7 @@ ax.set_ylim(-50, -25)
 # We will used the outter contour
 x_name, y_name = a.intern(False)
 adt = g.grid("adt")
-mask = ones(adt.shape, dtype='bool')
+mask = ones(adt.shape, dtype="bool")
 for eddy in a:
     i, j = Path(create_vertice(eddy[x_name], eddy[y_name])).pixels_in(g)
     mask[i, j] = False

@@ -6,7 +6,9 @@ from os import path
 
 
 class CheltonTracker(Model):
-    GROUND = RegularGridDataset(path.join(path.dirname(__file__), '../data/mask_1_60.nc'), 'lon', 'lat')
+    GROUND = RegularGridDataset(
+        path.join(path.dirname(__file__), "../data/mask_1_60.nc"), "lon", "lat"
+    )
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
@@ -20,7 +22,7 @@ class CheltonTracker(Model):
         # Compute Parameter of ellips
         minor, major = 1.05, 1.5
         y = self.basic_formula_ellips_major_axis(
-            self.obs['lat'],
+            self.obs["lat"],
             degrees=True,
             c0=minor,
             cmin=minor,
@@ -30,28 +32,32 @@ class CheltonTracker(Model):
         )
         # mask from ellips
         mask = self.shifted_ellipsoid_degrees_mask(
-            other,
-            minor=minor,  # Minor can be bigger than major??
-            major=y)
+            other, minor=minor, major=y  # Minor can be bigger than major??
+        )
 
         # We check ratio (maybe not usefull)
-        check_ratio(mask, self.obs['amplitude'], other.obs['amplitude'], self.obs['radius_e'], other.obs['radius_e'])
+        check_ratio(
+            mask,
+            self.obs["amplitude"],
+            other.obs["amplitude"],
+            self.obs["radius_e"],
+            other.obs["radius_e"],
+        )
         indexs_closest = where(mask)
-        mask[indexs_closest] = self.across_ground(self.obs[indexs_closest[0]], other.obs[indexs_closest[1]])
+        mask[indexs_closest] = self.across_ground(
+            self.obs[indexs_closest[0]], other.obs[indexs_closest[1]]
+        )
         return mask
 
     @classmethod
     def across_ground(cls, record0, record1):
         i, j, d_pix = cls.GROUND.compute_pixel_path(
-            x0=record0['lon'],
-            y0=record0['lat'],
-            x1=record1['lon'],
-            y1=record1['lat'],
+            x0=record0["lon"], y0=record0["lat"], x1=record1["lon"], y1=record1["lat"],
         )
 
-        data = cls.GROUND.grid('mask')[i, j]
+        data = cls.GROUND.grid("mask")[i, j]
         i_ground = unique(arange(len(record0)).repeat(d_pix + 1)[data == 1])
-        mask = ones(record1.shape, dtype='bool')
+        mask = ones(record1.shape, dtype="bool")
         mask[i_ground] = False
         return mask
 
@@ -70,7 +76,7 @@ class CheltonTracker(Model):
             for i in where(nb_link > 1)[0]:
                 m = i == i_other
                 multiple_in = i_self[m]
-                i_keep = self.obs['amplitude'][multiple_in].argmax()
+                i_keep = self.obs["amplitude"][multiple_in].argmax()
                 m[where(m)[0][i_keep]] = False
                 mask[m] = False
 
@@ -80,7 +86,9 @@ class CheltonTracker(Model):
 
 
 @njit(cache=True)
-def check_ratio(current_mask, self_amplitude, other_amplitude, self_radius, other_radius):
+def check_ratio(
+    current_mask, self_amplitude, other_amplitude, self_radius, other_radius
+):
     """
     Only very few case are remove with selection
 
