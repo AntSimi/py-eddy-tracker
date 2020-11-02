@@ -1797,7 +1797,7 @@ class RegularGridDataset(GridDataset):
     def display(self, ax, name, factor=1, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param str name: variable to display
+        :param str,array name: variable to display, could be an array
         :param float factor: multiply grid by
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolormesh`
 
@@ -1805,20 +1805,22 @@ class RegularGridDataset(GridDataset):
         """
         if "cmap" not in kwargs:
             kwargs["cmap"] = "coolwarm"
+        data = self.grid(name) if isinstance(name, str) else name
         return ax.pcolormesh(
-            self.x_bounds, self.y_bounds, self.grid(name).T * factor, **kwargs
+            self.x_bounds, self.y_bounds, data.T * factor, **kwargs
         )
 
     def contour(self, ax, name, factor=1, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
-        :param str name: variable to display
+        :param str,array name: variable to display, could be an array
         :param float factor: multiply grid by
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.contour`
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.contour
         """
-        return ax.contour(self.x_c, self.y_c, self.grid(name).T * factor, **kwargs)
+        data = self.grid(name) if isinstance(name, str) else name
+        return ax.contour(self.x_c, self.y_c, data.T * factor, **kwargs)
 
     def regrid(self, other, grid_name, new_name=None):
         """

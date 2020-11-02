@@ -59,8 +59,6 @@ sphinx_gallery_conf = {
     "doc_module": ("py_eddy_tracker",),
     "reference_url": {
         "py_eddy_tracker": None,
-        "matplotlib": "https://matplotlib.org/",
-        "numpy": "https://docs.scipy.org/doc/numpy/",
     },
     "line_numbers": False,
     "filename_pattern": "/pet",
