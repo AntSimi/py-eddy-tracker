@@ -71,7 +71,7 @@ logger = logging.getLogger("pet")
 @njit(cache=True, fastmath=True)
 def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5):
     """
-    work only if major is an array but faster * 6
+    Work only if major is an array but faster * 6
     """
     # c = (major ** 2 - minor ** 2) ** .5 + major
     c = major
@@ -190,7 +190,8 @@ class EddiesObservations(object):
         return f"""<b>{infos['nb_obs']} observations from {infos['t0']} to {infos['t1']} </b>"""
 
     def hist(self, varname, x, bins, percent=False, mean=False, nb=False):
-        """
+        """ Build histograms.
+
             :param str varname: variable to use to compute stat
             :param str x: variable to use to know in which bins
             :param array bins:
@@ -217,7 +218,7 @@ class EddiesObservations(object):
 
     def __repr__(self):
         """
-        Return general informations on dataset as a string
+        Return general informations on dataset as strings.
 
         :return: informations on datasets
         :rtype: str
@@ -299,7 +300,7 @@ class EddiesObservations(object):
 
     def add_fields(self, fields=list(), array_fields=list()):
         """
-        Add a new field
+        Add a new field.
         """
         nb_obs = self.obs.shape[0]
         new = self.__class__(
@@ -328,7 +329,7 @@ class EddiesObservations(object):
 
     def circle_contour(self, only_virtual=False):
         """
-        Set contour as a circle with radius and center data
+        Set contours as a circles from radius and center data.
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.circle_contour
         """
@@ -353,7 +354,7 @@ class EddiesObservations(object):
 
     @property
     def dtype(self):
-        """Return dtype to build numpy array
+        """Return dtype to build numpy array.
         """
         dtype = list()
         for elt in self.elements:
@@ -370,7 +371,7 @@ class EddiesObservations(object):
 
     @property
     def elements(self):
-        """Return all the names of the variables
+        """Return all the names of the variables.
         """
         elements = [i for i in self.ELEMENTS]
         if self.track_array_variables > 0:
@@ -383,7 +384,7 @@ class EddiesObservations(object):
         return list(set(elements))
 
     def coherence(self, other):
-        """Check coherence between two dataset
+        """Check coherence between two datasets.
         """
         test = self.track_extra_variables == other.track_extra_variables
         test *= self.track_array_variables == other.track_array_variables
@@ -409,7 +410,7 @@ class EddiesObservations(object):
         return eddies
 
     def merge(self, other):
-        """Merge two dataset
+        """Merge two datasets.
         """
         nb_obs_self = len(self)
         nb_obs = nb_obs_self + len(other)
@@ -431,7 +432,7 @@ class EddiesObservations(object):
 
     @property
     def obs(self):
-        """Return an array observations
+        """Return observations.
         """
         return self.observations
 
@@ -444,7 +445,7 @@ class EddiesObservations(object):
 
     def iter_on(self, xname, bins=None):
         """
-        Yield observation group for each bin
+        Yield observation group for each bin.
 
         :param str varname:
         :param array bins: bounds of each bin ,
@@ -478,7 +479,7 @@ class EddiesObservations(object):
 
     def align_on(self, other, var_name="time", **kwargs):
         """
-        Align the time indexes of two datasets
+        Align the time indexes of two datasets.
         """
         iter_self, iter_other = (
             self.iter_on(var_name, **kwargs),
@@ -497,7 +498,7 @@ class EddiesObservations(object):
             yield indexs_self, indexs_other, b0_self, b1_self
 
     def insert_observations(self, other, index):
-        """Insert other obs in self at the index
+        """Insert other obs in self at the index.
         """
         if not self.coherence(other):
             raise Exception("Observations with no coherence")
@@ -519,7 +520,7 @@ class EddiesObservations(object):
         return self
 
     def append(self, other):
-        """Merge
+        """Merge.
         """
         return self + other
 
@@ -528,7 +529,7 @@ class EddiesObservations(object):
 
     def distance(self, other):
         """ Use haversine distance for distance matrix between every self and
-        other eddies"""
+        other eddies."""
         return distance_grid(
             self.obs["lon"], self.obs["lat"], other.obs["lon"], other.obs["lat"]
         )
@@ -545,7 +546,7 @@ class EddiesObservations(object):
         )
 
     def index(self, index, reverse=False):
-        """Return obs from self at the index
+        """Return obs from self at the index.
         """
         if reverse:
             index = reverse_index(index, len(self))
@@ -570,7 +571,7 @@ class EddiesObservations(object):
     @classmethod
     def load_file(cls, filename, **kwargs):
         """
-        Load the netcdf or the zarr file
+        Load the netcdf or the zarr file.
 
         Load only latitude and longitude on the first 300 obs :
 
@@ -584,6 +585,10 @@ class EddiesObservations(object):
                 indexs=dict(obs=slice(0, 300)),
             )
             small_dataset = TrackEddiesObservations.load_file(filename, **kwargs_latlon_300)
+        
+        Default **kwargs to load zarr are : raw_data=False, remove_vars=None, include_vars=None
+
+        Default **kwargs to load netcdf are : raw_data=False, remove_vars=None, include_vars=None, indexs=None
         """
         filename_ = (
             filename.filename if isinstance(filename, ExFileObject) else filename
@@ -855,7 +860,7 @@ class EddiesObservations(object):
         self, previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model
     ):
         """
-        Filled virtual obs (C)
+        Filled virtual obs (C).
 
         :param previous_obs: previous obs from current (A)
         :param current_obs: previous obs from virtual (B)
@@ -914,16 +919,17 @@ class EddiesObservations(object):
         return labels
 
     def match(self, other, method="overlap", intern=False, cmin=0, **kwargs):
-        """Return index and score computed with the chosen method on the effective contour
+        """Return index and score computed on the effective contour.
 
         :param EddiesObservations other: Observations to compare
         :param str method:
             - "overlap": the score is computed with contours;
-            - "circle": circles are computed and used for score
+            - "circle": circles are computed and used for score (TODO)
         :param bool intern: if True, speed contour is used (default = effective contour)
         :param float cmin: 0 < cmin < 1, return only couples with score >= cmin
-        :param dict kwargs: look at :py:meth:`py_eddy_tracker.poly.vertice_overlap`
-        :return: return the indexes of the eddies in self coupled with eddies in other and their associated score
+        :param dict kwargs: look at :py:meth:`vertice_overlap`
+        :return: return the indexes of the eddies in self coupled with eddies in
+        other and their associated score
         :rtype: (array(int), array(int), array(float))
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.match
@@ -992,13 +998,14 @@ class EddiesObservations(object):
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
-        """Return cost function between obs to associate
+        """Return the cost function between two obs.
 
-        .. code-block:: python
+        .. math::
 
-            cost = sqrt(((amplitude_in - amplitude_out) / amplitude_in) ** 2 +
-                        ((speed_radius_in - speed_radius_out) / speed_radius_in) ** 2 +
-                        (distance / 125) ** 2)
+            cost = \sqrt{({Amp_{_{in}} - Amp_{_{out}} \over Amp_{_{in}}}) ^2 +
+              ({Rspeed_{_{in}} - Rspeed_{_{out}} \over Rspeed_{_{in}}}) ^2 + 
+              ({distance \over 125}) ^2
+            }
 
         :param records_in: starting observations
         :param records_out: observations to associate
@@ -1110,7 +1117,7 @@ class EddiesObservations(object):
 
     @staticmethod
     def solve_simultaneous(cost):
-        """Write something"""
+        """Write something (TODO)"""
         mask = ~cost.mask
         # Count number of link by self obs and other obs
         self_links = mask.sum(axis=1)
@@ -1482,7 +1489,7 @@ class EddiesObservations(object):
 
     def extract_with_area(self, area, **kwargs):
         """
-        Extract geographically with a bounding box
+        Extract geographically with a bounding box.
 
         :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
         :param dict kwargs: look at :py:meth:`extract_with_mask`
@@ -1503,7 +1510,7 @@ class EddiesObservations(object):
 
     def extract_with_mask(self, mask):
         """
-        Extract a subset of observations
+        Extract a subset of observations.
 
         :param array(bool) mask: mask to select observations
         :return: same object with selected observations
@@ -1529,6 +1536,8 @@ class EddiesObservations(object):
 
     def scatter(self, ax, name=None, ref=None, factor=1, **kwargs):
         """
+        Scatter data.
+
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
         :param str,array,None name:
             variable used to fill the contour, if None all elements have the same color
