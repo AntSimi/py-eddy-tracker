@@ -352,7 +352,7 @@ class Correspondances(list):
         kwargs = dict()
         needed_variable = self.class_method.needed_variable()
         if needed_variable is not None:
-            kwargs['include_vars'] = needed_variable
+            kwargs["include_vars"] = needed_variable
         self.swap_dataset(self.datasets[first_dataset - 1], **kwargs)
         # We begin with second file, first one is in previous
         for file_name in self.datasets[first_dataset:]:

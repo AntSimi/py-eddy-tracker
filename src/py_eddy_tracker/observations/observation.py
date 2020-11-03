@@ -3,7 +3,18 @@
 Base class to manage eddy observation
 """
 import logging
+from datetime import datetime
+from tarfile import ExFileObject
+from tokenize import TokenError
+
 import zarr
+from Polygon import Polygon
+from matplotlib.cm import get_cmap
+from matplotlib.collections import PolyCollection
+from matplotlib.colors import Normalize
+from matplotlib.path import Path as BasePath
+from netCDF4 import Dataset
+from numba import njit, types as numba_types
 from numpy import (
     zeros,
     where,
@@ -29,18 +40,9 @@ from numpy import (
     digitize,
     percentile,
 )
-from netCDF4 import Dataset
-from datetime import datetime
-from numba import njit, types as numba_types
-from Polygon import Polygon
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
-from tokenize import TokenError
-from tarfile import ExFileObject
-from matplotlib.path import Path as BasePath
-from matplotlib.collections import PolyCollection
-from matplotlib.cm import get_cmap
-from matplotlib.colors import Normalize
+
 from .. import VAR_DESCR, VAR_DESCR_inv, __version__
 from ..generic import (
     distance_grid,
@@ -157,26 +159,10 @@ class EddiesObservations(object):
                 raise Exception("Unknown element : %s" % elt)
         self.observations = zeros(size, dtype=self.dtype)
         self.sign_type = None
-
-    @property
-    def longitude(self):
-        return self.observations["lon"]
-
-    @property
-    def latitude(self):
-        return self.observations["lat"]
-
-    @property
-    def time(self):
-        return self.observations["time"]
-
+ 
     @property
     def tracks(self):
         return self.observations["track"]
-
-    @property
-    def observation_number(self):
-        return self.observations["n"]
 
     @property
     def sign_legend(self):
@@ -266,10 +252,34 @@ class EddiesObservations(object):
         Mean effective radius (km): {self.box_display(self.hist('radius_e', 'lat', bins_lat, mean=True) / 1000.)}
         Mean amplitude (cm)       : {self.box_display(self.hist('amplitude', 'lat', bins_lat, mean=True) * 100.)}"""
 
+    def __dir__(self):
+        """Provide method name lookup and completion.
+        """
+        base = set(dir(type(self)))
+        intern_name = set(self.elements)
+        extern_name = set([VAR_DESCR[k]['nc_name'] for k in intern_name])
+        # Must be check in init not here
+        if base & intern_name:
+            logger.warning("Some variable name have a common name with class attrs: %s", base & intern_name)
+        if base & extern_name:
+            logger.warning("Some variable name have a common name with class attrs: %s", base & extern_name)
+        return sorted(base.union(intern_name).union(extern_name))
+
     def __getitem__(self, attr):
         if attr in self.elements:
             return self.observations[attr]
+        elif attr in VAR_DESCR_inv:
+            return self.observations[VAR_DESCR_inv[attr]]
         raise KeyError("%s unknown" % attr)
+
+    def __getattr__(self, attr):
+        if attr in self.elements:
+            return self.observations[attr]
+        elif attr in VAR_DESCR_inv:
+            return self.observations[VAR_DESCR_inv[attr]]
+        raise AttributeError(
+            "{!r} object has no attribute {!r}".format(type(self).__name__, attr)
+        )
 
     @classmethod
     def needed_variable(cls):
@@ -310,7 +320,7 @@ class EddiesObservations(object):
         new.observations["type_cyc"] = self.sign_type
         return new
 
-    def circle_contour(self):
+    def circle_contour(self, only_virtual=False):
         """
         Set contours as a circles from radius and center data.
 
@@ -321,6 +331,8 @@ class EddiesObservations(object):
         radius_s = "contour_lon_s" in self.obs.dtype.names
         radius_e = "contour_lon_e" in self.obs.dtype.names
         for i, obs in enumerate(self):
+            if only_virtual and not obs["virtual"]:
+                continue
             x, y = obs["lon"], obs["lat"]
             if radius_s:
                 r_s = obs["radius_s"]
@@ -413,7 +425,7 @@ class EddiesObservations(object):
 
     @property
     def obs(self):
-        """Return an array observations.
+        """Return observations.
         """
         return self.observations
 
@@ -974,13 +986,13 @@ class EddiesObservations(object):
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
-        """Return the cost function between two obs
+        """Return the cost function between two obs.
 
         .. math::
 
-            cost = \sqrt{ ( {Amp_{_{in}} - Amp_{_{out}} \over Amp_{_{in}} } ) ^2 +
-              ( {Rspeed_{_{in}} - Rspeed_{_{out}} \over Rspeed_{_{in}} }) ^2 + 
-              ( {distance \over 125} ) ^2
+            cost = \sqrt{({Amp_{_{in}} - Amp_{_{out}} \over Amp_{_{in}}}) ^2 +
+              ({Rspeed_{_{in}} - Rspeed_{_{out}} \over Rspeed_{_{in}}}) ^2 + 
+              ({distance \over 125}) ^2
             }
 
         :param records_in: starting observations
@@ -1468,15 +1480,14 @@ class EddiesObservations(object):
         Extract geographically with a bounding box.
 
         :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
+        :param dict kwargs: look at :py:meth:`extract_with_mask`
+        :return: Return all eddy tracks which are in bounds
+        :rtype: EddiesObservations
+
         .. code-block:: python
 
             area = dict(llcrnrlon=x0, llcrnrlat=y0, urcrnrlon=x1, urcrnrlat=y1)
 
-	:param dict kwargs: look at :py:meth:`extract_with_mask`
-        :return: Return all eddy tracks which are in bounds
-        :rtype: EddiesObservations
-
-        
         .. minigallery:: py_eddy_tracker.EddiesObservations.extract_with_area
         """
         mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])

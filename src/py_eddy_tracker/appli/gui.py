@@ -15,7 +15,9 @@ from ..gui import GUI
 
 
 class Anim:
-    def __init__(self, eddy, intern=False, sleep_event=0.1, graphic_information=False, **kwargs):
+    def __init__(
+        self, eddy, intern=False, sleep_event=0.1, graphic_information=False, **kwargs
+    ):
         self.eddy = eddy
         x_name, y_name = eddy.intern(intern)
         self.t, self.x, self.y = eddy.time, eddy[x_name], eddy[y_name]

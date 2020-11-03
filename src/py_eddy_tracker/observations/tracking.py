@@ -20,7 +20,6 @@ from numpy import (
     arctan2,
     radians,
     degrees,
-    tan,
 )
 from datetime import datetime, timedelta
 from numba import njit

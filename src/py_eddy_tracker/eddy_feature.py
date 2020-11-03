@@ -45,7 +45,16 @@ class Amplitude(object):
         "mle",
     )
 
-    def __init__(self, contour, contour_height, data, interval, mle=1, nb_step_min=2, nb_step_to_be_mle=2):
+    def __init__(
+        self,
+        contour,
+        contour_height,
+        data,
+        interval,
+        mle=1,
+        nb_step_min=2,
+        nb_step_to_be_mle=2,
+    ):
         """
         Create amplitude object
 
@@ -132,7 +141,8 @@ class Amplitude(object):
             else:
                 # Verify if several extrema are seriously below contour
                 nb_real_extrema = (
-                    (level - self.grid_extract.data[lmi_i, lmi_j]) >= self.interval_min_secondary
+                    (level - self.grid_extract.data[lmi_i, lmi_j])
+                    >= self.interval_min_secondary
                 ).sum()
                 if nb_real_extrema > self.mle:
                     return False
@@ -174,7 +184,8 @@ class Amplitude(object):
             else:
                 # Verify if several extrema are seriously above contour
                 nb_real_extrema = (
-                    (self.grid_extract.data[lmi_i, lmi_j] - level) >= self.interval_min_secondary
+                    (self.grid_extract.data[lmi_i, lmi_j] - level)
+                    >= self.interval_min_secondary
                 ).sum()
                 if nb_real_extrema > self.mle:
                     return False

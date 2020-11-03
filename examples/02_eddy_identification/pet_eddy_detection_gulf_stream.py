@@ -54,7 +54,7 @@ update_axes(ax, m)
 
 # %%
 # Get geostrophic speed u,v
-# -------
+# -------------------------
 # U/V are deduced from ADT, this algortihm is not ok near the equator (~+- 2°)
 g.add_uv("adt")
 
@@ -91,7 +91,7 @@ update_axes(ax)
 
 # %%
 # Post analysis
-# ------------
+# -------------
 # Contours can be rejected for several reasons (shape error to high, several extremum in contour, ...)
 ax = start_axes("ADT rejected contours")
 g.contours.display(ax, only_unused=True, lw=0.25)
@@ -123,7 +123,11 @@ ax = start_axes("ADT rejected contours containing eddies")
 g.contours.label_contour_unused_which_contain_eddies(a)
 g.contours.label_contour_unused_which_contain_eddies(c)
 g.contours.display(
-    ax, only_contain_eddies=True, color="k", lw=1, label="Could be a contour of interaction"
+    ax,
+    only_contain_eddies=True,
+    color="k",
+    lw=1,
+    label="Could be a contour of interaction",
 )
 a.display(ax, color="r", linewidth=0.75, label="Anticyclonic", ref=-10)
 c.display(ax, color="b", linewidth=0.75, label="Cyclonic", ref=-10)
@@ -133,7 +137,8 @@ update_axes(ax)
 # %%
 # Output
 # ------
-# When displaying the detected eddies, dashed lines are for effective contour, solide lines for the contour of the maximum mean speed. See figure 1 of https://doi.org/10.1175/JTECH-D-14-00019.1
+# When displaying the detected eddies, dashed lines are for effective contour, solide lines for the contour of the
+# maximum mean speed. See figure 1 of https://doi.org/10.1175/JTECH-D-14-00019.1
 
 ax = start_axes("Eddies detected")
 a.display(ax, color="r", linewidth=0.75, label="Anticyclonic", ref=-10)

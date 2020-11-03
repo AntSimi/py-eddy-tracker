@@ -57,7 +57,7 @@ update_axes(ax, m)
 
 # %%
 # Amplitude and Speed Radius distributions
-# -----------------------
+# ----------------------------------------
 fig = plt.figure(figsize=(12, 5))
 ax_a = fig.add_subplot(121, xlabel="Amplitude (cm)")
 ax_r = fig.add_subplot(122, xlabel="Speed Radius (km)")
