@@ -257,12 +257,18 @@ class EddiesObservations(object):
         """
         base = set(dir(type(self)))
         intern_name = set(self.elements)
-        extern_name = set([VAR_DESCR[k]['nc_name'] for k in intern_name])
+        extern_name = set([VAR_DESCR[k]["nc_name"] for k in intern_name])
         # Must be check in init not here
         if base & intern_name:
-            logger.warning("Some variable name have a common name with class attrs: %s", base & intern_name)
+            logger.warning(
+                "Some variable name have a common name with class attrs: %s",
+                base & intern_name,
+            )
         if base & extern_name:
-            logger.warning("Some variable name have a common name with class attrs: %s", base & extern_name)
+            logger.warning(
+                "Some variable name have a common name with class attrs: %s",
+                base & extern_name,
+            )
         return sorted(base.union(intern_name).union(extern_name))
 
     def __getitem__(self, attr):
@@ -1524,9 +1530,9 @@ class EddiesObservations(object):
     def scatter(self, ax, name=None, ref=None, factor=1, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
-        :param str, None name:
+        :param str,array,None name:
             variable used to fill the contour, if None all elements have the same color
-        :param float, None ref: if define use like west bound ?
+        :param float,None ref: if define use like west bound ?
         :param float factor: multiply value by
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
         :return: scatter mappable
@@ -1538,7 +1544,8 @@ class EddiesObservations(object):
             x = (x - ref) % 360 + ref
         kwargs = kwargs.copy()
         if name is not None and "c" not in kwargs:
-            kwargs["c"] = self[name] * factor
+            v = self[name] if isinstance(name, str) else name
+            kwargs["c"] = v * factor
         return ax.scatter(x, self.latitude, **kwargs)
 
     def filled(
@@ -1556,7 +1563,7 @@ class EddiesObservations(object):
     ):
         """
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
-        :param str,array varname, None: variable used to fill the contours, or an array of same size than obs
+        :param str,array,None varname: variable used to fill the contours, or an array of same size than obs
         :param float,None ref: if define use like west bound?
         :param bool intern: if True draw speed contours instead of effective contours
         :param str cmap: matplotlib colormap name

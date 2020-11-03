@@ -349,7 +349,7 @@ def split_line(x, y, i):
 @njit(cache=True)
 def wrap_longitude(x, y, ref, cut=False):
     """
-    Will wrap contiguous longitude with reference like west bound.
+    Will wrap contiguous longitude with reference as west bound.
 
     :param array x:
     :param array y:
