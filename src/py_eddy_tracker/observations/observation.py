@@ -53,6 +53,7 @@ from ..generic import (
     reverse_index,
     bbox_indice_regular,
     hist_numba,
+    build_index,
 )
 from ..poly import (
     bbox_intersection,
@@ -159,7 +160,7 @@ class EddiesObservations(object):
                 raise Exception("Unknown element : %s" % elt)
         self.observations = zeros(size, dtype=self.dtype)
         self.sign_type = None
- 
+
     @property
     def tracks(self):
         return self.observations["track"]
@@ -452,18 +453,22 @@ class EddiesObservations(object):
         i = digitize(x, bins) - 1
         # Not monotonous
         if (d < 0).any():
-            for i_ in unique(i):
-                if i_ == -1 or i_ == nb_bins:
+            i_sort = i.argsort()
+            i0, i1, _ = build_index(i[i_sort])
+            m = ~(i0 == i1)
+            i0, i1 = i0[m], i1[m]
+            for i0_, i1_ in zip(i0, i1):
+                i_bins = i[i_sort[i0_]]
+                if i_bins == -1 or i_bins == nb_bins:
                     continue
-                index = where(i_ == i)[0]
-                yield index, bins[i_], bins[i_ + 1]
+                yield i_sort[i0_:i1_], bins[i_bins], bins[i_bins + 1]
         else:
-            # TODO : need improvement
-            for i_ in unique(i):
-                if i_ == -1 or i_ == nb_bins:
-                    continue
-                index = where(i_ == i)[0]
-                yield slice(index[0], index[-1] + 1), bins[i_], bins[i_ + 1]
+            i0, i1, _ = build_index(i)
+            m = ~(i0 == i1)
+            i0, i1 = i0[m], i1[m]
+            for i0_, i1_ in zip(i0, i1):
+                i_bins = i[i0_]
+                yield slice(i0_, i1_), bins[i_bins], bins[i_bins + 1]
 
     def align_on(self, other, var_name="time", **kwargs):
         """
@@ -703,6 +708,7 @@ class EddiesObservations(object):
             nb_obs = len(h_nc.dimensions[obs_dim])
             if indexs is not None and obs_dim in indexs:
                 sl = indexs[obs_dim]
+                sl = slice(sl.start, min(sl.stop, nb_obs))
                 if sl.stop is not None:
                     nb_obs = sl.stop
                 if sl.start is not None:
