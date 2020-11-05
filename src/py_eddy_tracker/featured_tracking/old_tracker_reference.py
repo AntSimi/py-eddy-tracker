@@ -22,13 +22,7 @@ class CheltonTracker(Model):
         # Compute Parameter of ellips
         minor, major = 1.05, 1.5
         y = self.basic_formula_ellips_major_axis(
-            self.obs["lat"],
-            degrees=True,
-            c0=minor,
-            cmin=minor,
-            cmax=major,
-            lat1=23,
-            lat2=5,
+            self.lat, degrees=True, c0=minor, cmin=minor, cmax=major, lat1=23, lat2=5,
         )
         # mask from ellips
         mask = self.shifted_ellipsoid_degrees_mask(
@@ -37,11 +31,7 @@ class CheltonTracker(Model):
 
         # We check ratio (maybe not usefull)
         check_ratio(
-            mask,
-            self.obs["amplitude"],
-            other.obs["amplitude"],
-            self.obs["radius_e"],
-            other.obs["radius_e"],
+            mask, self.amplitude, other.amplitude, self.radius_e, other.radius_e,
         )
         indexs_closest = where(mask)
         mask[indexs_closest] = self.across_ground(
@@ -76,7 +66,7 @@ class CheltonTracker(Model):
             for i in where(nb_link > 1)[0]:
                 m = i == i_other
                 multiple_in = i_self[m]
-                i_keep = self.obs["amplitude"][multiple_in].argmax()
+                i_keep = self.amplitude[multiple_in].argmax()
                 m[where(m)[0][i_keep]] = False
                 mask[m] = False
 

@@ -116,7 +116,7 @@ class Network:
         if display_iteration:
             print()
         eddies = eddies.add_fields(("track",))
-        eddies.obs["track"][new_i] = group
+        eddies.track[new_i] = group
         return eddies
 
 

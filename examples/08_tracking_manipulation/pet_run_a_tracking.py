@@ -28,8 +28,8 @@ c.track()
 c.prepare_merging()
 # We have now an eddy object
 eddies_area_tracker = c.merge(raw_data=False)
-eddies_area_tracker["virtual"][:] = eddies_area_tracker["time"] == 0
-eddies_area_tracker.filled_by_interpolation(eddies_area_tracker["virtual"] == 1)
+eddies_area_tracker.virtual[:] = eddies_area_tracker.time == 0
+eddies_area_tracker.filled_by_interpolation(eddies_area_tracker.virtual == 1)
 
 # %%
 # We run a traking with default tracker
@@ -37,8 +37,8 @@ c = Correspondances(datasets=file_objects, virtual=3)
 c.track()
 c.prepare_merging()
 eddies_default_tracker = c.merge(raw_data=False)
-eddies_default_tracker["virtual"][:] = eddies_default_tracker["time"] == 0
-eddies_default_tracker.filled_by_interpolation(eddies_default_tracker["virtual"] == 1)
+eddies_default_tracker.virtual[:] = eddies_default_tracker.time == 0
+eddies_default_tracker.filled_by_interpolation(eddies_default_tracker.virtual == 1)
 
 # %%
 # Start GUI to compare tracking

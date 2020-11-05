@@ -39,6 +39,7 @@ from numpy import (
     histogram,
     digitize,
     percentile,
+    array_equal,
 )
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
@@ -163,7 +164,14 @@ class EddiesObservations(object):
 
     @property
     def tracks(self):
-        return self.observations["track"]
+        return self.track
+
+    def __eq__(self, other):
+        if self.sign_type != other.sign_type:
+            return False
+        if self.dtype != other.dtype:
+            return False
+        return array_equal(self.obs, other.obs)
 
     @property
     def sign_legend(self):
@@ -231,8 +239,8 @@ class EddiesObservations(object):
         nb_obs = self.observations.shape[0]
 
         return f"""    | {nb_obs} observations from {t0} to {t1} ({period} days, ~{nb_obs / period:.0f} obs/day)
-    |   Speed area      : {self["speed_area"].sum() / period / 1e12:.2f} Mkm²/day
-    |   Effective area  : {self["effective_area"].sum() / period / 1e12:.2f} Mkm²/day
+    |   Speed area      : {self.speed_area.sum() / period / 1e12:.2f} Mkm²/day
+    |   Effective area  : {self.effective_area.sum() / period / 1e12:.2f} Mkm²/day
     ----Distribution in Amplitude:
     |   Amplitude bounds (cm)  {self.box_display(bins_amplitude)}
     |   Percent of eddies         : {
@@ -272,18 +280,18 @@ class EddiesObservations(object):
             )
         return sorted(base.union(intern_name).union(extern_name))
 
-    def __getitem__(self, attr):
+    def __getitem__(self, attr: str):
         if attr in self.elements:
-            return self.observations[attr]
+            return self.obs[attr]
         elif attr in VAR_DESCR_inv:
-            return self.observations[VAR_DESCR_inv[attr]]
+            return self.obs[VAR_DESCR_inv[attr]]
         raise KeyError("%s unknown" % attr)
 
     def __getattr__(self, attr):
         if attr in self.elements:
-            return self.observations[attr]
+            return self.obs[attr]
         elif attr in VAR_DESCR_inv:
-            return self.observations[VAR_DESCR_inv[attr]]
+            return self.obs[VAR_DESCR_inv[attr]]
         raise AttributeError(
             "{!r} object has no attribute {!r}".format(type(self).__name__, attr)
         )
@@ -324,7 +332,7 @@ class EddiesObservations(object):
 
     def add_rotation_type(self):
         new = self.add_fields(("type_cyc",))
-        new.observations["type_cyc"] = self.sign_type
+        new.type_cyc = self.sign_type
         return new
 
     def circle_contour(self, only_virtual=False):
@@ -422,8 +430,8 @@ class EddiesObservations(object):
             if key in other_keys:
                 eddies.obs[key][nb_obs_self:] = other.obs[key][:]
         if "track" in other_keys and "track" in self_keys:
-            last_track = eddies.obs["track"][nb_obs_self - 1] + 1
-            eddies.obs["track"][nb_obs_self:] += last_track
+            last_track = eddies.track[nb_obs_self - 1] + 1
+            eddies.track[nb_obs_self:] += last_track
         eddies.sign_type = self.sign_type
         return eddies
 
@@ -443,11 +451,11 @@ class EddiesObservations(object):
         for obs in self.obs:
             yield obs
 
-    def iter_on(self, xname, bins=None):
+    def iter_on(self, xname: str, bins=None):
         """
         Yield observation group for each bin.
 
-        :param str varname:
+        :param str xname:
         :param array bins: bounds of each bin ,
         :return: Group observations
         :rtype: self.__class__
@@ -530,12 +538,10 @@ class EddiesObservations(object):
     def distance(self, other):
         """ Use haversine distance for distance matrix between every self and
         other eddies."""
-        return distance_grid(
-            self.obs["lon"], self.obs["lat"], other.obs["lon"], other.obs["lat"]
-        )
+        return distance_grid(self.lon, self.lat, other.lon, other.lat)
 
     @staticmethod
-    def new_like(eddies, new_size):
+    def new_like(eddies, new_size: int):
         return eddies.__class__(
             new_size,
             track_extra_variables=eddies.track_extra_variables,
@@ -929,7 +935,7 @@ class EddiesObservations(object):
         :param float cmin: 0 < cmin < 1, return only couples with score >= cmin
         :param dict kwargs: look at :py:meth:`vertice_overlap`
         :return: return the indexes of the eddies in self coupled with eddies in
-        other and their associated score
+            other and their associated score
         :rtype: (array(int), array(int), array(float))
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.match
@@ -998,12 +1004,12 @@ class EddiesObservations(object):
 
     @staticmethod
     def cost_function(records_in, records_out, distance):
-        """Return the cost function between two obs.
+        r"""Return the cost function between two obs.
 
         .. math::
 
             cost = \sqrt{({Amp_{_{in}} - Amp_{_{out}} \over Amp_{_{in}}}) ^2 +
-              ({Rspeed_{_{in}} - Rspeed_{_{out}} \over Rspeed_{_{in}}}) ^2 + 
+              ({Rspeed_{_{in}} - Rspeed_{_{out}} \over Rspeed_{_{in}}}) ^2 +
               ({distance \over 125}) ^2
             }
 
@@ -1027,12 +1033,7 @@ class EddiesObservations(object):
 
     def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
         return shifted_ellipsoid_degrees_mask2(
-            self.obs["lon"],
-            self.obs["lat"],
-            other.obs["lon"],
-            other.obs["lat"],
-            minor,
-            major,
+            self.lon, self.lat, other.lon, other.lat, minor, major,
         )
 
     def fixed_ellipsoid_mask(
@@ -1056,10 +1057,10 @@ class EddiesObservations(object):
                 minor = minor[index_self]
             # focal distance
             f_degree = ((major ** 2 - minor ** 2) ** 0.5) / (
-                111.2 * cos(radians(self.obs["lat"][index_self]))
+                111.2 * cos(radians(self.lat[index_self]))
             )
 
-            lon_self = self.obs["lon"][index_self]
+            lon_self = self.lon[index_self]
             if shifted_ellips:
                 x_center_ellips = lon_self - (major - minor) / 2
             else:
@@ -1070,21 +1071,21 @@ class EddiesObservations(object):
 
             dist_left_f = distance(
                 lon_left_f,
-                self.obs["lat"][index_self],
-                other.obs["lon"][index_other],
-                other.obs["lat"][index_other],
+                self.lat[index_self],
+                other.lon[index_other],
+                other.lat[index_other],
             )
             dist_right_f = distance(
                 lon_right_f,
-                self.obs["lat"][index_self],
-                other.obs["lon"][index_other],
-                other.obs["lat"][index_other],
+                self.lat[index_self],
+                other.lon[index_other],
+                other.lat[index_other],
             )
             dist_2a = (dist_left_f + dist_right_f) / 1000
 
             accepted[index_other, index_self] = dist_2a < (2 * major)
             if only_east:
-                d_lon = (other.obs["lon"][index_other] - lon_self + 180) % 360 - 180
+                d_lon = (other.lon[index_other] - lon_self + 180) % 360 - 180
                 mask = d_lon < 0
                 accepted[index_other[mask], index_self[mask]] = False
         return accepted.T
@@ -1275,7 +1276,7 @@ class EddiesObservations(object):
                     dimensions=VAR_DESCR[name]["nc_dims"],
                 ),
                 VAR_DESCR[name]["nc_attr"],
-                self.observations[ori_name],
+                self.obs[ori_name],
                 scale_factor=VAR_DESCR[name].get("scale_factor", None),
                 add_offset=VAR_DESCR[name].get("add_offset", None),
                 filters=VAR_DESCR[name].get("filters", None),
@@ -1324,7 +1325,7 @@ class EddiesObservations(object):
                     dimensions=VAR_DESCR[name]["nc_dims"],
                 ),
                 VAR_DESCR[name]["nc_attr"],
-                self.observations[ori_name],
+                self.obs[ori_name],
                 scale_factor=VAR_DESCR[name].get("scale_factor", None),
                 add_offset=VAR_DESCR[name].get("add_offset", None),
                 **kwargs,
@@ -1649,11 +1650,11 @@ class EddiesObservations(object):
         .. minigallery:: py_eddy_tracker.EddiesObservations.display
         """
         if not extern_only:
-            lon_s = flatten_line_matrix(self.obs["contour_lon_s"])
-            lat_s = flatten_line_matrix(self.obs["contour_lat_s"])
+            lon_s = flatten_line_matrix(self.contour_lon_s)
+            lat_s = flatten_line_matrix(self.contour_lat_s)
         if not intern_only:
-            lon_e = flatten_line_matrix(self.obs["contour_lon_e"])
-            lat_e = flatten_line_matrix(self.obs["contour_lat_e"])
+            lon_e = flatten_line_matrix(self.contour_lon_e)
+            lat_e = flatten_line_matrix(self.contour_lat_e)
         if nobs and "label" in kwargs:
             kwargs["label"] += " (%s observations)" % len(self)
         kwargs_e = kwargs.copy()
@@ -1677,7 +1678,7 @@ class EddiesObservations(object):
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.first_obs
         """
-        return self.extract_with_mask(self["n"] == 0)
+        return self.extract_with_mask(self.n == 0)
 
     def last_obs(self):
         """
@@ -1689,7 +1690,7 @@ class EddiesObservations(object):
         """
         m = zeros(len(self), dtype="bool")
         m[-1] = True
-        m[:-1][self["n"][1:] == 0] = True
+        m[:-1][self.n[1:] == 0] = True
         return self.extract_with_mask(m)
 
     def is_convex(self, intern=False):

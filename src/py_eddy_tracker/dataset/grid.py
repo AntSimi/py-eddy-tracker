@@ -551,15 +551,16 @@ class GridDataset(object):
 
     def high_filter(self, grid_name, w_cut, **kwargs):
         """Return the grid high-pass filtered, by substracting to the grid the low-pass filter (default: order=1)
+
         :param grid_name: the name of the grid
         :param int, w_cut: the half-power wavelength cutoff (km)
-
         """
         result = self._low_filter(grid_name, w_cut, **kwargs)
         self.vars[grid_name] -= result
 
     def low_filter(self, grid_name, w_cut, **kwargs):
         """Return the grid low-pass filtered (default: order=1)
+
         :param grid_name: the name of the grid
         :param int, w_cut: the half-power wavelength cutoff (km)
         """
@@ -804,28 +805,25 @@ class GridDataset(object):
                         track_array_variables=sampling,
                         array_variables=array_variables,
                     )
-
-                    obs.obs["height_max_speed_contour"] = self.contours.cvalues[
-                        i_max_speed
-                    ]
-                    obs.obs["height_external_contour"] = cvalues
-                    obs.obs["height_inner_contour"] = self.contours.cvalues[i_inner]
+                    obs.height_max_speed_contour[:] = self.contours.cvalues[i_max_speed]
+                    obs.height_external_contour[:] = cvalues
+                    obs.height_inner_contour[:] = self.contours.cvalues[i_inner]
                     array_size = speed_array.shape[0]
-                    obs.obs["nb_contour_selected"] = array_size
+                    obs.nb_contour_selected[:] = array_size
                     if speed_array.shape[0] == 1:
-                        obs.obs["uavg_profile"][:] = speed_array[0]
+                        obs.uavg_profile[:] = speed_array[0]
                     else:
-                        obs.obs["uavg_profile"] = raw_resample(speed_array, sampling)
-                    obs.obs["amplitude"] = amp.amplitude
-                    obs.obs["speed_average"] = max_average_speed
-                    obs.obs["num_point_e"] = contour.lon.shape[0]
+                        obs.uavg_profile[:] = raw_resample(speed_array, sampling)
+                    obs.amplitude[:] = amp.amplitude
+                    obs.speed_average[:] = max_average_speed
+                    obs.num_point_e[:] = contour.lon.shape[0]
                     xy_e = uniform_resample(contour.lon, contour.lat, **out_sampling)
-                    obs.obs["contour_lon_e"], obs.obs["contour_lat_e"] = xy_e
-                    obs.obs["num_point_s"] = speed_contour.lon.shape[0]
+                    obs.contour_lon_e[:], obs.contour_lat_e[:] = xy_e
+                    obs.num_point_s[:] = speed_contour.lon.shape[0]
                     xy_s = uniform_resample(
                         speed_contour.lon, speed_contour.lat, **out_sampling
                     )
-                    obs.obs["contour_lon_s"], obs.obs["contour_lat_s"] = xy_s
+                    obs.contour_lon_s[:], obs.contour_lat_s[:] = xy_s
 
                     # FIXME : we use a contour without resampling
                     # First, get position based on innermost contour
@@ -841,20 +839,20 @@ class GridDataset(object):
                         create_vertice(*xy_e)
                     )
 
-                    obs.obs["radius_s"] = eddy_radius_s
-                    obs.obs["radius_e"] = eddy_radius_e
-                    obs.obs["shape_error_e"] = aerr_e
-                    obs.obs["shape_error_s"] = aerr_s
-                    obs.obs["speed_area"] = poly_area(
+                    obs.radius_s[:] = eddy_radius_s
+                    obs.radius_e[:] = eddy_radius_e
+                    obs.shape_error_e[:] = aerr_e
+                    obs.shape_error_s[:] = aerr_s
+                    obs.speed_area[:] = poly_area(
                         *coordinates_to_local(*xy_s, lon0=centlon_s, lat0=centlat_s)
                     )
-                    obs.obs["effective_area"] = poly_area(
+                    obs.effective_area[:] = poly_area(
                         *coordinates_to_local(*xy_e, lon0=centlon_s, lat0=centlat_s)
                     )
-                    obs.obs["lon"] = centlon_s
-                    obs.obs["lat"] = centlat_s
-                    obs.obs["lon_max"] = centlon_i
-                    obs.obs["lat_max"] = centlat_i
+                    obs.lon[:] = centlon_s
+                    obs.lat[:] = centlat_s
+                    obs.lon_max[:] = centlon_i
+                    obs.lat_max[:] = centlat_i
                     if aerr > 99.9 or aerr_s > 99.9:
                         logger.warning(
                             "Strange shape at this step! shape_error : %f, %f",
@@ -874,18 +872,14 @@ class GridDataset(object):
             else:
                 eddies = EddiesObservations.concatenate(eddies)
             eddies.sign_type = 1 if anticyclonic_search else -1
-            eddies.obs["time"] = (date - datetime(1950, 1, 1)).total_seconds() / 86400.0
+            eddies.time[:] = (date - datetime(1950, 1, 1)).total_seconds() / 86400.0
 
             # normalization longitude between 0 - 360, because storage have an offset on 180
-            eddies.obs["lon_max"] %= 360
-            eddies.obs["lon"] %= 360
-            ref = eddies.obs["lon"] - 180
-            eddies.obs["contour_lon_e"] = (
-                (eddies.obs["contour_lon_e"].T - ref) % 360 + ref
-            ).T
-            eddies.obs["contour_lon_s"] = (
-                (eddies.obs["contour_lon_s"].T - ref) % 360 + ref
-            ).T
+            eddies.lon_max[:] %= 360
+            eddies.lon[:] %= 360
+            ref = eddies.lon - 180
+            eddies.contour_lon_e[:] = ((eddies.contour_lon_e.T - ref) % 360 + ref).T
+            eddies.contour_lon_s[:] = ((eddies.contour_lon_s.T - ref) % 360 + ref).T
             a_and_c.append(eddies)
 
         if in_h_unit is not None:

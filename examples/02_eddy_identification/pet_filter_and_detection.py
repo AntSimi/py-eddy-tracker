@@ -62,20 +62,20 @@ fig = plt.figure(figsize=(12, 5))
 ax_a = fig.add_subplot(121, xlabel="Amplitude (cm)")
 ax_r = fig.add_subplot(122, xlabel="Speed Radius (km)")
 ax_a.hist(
-    merge_f["amplitude"] * 100,
+    merge_f.amplitude * 100,
     bins=arange(0.0005, 100, 1),
     label="Eddies in the filtered grid",
     histtype="step",
 )
 ax_a.hist(
-    merge_t["amplitude"] * 100,
+    merge_t.amplitude * 100,
     bins=arange(0.0005, 100, 1),
     label="Eddies without filter",
     histtype="step",
 )
 ax_a.set_xlim(0, 10)
-ax_r.hist(merge_f["radius_s"] / 1000.0, bins=arange(0, 300, 5), histtype="step")
-ax_r.hist(merge_t["radius_s"] / 1000.0, bins=arange(0, 300, 5), histtype="step")
+ax_r.hist(merge_f.radius_s / 1000.0, bins=arange(0, 300, 5), histtype="step")
+ax_r.hist(merge_t.radius_s / 1000.0, bins=arange(0, 300, 5), histtype="step")
 ax_r.set_xlim(0, 100)
 ax_a.legend()
 

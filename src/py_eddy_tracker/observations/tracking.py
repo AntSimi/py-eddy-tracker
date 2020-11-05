@@ -86,7 +86,7 @@ class TrackEddiesObservations(EddiesObservations):
         period = t1 - t0 + 1
         nb = self.nb_obs_by_track
         nb_obs = self.observations.shape[0]
-        m = self["virtual"].astype("bool")
+        m = self.virtual.astype("bool")
         nb_m = m.sum()
         bins_t = (1, 30, 90, 180, 270, 365, 1000, 10000)
         nb_tracks_by_t = histogram(nb, bins=bins_t)[0]
@@ -102,8 +102,8 @@ class TrackEddiesObservations(EddiesObservations):
     | {self.nb_tracks} tracks ({
         nb_obs / self.nb_tracks:.2f} obs/tracks, shorter {nb[nb!=0].min()} obs, longer {nb.max()} obs)
     |   {nb_m} filled observations ({nb_m / self.nb_tracks:.2f} obs/tracks, {nb_m / nb_obs * 100:.2f} % of total)
-    |   Intepolated speed area      : {self["speed_area"][m].sum() / period / 1e12:.2f} Mkm²/day
-    |   Intepolated effective area  : {self["effective_area"][m].sum() / period / 1e12:.2f} Mkm²/day
+    |   Intepolated speed area      : {self.speed_area[m].sum() / period / 1e12:.2f} Mkm²/day
+    |   Intepolated effective area  : {self.effective_area[m].sum() / period / 1e12:.2f} Mkm²/day
     |   Distance by day             : Mean {d[m_last].mean():.2f} , Median {median(d[m_last]):.2f} km/day
     |   Distance by track           : Mean {cum_d[~m_last].mean():.2f} , Median {median(cum_d[~m_last]):.2f} km/track
     ----Distribution in lifetime:
@@ -160,13 +160,13 @@ class TrackEddiesObservations(EddiesObservations):
                 continue
             # to normalize longitude before interpolation
             if var == "lon":
-                lon = self.obs[var]
-                first = where(self.obs["n"] == 0)[0]
+                lon = self.lon
+                first = where(self.n == 0)[0]
                 nb_obs = empty(first.shape, dtype="u4")
                 nb_obs[:-1] = first[1:] - first[:-1]
                 nb_obs[-1] = lon.shape[0] - first[-1]
                 lon0 = (lon[first] - 180).repeat(nb_obs)
-                self.obs[var] = (lon - lon0) % 360 + lon0
+                self.lon[:] = (lon - lon0) % 360 + lon0
             self.obs[var][mask] = interp(
                 index[mask], index[~mask], self.obs[var][~mask]
             )
@@ -184,11 +184,11 @@ class TrackEddiesObservations(EddiesObservations):
             var = field[0]
             eddies.obs[var] = self.obs[var][mask]
         if compress_id:
-            list_id = unique(eddies.obs["track"])
+            list_id = unique(eddies.obs.track)
             list_id.sort()
             id_translate = arange(list_id.max() + 1)
             id_translate[list_id] = arange(len(list_id)) + 1
-            eddies.obs["track"] = id_translate[eddies.obs["track"]]
+            eddies.track = id_translate[eddies.track]
         return eddies
 
     @property
@@ -340,7 +340,7 @@ class TrackEddiesObservations(EddiesObservations):
         )
         data["lon"] = self.longitude - self.longitude % res
         data["lat"] = self.latitude - self.latitude % res
-        data["track"] = self.obs["track"]
+        data["track"] = self.track
         _, indexs = unique(data, return_index=True)
         mask = zeros(self.obs.shape, dtype="bool")
         mask[indexs] = True
@@ -391,7 +391,7 @@ class TrackEddiesObservations(EddiesObservations):
         return self.new_like(self, 0)
 
     def loess_filter(self, half_window, xfield, yfield, inplace=True):
-        track = self.obs["track"]
+        track = self.track
         x = self.obs[xfield]
         y = self.obs[yfield]
         result = track_loess_filter(half_window, x, y, track)
@@ -400,7 +400,7 @@ class TrackEddiesObservations(EddiesObservations):
             return self
 
     def median_filter(self, half_window, xfield, yfield, inplace=True):
-        track = self.obs["track"]
+        track = self.track
         x = self.obs[xfield]
         y = self.obs[yfield]
         result = track_median_filter(half_window, x, y, track)
@@ -443,7 +443,7 @@ class TrackEddiesObservations(EddiesObservations):
 
         if full_path:
             if reject_virtual:
-                mask *= ~self.obs["virtual"].astype("bool")
+                mask *= ~self.virtual.astype("bool")
             tracks = unique(self.tracks[mask])
             mask = self.get_mask_from_id(tracks)
         elif remove_incomplete:
@@ -461,11 +461,11 @@ class TrackEddiesObservations(EddiesObservations):
                 var = field[0]
                 new.obs[var] = self.obs[var][mask]
             if compress_id:
-                list_id = unique(new.obs["track"])
+                list_id = unique(new.track)
                 list_id.sort()
                 id_translate = arange(list_id.max() + 1)
                 id_translate[list_id] = arange(len(list_id)) + 1
-                new.obs["track"] = id_translate[new.obs["track"]]
+                new.track = id_translate[new.track]
         return new
 
     def plot(self, ax, ref=None, **kwargs):
