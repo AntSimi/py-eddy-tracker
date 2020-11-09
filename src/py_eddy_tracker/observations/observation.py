@@ -1688,24 +1688,29 @@ class EddiesObservations(object):
         c.norm = Normalize(vmin=vmin, vmax=vmax)
         return c
 
-    def bins_stat(self, xname, bins=None, yname=None, method=None):
+    def bins_stat(self, xname, bins=None, yname=None, method=None, mask=None):
         """
         :param str,array xname: variable to compute stats on
         :param array, None bins: bins to perform statistics, if None bins = arange(variable.min(), variable.max() + 2)
-        :param None,str yname: variable used to apply method
+        :param None,str,array yname: variable used to apply method
         :param None,str method: If None method counts the number of observations in each bin, can be "mean", "std"
+        :param None,array(bool) mask: If defined use only True position
         :return: x array and y array
         :rtype: array,array
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.bins_stat
         """
         v = self[xname] if isinstance(xname, str) else xname
+        if mask is not None:
+            v = v[mask]
         if bins is None:
             bins = arange(v.min(), v.max() + 2)
         y, x = hist_numba(v, bins=bins)
         x = (x[1:] + x[:-1]) / 2
         if method == "mean":
-            y_v = self[yname]
+            y_v = self[yname] if isinstance(yname, str) else yname
+            if mask is not None:
+                y_v = y_v[mask]
             y_, _ = histogram(v, bins=bins, weights=y_v)
             y = y_ / y
         return x, y
