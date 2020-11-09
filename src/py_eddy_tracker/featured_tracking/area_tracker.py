@@ -6,6 +6,13 @@ logger = logging.getLogger("pet")
 
 
 class AreaTracker(Model):
+
+    __slots__ = ("cmin",)
+
+    def __init__(self, *args, cmin=0.2, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cmin = cmin
+
     @classmethod
     def needed_variable(cls):
         vars = ["longitude", "latitude"]
@@ -17,7 +24,7 @@ class AreaTracker(Model):
         i, j, c = self.match(other, intern=False)
         cost_mat = ma.empty(shape, dtype="f4")
         cost_mat.mask = ma.ones(shape, dtype="bool")
-        m = c > 0.2
+        m = c > self.cmin
         i, j, c = i[m], j[m], c[m]
         cost_mat[i, j] = 1 - c
 

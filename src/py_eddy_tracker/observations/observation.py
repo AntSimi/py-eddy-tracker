@@ -539,6 +539,16 @@ class EddiesObservations(object):
         other eddies."""
         return distance_grid(self.lon, self.lat, other.lon, other.lat)
 
+    def __copy__(self):
+        eddies = self.new_like(self, len(self))
+        for k in self.obs.dtype.names:
+            eddies[k][:] = self[k][:]
+        eddies.sign_type = self.sign_type
+        return eddies
+
+    def copy(self):
+        return self.__copy__()
+
     @staticmethod
     def new_like(eddies, new_size: int):
         return eddies.__class__(
@@ -599,6 +609,8 @@ class EddiesObservations(object):
         filename_ = (
             filename.filename if isinstance(filename, ExFileObject) else filename
         )
+        if isinstance(filename, zarr.storage.MutableMapping):
+            return cls.load_from_zarr(filename, **kwargs)
         end = b".zarr" if isinstance(filename_, bytes) else ".zarr"
         if filename_.endswith(end):
             return cls.load_from_zarr(filename, **kwargs)
@@ -614,6 +626,7 @@ class EddiesObservations(object):
         include_vars=None,
         indexs=None,
         buffer_size=5000000,
+        **class_kwargs,
     ):
         """Load data from zarr.
 
@@ -623,6 +636,7 @@ class EddiesObservations(object):
         :param None,list(str) include_vars: If defined only this variable will be loaded
         :param None,dict indexs: Indexs to laad only a slice of data
         :param int buffer_size: Size of buffer used to load zarr data
+        :param class_kwargs: argument to set up observations class
         :return: Obsevations selected
         :return type: class
         """
@@ -667,6 +681,7 @@ class EddiesObservations(object):
         kwargs["only_variables"] = (
             None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
         )
+        kwargs.update(class_kwargs)
         eddies = cls(size=nb_obs, **kwargs)
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
@@ -727,7 +742,7 @@ class EddiesObservations(object):
         if i_stop is None:
             i_stop = handler_zarr.shape[0]
         for i in range(i_start, i_stop, buffer_size):
-            sl_in = slice(i, i + buffer_size)
+            sl_in = slice(i, min(i + buffer_size, i_stop))
             data = handler_zarr[sl_in]
             if factor != 1:
                 data *= factor
@@ -741,7 +756,13 @@ class EddiesObservations(object):
 
     @classmethod
     def load_from_netcdf(
-        cls, filename, raw_data=False, remove_vars=None, include_vars=None, indexs=None
+        cls,
+        filename,
+        raw_data=False,
+        remove_vars=None,
+        include_vars=None,
+        indexs=None,
+        **class_kwargs,
     ):
         """Load data from netcdf.
 
@@ -750,6 +771,7 @@ class EddiesObservations(object):
         :param None,list(str) remove_vars: List of variable name which will be not loaded
         :param None,list(str) include_vars: If defined only this variable will be loaded
         :param None,dict indexs: Indexs to laad only a slice of data
+        :param class_kwargs: argument to set up observations class
         :return: Obsevations selected
         :return type: class
         """
@@ -799,6 +821,7 @@ class EddiesObservations(object):
                 if include_vars is None
                 else [VAR_DESCR_inv[i] for i in include_vars]
             )
+            kwargs.update(class_kwargs)
             eddies = cls(size=nb_obs, **kwargs)
             for variable in var_list:
                 var_inv = VAR_DESCR_inv[variable]
@@ -1439,7 +1462,7 @@ class EddiesObservations(object):
         add_offset=None,
         filters=None,
         compressor=None,
-        chunck_size=2500000
+        chunck_size=2500000,
     ):
         kwargs_variable["shape"] = data.shape
         kwargs_variable["compressor"] = (

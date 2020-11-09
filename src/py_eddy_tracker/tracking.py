@@ -27,6 +27,7 @@ from numpy import (
 from netCDF4 import Dataset, default_fillvals
 import logging
 import platform
+import json
 from numba import njit, types as numba_types
 
 logger = logging.getLogger("pet")
@@ -57,12 +58,18 @@ class Correspondances(list):
     N_DTYPE = "u2"
 
     def __init__(
-        self, datasets, virtual=0, class_method=None, previous_correspondance=None
+        self,
+        datasets,
+        virtual=0,
+        class_method=None,
+        class_kw=None,
+        previous_correspondance=None,
     ):
         """Initiate tracking
 
         :param list(str) datasets: A sorted list of filename which contains eddy observations to track
         :param class class_method: A class which tell how to track
+        :param dict class_kw: keyword argument to setup class
         :param Correspondances previous_correspondance: A previous correspondance object if you want continue tracking
         """
         super().__init__()
@@ -77,6 +84,7 @@ class Correspondances(list):
             self.class_method = EddiesObservations
         else:
             self.class_method = class_method
+        self.class_kw = dict() if class_kw is None else class_kw
 
         # To count ID
         self.current_id = 0
@@ -122,6 +130,7 @@ class Correspondances(list):
             datasets=self.datasets,
             virtual=self.nb_virtual,
             class_method=self.class_method,
+            class_kw=self.class_kw,
             previous_correspondance=self.filename_previous_correspondance,
         )
         for i in self:
@@ -158,6 +167,8 @@ class Correspondances(list):
         """
         self.previous2_obs = self.previous_obs
         self.previous_obs = self.current_obs
+        kwargs = kwargs.copy()
+        kwargs.update(self.class_kw)
         self.current_obs = self.class_method.load_file(dataset, *args, **kwargs)
 
     def merge_correspondance(self, other):
@@ -323,7 +334,7 @@ class Correspondances(list):
             for correspondance in self.previous_correspondance[:first_dataset]:
                 self.append(correspondance)
             self.current_obs = self.class_method.load_file(
-                self.datasets[first_dataset - 2]
+                self.datasets[first_dataset - 2], **self.class_kw
             )
             flg_virtual = self.previous_correspondance.virtual
             with Dataset(self.filename_previous_correspondance) as general_handler:
@@ -381,88 +392,98 @@ class Correspondances(list):
             if self.virtual:
                 flg_virtual = True
 
+    def to_netcdf(self, handler):
+        nb_step = len(self.datasets) - 1
+        logger.info("Create correspondance file")
+        # Create dimensions
+        logger.debug('Create Dimensions "Nlink" : %d', self.nb_link_max)
+        handler.createDimension("Nlink", self.nb_link_max)
+
+        logger.debug('Create Dimensions "Nstep" : %d', nb_step)
+        handler.createDimension("Nstep", nb_step)
+        var_file_in = handler.createVariable(
+            zlib=True,
+            complevel=1,
+            varname="FileIn",
+            datatype="S1024",
+            dimensions="Nstep",
+        )
+        var_file_out = handler.createVariable(
+            zlib=True,
+            complevel=1,
+            varname="FileOut",
+            datatype="S1024",
+            dimensions="Nstep",
+        )
+
+        def get_filename(dataset):
+            if not isinstance(dataset, str) or not isinstance(dataset, bytes):
+                return "In memory file"
+            return dataset
+
+        for i, dataset in enumerate(self.datasets[:-1]):
+            var_file_in[i] = get_filename(dataset)
+            var_file_out[i] = get_filename(self.datasets[i + 1])
+
+        var_nb_link = handler.createVariable(
+            zlib=True,
+            complevel=1,
+            varname="nb_link",
+            datatype="u2",
+            dimensions="Nstep",
+        )
+
+        datas = dict()
+        for name, dtype in self.correspondance_dtype:
+            if dtype is bool_:
+                dtype = "u1"
+            kwargs_cv = dict()
+            if "u1" in dtype:
+                kwargs_cv["fill_value"] = (255,)
+            handler.createVariable(
+                zlib=True,
+                complevel=1,
+                varname=name,
+                datatype=dtype,
+                dimensions=("Nstep", "Nlink"),
+                **kwargs_cv
+            )
+            datas[name] = ma.empty((nb_step, self.nb_link_max), dtype=dtype)
+            datas[name].mask = datas[name] == datas[name]
+
+        for i, correspondance in enumerate(self):
+            logger.debug("correspondance %d", i)
+            nb_elt = correspondance.shape[0]
+            var_nb_link[i] = nb_elt
+            for name, _ in self.correspondance_dtype:
+                datas[name][i, :nb_elt] = correspondance[name]
+        for name, data in datas.items():
+            h_v = handler.variables[name]
+            h_v[:] = data
+            if "File" not in name:
+                h_v.min = h_v[:].min()
+                h_v.max = h_v[:].max()
+
+        handler.virtual_use = str(self.virtual)
+        handler.virtual_max_segment = self.nb_virtual
+        handler.last_current_id = self.current_id
+        if self.virtual_obs is not None:
+            group = handler.createGroup("LastVirtualObs")
+            self.virtual_obs.to_netcdf(group)
+            group = handler.createGroup("LastPreviousVirtualObs")
+            self.previous_virtual_obs.to_netcdf(group)
+        handler.module = self.class_method.__module__
+        handler.classname = self.class_method.__qualname__
+        handler.class_kw = json.dumps(self.class_kw)
+        handler.node = platform.node()
+        logger.info("Create correspondance file done")
+
     def save(self, filename, dict_completion=None):
         self.prepare_merging()
-        nb_step = len(self.datasets) - 1
         if isinstance(dict_completion, dict):
             filename = filename.format(**dict_completion)
-        logger.info("Create correspondance file %s", filename)
         with Dataset(filename, "w", format="NETCDF4") as h_nc:
-            # Create dimensions
-            logger.debug('Create Dimensions "Nlink" : %d', self.nb_link_max)
-            h_nc.createDimension("Nlink", self.nb_link_max)
-
-            logger.debug('Create Dimensions "Nstep" : %d', nb_step)
-            h_nc.createDimension("Nstep", nb_step)
-            var_file_in = h_nc.createVariable(
-                zlib=True,
-                complevel=1,
-                varname="FileIn",
-                datatype="S1024",
-                dimensions="Nstep",
-            )
-            var_file_out = h_nc.createVariable(
-                zlib=True,
-                complevel=1,
-                varname="FileOut",
-                datatype="S1024",
-                dimensions="Nstep",
-            )
-            for i, dataset in enumerate(self.datasets[:-1]):
-                var_file_in[i] = dataset
-                var_file_out[i] = self.datasets[i + 1]
-
-            var_nb_link = h_nc.createVariable(
-                zlib=True,
-                complevel=1,
-                varname="nb_link",
-                datatype="u2",
-                dimensions="Nstep",
-            )
-
-            datas = dict()
-            for name, dtype in self.correspondance_dtype:
-                if dtype is bool_:
-                    dtype = "u1"
-                kwargs_cv = dict()
-                if "u1" in dtype:
-                    kwargs_cv["fill_value"] = (255,)
-                h_nc.createVariable(
-                    zlib=True,
-                    complevel=1,
-                    varname=name,
-                    datatype=dtype,
-                    dimensions=("Nstep", "Nlink"),
-                    **kwargs_cv
-                )
-                datas[name] = ma.empty((nb_step, self.nb_link_max), dtype=dtype)
-                datas[name].mask = datas[name] == datas[name]
-
-            for i, correspondance in enumerate(self):
-                logger.debug("correspondance %d", i)
-                nb_elt = correspondance.shape[0]
-                var_nb_link[i] = nb_elt
-                for name, _ in self.correspondance_dtype:
-                    datas[name][i, :nb_elt] = correspondance[name]
-            for name, data in datas.items():
-                h_v = h_nc.variables[name]
-                h_v[:] = data
-                if "File" not in name:
-                    h_v.min = h_v[:].min()
-                    h_v.max = h_v[:].max()
-
-            h_nc.virtual_use = str(self.virtual)
-            h_nc.virtual_max_segment = self.nb_virtual
-            h_nc.last_current_id = self.current_id
-            if self.virtual_obs is not None:
-                group = h_nc.createGroup("LastVirtualObs")
-                self.virtual_obs.to_netcdf(group)
-                group = h_nc.createGroup("LastPreviousVirtualObs")
-                self.previous_virtual_obs.to_netcdf(group)
-            h_nc.module = self.class_method.__module__
-            h_nc.classname = self.class_method.__qualname__
-            h_nc.node = platform.node()
-        logger.info("Create correspondance file done")
+            self.to_netcdf(h_nc)
 
     def load_compatible(self, filename):
         if filename is None:
@@ -482,41 +503,55 @@ class Correspondances(list):
         return previous_correspondance
 
     @classmethod
+    def from_netcdf(cls, handler):
+        datas = {varname: data[:] for varname, data in handler.variables.items()}
+
+        datasets = list(datas["FileIn"])
+        datasets.append(datas["FileOut"][-1])
+
+        if hasattr(handler, "module"):
+            class_method = getattr(
+                __import__(handler.module, globals(), locals(), handler.classname),
+                handler.classname,
+            )
+            class_kw = getattr(handler, "class_kw", dict())
+            if isinstance(class_kw, str):
+                class_kw = json.loads(class_kw)
+        else:
+            class_method = None
+            class_kw = dict()
+        logger.info("File load with class %s(%s)", class_method, class_kw)
+        obj = cls(
+            datasets,
+            handler.virtual_max_segment,
+            class_method=class_method,
+            class_kw=class_kw,
+        )
+
+        id_max = 0
+        for i, nb_elt in enumerate(datas["nb_link"][:]):
+            logger.debug(
+                "Link between %s and %s", datas["FileIn"][i], datas["FileOut"][i]
+            )
+            correspondance = array(
+                datas["in"][i, :nb_elt], dtype=obj.correspondance_dtype
+            )
+            for name, _ in obj.correspondance_dtype:
+                if name == "in":
+                    continue
+                if name == "virtual_length":
+                    correspondance[name] = 255
+                correspondance[name] = datas[name][i, :nb_elt]
+            id_max = max(id_max, correspondance["id"].max())
+            obj.append(correspondance)
+        obj.current_id = id_max + 1
+        return obj
+
+    @classmethod
     def load(cls, filename):
-        logger.info("Try load %s", filename)
+        logger.info("Loading %s", filename)
         with Dataset(filename, "r", format="NETCDF4") as h_nc:
-            datas = {varname: data[:] for varname, data in h_nc.variables.items()}
-
-            datasets = list(datas["FileIn"])
-            datasets.append(datas["FileOut"][-1])
-
-            if hasattr(h_nc, "module"):
-                class_method = getattr(
-                    __import__(h_nc.module, globals(), locals(), h_nc.classname),
-                    h_nc.classname,
-                )
-            else:
-                class_method = None
-            logger.info("File %s load with class %s", filename, class_method)
-            obj = cls(datasets, h_nc.virtual_max_segment, class_method=class_method)
-
-            id_max = 0
-            for i, nb_elt in enumerate(datas["nb_link"][:]):
-                logger.debug(
-                    "Link between %s and %s", datas["FileIn"][i], datas["FileOut"][i]
-                )
-                correspondance = array(
-                    datas["in"][i, :nb_elt], dtype=obj.correspondance_dtype
-                )
-                for name, _ in obj.correspondance_dtype:
-                    if name == "in":
-                        continue
-                    if name == "virtual_length":
-                        correspondance[name] = 255
-                    correspondance[name] = datas[name][i, :nb_elt]
-                id_max = max(id_max, correspondance["id"].max())
-                obj.append(correspondance)
-            obj.current_id = id_max + 1
+            obj = cls.from_netcdf(h_nc)
         return obj
 
     def prepare_merging(self):

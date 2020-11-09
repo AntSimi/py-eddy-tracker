@@ -6,6 +6,9 @@ from os import path
 
 
 class CheltonTracker(Model):
+
+    __slots__ = tuple()
+
     GROUND = RegularGridDataset(
         path.join(path.dirname(__file__), "../data/mask_1_60.nc"), "lon", "lat"
     )

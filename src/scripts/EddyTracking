@@ -156,12 +156,14 @@ if __name__ == "__main__":
         CORRESPONDANCES_OUT = "{path}/{sign_type}_correspondances.nc"
 
     CLASS = None
+    CLASS_KW = dict()
     if "CLASS" in CONFIG:
         CLASSNAME = CONFIG["CLASS"]["CLASS"]
         CLASS = getattr(
             __import__(CONFIG["CLASS"]["MODULE"], globals(), locals(), CLASSNAME),
             CLASSNAME,
         )
+        CLASS_KW = CONFIG["CLASS"].get("OPTIONS", dict())
 
     NB_VIRTUAL_OBS_MAX_BY_SEGMENT = int(CONFIG.get("VIRTUAL_LENGTH_MAX", 0))
 
@@ -199,6 +201,7 @@ if __name__ == "__main__":
         datasets=DATASET_LIST["filename"],
         virtual=NB_VIRTUAL_OBS_MAX_BY_SEGMENT,
         class_method=CLASS,
+        class_kw=CLASS_KW,
         previous_correspondance=CORRESPONDANCES_IN,
     )
     CORRESPONDANCES.track()
