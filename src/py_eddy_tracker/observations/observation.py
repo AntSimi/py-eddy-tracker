@@ -30,7 +30,6 @@ from numpy import (
     empty,
     absolute,
     concatenate,
-    float64,
     ceil,
     arange,
     histogram2d,
@@ -568,7 +567,10 @@ class EddiesObservations(object):
 
     @staticmethod
     def zarr_dimension(filename):
-        h = zarr.open(filename)
+        if isinstance(filename, zarr.storage.MutableMapping):
+            h = filename
+        else:
+            h = zarr.open(filename)
         dims = list()
         for varname in h:
             dims.extend(list(getattr(h, varname).shape))
@@ -591,10 +593,8 @@ class EddiesObservations(object):
                 indexs=dict(obs=slice(0, 300)),
             )
             small_dataset = TrackEddiesObservations.load_file(filename, **kwargs_latlon_300)
-        
-        Default **kwargs to load zarr are : raw_data=False, remove_vars=None, include_vars=None
 
-        Default **kwargs to load netcdf are : raw_data=False, remove_vars=None, include_vars=None, indexs=None
+        For `**kwargs` look at :py:meth:`load_from_zarr` or :py:meth:`load_from_netcdf`
         """
         filename_ = (
             filename.filename if isinstance(filename, ExFileObject) else filename
@@ -607,21 +607,46 @@ class EddiesObservations(object):
 
     @classmethod
     def load_from_zarr(
-        cls, filename, raw_data=False, remove_vars=None, include_vars=None
+        cls,
+        filename,
+        raw_data=False,
+        remove_vars=None,
+        include_vars=None,
+        indexs=None,
+        buffer_size=5000000,
     ):
+        """Load data from zarr.
+
+        :param str,store filename: path or store to load data
+        :param bool raw_data: If true load data without apply scale_factor and add_offset
+        :param None,list(str) remove_vars: List of variable name which will be not loaded
+        :param None,list(str) include_vars: If defined only this variable will be loaded
+        :param None,dict indexs: Indexs to laad only a slice of data
+        :param int buffer_size: Size of buffer used to load zarr data
+        :return: Obsevations selected
+        :return type: class
+        """
         # FIXME must be investigate, in zarr no dimensions name (or could be add in attr)
         array_dim = 50
-        BLOC = 5000000
-        if not isinstance(filename, str):
-            filename = filename.astype(str)
-        h_zarr = zarr.open(filename)
-        var_list = list(h_zarr.keys())
-        if include_vars is not None:
-            var_list = [i for i in var_list if i in include_vars]
-        elif remove_vars is not None:
-            var_list = [i for i in var_list if i not in remove_vars]
+        if isinstance(filename, zarr.storage.MutableMapping):
+            h_zarr = filename
+        else:
+            if not isinstance(filename, str):
+                filename = filename.astype(str)
+            h_zarr = zarr.open(filename)
+        var_list = cls.build_var_list(list(h_zarr.keys()), remove_vars, include_vars)
 
         nb_obs = getattr(h_zarr, var_list[0]).shape[0]
+        if indexs is not None and "obs" in indexs:
+            sl = indexs["obs"]
+            sl = slice(sl.start, min(sl.stop, nb_obs))
+            if sl.stop is not None:
+                nb_obs = sl.stop
+            if sl.start is not None:
+                nb_obs -= sl.start
+            if sl.step is not None:
+                indexs["obs"] = slice(sl.start, sl.stop)
+                logger.warning("step of slice won't be use")
         logger.debug("%d observations will be load", nb_obs)
         kwargs = dict()
         dims = cls.zarr_dimension(filename)
@@ -647,65 +672,87 @@ class EddiesObservations(object):
             var_inv = VAR_DESCR_inv[variable]
             logger.debug("%s will be loaded", variable)
             # find unit factor
-            factor = 1
             input_unit = h_zarr[variable].attrs.get("unit", None)
             if input_unit is None:
                 input_unit = h_zarr[variable].attrs.get("units", None)
             output_unit = VAR_DESCR[var_inv]["nc_attr"].get("units", None)
-            if (
-                output_unit is not None
-                and input_unit is not None
-                and output_unit != input_unit
-            ):
-                units = UnitRegistry()
-                try:
-                    input_unit = units.parse_expression(
-                        input_unit, case_sensitive=False
-                    )
-                    output_unit = units.parse_expression(
-                        output_unit, case_sensitive=False
-                    )
-                except UndefinedUnitError:
-                    input_unit = None
-                except TokenError:
-                    input_unit = None
-                if input_unit is not None:
-                    factor = input_unit.to(output_unit).to_tuple()[0]
-                    # If we are able to find a conversion
-                    if factor != 1:
-                        logger.info(
-                            "%s will be multiply by %f to take care of units(%s->%s)",
-                            variable,
-                            factor,
-                            input_unit,
-                            output_unit,
-                        )
-            nb = h_zarr[variable].shape[0]
-
+            factor = cls.compare_units(input_unit, output_unit, variable)
+            sl_obs = slice(None) if indexs is None else indexs.get("obs", slice(None))
             scale_factor = VAR_DESCR[var_inv].get("scale_factor", None)
             add_offset = VAR_DESCR[var_inv].get("add_offset", None)
-            for i in range(0, nb, BLOC):
-                sl = slice(i, i + BLOC)
-                data = h_zarr[variable][sl]
-                if factor != 1:
-                    data *= factor
-                if raw_data:
-                    if add_offset is not None:
-                        data -= add_offset
-                    if scale_factor is not None:
-                        data /= scale_factor
-                eddies.obs[var_inv][sl] = data
+            cls.copy_data_to_zarr(
+                h_zarr[variable],
+                eddies.obs[var_inv],
+                sl_obs,
+                buffer_size,
+                factor,
+                raw_data,
+                scale_factor,
+                add_offset,
+            )
 
-        eddies.sign_type = h_zarr.attrs.get("rotation_type", 0)
+        eddies.sign_type = int(h_zarr.attrs.get("rotation_type", 0))
         if eddies.sign_type == 0:
             logger.debug("File come from another algorithm of identification")
             eddies.sign_type = -1
         return eddies
 
+    @staticmethod
+    def copy_data_to_zarr(
+        handler_zarr,
+        handler_eddies,
+        sl_obs,
+        buffer_size,
+        factor,
+        raw_data,
+        scale_factor,
+        add_offset,
+    ):
+        """
+        Copy with buffer for zarr.
+
+        Zarr need to get real value, and size could be huge, so we use a buffer to manage memory
+        :param zarr_dataset handler_zarr:
+        :param array handler_eddies:
+        :param slice zarr_dataset sl_obs:
+        :param int zarr_dataset buffer_size:
+        :param float zarr_dataset factor:
+        :param bool zarr_dataset raw_data:
+        :param None,float zarr_dataset scale_factor:
+        :param None,float add_offset:
+        """
+        i_start, i_stop = sl_obs.start, sl_obs.stop
+        if i_start is None:
+            i_start = 0
+        if i_stop is None:
+            i_stop = handler_zarr.shape[0]
+        for i in range(i_start, i_stop, buffer_size):
+            sl_in = slice(i, i + buffer_size)
+            data = handler_zarr[sl_in]
+            if factor != 1:
+                data *= factor
+            if raw_data:
+                if add_offset is not None:
+                    data -= add_offset
+                if scale_factor is not None:
+                    data /= scale_factor
+            sl_out = slice(i - i_start, i - i_start + buffer_size)
+            handler_eddies[sl_out] = data
+
     @classmethod
     def load_from_netcdf(
         cls, filename, raw_data=False, remove_vars=None, include_vars=None, indexs=None
     ):
+        """Load data from netcdf.
+
+        :param str,ExFileObject filename: path or handler to load data
+        :param bool raw_data: If true load data without apply scale_factor and add_offset
+        :param None,list(str) remove_vars: List of variable name which will be not loaded
+        :param None,list(str) include_vars: If defined only this variable will be loaded
+        :param None,dict indexs: Indexs to laad only a slice of data
+        :return: Obsevations selected
+        :return type: class
+        """
         array_dim = "NbSample"
         if isinstance(filename, bytes):
             filename = filename.astype(str)
@@ -715,11 +762,9 @@ class EddiesObservations(object):
         else:
             args, kwargs = (filename,), dict()
         with Dataset(*args, **kwargs) as h_nc:
-            var_list = list(h_nc.variables.keys())
-            if include_vars is not None:
-                var_list = [i for i in var_list if i in include_vars]
-            elif remove_vars is not None:
-                var_list = [i for i in var_list if i not in remove_vars]
+            var_list = cls.build_var_list(
+                list(h_nc.variables.keys()), remove_vars, include_vars
+            )
 
             obs_dim = cls.obs_dimension(h_nc)
             nb_obs = len(h_nc.dimensions[obs_dim])
@@ -771,34 +816,7 @@ class EddiesObservations(object):
                     if input_unit is None:
                         input_unit = getattr(h_nc.variables[variable], "units", None)
                     output_unit = VAR_DESCR[var_inv]["nc_attr"].get("units", None)
-                    if (
-                        output_unit is not None
-                        and input_unit is not None
-                        and output_unit != input_unit
-                    ):
-                        units = UnitRegistry()
-                        try:
-                            input_unit = units.parse_expression(
-                                input_unit, case_sensitive=False
-                            )
-                            output_unit = units.parse_expression(
-                                output_unit, case_sensitive=False
-                            )
-                        except UndefinedUnitError:
-                            input_unit = None
-                        except TokenError:
-                            input_unit = None
-                        if input_unit is not None:
-                            factor = input_unit.to(output_unit).to_tuple()[0]
-                            # If we are able to find a conversion
-                            if factor != 1:
-                                logger.info(
-                                    "%s will be multiply by %f to take care of units(%s->%s)",
-                                    variable,
-                                    factor,
-                                    input_unit,
-                                    output_unit,
-                                )
+                    factor = cls.compare_units(input_unit, output_unit, variable)
                 if indexs is None:
                     indexs = dict()
                 var_sl = [
@@ -825,6 +843,38 @@ class EddiesObservations(object):
                 eddies.sign_type = -1
 
         return eddies
+
+    @staticmethod
+    def build_var_list(var_list, remove_vars, include_vars):
+        if include_vars is not None:
+            var_list = [i for i in var_list if i in include_vars]
+        elif remove_vars is not None:
+            var_list = [i for i in var_list if i not in remove_vars]
+        return var_list
+
+    @staticmethod
+    def compare_units(input_unit, output_unit, name):
+        if output_unit is None or input_unit is None or output_unit == input_unit:
+            return 1
+        units = UnitRegistry()
+        try:
+            input_unit = units.parse_expression(input_unit, case_sensitive=False)
+            output_unit = units.parse_expression(output_unit, case_sensitive=False)
+        except UndefinedUnitError:
+            input_unit = None
+        except TokenError:
+            input_unit = None
+        if input_unit is not None:
+            factor = input_unit.to(output_unit).to_tuple()[0]
+            # If we are able to find a conversion
+            if factor != 1:
+                logger.info(
+                    "%s will be multiply by %f to take care of units(%s->%s)",
+                    name,
+                    factor,
+                    input_unit,
+                    output_unit,
+                )
 
     @classmethod
     def from_zarr(cls, handler):
@@ -1389,6 +1439,7 @@ class EddiesObservations(object):
         add_offset=None,
         filters=None,
         compressor=None,
+        chunck_size=2500000
     ):
         kwargs_variable["shape"] = data.shape
         kwargs_variable["compressor"] = (
@@ -1401,8 +1452,8 @@ class EddiesObservations(object):
                 add_offset = 0
             kwargs_variable["filters"].append(
                 zarr.FixedScaleOffset(
-                    offset=float64(add_offset),
-                    scale=1 / float64(scale_factor),
+                    offset=add_offset,
+                    scale=1 / scale_factor,
                     dtype=kwargs_variable["dtype"],
                     astype=store_dtype,
                 )
@@ -1412,10 +1463,10 @@ class EddiesObservations(object):
         dims = kwargs_variable.get("dimensions", None)
         # Manage chunk in 2d case
         if len(dims) == 1:
-            kwargs_variable["chunks"] = (2500000,)
+            kwargs_variable["chunks"] = (chunck_size,)
         if len(dims) == 2:
             second_dim = data.shape[1]
-            kwargs_variable["chunks"] = (200000, second_dim)
+            kwargs_variable["chunks"] = (chunck_size // second_dim, second_dim)
 
         kwargs_variable.pop("dimensions")
         v = handler_zarr.create_dataset(**kwargs_variable)
@@ -1443,7 +1494,7 @@ class EddiesObservations(object):
             logger.warning("Data is empty")
 
     def write_file(
-        self, path="./", filename="%(path)s/%(sign_type)s.nc", zarr_flag=False
+        self, path="./", filename="%(path)s/%(sign_type)s.nc", zarr_flag=False, **kwargs
     ):
         """Write a netcdf or zarr with eddy obs.
         Zarr is usefull for large dataset > 10M observations
@@ -1451,6 +1502,7 @@ class EddiesObservations(object):
         :param str path: set path variable
         :param str filename: model to store file
         :param bool zarr_flag: If True, method will use zarr format instead of netcdf
+        :param dict kwargs: look at :py:meth:`to_zarr` or :py:meth:`to_netcdf`
         """
         filename = filename % dict(
             path=path,
@@ -1464,10 +1516,10 @@ class EddiesObservations(object):
         logger.info("Store in %s", filename)
         if zarr_flag:
             handler = zarr.open(filename, "w")
-            self.to_zarr(handler)
+            self.to_zarr(handler, **kwargs)
         else:
             with Dataset(filename, "w", format="NETCDF4") as handler:
-                self.to_netcdf(handler)
+                self.to_netcdf(handler, **kwargs)
 
     @property
     def global_attr(self):

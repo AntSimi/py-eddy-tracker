@@ -22,7 +22,6 @@ Email: evanmason@gmail.com
 
 from argparse import ArgumentParser
 import logging
-import numpy
 import zarr
 from ._version import get_versions
 
@@ -388,8 +387,8 @@ VAR_DESCR = dict(
         nc_type="f4",
         filters=[zarr.Delta("i2")],
         output_type="i2",
-        scale_factor=numpy.float32(0.01),
-        add_offset=180,
+        scale_factor=0.01,
+        add_offset=180.0,
         nc_dims=("obs", "NbSample"),
         nc_attr=dict(
             long_name="Effective Contour Longitudes",
@@ -405,7 +404,7 @@ VAR_DESCR = dict(
         nc_type="f4",
         filters=[zarr.Delta("i2")],
         output_type="i2",
-        scale_factor=numpy.float32(0.01),
+        scale_factor=0.01,
         nc_dims=("obs", "NbSample"),
         nc_attr=dict(
             long_name="Effective Contour Latitudes",
@@ -432,8 +431,8 @@ VAR_DESCR = dict(
         nc_type="f4",
         filters=[zarr.Delta("i2")],
         output_type="i2",
-        scale_factor=numpy.float32(0.01),
-        add_offset=180,
+        scale_factor=0.01,
+        add_offset=180.0,
         nc_dims=("obs", "NbSample"),
         nc_attr=dict(
             long_name="Speed Contour Longitudes",
@@ -449,7 +448,7 @@ VAR_DESCR = dict(
         nc_type="f4",
         filters=[zarr.Delta("i2")],
         output_type="i2",
-        scale_factor=numpy.float32(0.01),
+        scale_factor=0.01,
         nc_dims=("obs", "NbSample"),
         nc_attr=dict(
             long_name="Speed Contour Latitudes",
