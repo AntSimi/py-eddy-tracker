@@ -4,9 +4,10 @@ Display fields
 
 """
 
-from matplotlib import pyplot as plt
-from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
+from matplotlib import pyplot as plt
+
+from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 # %%
 # Load an experimental cyclonic atlas, we keep only eddies which are follow more than 180 days

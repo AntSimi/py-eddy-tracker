@@ -7,10 +7,11 @@ Select pixel in eddies
 from matplotlib import pyplot as plt
 from matplotlib.path import Path
 from numpy import ones
-from py_eddy_tracker.observations.observation import EddiesObservations
-from py_eddy_tracker.dataset.grid import RegularGridDataset
-from py_eddy_tracker.poly import create_vertice
+
 from py_eddy_tracker import data
+from py_eddy_tracker.dataset.grid import RegularGridDataset
+from py_eddy_tracker.observations.observation import EddiesObservations
+from py_eddy_tracker.poly import create_vertice
 
 # %%
 # Load an eddy file which contains contours

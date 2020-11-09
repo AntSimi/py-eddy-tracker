@@ -7,11 +7,13 @@ Script will detect eddies on adt field, and compute u,v with method add_uv(which
 Figures will show different step to detect eddies.
 
 """
-from numpy import arange
 from datetime import datetime
+
 from matplotlib import pyplot as plt
-from py_eddy_tracker.dataset.grid import RegularGridDataset
+from numpy import arange
+
 from py_eddy_tracker import data
+from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker.eddy_feature import Contours
 
 

@@ -3,10 +3,11 @@ Count center
 ============
 
 """
+import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
+
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-import py_eddy_tracker_sample
 
 # %%
 # Load an experimental med atlas over a period of 26 years (1993-2019)

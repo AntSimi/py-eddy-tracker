@@ -3,10 +3,12 @@
 Applications on detection and tracking files
 """
 import argparse
+
 from netCDF4 import Dataset
+
 from .. import EddyParser
-from ..observations.tracking import TrackEddiesObservations
 from ..observations.observation import EddiesObservations
+from ..observations.tracking import TrackEddiesObservations
 
 
 def eddies_add_circle():

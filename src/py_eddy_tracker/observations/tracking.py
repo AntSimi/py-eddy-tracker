@@ -3,39 +3,39 @@
 Class to manage observations gathered in track
 """
 import logging
-from numpy import (
-    empty,
-    arange,
-    where,
-    unique,
-    interp,
-    ones,
-    bool_,
-    zeros,
-    array,
-    median,
-    histogram,
-    sin,
-    cos,
-    arctan2,
-    radians,
-    degrees,
-)
 from datetime import datetime, timedelta
-from numba import njit
-from Polygon import Polygon
-from .observation import EddiesObservations
-from .. import VAR_DESCR_inv
-from ..generic import split_line, wrap_longitude, build_index, distance, cumsum_by_track
-from ..poly import polygon_overlap, create_vertice_from_2darray
 
+from numba import njit
+from numpy import (
+    arange,
+    arctan2,
+    array,
+    bool_,
+    cos,
+    degrees,
+    empty,
+    histogram,
+    interp,
+    median,
+    ones,
+    radians,
+    sin,
+    unique,
+    where,
+    zeros,
+)
+from Polygon import Polygon
+
+from .. import VAR_DESCR_inv
+from ..generic import build_index, cumsum_by_track, distance, split_line, wrap_longitude
+from ..poly import create_vertice_from_2darray, polygon_overlap
+from .observation import EddiesObservations
 
 logger = logging.getLogger("pet")
 
 
 class TrackEddiesObservations(EddiesObservations):
-    """Class to practice Tracking on observations
-    """
+    """Class to practice Tracking on observations"""
 
     __slots__ = ("__obs_by_track", "__first_index_of_track", "__nb_track")
 
@@ -113,8 +113,7 @@ class TrackEddiesObservations(EddiesObservations):
         return content
 
     def add_distance(self):
-        """Add a field of distance (m) between to consecutive observation, 0 for the last observation of each track
-        """
+        """Add a field of distance (m) between to consecutive observation, 0 for the last observation of each track"""
         if "distance_next" in self.observations.dtype.descr:
             return self
         new = self.add_fields(("distance_next",))
@@ -172,8 +171,7 @@ class TrackEddiesObservations(EddiesObservations):
             )
 
     def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
-        """Select eddies which are longer than nb_min
-        """
+        """Select eddies which are longer than nb_min"""
         mask = nb_obs >= nb_min
         nb_obs_select = mask.sum()
         logger.info("Selection of %d observations", nb_obs_select)
@@ -198,8 +196,7 @@ class TrackEddiesObservations(EddiesObservations):
         return list(set(elements))
 
     def set_global_attr_netcdf(self, h_nc):
-        """Set global attr
-        """
+        """Set global attr"""
         h_nc.title = "Cyclonic" if self.sign_type == -1 else "Anticyclonic"
         h_nc.Metadata_Conventions = "Unidata Dataset Discovery v1.0"
         h_nc.comment = "Surface product; mesoscale eddies"
@@ -487,8 +484,7 @@ class TrackEddiesObservations(EddiesObservations):
         return ax.plot(x, y, **kwargs)
 
     def split_network(self, intern=True, **kwargs):
-        """Divide each group in track
-        """
+        """Divide each group in track"""
         track_s, track_e, track_ref = build_index(self.tracks)
         ids = empty(
             len(self),

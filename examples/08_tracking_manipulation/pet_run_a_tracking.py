@@ -8,10 +8,9 @@ This example didn't replace EddyTracking, we remove check that application do an
 # %%
 
 from py_eddy_tracker.data import get_remote_sample
-from py_eddy_tracker.tracking import Correspondances
 from py_eddy_tracker.featured_tracking.area_tracker import AreaTracker
 from py_eddy_tracker.gui import GUI
-
+from py_eddy_tracker.tracking import Correspondances
 
 # %%
 # Get remote data, we will keep only 180 first days,

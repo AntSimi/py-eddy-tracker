@@ -3,9 +3,10 @@
 """
 Subset eddy Dataset
 """
+import logging
+
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-import logging
 
 logger = logging.getLogger("pet")
 

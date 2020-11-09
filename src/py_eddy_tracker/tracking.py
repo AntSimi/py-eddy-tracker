@@ -3,32 +3,35 @@
 Class to store link between observations
 """
 
-from datetime import timedelta, datetime
+import json
+import logging
+import platform
+from datetime import datetime, timedelta
+
+from netCDF4 import Dataset, default_fillvals
+from numba import njit
+from numba import types as numba_types
+from numpy import (
+    arange,
+    array,
+    bool_,
+    concatenate,
+    empty,
+    isin,
+    ma,
+    ones,
+    setdiff1d,
+    uint16,
+    unique,
+    where,
+    zeros,
+)
+
 from py_eddy_tracker.observations.observation import (
     EddiesObservations,
     VirtualEddiesObservations,
 )
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-from numpy import (
-    bool_,
-    array,
-    arange,
-    ones,
-    setdiff1d,
-    zeros,
-    uint16,
-    where,
-    empty,
-    isin,
-    unique,
-    concatenate,
-    ma,
-)
-from netCDF4 import Dataset, default_fillvals
-import logging
-import platform
-import json
-from numba import njit, types as numba_types
 
 logger = logging.getLogger("pet")
 
@@ -163,8 +166,7 @@ class Correspondances(list):
         return date_start, date_stop
 
     def swap_dataset(self, dataset, *args, **kwargs):
-        """ Swap to next dataset
-        """
+        """Swap to next dataset"""
         self.previous2_obs = self.previous_obs
         self.previous_obs = self.current_obs
         kwargs = kwargs.copy()
@@ -207,8 +209,7 @@ class Correspondances(list):
     def store_correspondance(
         self, i_previous, i_current, nb_real_obs, association_cost
     ):
-        """Storing correspondance in an array
-        """
+        """Storing correspondance in an array"""
         # Create array to store correspondance data
         correspondance = array(i_previous, dtype=self.correspondance_dtype)
         if self.virtual:
@@ -275,15 +276,13 @@ class Correspondances(list):
         super().append(*args, **kwargs)
 
     def id_generator(self, nb_id):
-        """Generation id and incrementation
-        """
+        """Generation id and incrementation"""
         values = arange(self.current_id, self.current_id + nb_id)
         self.current_id += nb_id
         return values
 
     def recense_dead_id_to_extend(self):
-        """Recense dead id to extend in virtual observation
-        """
+        """Recense dead id to extend in virtual observation"""
         # List previous id which are not use in the next step
         dead_id = setdiff1d(self[-2]["id"], self[-1]["id"])
         nb_dead = dead_id.shape[0]
@@ -355,8 +354,7 @@ class Correspondances(list):
         return 1, False
 
     def track(self):
-        """Run tracking
-        """
+        """Run tracking"""
         self.reset_dataset_cache()
         first_dataset, flg_virtual = self.load_state()
 
@@ -577,8 +575,7 @@ class Correspondances(list):
         logger.info("%d observations will be join", self.nb_obs)
 
     def longer_than(self, size_min):
-        """Remove from correspondance table all association for shorter eddies than size_min
-        """
+        """Remove from correspondance table all association for shorter eddies than size_min"""
         # Identify eddies longer than
         i_keep_track = where(self.nb_obs_by_tracks >= size_min)[0]
         # Reduce array
@@ -598,8 +595,7 @@ class Correspondances(list):
         logger.debug("Select longer than %d done", size_min)
 
     def shorter_than(self, size_max):
-        """Remove from correspondance table all association for longer eddies than size_max
-        """
+        """Remove from correspondance table all association for longer eddies than size_max"""
         # Identify eddies longer than
         i_keep_track = where(self.nb_obs_by_tracks < size_max)[0]
         # Reduce array
@@ -619,8 +615,7 @@ class Correspondances(list):
         logger.debug("Select shorter than %d done", size_max)
 
     def merge(self, until=-1, raw_data=True):
-        """Merge all the correspondance in one array with all fields
-        """
+        """Merge all the correspondance in one array with all fields"""
         # Start loading identification again to save in the finals tracks
         # Load first file
         self.reset_dataset_cache()

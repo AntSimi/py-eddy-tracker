@@ -3,67 +3,72 @@
 Class to load and manipulate RegularGrid and UnRegularGrid
 """
 import logging
+from datetime import datetime
+
+from cv2 import filter2D
+from matplotlib.path import Path as BasePath
+from netCDF4 import Dataset
+from numba import njit
+from numba import types as numba_types
 from numpy import (
-    concatenate,
-    empty,
-    where,
-    array,
-    sin,
-    deg2rad,
-    pi,
-    ones,
-    cos,
-    ma,
-    int8,
-    histogram2d,
     arange,
-    float_,
-    linspace,
+    array,
+    ceil,
+    concatenate,
+    cos,
+    deg2rad,
+    empty,
     errstate,
+    exp,
+    float_,
+    histogram2d,
+    int8,
     int_,
     interp,
+    isnan,
+    linspace,
+    ma,
+)
+from numpy import mean as np_mean
+from numpy import (
     meshgrid,
     nan,
-    ceil,
-    sinc,
-    isnan,
-    percentile,
-    zeros,
-    round_,
     nanmean,
-    exp,
-    mean as np_mean,
+    ones,
+    percentile,
+    pi,
+    round_,
+    sin,
+    sinc,
+    where,
+    zeros,
 )
-from datetime import datetime
-from scipy.special import j1
-from netCDF4 import Dataset
-from scipy.ndimage import gaussian_filter, convolve
-from scipy.interpolate import RectBivariateSpline, interp1d
-from scipy.spatial import cKDTree
-from scipy.signal import welch
-from cv2 import filter2D
-from numba import njit, types as numba_types
-from matplotlib.path import Path as BasePath
 from pint import UnitRegistry
-from ..observations.observation import EddiesObservations
-from ..eddy_feature import Amplitude, Contours
+from scipy.interpolate import RectBivariateSpline, interp1d
+from scipy.ndimage import convolve, gaussian_filter
+from scipy.signal import welch
+from scipy.spatial import cKDTree
+from scipy.special import j1
+
 from .. import VAR_DESCR
+from ..eddy_feature import Amplitude, Contours
 from ..generic import (
+    bbox_indice_regular,
+    coordinates_to_local,
     distance,
     interp2d_geo,
-    uniform_resample,
-    coordinates_to_local,
     local_to_coordinates,
     nearest_grd_indice,
-    bbox_indice_regular,
+    uniform_resample,
 )
+from ..observations.observation import EddiesObservations
 from ..poly import (
-    poly_contain_poly,
-    winding_number_poly,
     create_vertice,
-    poly_area,
     fit_circle,
     get_pixel_in_regular,
+    poly_area,
+    poly_contain_poly,
+    winding_number_poly,
 )
 
 logger = logging.getLogger("pet")
@@ -296,11 +301,24 @@ class GridDataset(object):
         self.interpolators = dict()
         if centered is None:
             logger.warning(
-                "We assume pixel position of grid is center for %s", filename,
+                "We assume pixel position of grid is center for %s",
+                filename,
             )
         if not unset:
             self.load_general_features()
             self.load()
+
+    def get_slice(self, **kwargs):
+        """
+        Get slice for each axes specified
+
+        :param dict kwargs:
+        :return: A dict of slice
+        :rtype: dict[slice]
+        """
+        for k, v in kwargs.items():
+            with Dataset(self.filename) as h:
+                print(k, v)
 
     @property
     def is_centered(self):
@@ -316,8 +334,7 @@ class GridDataset(object):
             return self.centered
 
     def load_general_features(self):
-        """Load attrs to  be stored in object
-        """
+        """Load attrs to  be stored in object"""
         logger.debug(
             "Load general feature from %(filename)s", dict(filename=self.filename)
         )
@@ -327,7 +344,10 @@ class GridDataset(object):
             self.variables_description = dict()
             for i, v in h.variables.items():
                 args = (i, v.datatype)
-                kwargs = dict(dimensions=v.dimensions, zlib=True,)
+                kwargs = dict(
+                    dimensions=v.dimensions,
+                    zlib=True,
+                )
                 if hasattr(v, "_FillValue"):
                     kwargs["fill_value"] = (v._FillValue,)
                 attrs = dict()
@@ -429,8 +449,7 @@ class GridDataset(object):
                 raise Exception("not write")
 
     def is_circular(self):
-        """Check grid circularity
-        """
+        """Check grid circularity"""
         return False
 
     def units(self, varname):
@@ -518,8 +537,7 @@ class GridDataset(object):
         return self.vars[varname]
 
     def grid_tiles(self, varname, slice_x, slice_y):
-        """Give the grid tiles required, without buffer system
-        """
+        """Give the grid tiles required, without buffer system"""
         coordinates_dims = list(self.x_dim)
         coordinates_dims.extend(list(self.y_dim))
         logger.debug(
@@ -569,8 +587,7 @@ class GridDataset(object):
 
     @property
     def bounds(self):
-        """Give bounds
-        """
+        """Give bounds"""
         return (
             self.x_bounds.min(),
             self.x_bounds.max(),
@@ -968,8 +985,7 @@ class GridDataset(object):
 
     @staticmethod
     def _gaussian_filter(data, sigma, mode="reflect"):
-        """Standard gaussian filter
-        """
+        """Standard gaussian filter"""
         local_data = data.copy()
         local_data[data.mask] = 0
 
@@ -1001,8 +1017,7 @@ class GridDataset(object):
 
 
 class UnRegularGridDataset(GridDataset):
-    """Class managing unregular grid
-    """
+    """Class managing unregular grid"""
 
     __slots__ = (
         "index_interp",
@@ -1010,8 +1025,7 @@ class UnRegularGridDataset(GridDataset):
     )
 
     def load(self):
-        """Load variable (data)
-        """
+        """Load variable (data)"""
         x_name, y_name = self.coordinates
         with Dataset(self.filename) as h:
             self.x_dim = h.variables[x_name].dimensions
@@ -1029,8 +1043,7 @@ class UnRegularGridDataset(GridDataset):
 
     @property
     def bounds(self):
-        """Give bound
-        """
+        """Give bound"""
         return self.x_c.min(), self.x_c.max(), self.y_c.min(), self.y_c.max()
 
     def bbox_indice(self, vertices):
@@ -1126,8 +1139,7 @@ class UnRegularGridDataset(GridDataset):
 
 
 class RegularGridDataset(GridDataset):
-    """Class only for regular grid
-    """
+    """Class only for regular grid"""
 
     __slots__ = (
         "_speed_ev",
@@ -1173,8 +1185,7 @@ class RegularGridDataset(GridDataset):
         return obj
 
     def init_pos_interpolator(self):
-        """Create function to have a quick index interpolator
-        """
+        """Create function to have a quick index interpolator"""
         self.xinterp = arange(self.x_bounds.shape[0])
         self.yinterp = arange(self.y_bounds.shape[0])
 
@@ -1206,19 +1217,16 @@ class RegularGridDataset(GridDataset):
 
     @property
     def xstep(self):
-        """Only for regular grid with no step variation
-        """
+        """Only for regular grid with no step variation"""
         return self._x_step
 
     @property
     def ystep(self):
-        """Only for regular grid with no step variation
-        """
+        """Only for regular grid with no step variation"""
         return self._y_step
 
     def compute_pixel_path(self, x0, y0, x1, y1):
-        """Give a series of indexes which describe the path between to position
-        """
+        """Give a series of indexes which describe the path between to position"""
         return compute_pixel_path(
             x0,
             y0,
@@ -1232,13 +1240,11 @@ class RegularGridDataset(GridDataset):
         )
 
     def clean_land(self):
-        """Function to remove all land pixel
-        """
+        """Function to remove all land pixel"""
         pass
 
     def is_circular(self):
-        """Check if the grid is circular
-        """
+        """Check if the grid is circular"""
         if self._is_circular is None:
             self._is_circular = (
                 abs((self.x_bounds[0] % 360) - (self.x_bounds[-1] % 360)) < 0.0001
@@ -1323,8 +1329,7 @@ class RegularGridDataset(GridDataset):
         return self.finalize_kernel(kernel, order, half_x_pt, half_y_pt)
 
     def _low_filter(self, grid_name, w_cut, **kwargs):
-        """low filtering
-        """
+        """low filtering"""
         return self.convolve_filter_with_dynamic_kernel(
             grid_name, self.kernel_bessel, wave_length=w_cut, **kwargs
         )
@@ -1784,8 +1789,7 @@ class RegularGridDataset(GridDataset):
         )
 
     def init_speed_coef(self, uname="u", vname="v"):
-        """Draft
-        """
+        """Draft"""
         self._speed_ev = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** 0.5
 
     def display(self, ax, name, factor=1, **kwargs):
@@ -1858,8 +1862,7 @@ class RegularGridDataset(GridDataset):
 
 @njit(cache=True, fastmath=True)
 def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
-    """Give a serie of indexes describing the path between two position
-    """
+    """Give a serie of indexes describing the path between two position"""
     # index
     nx = x0.shape[0]
     i_x0 = empty(nx, dtype=numba_types.int_)

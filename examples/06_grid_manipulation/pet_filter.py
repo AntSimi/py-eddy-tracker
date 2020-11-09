@@ -7,10 +7,11 @@ How filter work in py eddy tracker. This implementation maybe doesn't respect st
 We code a specific filter in order to filter grid with same wavelength at each pixel.
 """
 
-from py_eddy_tracker.dataset.grid import RegularGridDataset
-from py_eddy_tracker import data
 from matplotlib import pyplot as plt
 from numpy import arange
+
+from py_eddy_tracker import data
+from py_eddy_tracker.dataset.grid import RegularGridDataset
 
 
 def start_axes(title):
@@ -31,7 +32,9 @@ def update_axes(ax, mappable=None):
 # %%
 # All information will be for regular grid
 g = RegularGridDataset(
-    data.get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude",
+    data.get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"),
+    "longitude",
+    "latitude",
 )
 # %%
 # Kernel

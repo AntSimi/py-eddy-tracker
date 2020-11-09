@@ -4,14 +4,16 @@ Entry point to create and manipulate observations network
 """
 
 import logging
+
 from netCDF4 import Dataset
-from numpy import empty, arange, zeros
+from numpy import arange, empty, zeros
 from Polygon import Polygon
-from ..poly import polygon_overlap, create_vertice_from_2darray
+
 from .. import EddyParser
+from ..generic import build_index
 from ..observations.network import Network
 from ..observations.tracking import TrackEddiesObservations
-from ..generic import build_index
+from ..poly import create_vertice_from_2darray, polygon_overlap
 
 logger = logging.getLogger("pet")
 
@@ -19,7 +21,8 @@ logger = logging.getLogger("pet")
 def build_network():
     parser = EddyParser("Merge eddies")
     parser.add_argument(
-        "identification_regex", help="Give an expression which will use with glob",
+        "identification_regex",
+        help="Give an expression which will use with glob",
     )
     parser.add_argument("out", help="output file")
     parser.add_argument(
@@ -59,8 +62,7 @@ def divide_network():
 
 
 def split_network(input, output):
-    """Divide each group in track
-    """
+    """Divide each group in track"""
     sl = slice(None)
     with Dataset(input) as h:
         group = h.variables["track"][sl]
@@ -292,7 +294,11 @@ def display_network(x, y, tr, t, c):
             lw=0.5,
         )
         ax_time.plot(
-            t[sl], tr[s].repeat(e - s), color=color, lw=1, marker="+",
+            t[sl],
+            tr[s].repeat(e - s),
+            color=color,
+            lw=1,
+            marker="+",
         )
         ax_time.text(t[s], tr[s] + 0.15, f"{x[s].mean():.2f}, {y[s].mean():.2f}")
         ax_time.axvline(t[s], color=".75", lw=0.5, ls="--", zorder=-10)

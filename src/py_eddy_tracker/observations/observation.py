@@ -8,61 +8,62 @@ from tarfile import ExFileObject
 from tokenize import TokenError
 
 import zarr
-from Polygon import Polygon
 from matplotlib.cm import get_cmap
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import Normalize
 from matplotlib.path import Path as BasePath
 from netCDF4 import Dataset
-from numba import njit, types as numba_types
+from numba import njit
+from numba import types as numba_types
 from numpy import (
-    zeros,
-    where,
-    unique,
-    ma,
-    cos,
-    radians,
-    isnan,
-    ones,
-    ndarray,
-    floor,
-    array,
-    empty,
     absolute,
-    concatenate,
-    ceil,
     arange,
-    histogram2d,
-    linspace,
-    sin,
-    histogram,
-    digitize,
-    percentile,
+    array,
     array_equal,
+    ceil,
+    concatenate,
+    cos,
+    digitize,
+    empty,
+    floor,
+    histogram,
+    histogram2d,
+    isnan,
+    linspace,
+    ma,
+    ndarray,
+    ones,
+    percentile,
+    radians,
+    sin,
+    unique,
+    where,
+    zeros,
 )
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
+from Polygon import Polygon
 
 from .. import VAR_DESCR, VAR_DESCR_inv, __version__
 from ..generic import (
-    distance_grid,
+    bbox_indice_regular,
+    build_index,
     distance,
+    distance_grid,
     flatten_line_matrix,
-    wrap_longitude,
+    hist_numba,
     local_to_coordinates,
     reverse_index,
-    bbox_indice_regular,
-    hist_numba,
-    build_index,
+    wrap_longitude,
 )
 from ..poly import (
     bbox_intersection,
-    vertice_overlap,
-    create_vertice,
     close_center,
-    get_pixel_in_regular,
-    winding_number_poly,
     convexs,
+    create_vertice,
+    get_pixel_in_regular,
+    vertice_overlap,
+    winding_number_poly,
 )
 
 logger = logging.getLogger("pet")
@@ -197,17 +198,17 @@ class EddiesObservations(object):
         return f"""<b>{infos['nb_obs']} observations from {infos['t0']} to {infos['t1']} </b>"""
 
     def hist(self, varname, x, bins, percent=False, mean=False, nb=False):
-        """ Build histograms.
+        """Build histograms.
 
-            :param str varname: variable to use to compute stat
-            :param str x: variable to use to know in which bins
-            :param array bins:
-            :param bool percent: normalize by sum of all bins
-            :param bool mean: compute mean by bins
-            :param bool nb: only count by bins
-            :return: value by bins
-            :rtype: array
-            """
+        :param str varname: variable to use to compute stat
+        :param str x: variable to use to know in which bins
+        :param array bins:
+        :param bool percent: normalize by sum of all bins
+        :param bool mean: compute mean by bins
+        :param bool nb: only count by bins
+        :return: value by bins
+        :rtype: array
+        """
         if nb:
             v = hist_numba(self[x], bins=bins)[0]
         else:
@@ -261,8 +262,7 @@ class EddiesObservations(object):
         Mean amplitude (cm)       : {self.box_display(self.hist('amplitude', 'lat', bins_lat, mean=True) * 100.)}"""
 
     def __dir__(self):
-        """Provide method name lookup and completion.
-        """
+        """Provide method name lookup and completion."""
         base = set(dir(type(self)))
         intern_name = set(self.elements)
         extern_name = set([VAR_DESCR[k]["nc_name"] for k in intern_name])
@@ -361,8 +361,7 @@ class EddiesObservations(object):
 
     @property
     def dtype(self):
-        """Return dtype to build numpy array.
-        """
+        """Return dtype to build numpy array."""
         dtype = list()
         for elt in self.elements:
             data_type = (
@@ -378,8 +377,7 @@ class EddiesObservations(object):
 
     @property
     def elements(self):
-        """Return all the names of the variables.
-        """
+        """Return all the names of the variables."""
         elements = [i for i in self.ELEMENTS]
         if self.track_array_variables > 0:
             elements += self.array_variables
@@ -391,8 +389,7 @@ class EddiesObservations(object):
         return list(set(elements))
 
     def coherence(self, other):
-        """Check coherence between two datasets.
-        """
+        """Check coherence between two datasets."""
         test = self.track_extra_variables == other.track_extra_variables
         test *= self.track_array_variables == other.track_array_variables
         test *= self.array_variables == other.array_variables
@@ -417,8 +414,7 @@ class EddiesObservations(object):
         return eddies
 
     def merge(self, other):
-        """Merge two datasets.
-        """
+        """Merge two datasets."""
         nb_obs_self = len(self)
         nb_obs = nb_obs_self + len(other)
         eddies = self.new_like(self, nb_obs)
@@ -439,8 +435,7 @@ class EddiesObservations(object):
 
     @property
     def obs(self):
-        """Return observations.
-        """
+        """Return observations."""
         return self.observations
 
     def __len__(self):
@@ -505,8 +500,7 @@ class EddiesObservations(object):
             yield indexs_self, indexs_other, b0_self, b1_self
 
     def insert_observations(self, other, index):
-        """Insert other obs in self at the index.
-        """
+        """Insert other obs in self at the index."""
         if not self.coherence(other):
             raise Exception("Observations with no coherence")
         insert_size = len(other.obs)
@@ -527,15 +521,14 @@ class EddiesObservations(object):
         return self
 
     def append(self, other):
-        """Merge.
-        """
+        """Merge."""
         return self + other
 
     def __add__(self, other):
         return self.insert_observations(other, -1)
 
     def distance(self, other):
-        """ Use haversine distance for distance matrix between every self and
+        """Use haversine distance for distance matrix between every self and
         other eddies."""
         return distance_grid(self.lon, self.lat, other.lon, other.lat)
 
@@ -561,8 +554,7 @@ class EddiesObservations(object):
         )
 
     def index(self, index, reverse=False):
-        """Return obs from self at the index.
-        """
+        """Return obs from self at the index."""
         if reverse:
             index = reverse_index(index, len(self))
         size = 1
@@ -597,12 +589,14 @@ class EddiesObservations(object):
 
             kwargs_latlon_300 = dict(
                 include_vars=[
-                "longitude",
-                "latitude",
+                    "longitude",
+                    "latitude",
                 ],
                 indexs=dict(obs=slice(0, 300)),
             )
-            small_dataset = TrackEddiesObservations.load_file(filename, **kwargs_latlon_300)
+            small_dataset = TrackEddiesObservations.load_file(
+                filename, **kwargs_latlon_300
+            )
 
         For `**kwargs` look at :py:meth:`load_from_zarr` or :py:meth:`load_from_netcdf`
         """
@@ -1037,7 +1031,7 @@ class EddiesObservations(object):
 
     @classmethod
     def cost_function_common_area(cls, xy_in, xy_out, distance, intern=False):
-        """ How does it work on x bound ?
+        """How does it work on x bound ?
 
         :param xy_in:
         :param xy_out:
@@ -1106,7 +1100,12 @@ class EddiesObservations(object):
 
     def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
         return shifted_ellipsoid_degrees_mask2(
-            self.lon, self.lat, other.lon, other.lat, minor, major,
+            self.lon,
+            self.lat,
+            other.lon,
+            other.lat,
+            minor,
+            major,
         )
 
     def fixed_ellipsoid_mask(
@@ -1167,8 +1166,7 @@ class EddiesObservations(object):
     def basic_formula_ellips_major_axis(
         lats, cmin=1.5, cmax=10.0, c0=1.5, lat1=13.5, lat2=5.0, degrees=False
     ):
-        """Give major axis in km with a given latitude
-        """
+        """Give major axis in km with a given latitude"""
         # Straight line between lat1 and lat2:
         # y = a * x + b
         a = (cmin - cmax) / (lat1 - lat2)
@@ -1304,8 +1302,7 @@ class EddiesObservations(object):
         return i_self, i_other
 
     def tracking(self, other):
-        """Track obs between self and other
-        """
+        """Track obs between self and other"""
         dist = self.distance(other)
         mask_accept_dist = self.mask_function(other, dist)
         indexs_closest = where(mask_accept_dist)
@@ -1849,16 +1846,16 @@ class EddiesObservations(object):
 
     def grid_box_stat(self, bins, varname, method=50, data=None):
         """
-            Compute mean of eddies in each bin
+        Compute mean of eddies in each bin
 
-            :param (numpy.array,numpy.array) bins: bins (grid) to count
-            :param str varname: variable to apply the method
-            :param str,float method: method to apply. If float, use ?
-            :param array data: Array used to compute stat if defined
-            :return: return grid of method
-            :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
+        :param (numpy.array,numpy.array) bins: bins (grid) to count
+        :param str varname: variable to apply the method
+        :param str,float method: method to apply. If float, use ?
+        :param array data: Array used to compute stat if defined
+        :return: return grid of method
+        :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
 
-            .. minigallery:: py_eddy_tracker.EddiesObservations.grid_box_stat
+        .. minigallery:: py_eddy_tracker.EddiesObservations.grid_box_stat
         """
         x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
         x0 = bins[0][0]
@@ -2086,7 +2083,10 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
     max_method = "max" == method
     mean_method = "mean" == method
     for elt in range(nb):
-        v = create_vertice(x[elt], y[elt],)
+        v = create_vertice(
+            x[elt],
+            y[elt],
+        )
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
             v, x0, y0, xstep, ystep, 1, circular, nb_x
         )
@@ -2105,8 +2105,7 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
 
 
 class VirtualEddiesObservations(EddiesObservations):
-    """Class to work with virtual obs
-    """
+    """Class to work with virtual obs"""
 
     __slots__ = ()
 

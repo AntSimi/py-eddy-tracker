@@ -1,6 +1,7 @@
 import zarr
-from py_eddy_tracker.observations.observation import EddiesObservations
+
 from py_eddy_tracker.data import get_path
+from py_eddy_tracker.observations.observation import EddiesObservations
 
 a_filename, c_filename = (
     get_path("Anticyclonic_20190223.nc"),

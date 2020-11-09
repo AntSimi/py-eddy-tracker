@@ -4,9 +4,10 @@ Display Tracks
 
 """
 
-from matplotlib import pyplot as plt
-from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
+from matplotlib import pyplot as plt
+
+from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 # %%
 # Load experimental atlas

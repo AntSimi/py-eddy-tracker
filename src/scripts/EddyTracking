@@ -3,19 +3,20 @@
 """
 Track eddy with Identification file produce with EddyIdentification
 """
-from py_eddy_tracker import EddyParser
-from yaml import load as yaml_load
-from py_eddy_tracker.tracking import Correspondances
-from os.path import exists, dirname, basename
-from os import mkdir
-from re import compile as re_compile
-from os.path import join as join_path
-from numpy import bytes_, empty, unique
-from netCDF4 import Dataset
+import logging
 from datetime import datetime
 from glob import glob
-import logging
+from os import mkdir
+from os.path import basename, dirname, exists
+from os.path import join as join_path
+from re import compile as re_compile
 
+from netCDF4 import Dataset
+from numpy import bytes_, empty, unique
+from yaml import load as yaml_load
+
+from py_eddy_tracker import EddyParser
+from py_eddy_tracker.tracking import Correspondances
 
 logger = logging.getLogger("pet")
 

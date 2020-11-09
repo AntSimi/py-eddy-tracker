@@ -6,9 +6,10 @@ Gallery of contours with shape error
 
 """
 from matplotlib import pyplot as plt
-from numpy import arange, radians, linspace, cos, sin
-from py_eddy_tracker.dataset.grid import RegularGridDataset
+from numpy import arange, cos, linspace, radians, sin
+
 from py_eddy_tracker import data
+from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker.eddy_feature import Contours
 from py_eddy_tracker.generic import local_to_coordinates
 

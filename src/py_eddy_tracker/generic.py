@@ -3,27 +3,28 @@
 Tool method which use mostly numba
 """
 
+from numba import njit, prange
+from numba import types as numba_types
 from numpy import (
-    sin,
-    pi,
-    cos,
-    arctan2,
-    arcsin,
-    empty,
-    nan,
     absolute,
+    arcsin,
+    arctan2,
+    bool_,
+    cos,
+    empty,
     floor,
-    ones,
-    linspace,
+    histogram,
     interp,
+    isnan,
+    linspace,
+    nan,
+    ones,
+    pi,
+    radians,
+    sin,
     where,
     zeros,
-    isnan,
-    bool_,
-    radians,
-    histogram,
 )
-from numba import njit, prange, types as numba_types
 
 
 @njit(cache=True)

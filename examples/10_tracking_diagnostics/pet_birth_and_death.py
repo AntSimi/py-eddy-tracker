@@ -5,9 +5,10 @@ Birth and death
 Following figures are based on https://doi.org/10.1016/j.pocean.2011.01.002
 
 """
-from matplotlib import pyplot as plt
-from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
+from matplotlib import pyplot as plt
+
+from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 
 # %%

@@ -4,13 +4,12 @@ Radius vs area
 
 """
 from matplotlib import pyplot as plt
-from py_eddy_tracker.observations.observation import EddiesObservations
+from numpy import array, pi
+
 from py_eddy_tracker import data
-
-from py_eddy_tracker.poly import poly_area
 from py_eddy_tracker.generic import coordinates_to_local
-from numpy import pi, array
-
+from py_eddy_tracker.observations.observation import EddiesObservations
+from py_eddy_tracker.poly import poly_area
 
 # %%
 # Load detection files

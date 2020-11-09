@@ -3,6 +3,7 @@
 Entry point with no direct link with eddies
 """
 import argparse
+
 import zarr
 
 

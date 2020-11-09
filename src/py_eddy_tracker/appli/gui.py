@@ -3,15 +3,17 @@
 Entry point of graphic user interface
 """
 
-from numpy import arange, empty, where
+from datetime import datetime
+
 from matplotlib import pyplot
 from matplotlib.collections import LineCollection
-from datetime import datetime
-from ..poly import create_vertice
-from ..generic import flatten_line_matrix
+from numpy import arange, empty, where
+
 from .. import EddyParser
-from ..observations.tracking import TrackEddiesObservations
+from ..generic import flatten_line_matrix
 from ..gui import GUI
+from ..observations.tracking import TrackEddiesObservations
+from ..poly import create_vertice
 
 
 class Anim:

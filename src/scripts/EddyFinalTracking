@@ -3,12 +3,13 @@
 """
 Track eddy with Identification file produce with EddyIdentification
 """
+import datetime as dt
+import logging
+from os import mkdir
+from os.path import exists
+
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.tracking import Correspondances
-from os.path import exists
-from os import mkdir
-import logging
-import datetime as dt
 
 logger = logging.getLogger("pet")
 

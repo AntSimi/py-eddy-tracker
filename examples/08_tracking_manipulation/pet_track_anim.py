@@ -5,9 +5,10 @@ Track animation
 Run in a terminal this script, which allow to watch eddy evolution
 
 """
-from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-from py_eddy_tracker.appli.gui import Anim
 import py_eddy_tracker_sample
+
+from py_eddy_tracker.appli.gui import Anim
+from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 # %%
 # Load experimental atlas, and we select one eddy

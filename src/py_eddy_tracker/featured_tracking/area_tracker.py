@@ -1,6 +1,8 @@
-from ..observations.observation import EddiesObservations as Model
-from numpy import ma
 import logging
+
+from numpy import ma
+
+from ..observations.observation import EddiesObservations as Model
 
 logger = logging.getLogger("pet")
 

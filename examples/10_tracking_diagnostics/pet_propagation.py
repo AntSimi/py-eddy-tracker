@@ -3,11 +3,12 @@ Propagation Histogram
 =====================
 
 """
-from matplotlib import pyplot as plt
-from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-from py_eddy_tracker.generic import cumsum_by_track
 import py_eddy_tracker_sample
+from matplotlib import pyplot as plt
 from numpy import arange, ones
+
+from py_eddy_tracker.generic import cumsum_by_track
+from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 # %%
 # Load an experimental med atlas over a period of 26 years (1993-2019)

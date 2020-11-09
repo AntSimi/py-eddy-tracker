@@ -3,10 +3,11 @@ Parameter Histogram
 ===================
 
 """
-from matplotlib import pyplot as plt
-from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 import py_eddy_tracker_sample
+from matplotlib import pyplot as plt
 from numpy import arange
+
+from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 # %%
 # Load an experimental med atlas over a period of 26 years (1993-2019)

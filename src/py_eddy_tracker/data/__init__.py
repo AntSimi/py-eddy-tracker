@@ -8,11 +8,12 @@ EddyId \
     20160515 adt None None longitude latitude . \
     --cut 800 --fil 1
 """
-from os import path
-import requests
 import io
-import tarfile
 import lzma
+import tarfile
+from os import path
+
+import requests
 
 
 def get_path(name):

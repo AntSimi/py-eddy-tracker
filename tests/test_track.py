@@ -1,9 +1,10 @@
-from py_eddy_tracker.observations.observation import EddiesObservations
-from py_eddy_tracker.data import get_path
-from py_eddy_tracker.tracking import Correspondances
-from py_eddy_tracker.featured_tracking.area_tracker import AreaTracker
 import zarr
 from netCDF4 import Dataset
+
+from py_eddy_tracker.data import get_path
+from py_eddy_tracker.featured_tracking.area_tracker import AreaTracker
+from py_eddy_tracker.observations.observation import EddiesObservations
+from py_eddy_tracker.tracking import Correspondances
 
 filename = get_path("Anticyclonic_20190223.nc")
 a0 = EddiesObservations.load_file(filename)

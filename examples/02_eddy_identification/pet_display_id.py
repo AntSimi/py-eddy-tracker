@@ -5,8 +5,9 @@ Display identification
 """
 
 from matplotlib import pyplot as plt
-from py_eddy_tracker.observations.observation import EddiesObservations
+
 from py_eddy_tracker import data
+from py_eddy_tracker.observations.observation import EddiesObservations
 
 # %%
 # Load detection files

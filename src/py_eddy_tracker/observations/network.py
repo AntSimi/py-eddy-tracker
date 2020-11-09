@@ -4,11 +4,13 @@ Class to create network of observations
 """
 import logging
 from glob import glob
-from numpy import array, empty, arange, unique, bincount, uint32
+
 from numba import njit
+from numpy import arange, array, bincount, empty, uint32, unique
+
+from ..poly import bbox_intersection, vertice_overlap
 from .observation import EddiesObservations
 from .tracking import TrackEddiesObservations
-from ..poly import bbox_intersection, vertice_overlap
 
 logger = logging.getLogger("pet")
 
@@ -122,8 +124,7 @@ class Network:
 
 @njit(cache=True)
 def get_next_index(gr):
-    """Return for each obs index the new position to join all group
-    """
+    """Return for each obs index the new position to join all group"""
     nb_obs_gr = bincount(gr)
     i_gr = nb_obs_gr.cumsum() - nb_obs_gr
     new_index = empty(gr.shape, dtype=uint32)

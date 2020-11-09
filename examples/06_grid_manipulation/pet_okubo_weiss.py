@@ -13,10 +13,11 @@ with normal strain (:math:`S_n`), shear strain (:math:`S_s`) and vorticity (:mat
 
 """
 from matplotlib import pyplot as plt
+from numpy import arange, ma, where
+
+from py_eddy_tracker import data
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker.observations.observation import EddiesObservations
-from py_eddy_tracker import data
-from numpy import arange, ma, where
 
 
 # %%

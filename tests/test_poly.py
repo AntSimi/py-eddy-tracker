@@ -1,6 +1,7 @@
-from py_eddy_tracker.poly import poly_area_vertice, fit_circle, convex, get_convex_hull
 from numpy import array, pi
 from pytest import approx
+
+from py_eddy_tracker.poly import convex, fit_circle, get_convex_hull, poly_area_vertice
 
 # Vertices for next test
 V = array(((2, 2, 3, 3, 2), (-10, -9, -9, -10, -10)))

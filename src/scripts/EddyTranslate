@@ -3,10 +3,11 @@
 """
 Translate eddy Dataset
 """
+import zarr
+from netCDF4 import Dataset
+
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.observations.observation import EddiesObservations
-from netCDF4 import Dataset
-import zarr
 
 
 def id_parser():

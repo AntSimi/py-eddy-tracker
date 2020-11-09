@@ -3,9 +3,10 @@
 Method for polygon
 """
 
-from numpy import empty, where, array, ones, pi, concatenate
+from numba import njit, prange
+from numba import types as numba_types
+from numpy import array, concatenate, empty, ones, pi, where
 from numpy.linalg import lstsq
-from numba import njit, prange, types as numba_types
 from Polygon import Polygon
 
 
@@ -516,14 +517,15 @@ def fit_circle_(x, y):
         import numpy as np
         from py_eddy_tracker.poly import fit_circle_
         from py_eddy_tracker.generic import build_circle
-        V = np.array(((2, 2, 3, 3, 2), (-10, -9, -9, -10, -10)), dtype='f4')
+
+        V = np.array(((2, 2, 3, 3, 2), (-10, -9, -9, -10, -10)), dtype="f4")
         x0, y0, radius, err = fit_circle_(V[0], V[1])
         ax = plt.subplot(111)
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         ax.grid(True)
-        ax.plot(*build_circle(x0,y0, radius), 'r')
-        ax.plot(x0, y0, 'r+')
-        ax.plot(*V, 'b.')
+        ax.plot(*build_circle(x0, y0, radius), "r")
+        ax.plot(x0, y0, "r+")
+        ax.plot(*V, "b.")
         plt.show()
     """
     datas = ones((x.shape[0] - 1, 3), dtype=x.dtype)

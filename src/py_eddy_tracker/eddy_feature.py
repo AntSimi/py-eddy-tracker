@@ -4,22 +4,25 @@ Class to compute Amplitude and average speed profile
 """
 
 import logging
-from numpy import (
-    empty,
-    array,
-    concatenate,
-    ma,
-    zeros,
-    unique,
-    round,
-    ones,
-    int_,
-    digitize,
-)
+
+from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize
 from matplotlib.figure import Figure
-from matplotlib.cm import get_cmap
-from numba import njit, types as numba_types
+from numba import njit
+from numba import types as numba_types
+from numpy import (
+    array,
+    concatenate,
+    digitize,
+    empty,
+    int_,
+    ma,
+    ones,
+    round,
+    unique,
+    zeros,
+)
+
 from .poly import winding_number_poly
 
 logger = logging.getLogger("pet")
@@ -106,8 +109,7 @@ class Amplitude(object):
         self.mle = mle
 
     def within_amplitude_limits(self):
-        """Need update
-        """
+        """Need update"""
         return self.interval_min <= self.amplitude
 
     def all_pixels_below_h0(self, level):
@@ -429,8 +431,8 @@ class Contours(object):
         closed_contours = 0
         # Count level and contour
         for i, collection in enumerate(self.contours.collections):
-            collection.get_nearest_path_bbox_contain_pt = lambda x, y, i=i: self.get_index_nearest_path_bbox_contain_pt(
-                i, x, y
+            collection.get_nearest_path_bbox_contain_pt = (
+                lambda x, y, i=i: self.get_index_nearest_path_bbox_contain_pt(i, x, y)
             )
             nb_level += 1
 
@@ -731,8 +733,7 @@ def index_from_nearest_path_with_pt_in_bbox_(
     xpt,
     ypt,
 ):
-    """Get index from nearest path in edge bbox contain pt
-    """
+    """Get index from nearest path in edge bbox contain pt"""
     # Nb contour in level
     if nb_c_per_l[level_index] == 0:
         return -1

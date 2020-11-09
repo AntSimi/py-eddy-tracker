@@ -8,10 +8,12 @@ in a common structure with altimetry.
 Figures higlights the different steps.
 """
 
-from matplotlib import pyplot as plt
-from py_eddy_tracker.dataset.grid import RegularGridDataset
 from datetime import datetime
+
+from matplotlib import pyplot as plt
+
 from py_eddy_tracker import data
+from py_eddy_tracker.dataset.grid import RegularGridDataset
 
 date = datetime(2016, 7, 7)
 
