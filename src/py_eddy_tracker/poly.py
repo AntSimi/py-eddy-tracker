@@ -11,7 +11,14 @@ from Polygon import Polygon
 
 
 @njit(cache=True)
-def is_left(x_line_0, y_line_0, x_line_1, y_line_1, x_test, y_test):
+def is_left(
+    x_line_0: float,
+    y_line_0: float,
+    x_line_1: float,
+    y_line_1: float,
+    x_test: float,
+    y_test: float,
+) -> bool:
     """
     Test if point is left of an infinit line.
 

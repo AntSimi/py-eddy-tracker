@@ -306,6 +306,16 @@ class TrackEddiesObservations(EddiesObservations):
         self.compute_index()
         return self.__obs_by_track
 
+    @property
+    def lifetime(self):
+        """Return for each observation lifetime"""
+        return self.nb_obs_by_track.repeat(self.nb_obs_by_track)
+
+    @property
+    def age(self):
+        """Return for each observation age in %, will be [0:100]"""
+        return self.n.astype("f4") / (self.lifetime - 1) * 100.0
+
     def extract_ids(self, tracks):
         mask = self.get_mask_from_id(array(tracks))
         return self.extract_with_mask(mask)
