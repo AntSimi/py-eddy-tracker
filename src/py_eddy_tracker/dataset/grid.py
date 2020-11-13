@@ -1842,13 +1842,14 @@ class RegularGridDataset(GridDataset):
         # self.variables_description[new_name]['infos'] = False
         # self.variables_description[new_name]['kwargs']['dimensions'] = ...
 
-    def interp(self, grid_name, lons, lats):
+    def interp(self, grid_name, lons, lats, method="bilinear"):
         """
         Compute z over lons, lats
 
         :param str grid_name: Grid to be interpolated
         :param lons: new x
         :param lats: new y
+        :param str method: Could be 'bilinear' or 'nearest'
 
         :return: new z
         """
@@ -1857,7 +1858,9 @@ class RegularGridDataset(GridDataset):
             m = g.mask
         else:
             m = ones(g.shape) if g.mask else zeros(g.shape)
-        return interp2d_geo(self.x_c, self.y_c, g, m, lons, lats)
+        return interp2d_geo(
+            self.x_c, self.y_c, g, m, lons, lats, nearest=method == "nearest"
+        )
 
 
 @njit(cache=True, fastmath=True)

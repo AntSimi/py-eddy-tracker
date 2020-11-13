@@ -1934,12 +1934,12 @@ class EddiesObservations(object):
         :param grid_object: Handler of grid to interp
         :type grid_object: py_eddy_tracker.dataset.grid.RegularGridDataset
         :param str varname: Name of variable to use
-        :param str method: 'center', 'mean', 'max', 'min'
+        :param str method: 'center', 'mean', 'max', 'min', 'nearest'
         :param str dtype: if None we use var dtype
         :param bool intern: Use extern or intern contour
         """
-        if method == "center":
-            return grid_object.interp(varname, self.longitude, self.latitude)
+        if method in ("center", "nearest"):
+            return grid_object.interp(varname, self.longitude, self.latitude, method)
         elif method in ("min", "max", "mean", "count"):
             x0 = grid_object.x_bounds[0]
             x_name, y_name = self.intern(False if intern is None else intern)

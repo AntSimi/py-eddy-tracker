@@ -177,7 +177,7 @@ def cumsum_by_track(field, track):
 
 
 @njit(cache=True, fastmath=True)
-def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
+def interp2d_geo(x_g, y_g, z_g, m_g, x, y, nearest=False):
     """
     For geographic grid, test of cicularity.
 
@@ -187,6 +187,7 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
     :param array m_g: Boolean grid, True if value is masked
     :param array x: coordinate where interpolate z
     :param array y: coordinate where interpolate z
+    :param bool nearest: if true we will take nearest pixel
     :return: z interpolated
     :rtype: array
     """
@@ -223,9 +224,21 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y):
         if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
             z[i] = nan
         else:
-            z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (
-                z01 * (1 - xd) + z11 * xd
-            ) * yd
+            if nearest:
+                if xd <= 0.5:
+                    if yd <= 0.5:
+                        z[i] = z00
+                    else:
+                        z[i] = z01
+                else:
+                    if yd <= 0.5:
+                        z[i] = z10
+                    else:
+                        z[i] = z11
+            else:
+                z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (
+                    z01 * (1 - xd) + z11 * xd
+                ) * yd
     return z
 
 
