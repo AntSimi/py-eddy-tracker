@@ -25,6 +25,18 @@ An eddy identification will produce two files in the output directory, one for a
 
 In regional area which are away from the equator, current could be deduce from height, juste write *None None* inplace of *ugos vgos*
 
+In case of **datacube**, you need to specify index for each layer (time, depth, ...) wiht *--indexs* option like:
+
+.. code-block:: bash
+
+    EddyId share/nrt_global_allsat_phy_l4_20190223_20190226.nc 20190223 \
+        adt ugos vgos longitude latitude \
+        out_directory -v DEBUG --indexs time=0
+
+.. warning::
+    If no index are specified, you will apply identification only on dataset first layer, which could be
+    a problem for datacube. Date set in command is used only for output storage.
+
 Python code
 ***********
 

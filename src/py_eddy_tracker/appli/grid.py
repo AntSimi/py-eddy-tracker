@@ -2,6 +2,7 @@
 """
 All entry point to manipulate grid
 """
+from argparse import Action
 from datetime import datetime
 
 from .. import EddyParser
@@ -47,6 +48,17 @@ def grid_filtering():
     h.write(args.filename_out)
 
 
+class DictAction(Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        indexs = None
+        if len(values):
+            indexs = dict()
+            for value in values:
+                k, v = value.split("=")
+                indexs[k] = int(v)
+        setattr(namespace, self.dest, indexs)
+
+
 def eddy_id(args=None):
     parser = EddyParser("Eddy Identification")
     parser.add_argument("filename")
@@ -69,8 +81,14 @@ def eddy_id(args=None):
     parser.add_argument("--unregular", action="store_true", help="if grid is unregular")
     help = "Output will be wrote in zarr"
     parser.add_argument("--zarr", action="store_true", help=help)
+    help = "Indexs to select grid : --indexs time=2, will select third step along time dimensions"
+    parser.add_argument(
+        "--indexs",
+        nargs="*",
+        help=help,
+        action=DictAction,
+    )
     args = parser.parse_args(args) if args else parser.parse_args()
-
     date = datetime.strptime(args.datetime, "%Y%m%d")
     kwargs = dict(
         step=args.isoline_step,
@@ -90,7 +108,8 @@ def eddy_id(args=None):
         unregular=args.unregular,
         cut_wavelength=args.cut_wavelength,
         filter_order=args.filter_order,
-        **kwargs
+        indexs=args.indexs,
+        **kwargs,
     )
     out_name = date.strftime("%(path)s/%(sign_type)s_%Y%m%d.nc")
     a.write_file(path=args.path_out, filename=out_name, zarr_flag=args.zarr)
@@ -108,10 +127,11 @@ def identification(
     unregular=False,
     cut_wavelength=500,
     filter_order=1,
+    indexs=None,
     **kwargs
 ):
     grid_class = UnRegularGridDataset if unregular else RegularGridDataset
-    grid = grid_class(filename, lon, lat)
+    grid = grid_class(filename, lon, lat, indexs=indexs)
     if u == "None" and v == "None":
         grid.add_uv(h)
         u, v = "u", "v"

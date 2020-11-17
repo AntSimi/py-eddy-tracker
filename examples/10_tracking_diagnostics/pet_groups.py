@@ -1,6 +1,6 @@
 """
 Groups distribution
-==================
+===================
 
 """
 import py_eddy_tracker_sample

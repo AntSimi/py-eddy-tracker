@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add option to EddyId to select data index like `--indexs time=5 depth=2`
 - Add a method to merge several indexs type for eddy obs
 - Acces at dataset variable like attribute, and lifetime/age are available for all observations
 - Add **EddyInfos** application to get general information about eddies dataset
