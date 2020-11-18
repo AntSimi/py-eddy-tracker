@@ -283,6 +283,16 @@ class TrackEddiesObservations(EddiesObservations):
             compute_index(self.tracks, self.__first_index_of_track, self.__obs_by_track)
             logger.debug("... OK")
 
+    @classmethod
+    def concatenate(cls, observations):
+        eddies = super().concatenate(observations)
+        last_track = 0
+        for obs in observations:
+            nb_obs = len(obs)
+            eddies.track[-nb_obs:] = obs.track + last_track
+            last_track = eddies.track[-nb_obs:].max() + 1
+        return eddies
+
     def count_by_track(self, mask):
         """
         Count by track

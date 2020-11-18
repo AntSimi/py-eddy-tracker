@@ -25,6 +25,7 @@ from numpy import (
     cos,
     digitize,
     empty,
+    errstate,
     floor,
     histogram,
     histogram2d,
@@ -119,6 +120,7 @@ class EddiesObservations(object):
         "observations",
         "sign_type",
         "raw_data",
+        "period_",
     )
 
     ELEMENTS = [
@@ -150,6 +152,7 @@ class EddiesObservations(object):
         only_variables=None,
         raw_data=False,
     ):
+        self.period_ = None
         self.only_variables = only_variables
         self.raw_data = raw_data
         self.track_extra_variables = (
@@ -1686,65 +1689,89 @@ class EddiesObservations(object):
         c.norm = Normalize(vmin=vmin, vmax=vmax)
         return c
 
-    def merge_indexs(self, filter, index=None):
+    def __merge_filters__(self, *filters):
         """
-        Compute an intersectin between indexs and filters after to evaluate each of them
+        Compute an intersection between all filters after to evaluate each of them
 
-        :param callable,None,slice,array[int],array[bool] filter:
-        :param callable,None,slice,array[int],array[bool] index:
+        :param list(slice,array[int],array[bool]) filters:
 
         :return: Return applicable object to numpy.array
         :rtype: slice, index, mask
         """
-        # If filter is a function we apply on dataset
-        if callable(filter):
-            filter = filter(self)
-        # Solve indexs case
-        if index is not None:
-            index = self.merge_indexs(index)
+        filter1 = filters[0]
+        if len(filters) > 2:
+            filter2 = self.__merge_filters__(*filters[1:])
+        elif len(filters) == 2:
+            filter2 = filters[1]
         # Merge indexs and filter
-        if index is None and filter is None:
-            return slice(None)
-        if index is None:
-            return filter
-        if filter is None:
-            return index
-        if isinstance(index, slice):
+        if isinstance(filter1, slice):
             reject = ones(len(self), dtype="bool")
-            reject[index] = False
-            if isinstance(filter, slice):
-                reject[filter] = False
+            reject[filter1] = False
+            if isinstance(filter2, slice):
+                reject[filter2] = False
                 return ~reject
             # Mask case
-            elif filter.dtype == bool:
-                return ~reject * filter
+            elif filter2.dtype == bool:
+                return ~reject * filter2
             # index case
             else:
-                return filter[~reject[filter]]
+                return filter2[~reject[filter2]]
         # mask case
-        elif index.dtype == bool:
-            if isinstance(filter, slice):
+        elif filter1.dtype == bool:
+            if isinstance(filter2, slice):
                 select = zeros(len(self), dtype="bool")
-                select[filter] = True
-                return select * index
+                select[filter2] = True
+                return select * filter1
             # Mask case
-            elif filter.dtype == bool:
-                return filter * index
+            elif filter2.dtype == bool:
+                return filter2 * filter1
             # index case
             else:
-                return filter[index[filter]]
+                return filter2[filter1[filter2]]
         # index case
         else:
-            if isinstance(filter, slice):
+            if isinstance(filter2, slice):
                 select = zeros(len(self), dtype="bool")
-                select[filter] = True
-                return index[select[index]]
+                select[filter2] = True
+                return filter1[select[filter1]]
             # Mask case
-            elif filter.dtype == bool:
-                return index[filter[index]]
+            elif filter2.dtype == bool:
+                return filter1[filter2[filter1]]
             # index case
             else:
-                return index[in1d(index, filter)]
+                return filter1[in1d(filter1, filter2)]
+
+    def merge_filters(self, *filters):
+        """
+        Compute an intersection between all filters after to evaluate each of them
+
+        :param list(callable,None,slice,array[int],array[bool]) filters:
+
+        :return: Return applicable object to numpy.array
+        :rtype: slice, index, mask
+        """
+        filters_ = list()
+        # Remove all filter which select all obs
+        for filter in filters:
+            if callable(filter):
+                filter = filter(self)
+            if filter is None:
+                continue
+            if isinstance(filter, slice):
+                if slice(None) == slice(None):
+                    continue
+            if filter.dtype == "bool":
+                if filter.all():
+                    continue
+                if not filter.any():
+                    return empty(0, dtype=int)
+            filters_.append(filter)
+        if len(filters_) == 1:
+            return filters_[0]
+        elif len(filters_) == 0:
+            return slice(None)
+        else:
+            return self.__merge_filters__(*filters_)
 
     def bins_stat(self, xname, bins=None, yname=None, method=None, mask=None):
         """
@@ -1891,7 +1918,6 @@ class EddiesObservations(object):
             grid.mask = grid.data == 0
         else:
             x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
-            # x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
             nb = x_ref.shape[0]
             for i_, (x, y_) in enumerate(zip(self[x_name], self[y_name])):
                 x_ = (x - x_ref[i_]) % 360 + x_ref[i_]
@@ -1974,15 +2000,16 @@ class EddiesObservations(object):
             nb_obs = histogram2d(x, y, (x_bins, y_bins))[0]
         from ..dataset.grid import RegularGridDataset
 
-        regular_grid = RegularGridDataset.with_array(
-            coordinates=("x", "y"),
-            datas={
-                varname: ma.array(sum_obs / nb_obs, mask=nb_obs == 0),
-                "x": x_bins[:-1],
-                "y": y_bins[:-1],
-            },
-            centered=False,
-        )
+        with errstate(divide="ignore", invalid="ignore"):
+            regular_grid = RegularGridDataset.with_array(
+                coordinates=("x", "y"),
+                datas={
+                    varname: ma.array(sum_obs / nb_obs, mask=nb_obs == 0),
+                    "x": x_bins[:-1],
+                    "y": y_bins[:-1],
+                },
+                centered=False,
+            )
         return regular_grid
 
     def interp_grid(
@@ -2030,7 +2057,18 @@ class EddiesObservations(object):
         :return: first and last date
         :rtype: (int,int)
         """
-        return self.time.min(), self.time.max()
+        if self.period_ is None:
+            self.period_ = self.time.min(), self.time.max()
+        return self.period_
+
+    @property
+    def nb_days(self):
+        """Return period days cover by dataset
+
+        :return: Number of days
+        :rtype: int
+        """
+        return self.period[1] - self.period[0] + 1
 
 
 @njit(cache=True)
