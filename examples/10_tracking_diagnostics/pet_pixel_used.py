@@ -64,3 +64,20 @@ for ax in (ax_a, ax_c, ax_all, ax_ratio):
     ax.set_aspect("equal")
     ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)
     ax.grid()
+
+# %%
+# Count Anticyclones as a function of lifetime
+# --------------------------------------------
+
+fig = plt.figure(figsize=(12, 10))
+ax = fig.add_subplot(211)
+g_a = a.grid_count(bins, intern=True, filter=a.lifetime >= 30)
+m = g_a.display(ax, **kwargs_pcolormesh)
+ax.set_aspect("equal")
+ax.set_title("Anticyclones with lifetime >= 30 days")
+cb = plt.colorbar(m, cax=fig.add_axes([0.94, 0.1, 0.015, 0.8]))
+ax = fig.add_subplot(212)
+g_a = a.grid_count(bins, intern=True, filter=a.lifetime < 30)
+m = g_a.display(ax, **kwargs_pcolormesh)
+ax.set_aspect("equal")
+ax.set_title("Anticyclones with lifetime < 30 days")
