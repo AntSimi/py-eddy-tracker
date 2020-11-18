@@ -89,7 +89,7 @@ class GUI:
             t0_, t1_ = dataset.period
             t0, t1 = min(t0, t0_), max(t1, t1_)
 
-        self.settings = dict(period=(t0, t1), now=t1,)
+        self.settings = dict(period=(t0, t1), now=t1)
 
     @property
     def now(self):

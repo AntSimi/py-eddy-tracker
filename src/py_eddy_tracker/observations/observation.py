@@ -1104,7 +1104,12 @@ class EddiesObservations(object):
 
     def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
         return shifted_ellipsoid_degrees_mask2(
-            self.lon, self.lat, other.lon, other.lat, minor, major,
+            self.lon,
+            self.lat,
+            other.lon,
+            other.lat,
+            minor,
+            major,
         )
 
     def fixed_ellipsoid_mask(

@@ -31,7 +31,7 @@ def update_axes(ax, mappable=None):
 # Load Input grid, ADT will be used to detect eddies
 
 g = RegularGridDataset(
-    data.get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude",
+    data.get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
 )
 g.add_uv("adt", "ugos", "vgos")
 g.add_uv("sla", "ugosa", "vgosa")
