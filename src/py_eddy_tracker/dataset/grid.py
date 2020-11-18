@@ -301,8 +301,7 @@ class GridDataset(object):
         self.interpolators = dict()
         if centered is None:
             logger.warning(
-                "We assume pixel position of grid is center for %s",
-                filename,
+                "We assume pixel position of grid is center for %s", filename,
             )
         if not unset:
             self.load_general_features()
@@ -344,10 +343,7 @@ class GridDataset(object):
             self.variables_description = dict()
             for i, v in h.variables.items():
                 args = (i, v.datatype)
-                kwargs = dict(
-                    dimensions=v.dimensions,
-                    zlib=True,
-                )
+                kwargs = dict(dimensions=v.dimensions, zlib=True,)
                 if hasattr(v, "_FillValue"):
                     kwargs["fill_value"] = (v._FillValue,)
                 attrs = dict()

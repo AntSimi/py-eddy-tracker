@@ -32,20 +32,8 @@ ax.grid()
 c.plot(ax, color="gray", lw=0.1, ref=-10, label="all tracks")
 c_subset.plot(ax, color="red", lw=0.2, ref=-10, label="selected tracks")
 ax.plot(
-    (
-        x0,
-        x0,
-        x1,
-        x1,
-        x0,
-    ),
-    (
-        y0,
-        y1,
-        y1,
-        y0,
-        y0,
-    ),
+    (x0, x0, x1, x1, x0,),
+    (y0, y1, y1, y0, y0,),
     color="green",
     lw=1.5,
     label="Box of selection",

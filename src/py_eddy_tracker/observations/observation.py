@@ -1104,12 +1104,7 @@ class EddiesObservations(object):
 
     def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
         return shifted_ellipsoid_degrees_mask2(
-            self.lon,
-            self.lat,
-            other.lon,
-            other.lat,
-            minor,
-            major,
+            self.lon, self.lat, other.lon, other.lat, minor, major,
         )
 
     def fixed_ellipsoid_mask(
@@ -1881,13 +1876,14 @@ class EddiesObservations(object):
         xname, yname = self.intern(intern)
         return insidepoly(x, y, self[xname], self[yname])
 
-    def grid_count(self, bins, intern=False, center=False):
+    def grid_count(self, bins, intern=False, center=False, filter=slice(None)):
         """
         Count the eddies in each bin (use all pixels in each contour)
 
         :param (numpy.array,numpy.array) bins: bins (grid) to count
         :param bool intern: if True use speed contour only
         :param bool center: if True use of center to count
+        :param array,mask,slice filter: keep the data selected with the filter
         :return: return the grid of counts
         :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
 
@@ -1913,13 +1909,15 @@ class EddiesObservations(object):
         )
         debug_active = logger.getEffectiveLevel() == logging.DEBUG
         if center:
-            x, y = (self.longitude - x0) % 360 + x0, self.latitude
+            x, y = (self.longitude[filter] - x0) % 360 + x0, self.latitude[filter]
             grid[:] = histogram2d(x, y, (x_bins, y_bins))[0]
             grid.mask = grid.data == 0
         else:
-            x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
+            x_ref = ((self.longitude[filter] - x0) % 360 + x0 - 180).reshape(-1, 1)
             nb = x_ref.shape[0]
-            for i_, (x, y_) in enumerate(zip(self[x_name], self[y_name])):
+            for i_, (x, y_) in enumerate(
+                zip(self[x_name][filter], self[y_name][filter])
+            ):
                 x_ = (x - x_ref[i_]) % 360 + x_ref[i_]
                 if debug_active and i_ % 10000 == 0:
                     print(f"{i_}/{nb}", end="\r")
@@ -2181,10 +2179,7 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
     max_method = "max" == method
     mean_method = "mean" == method
     for elt in range(nb):
-        v = create_vertice(
-            x[elt],
-            y[elt],
-        )
+        v = create_vertice(x[elt], y[elt])
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
             v, x0, y0, xstep, ystep, 1, circular, nb_x
         )
