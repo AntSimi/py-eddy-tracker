@@ -28,6 +28,7 @@ from numpy import (
     floor,
     histogram,
     histogram2d,
+    in1d,
     isnan,
     linspace,
     ma,
@@ -1680,6 +1681,66 @@ class EddiesObservations(object):
         c.norm = Normalize(vmin=vmin, vmax=vmax)
         return c
 
+    def merge_indexs(self, filter, index=None):
+        """
+        Compute an intersectin between indexs and filters after to evaluate each of them
+
+        :param callable,None,slice,array[int],array[bool] filter:
+        :param callable,None,slice,array[int],array[bool] index:
+
+        :return: Return applicable object to numpy.array
+        :rtype: slice, index, mask
+        """
+        # If filter is a function we apply on dataset
+        if callable(filter):
+            filter = filter(self)
+        # Solve indexs case
+        if index is not None:
+            index = self.merge_indexs(index)
+        # Merge indexs and filter
+        if index is None and filter is None:
+            return slice(None)
+        if index is None:
+            return filter
+        if filter is None:
+            return index
+        if isinstance(index, slice):
+            reject = ones(len(self), dtype="bool")
+            reject[index] = False
+            if isinstance(filter, slice):
+                reject[filter] = False
+                return ~reject
+            # Mask case
+            elif filter.dtype == bool:
+                return ~reject * filter
+            # index case
+            else:
+                return filter[~reject[filter]]
+        # mask case
+        elif index.dtype == bool:
+            if isinstance(filter, slice):
+                select = zeros(len(self), dtype="bool")
+                select[filter] = True
+                return select * index
+            # Mask case
+            elif filter.dtype == bool:
+                return filter * index
+            # index case
+            else:
+                return filter[index[filter]]
+        # index case
+        else:
+            if isinstance(filter, slice):
+                select = zeros(len(self), dtype="bool")
+                select[filter] = True
+                return index[select[index]]
+            # Mask case
+            elif filter.dtype == bool:
+                return index[filter[index]]
+            # index case
+            else:
+                return index[in1d(index, filter)]
+
     def bins_stat(self, xname, bins=None, yname=None, method=None, mask=None):
         """
         :param str,array xname: variable to compute stats on
@@ -1693,16 +1754,15 @@ class EddiesObservations(object):
         .. minigallery:: py_eddy_tracker.EddiesObservations.bins_stat
         """
         v = self[xname] if isinstance(xname, str) else xname
-        if mask is not None:
-            v = v[mask]
+        mask = self.merge_indexs(mask)
+        v = v[mask]
         if bins is None:
             bins = arange(v.min(), v.max() + 2)
         y, x = hist_numba(v, bins=bins)
         x = (x[1:] + x[:-1]) / 2
         if method == "mean":
             y_v = self[yname] if isinstance(yname, str) else yname
-            if mask is not None:
-                y_v = y_v[mask]
+            y_v = y_v[mask]
             y_, _ = histogram(v, bins=bins, weights=y_v)
             y = y_ / y
         return x, y
