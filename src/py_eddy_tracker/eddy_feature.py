@@ -431,8 +431,8 @@ class Contours(object):
         closed_contours = 0
         # Count level and contour
         for i, collection in enumerate(self.contours.collections):
-            collection.get_nearest_path_bbox_contain_pt = (
-                lambda x, y, i=i: self.get_index_nearest_path_bbox_contain_pt(i, x, y)
+            collection.get_nearest_path_bbox_contain_pt = lambda x, y, i=i: self.get_index_nearest_path_bbox_contain_pt(
+                i, x, y
             )
             nb_level += 1
 

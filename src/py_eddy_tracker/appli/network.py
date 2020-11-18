@@ -21,8 +21,7 @@ logger = logging.getLogger("pet")
 def build_network():
     parser = EddyParser("Merge eddies")
     parser.add_argument(
-        "identification_regex",
-        help="Give an expression which will use with glob",
+        "identification_regex", help="Give an expression which will use with glob",
     )
     parser.add_argument("out", help="output file")
     parser.add_argument(
@@ -294,11 +293,7 @@ def display_network(x, y, tr, t, c):
             lw=0.5,
         )
         ax_time.plot(
-            t[sl],
-            tr[s].repeat(e - s),
-            color=color,
-            lw=1,
-            marker="+",
+            t[sl], tr[s].repeat(e - s), color=color, lw=1, marker="+",
         )
         ax_time.text(t[s], tr[s] + 0.15, f"{x[s].mean():.2f}, {y[s].mean():.2f}")
         ax_time.axvline(t[s], color=".75", lw=0.5, ls="--", zorder=-10)

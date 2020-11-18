@@ -149,10 +149,7 @@ VAR_DESCR = dict(
         output_type="uint16",
         scale_factor=50.0,
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Distance to next position",
-            units="m",
-        ),
+        nc_attr=dict(long_name="Distance to next position", units="m",),
     ),
     virtual=dict(
         attr_name=None,
@@ -304,18 +301,14 @@ VAR_DESCR = dict(
         nc_name="i",
         nc_type="uint16",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Longitude index in the grid of the detection",
-        ),
+        nc_attr=dict(long_name="Longitude index in the grid of the detection",),
     ),
     j=dict(
         attr_name="j",
         nc_name="j",
         nc_type="uint16",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Latitude index in the grid of the detection",
-        ),
+        nc_attr=dict(long_name="Latitude index in the grid of the detection",),
     ),
     eke=dict(
         attr_name="eke",
@@ -364,8 +357,7 @@ VAR_DESCR = dict(
         nc_type="uint32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Trajectory number",
-            comment="Trajectory identification number",
+            long_name="Trajectory number", comment="Trajectory identification number",
         ),
     ),
     sub_track=dict(
@@ -374,8 +366,7 @@ VAR_DESCR = dict(
         nc_type="uint32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Segment Number",
-            comment="Segment number inside a group",
+            long_name="Segment Number", comment="Segment number inside a group",
         ),
     ),
     n=dict(
@@ -498,11 +489,7 @@ VAR_DESCR = dict(
         output_type="u1",
         scale_factor=0.4,
         nc_dims=("obs",),
-        nc_attr=dict(
-            units="%",
-            comment="score",
-            long_name="Score",
-        ),
+        nc_attr=dict(units="%", comment="score", long_name="Score",),
     ),
     index_other=dict(
         attr_name=None,
@@ -571,10 +558,7 @@ VAR_DESCR = dict(
         old_nc_name=["Chl"],
         nc_type="f4",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Log base 10 chlorophyll",
-            units="Log(Chl/[mg/m^3])",
-        ),
+        nc_attr=dict(long_name="Log base 10 chlorophyll", units="Log(Chl/[mg/m^3])",),
     ),
     dchl=dict(
         attr_name=None,
@@ -594,8 +578,7 @@ VAR_DESCR = dict(
         nc_type="f4",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Log base 10 background chlorophyll",
-            units="Log(Chl/[mg/m^3])",
+            long_name="Log base 10 background chlorophyll", units="Log(Chl/[mg/m^3])",
         ),
     ),
     year=dict(
@@ -604,10 +587,7 @@ VAR_DESCR = dict(
         old_nc_name=["Year"],
         nc_type="u2",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Year",
-            units="year",
-        ),
+        nc_attr=dict(long_name="Year", units="year",),
     ),
     month=dict(
         attr_name=None,
@@ -615,10 +595,7 @@ VAR_DESCR = dict(
         old_nc_name=["Month"],
         nc_type="u1",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Month",
-            units="month",
-        ),
+        nc_attr=dict(long_name="Month", units="month",),
     ),
     day=dict(
         attr_name=None,
@@ -626,10 +603,7 @@ VAR_DESCR = dict(
         old_nc_name=["Day"],
         nc_type="u1",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Day",
-            units="day",
-        ),
+        nc_attr=dict(long_name="Day", units="day",),
     ),
     nb_contour_selected=dict(
         attr_name=None,

@@ -25,13 +25,7 @@ class CheltonTracker(Model):
         # Compute Parameter of ellips
         minor, major = 1.05, 1.5
         y = self.basic_formula_ellips_major_axis(
-            self.lat,
-            degrees=True,
-            c0=minor,
-            cmin=minor,
-            cmax=major,
-            lat1=23,
-            lat2=5,
+            self.lat, degrees=True, c0=minor, cmin=minor, cmax=major, lat1=23, lat2=5,
         )
         # mask from ellips
         mask = self.shifted_ellipsoid_degrees_mask(
@@ -40,11 +34,7 @@ class CheltonTracker(Model):
 
         # We check ratio (maybe not usefull)
         check_ratio(
-            mask,
-            self.amplitude,
-            other.amplitude,
-            self.radius_e,
-            other.radius_e,
+            mask, self.amplitude, other.amplitude, self.radius_e, other.radius_e,
         )
         indexs_closest = where(mask)
         mask[indexs_closest] = self.across_ground(
@@ -55,10 +45,7 @@ class CheltonTracker(Model):
     @classmethod
     def across_ground(cls, record0, record1):
         i, j, d_pix = cls.GROUND.compute_pixel_path(
-            x0=record0["lon"],
-            y0=record0["lat"],
-            x1=record1["lon"],
-            y1=record1["lat"],
+            x0=record0["lon"], y0=record0["lat"], x1=record1["lon"], y1=record1["lat"],
         )
 
         data = cls.GROUND.grid("mask")[i, j]
