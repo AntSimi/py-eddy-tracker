@@ -1198,10 +1198,23 @@ class RegularGridDataset(GridDataset):
         )
 
     def get_pixels_in(self, contour):
-        (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
-        return get_pixel_in_regular(
-            contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop
-        )
+        """
+        Get indices of pixels in contour.
+
+        :param vertice,Path contour: Contour which enclosed some pixels
+        :return: Indices of grid in contour
+        :rtype: array[int],array[int]
+        """
+        if isinstance(contour, BasePath):
+            (x_start, x_stop), (y_start, y_stop) = contour.bbox_slice
+            return get_pixel_in_regular(
+                contour.vertices, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop
+            )
+        else:
+            (x_start, x_stop), (y_start, y_stop) = self.bbox_indice(contour)
+            return get_pixel_in_regular(
+                contour, self.x_c, self.y_c, x_start, x_stop, y_start, y_stop
+            )
 
     def normalize_x_indice(self, indices):
         return indices % self.x_size

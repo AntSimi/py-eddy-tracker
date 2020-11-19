@@ -1912,24 +1912,28 @@ class EddiesObservations(object):
             ),
             centered=True,
         )
-        debug_active = logger.getEffectiveLevel() == logging.DEBUG
         if center:
             x, y = (self.longitude[filter] - x0) % 360 + x0, self.latitude[filter]
             grid[:] = histogram2d(x, y, (x_bins, y_bins))[0]
             grid.mask = grid.data == 0
         else:
             x_ref = ((self.longitude[filter] - x0) % 360 + x0 - 180).reshape(-1, 1)
-            nb = x_ref.shape[0]
-            for i_, (x, y_) in enumerate(
-                zip(self[x_name][filter], self[y_name][filter])
-            ):
-                x_ = (x - x_ref[i_]) % 360 + x_ref[i_]
-                if debug_active and i_ % 10000 == 0:
-                    print(f"{i_}/{nb}", end="\r")
-                i, j = BasePath(create_vertice(x_, y_)).pixels_in(regular_grid)
-                grid_count_(grid, i, j)
-            if debug_active:
-                print()
+            x_contour, y_contour = self[x_name][filter], self[y_name][filter]
+            grid_count_pixel_in(
+                grid,
+                x_contour,
+                y_contour,
+                x_ref,
+                regular_grid.x_bounds,
+                regular_grid.y_bounds,
+                regular_grid.xstep,
+                regular_grid.ystep,
+                regular_grid.N,
+                regular_grid.is_circular(),
+                regular_grid.x_size,
+                regular_grid.x_c,
+                regular_grid.y_c,
+            )
             grid.mask = grid == 0
         return regular_grid
 
@@ -2081,6 +2085,59 @@ def grid_count_(grid, i, j):
     """
     for i_, j_ in zip(i, j):
         grid[i_, j_] += 1
+
+
+@njit(cache=True)
+def grid_count_pixel_in(
+    grid,
+    x,
+    y,
+    x_ref,
+    x_bounds,
+    y_bounds,
+    xstep,
+    ystep,
+    N,
+    is_circular,
+    x_size,
+    x_c,
+    y_c,
+):
+    """
+    Count how many time a pixel is used.
+
+    :param array grid:
+    :param array x: x for all contour
+    :param array y: y for all contour
+    :param array x_ref: x reference for wrapping
+    :param array x_bounds: grid longitude
+    :param array y_bounds: grid latitude
+    :param float xstep: step between two longitude
+    :param float ystep: step between two latitude
+    :param int N: shift of index to enlarge window
+    :param bool is_circular: To know if grid is wrappable
+    :param int x_size: Number of longitude
+    :param array x_c: longitude coordinate of grid
+    :param array y_c: latitude coordinate of grid
+    """
+    nb = x_ref.shape[0]
+    for i_ in range(nb):
+        x_, y_, x_ref_ = x[i_], y[i_], x_ref[i_]
+        x_ = (x_ - x_ref_) % 360 + x_ref_
+        v = create_vertice(x_, y_)
+        (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
+            v,
+            x_bounds,
+            y_bounds,
+            xstep,
+            ystep,
+            N,
+            is_circular,
+            x_size,
+        )
+
+        i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
+        grid_count_(grid, i, j)
 
 
 @njit(cache=True)
