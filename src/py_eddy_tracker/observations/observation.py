@@ -288,6 +288,8 @@ class EddiesObservations(object):
             return self.obs[attr]
         elif attr in VAR_DESCR_inv:
             return self.obs[VAR_DESCR_inv[attr]]
+        elif attr in ("lifetime", "age"):
+            return getattr(self, attr)
         raise KeyError("%s unknown" % attr)
 
     def __getattr__(self, attr):
@@ -1104,12 +1106,7 @@ class EddiesObservations(object):
 
     def shifted_ellipsoid_degrees_mask(self, other, minor=1.5, major=1.5):
         return shifted_ellipsoid_degrees_mask2(
-            self.lon,
-            self.lat,
-            other.lon,
-            other.lat,
-            minor,
-            major,
+            self.lon, self.lat, other.lon, other.lat, minor, major
         )
 
     def fixed_ellipsoid_mask(
