@@ -45,3 +45,6 @@ def test_area_tracking_parameter():
         c.to_netcdf(h)
         c_reloaded = Correspondances.from_netcdf(h)
         assert class_kw == c_reloaded.class_kw
+
+    # test access to the lifetime (item)
+    eddies_tracked["lifetime"]
