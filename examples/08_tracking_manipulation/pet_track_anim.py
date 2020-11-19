@@ -20,13 +20,13 @@ eddy = a.extract_ids([9672]).index(slice(0, 300))
 
 # %%
 # Run animation
-# Key shortcut
-#   Escape => exit
-#   SpaceBar => pause
-#   left arrow => t - 1
-#   right arrow => t + 1
-#   + => speed increase of 10 %
-#   - => speed decrease of 10 %
+# Key shortcut :
+#  * Escape => exit
+#  * SpaceBar => pause
+#  * left arrow => t - 1
+#  * right arrow => t + 1
+#  * \+ => speed increase of 10 %
+#  * \- => speed decrease of 10 %
 a = Anim(eddy, sleep_event=1e-10, intern=True, figsize=(8, 3.5), cmap="viridis")
 a.txt.set_position((17, 34.6))
 a.ax.set_xlim(16.5, 23)

@@ -31,7 +31,7 @@ bins_percentile = arange(0, 100.0001, 5)
 def stats_compilation(dataset, groups, field, bins, filter=None):
     datas = dict(ref=dataset.bins_stat(field, bins=bins, mask=filter)[1], y=dict())
     for k, index in groups.items():
-        i = dataset.merge_indexs(filter, index)
+        i = dataset.merge_filters(filter, index)
         x, datas["y"][k] = dataset.bins_stat(field, bins=bins, mask=i)
     datas["x"], datas["bins"] = x, bins
     return datas

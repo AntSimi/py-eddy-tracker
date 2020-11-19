@@ -1786,7 +1786,7 @@ class EddiesObservations(object):
         .. minigallery:: py_eddy_tracker.EddiesObservations.bins_stat
         """
         v = self[xname] if isinstance(xname, str) else xname
-        mask = self.merge_indexs(mask)
+        mask = self.merge_filters(mask)
         v = v[mask]
         if bins is None:
             bins = arange(v.min(), v.max() + 2)
