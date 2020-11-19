@@ -101,12 +101,12 @@ great_current.display(ax, color="k")
 update_axes(ax)
 
 # %%
-# Criteria for rejecting a contour
-# 0. - Accepted (green)
-# 1. - Rejection for shape error (red)
-# 2. - Masked value within contour (blue)
-# 3. - Under or over the pixel limit bounds (black)
-# 4. - Amplitude criterion (yellow)
+# Criteria for rejecting a contour :
+#  0. Accepted (green)
+#  1. Rejection for shape error (red)
+#  2. Masked value within contour (blue)
+#  3. Under or over the pixel limit bounds (black)
+#  4. Amplitude criterion (yellow)
 ax = start_axes("Contours' rejection criteria")
 g.contours.display(ax, only_unused=True, lw=0.5, display_criterion=True)
 update_axes(ax)
