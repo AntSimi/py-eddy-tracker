@@ -1,7 +1,6 @@
 """
 Count center
 ============
-
 """
 import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
@@ -18,12 +17,12 @@ c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 
+# %%
 # Parameters
-t0, t1 = a.period
 step = 0.125
 bins = ((-10, 37, step), (30, 46, step))
 kwargs_pcolormesh = dict(
-    cmap="terrain_r", vmin=0, vmax=2, factor=1 / (step ** 2 * (t1 - t0)), name="count"
+    cmap="terrain_r", vmin=0, vmax=2, factor=1 / (a.nb_days * step ** 2), name="count"
 )
 
 
@@ -75,14 +74,15 @@ for ax in (ax_a, ax_c, ax_all, ax_ratio):
 # Count at the center's position
 
 fig = plt.figure(figsize=(12, 10))
+mask = a.lifetime >= 60
 ax_long = fig.add_axes([0.03, 0.53, 0.90, 0.45])
-g_a = a.grid_count(bins, center=True, filter=a.lifetime >= 30)
+g_a = a.grid_count(bins, center=True, filter=mask)
 m = g_a.display(ax_long, **kwargs_pcolormesh)
-ax_long.set_title("Anticyclones with lifetime >= 30 days")
+ax_long.set_title(f"Anticyclones with lifetime >= 60 days ({mask.sum()} Obs)")
 ax_short = fig.add_axes([0.03, 0.03, 0.90, 0.45])
-g_a = a.grid_count(bins, center=True, filter=a.lifetime < 30)
+g_a = a.grid_count(bins, center=True, filter=~mask)
 m = g_a.display(ax_short, **kwargs_pcolormesh)
-ax_short.set_title("Anticyclones with lifetime < 30 days")
+ax_short.set_title(f"Anticyclones with lifetime < 60 days ({(~mask).sum()} Obs)")
 for ax in (ax_short, ax_long):
     ax.set_aspect("equal"), ax.grid()
     ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)

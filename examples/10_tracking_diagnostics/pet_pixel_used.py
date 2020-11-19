@@ -1,7 +1,6 @@
 """
 Count pixel used
-======================
-
+================
 """
 import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
@@ -17,12 +16,15 @@ a = TrackEddiesObservations.load_file(
 c = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
-t0, t1 = a.period
+
+# %%
+# Parameters
 step = 0.125
 bins = ((-10, 37, step), (30, 46, step))
 kwargs_pcolormesh = dict(
-    cmap="terrain_r", vmin=0, vmax=0.75, factor=1 / (t1 - t0), name="count"
+    cmap="terrain_r", vmin=0, vmax=0.75, factor=1 / a.nb_days, name="count"
 )
+
 
 # %%
 # Plot
@@ -68,16 +70,16 @@ for ax in (ax_a, ax_c, ax_all, ax_ratio):
 # %%
 # Count Anticyclones as a function of lifetime
 # --------------------------------------------
-
 fig = plt.figure(figsize=(12, 10))
+mask = a.lifetime >= 60
 ax_long = fig.add_axes([0.03, 0.53, 0.90, 0.45])
-g_a = a.grid_count(bins, intern=True, filter=a.lifetime >= 30)
+g_a = a.grid_count(bins, intern=True, filter=mask)
 m = g_a.display(ax_long, **kwargs_pcolormesh)
-ax_long.set_title("Anticyclones with lifetime >= 30 days")
+ax_long.set_title(f"Anticyclones with lifetime >= 60 days ({mask.sum()} Obs)")
 ax_short = fig.add_axes([0.03, 0.03, 0.90, 0.45])
-g_a = a.grid_count(bins, intern=True, filter=a.lifetime < 30)
+g_a = a.grid_count(bins, intern=True, filter=~mask)
 m = g_a.display(ax_short, **kwargs_pcolormesh)
-ax_short.set_title("Anticyclones with lifetime < 30 days")
+ax_short.set_title(f"Anticyclones with lifetime < 60 days ({(~mask).sum()} Obs)")
 for ax in (ax_short, ax_long):
     ax.set_aspect("equal"), ax.grid()
     ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)

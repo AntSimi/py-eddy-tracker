@@ -1758,9 +1758,9 @@ class EddiesObservations(object):
             if filter is None:
                 continue
             if isinstance(filter, slice):
-                if slice(None) == slice(None):
+                if filter == slice(None):
                     continue
-            if filter.dtype == "bool":
+            elif filter.dtype == "bool":
                 if filter.all():
                     continue
                 if not filter.any():
