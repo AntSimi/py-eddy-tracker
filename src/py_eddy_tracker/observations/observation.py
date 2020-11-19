@@ -1750,6 +1750,8 @@ class EddiesObservations(object):
         :return: Return applicable object to numpy.array
         :rtype: slice, index, mask
         """
+        if len(filters) == 1 and isinstance(filters[0], list):
+            filters = filters[0]
         filters_ = list()
         # Remove all filter which select all obs
         for filter in filters:
@@ -1894,6 +1896,7 @@ class EddiesObservations(object):
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.grid_count
         """
+        filter = self.merge_filters(filter)
         x_name, y_name = self.intern(intern)
         x_bins, y_bins = arange(*bins[0]), arange(*bins[1])
         x0 = bins[0][0]
