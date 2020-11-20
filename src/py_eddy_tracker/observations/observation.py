@@ -1937,7 +1937,7 @@ class EddiesObservations(object):
             grid.mask = grid == 0
         return regular_grid
 
-    def grid_box_stat(self, bins, varname, method=50, data=None):
+    def grid_box_stat(self, bins, varname, method=50, data=None, filter=slice(None)):
         """
         Compute mean of eddies in each bin
 
@@ -1945,6 +1945,7 @@ class EddiesObservations(object):
         :param str varname: variable to apply the method
         :param str,float method: method to apply. If float, use ?
         :param array data: Array used to compute stat if defined
+        :param array,mask,slice filter: keep the data selected with the filter
         :return: return grid of method
         :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
 
@@ -1955,8 +1956,10 @@ class EddiesObservations(object):
         x, y = (self.longitude - x0) % 360 + x0, self.latitude
         data = self[varname] if data is None else data
         if hasattr(data, "mask"):
-            m = ~data.mask
-            x, y, data = x[m], y[m], data[m]
+            filter = self.merge_filters(~data.mask, self.merge_filters(filter))
+        else:
+            filter = self.merge_filters(filter)
+        x, y, data = x[filter], y[filter], data[filter]
 
         from ..dataset.grid import RegularGridDataset
 
