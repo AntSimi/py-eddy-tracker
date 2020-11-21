@@ -77,7 +77,7 @@ fig = plt.figure(figsize=(12, 10))
 mask = a.lifetime >= 60
 ax_long = fig.add_axes([0.03, 0.53, 0.90, 0.45])
 g_a = a.grid_count(bins, center=True, filter=mask)
-m = g_a.display(ax_long, **kwargs_pcolormesh)
+g_a.display(ax_long, **kwargs_pcolormesh)
 ax_long.set_title(f"Anticyclones with lifetime >= 60 days ({mask.sum()} Obs)")
 ax_short = fig.add_axes([0.03, 0.03, 0.90, 0.45])
 g_a = a.grid_count(bins, center=True, filter=~mask)

@@ -11,7 +11,6 @@ import zarr
 from matplotlib.cm import get_cmap
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import Normalize
-from matplotlib.path import Path as BasePath
 from netCDF4 import Dataset
 from numba import njit
 from numba import types as numba_types
