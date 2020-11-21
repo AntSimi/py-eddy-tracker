@@ -1609,6 +1609,76 @@ class RegularGridDataset(GridDataset):
     def compute_stencil(
         self, data, stencil_halfwidth=4, mode="reflect", vertical=False
     ):
+        r"""
+        Apply stencil ponderation on field.
+
+        :param array data: array where apply stencil
+        :param int stencil_halfwidth: from 1 t0 4, maximal stencil used
+        :param str mode: convolution mode
+        :param bool vertical: if True, method apply a vertical convolution
+        :return: gradient array from stencil application
+        :rtype: array
+
+        Short story, how to get stencil coefficient for stencil (3 points, 5 points and 7 points)
+
+        Taylor's theorem:
+
+        .. math::
+            f(x \pm h) = f(x) \pm f'(x)h
+                + \frac{f''(x)h^2}{2!} \pm \frac{f^{(3)}(x)h^3}{3!}
+                + \frac{f^{(4)}(x)h^4}{4!} \pm \frac{f^{(5)}(x)h^5}{5!}
+                + O(h^6)
+
+        If we stop at `O(h^2)`, we get classic differenciation (stencil 3 points):
+
+        .. math:: f(x+h) - f(x-h) = f(x) - f(x) + 2 f'(x)h + O(h^2)
+
+        .. math:: f'(x) = \frac{f(x+h) - f(x-h)}{2h} + O(h^2)
+
+        If we stop at `O(h^4)`, we will get stencil 5 points:
+
+        .. math::
+            f(x+h) - f(x-h) = 2 f'(x)h + 2 \frac{f^{(3)}(x)h^3}{3!} + O(h^4)
+            :label: E1
+
+        .. math::
+            f(x+2h) - f(x-2h) = 4 f'(x)h + 16 \frac{f^{(3)}(x)h^3}{3!} + O(h^4)
+            :label: E2
+
+        If we multiply equation :eq:`E1` by 8 and substract equation :eq:`E2`, we get:
+
+        .. math:: 8(f(x+h) - f(x-h)) - (f(x+2h) - f(x-2h)) = 16 f'(x)h - 4 f'(x)h + O(h^4)
+
+        .. math:: f'(x) = \frac{f(x-2h) - 8f(x-h) + 8f(x+h) - f(x+2h)}{12h} + O(h^4)
+
+        If we stop at `O(h^6)`, we will get stencil 7 points:
+
+        .. math::
+            f(x+h) - f(x-h) = 2 f'(x)h + 2 \frac{f^{(3)}(x)h^3}{3!} + 2 \frac{f^{(5)}(x)h^5}{5!} + O(h^6)
+            :label: E3
+
+        .. math::
+            f(x+2h) - f(x-2h) = 4 f'(x)h + 16 \frac{f^{(3)}(x)h^3}{3!} + 64 \frac{f^{(5)}(x)h^5}{5!} + O(h^6)
+            :label: E4
+
+        .. math::
+            f(x+3h) - f(x-3h) = 6 f'(x)h + 54 \frac{f^{(3)}(x)h^3}{3!} + 486 \frac{f^{(5)}(x)h^5}{5!} + O(h^6)
+            :label: E5
+
+        If we multiply equation :eq:`E3` by 45 and substract equation :eq:`E4` multiply by 9
+        and add equation :eq:`E5`, we get:
+
+        .. math::
+            45(f(x+h) - f(x-h)) - 9(f(x+2h) - f(x-2h)) + (f(x+3h) - f(x-3h)) =
+            90 f'(x)h - 36 f'(x)h + 6 f'(x)h + O(h^6)
+
+        .. math::
+            f'(x) = \frac{-f(x-3h) + 9f(x-2h) - 45f(x-h) + 45f(x+h) - 9f(x+2h) +f(x+3h)}{60h} + O(h^6)
+
+        ...
+
+
+        """
         stencil_halfwidth = max(min(int(stencil_halfwidth), 4), 1)
         logger.debug("Stencil half width apply : %d", stencil_halfwidth)
         # output
@@ -1739,7 +1809,7 @@ class RegularGridDataset(GridDataset):
         :param str grid_height: grid name where the funtion will apply stencil method
         :param str uname: future name of u
         :param str vname: future name of v
-        :param int stencil_halfwidth: largest stencil could be apply
+        :param int stencil_halfwidth: largest stencil could be apply (max: 4)
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.add_uv
         """
