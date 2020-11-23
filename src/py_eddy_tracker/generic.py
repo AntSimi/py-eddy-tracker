@@ -293,7 +293,7 @@ def flatten_line_matrix(l_matrix):
 @njit(cache=True)
 def simplify(x, y, precision=0.1):
     """
-    Will remove all middle point which are closer than precision.
+    Will remove all middle/end point which are closer than precision.
 
     :param array x:
     :param array y:
@@ -303,9 +303,19 @@ def simplify(x, y, precision=0.1):
     """
     precision2 = precision ** 2
     nb = x.shape[0]
-    x_previous, y_previous = x[0], y[0]
+    # will be True for value keep
     mask = ones(nb, dtype=bool_)
-    for i in range(1, nb):
+    for j in range(0, nb):
+        x_previous, y_previous = x[j], y[j]
+        if isnan(x_previous) or isnan(y_previous):
+            mask[j] = False
+            continue
+        break
+    # Only nan
+    if j == (nb - 1):
+        return zeros(0, dtype=x.dtype), zeros(0, dtype=x.dtype)
+
+    for i in range(j + 1, nb):
         x_, y_ = x[i], y[i]
         if isnan(x_) or isnan(y_):
             continue
