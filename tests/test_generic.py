@@ -15,6 +15,9 @@ def test_simplify():
     x[4] = nan
     x_, y_ = simplify(x, y, precision=1)
     assert x_.shape[0] == 6
+    x[3] = nan
+    x_, y_ = simplify(x, y, precision=1)
+    assert x_.shape[0] == 6
     x[:4] = nan
     x_, y_ = simplify(x, y, precision=1)
     assert x_.shape[0] == 3

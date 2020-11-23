@@ -315,10 +315,16 @@ def simplify(x, y, precision=0.1):
     if j == (nb - 1):
         return zeros(0, dtype=x.dtype), zeros(0, dtype=x.dtype)
 
+    last_nan = False
     for i in range(j + 1, nb):
         x_, y_ = x[i], y[i]
         if isnan(x_) or isnan(y_):
+            if last_nan:
+                mask[i] = False
+            else:
+                last_nan = True
             continue
+        last_nan = False
         d_x = x_ - x_previous
         if d_x > precision:
             x_previous, y_previous = x_, y_
