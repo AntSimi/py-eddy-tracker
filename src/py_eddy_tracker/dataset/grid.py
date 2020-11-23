@@ -412,6 +412,20 @@ class GridDataset(object):
         self.setup_coordinates()
         self.init_pos_interpolator()
 
+    @staticmethod
+    def c_to_bounds(c):
+        """
+        Centred coordinates to bounds coordinates
+
+        :param array c: centred coordinates to translate
+        :return: bounds coordinates
+        """
+        bounds = concatenate((c, (2 * c[-1] - c[-2],)))
+        d = bounds[1:] - bounds[:-1]
+        bounds[:-1] -= d / 2
+        bounds[-1] -= d[-1] / 2
+        return bounds
+
     def setup_coordinates(self):
         x_name, y_name = self.coordinates
         if self.is_centered:
@@ -1416,7 +1430,7 @@ class RegularGridDataset(GridDataset):
             demi_x, demi_y = k_shape[0] // 2, k_shape[1] // 2
             values_sum = filter2D(tmp_matrix.data, -1, kernel)[demi_x:-demi_x, demi_y]
             kernel_sum = filter2D(m.astype(float), -1, kernel)[demi_x:-demi_x, demi_y]
-            with errstate(invalid="ignore"):
+            with errstate(invalid="ignore", divide="ignore"):
                 if extend:
                     data_out[:, i] = ma.array(
                         values_sum / kernel_sum,
@@ -1871,11 +1885,12 @@ class RegularGridDataset(GridDataset):
         """Draft"""
         self._speed_ev = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** 0.5
 
-    def display(self, ax, name, factor=1, **kwargs):
+    def display(self, ax, name, factor=1, ref=None, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
         :param str,array name: variable to display, could be an array
         :param float factor: multiply grid by
+        :param float,None ref: if define use like west bound
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolormesh`
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.display
@@ -1883,19 +1898,34 @@ class RegularGridDataset(GridDataset):
         if "cmap" not in kwargs:
             kwargs["cmap"] = "coolwarm"
         data = self.grid(name) if isinstance(name, str) else name
-        return ax.pcolormesh(self.x_bounds, self.y_bounds, data.T * factor, **kwargs)
+        if ref is None:
+            x = self.x_bounds
+        else:
+            x = (self.x_c - ref) % 360 + ref
+            i = x.argsort()
+            x = self.c_to_bounds(x[i])
+            data = data[i]
+        return ax.pcolormesh(x, self.y_bounds, data.T * factor, **kwargs)
 
-    def contour(self, ax, name, factor=1, **kwargs):
+    def contour(self, ax, name, factor=1, ref=None, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes use to draw
         :param str,array name: variable to display, could be an array
         :param float factor: multiply grid by
+        :param float,None ref: if define use like west bound
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.contour`
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.contour
         """
         data = self.grid(name) if isinstance(name, str) else name
-        return ax.contour(self.x_c, self.y_c, data.T * factor, **kwargs)
+        if ref is None:
+            x = self.x_c
+        else:
+            x = (self.x_c - ref) % 360 + ref
+            i = x.argsort()
+            x = x[i]
+            data = data[i]
+        return ax.contour(x, self.y_c, data.T * factor, **kwargs)
 
     def regrid(self, other, grid_name, new_name=None):
         """

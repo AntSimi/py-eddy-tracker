@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Allow to give a x reference when we display grid to be able to change xlim
 - Add option to EddyId to select data index like `--indexs time=5 depth=2`
 - Add a method to merge several indexs type for eddy obs
 - Acces at dataset variable like attribute, and lifetime/age are available for all observations
