@@ -169,10 +169,9 @@ def cumsum_by_track(field, track):
         tr = track[i]
         if tr != tr_previous:
             d_cum = 0
-        cumsum_array[i] = d_cum
         d_cum += field[i]
+        cumsum_array[i] = d_cum
         tr_previous = tr
-    cumsum_array[i + 1] = d_cum
     return cumsum_array
 
 
