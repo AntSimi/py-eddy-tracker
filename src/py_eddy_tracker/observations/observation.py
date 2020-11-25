@@ -1823,14 +1823,16 @@ class EddiesObservations(object):
         if not extern_only:
             kwargs_e.pop("label", None)
 
+        mappables = list()
         if not extern_only:
             if ref is not None:
                 lon_s, lat_s = wrap_longitude(lon_s, lat_s, ref, cut=True)
-            ax.plot(lon_s, lat_s, **kwargs)
+            mappables.append(ax.plot(lon_s, lat_s, **kwargs)[0])
         if not intern_only:
             if ref is not None:
                 lon_e, lat_e = wrap_longitude(lon_e, lat_e, ref, cut=True)
-            ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)
+            mappables.append(ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)[0])
+        return mappables
 
     def first_obs(self):
         """
