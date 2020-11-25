@@ -287,10 +287,14 @@ class TrackEddiesObservations(EddiesObservations):
     def concatenate(cls, observations):
         eddies = super().concatenate(observations)
         last_track = 0
+        i_start = 0
         for obs in observations:
             nb_obs = len(obs)
-            eddies.track[-nb_obs:] = obs.track + last_track
-            last_track = eddies.track[-nb_obs:].max() + 1
+            sl = slice(i_start, i_start + nb_obs)
+            new_track = obs.track + last_track
+            eddies.track[sl] = new_track
+            last_track = new_track.max() + 1
+            i_start += nb_obs
         return eddies
 
     def count_by_track(self, mask):
