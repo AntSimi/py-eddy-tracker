@@ -28,7 +28,7 @@ from Polygon import Polygon
 
 from .. import VAR_DESCR_inv
 from ..generic import build_index, cumsum_by_track, distance, split_line, wrap_longitude
-from ..poly import create_vertice_from_2darray, polygon_overlap
+from ..poly import create_vertice_from_2darray, merge, polygon_overlap
 from .observation import EddiesObservations
 
 logger = logging.getLogger("pet")
@@ -488,6 +488,43 @@ class TrackEddiesObservations(EddiesObservations):
                 id_translate[list_id] = arange(len(list_id)) + 1
                 new.track = id_translate[new.track]
         return new
+
+    def shape_polygon(self, intern=False):
+        """
+        Get polygons which enclosed each track
+
+        :param bool intern: If True use speed contour instead of effective contour
+        :rtype: list(array, array)
+        """
+        xname, yname = self.intern(intern)
+        return [merge(track[xname], track[yname]) for track in self.iter_track()]
+
+    def display_shape(self, ax, ref=None, intern=False, **kwargs):
+        """
+        This function will draw shape of each track
+
+        :param matplotlib.axes.Axes ax: ax where drawed
+        :param float,int ref: if defined all coordinates will be wrapped with ref like west boundary
+        :param bool intern: If True use speed contour instead of effective contour
+        :param dict kwargs: keyword arguments for Axes.plot
+        :return: matplotlib mappable
+        """
+        if "label" in kwargs:
+            kwargs["label"] = self.format_label(kwargs["label"])
+        if len(self) == 0:
+            x, y = [], []
+        else:
+            polygons = self.shape_polygon(intern)
+            x, y = list(), list()
+            for p_ in polygons:
+                x.append((nan,))
+                y.append((nan,))
+                x.append(p_[0])
+                y.append(p_[1])
+            x, y = concatenate(x), concatenate(y)
+            if ref is not None:
+                x, y = wrap_longitude(x, y, ref, cut=True)
+        return ax.plot(x, y, **kwargs)
 
     def plot(self, ax, ref=None, **kwargs):
         """

@@ -5,7 +5,7 @@ Method for polygon
 
 from numba import njit, prange
 from numba import types as numba_types
-from numpy import array, concatenate, empty, ones, pi, where
+from numpy import array, concatenate, empty, nan, ones, pi, where
 from numpy.linalg import lstsq
 from Polygon import Polygon
 
@@ -377,6 +377,33 @@ def get_wrap_vertice(x0, y0, x1, y1, i):
         ref = x0_[0] - x0.dtype.type(180)
         x1_ = (x1_ - ref) % 360 + ref
     return create_vertice(x0_, y0[i]), create_vertice(x1_, y1[i])
+
+
+def merge(x, y):
+    """
+    Merge all polygon of the list
+
+    :param array x: 2D array for a list of polygon
+    :param array y: 2D array for a list of polygon
+    :return: Polygons which enclosed all
+    :rtype: array, array
+    """
+    nb = x.shape[0]
+    p = None
+    for i in range(nb):
+        p_ = Polygon(create_vertice(x[i], y[i]))
+        if p is None:
+            p = p_
+        else:
+            p += p_
+    x, y = list(), list()
+    for p_ in p:
+        p_ = array(p_).T
+        x.append((nan,))
+        y.append((nan,))
+        x.append(p_[0])
+        y.append(p_[1])
+    return concatenate(x), concatenate(y)
 
 
 def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
