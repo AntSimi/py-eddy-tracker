@@ -307,18 +307,6 @@ class GridDataset(object):
             self.load_general_features()
             self.load()
 
-    def get_slice(self, **kwargs):
-        """
-        Get slice for each axes specified
-
-        :param dict kwargs:
-        :return: A dict of slice
-        :rtype: dict[slice]
-        """
-        for k, v in kwargs.items():
-            with Dataset(self.filename) as h:
-                print(k, v)
-
     @property
     def is_centered(self):
         """Give True if pixel is described with its center's position or

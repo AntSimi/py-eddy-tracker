@@ -278,7 +278,14 @@ def flatten_line_matrix(l_matrix):
     """
     nb_line, sampling = l_matrix.shape
     final_size = (nb_line - 1) + nb_line * sampling
+    empty_dataset = False
+    if final_size < 1:
+        empty_dataset = True
+        final_size = 1
     out = empty(final_size, dtype=l_matrix.dtype)
+    if empty_dataset:
+        out[:] = nan
+        return out
     inc = 0
     for i in range(nb_line):
         for j in range(sampling):
