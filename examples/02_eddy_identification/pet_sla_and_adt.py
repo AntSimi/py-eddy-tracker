@@ -43,10 +43,14 @@ g.bessel_high_filter("sla", wavelength)
 date = datetime(2016, 5, 15)
 
 # %%
-kwargs_a_adt = dict(lw=0.5, label="Anticyclonic ADT", ref=-10, color="k")
-kwargs_c_adt = dict(lw=0.5, label="Cyclonic ADT", ref=-10, color="r")
-kwargs_a_sla = dict(lw=0.5, label="Anticyclonic SLA", ref=-10, color="g")
-kwargs_c_sla = dict(lw=0.5, label="Cyclonic SLA", ref=-10, color="b")
+kwargs_a_adt = dict(
+    lw=0.5, label="Anticyclonic ADT ({nb_obs} eddies)", ref=-10, color="k"
+)
+kwargs_c_adt = dict(lw=0.5, label="Cyclonic ADT ({nb_obs} eddies)", ref=-10, color="r")
+kwargs_a_sla = dict(
+    lw=0.5, label="Anticyclonic SLA ({nb_obs} eddies)", ref=-10, color="g"
+)
+kwargs_c_sla = dict(lw=0.5, label="Cyclonic SLA ({nb_obs} eddies)", ref=-10, color="b")
 
 # %%
 # Run algorithm of detection

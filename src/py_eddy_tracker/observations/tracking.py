@@ -11,12 +11,14 @@ from numpy import (
     arctan2,
     array,
     bool_,
+    concatenate,
     cos,
     degrees,
     empty,
     histogram,
     interp,
     median,
+    nan,
     ones,
     radians,
     sin,
@@ -526,6 +528,15 @@ class TrackEddiesObservations(EddiesObservations):
                 x, y = wrap_longitude(x, y, ref, cut=True)
         return ax.plot(x, y, **kwargs)
 
+    def format_label(self, label):
+        t0, t1 = self.period
+        return label.format(
+            t0=t0,
+            t1=t1,
+            nb_obs=len(self),
+            nb_tracks=(self.nb_obs_by_track != 0).sum(),
+        )
+
     def plot(self, ax, ref=None, **kwargs):
         """
         This function will draw path of each track
@@ -536,12 +547,13 @@ class TrackEddiesObservations(EddiesObservations):
         :return: matplotlib mappable
         """
         if "label" in kwargs:
-            kwargs["label"] += " (%s eddies)" % (self.nb_obs_by_track != 0).sum()
+            kwargs["label"] = self.format_label(kwargs["label"])
         if len(self) == 0:
-            return ax.plot([], [], **kwargs)
-        x, y = split_line(self.longitude, self.latitude, self.tracks)
-        if ref is not None:
-            x, y = wrap_longitude(x, y, ref, cut=True)
+            x, y = [], []
+        else:
+            x, y = split_line(self.longitude, self.latitude, self.tracks)
+            if ref is not None:
+                x, y = wrap_longitude(x, y, ref, cut=True)
         return ax.plot(x, y, **kwargs)
 
     def split_network(self, intern=True, **kwargs):

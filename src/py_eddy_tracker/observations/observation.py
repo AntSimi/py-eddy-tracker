@@ -1797,16 +1797,21 @@ class EddiesObservations(object):
             y = y_ / y
         return x, y
 
-    def display(
-        self, ax, ref=None, extern_only=False, intern_only=False, nobs=True, **kwargs
-    ):
+    def format_label(self, label):
+        t0, t1 = self.period
+        return label.format(
+            t0=t0,
+            t1=t1,
+            nb_obs=len(self),
+        )
+
+    def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
         """Plot the speed and effective (dashed) contour of the eddies
 
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
         :param float,None ref: western longitude reference used
         :param bool extern_only: if True, draw only the effective contour
         :param bool intern_only: if True, draw only the speed contour
-        :param bool nobs: if True, add the number of eddies in label
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.plot`
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.display
@@ -1817,9 +1822,11 @@ class EddiesObservations(object):
         if not intern_only:
             lon_e = flatten_line_matrix(self.contour_lon_e)
             lat_e = flatten_line_matrix(self.contour_lat_e)
-        if nobs and "label" in kwargs:
-            kwargs["label"] += " (%s observations)" % len(self)
+        if "label" in kwargs:
+            kwargs["label"] = self.format_label(kwargs["label"])
         kwargs_e = kwargs.copy()
+        if "ls" not in kwargs_e and "linestyle" not in kwargs_e:
+            kwargs_e["linestyle"] = "-."
         if not extern_only:
             kwargs_e.pop("label", None)
 
@@ -1831,7 +1838,7 @@ class EddiesObservations(object):
         if not intern_only:
             if ref is not None:
                 lon_e, lat_e = wrap_longitude(lon_e, lat_e, ref, cut=True)
-            mappables.append(ax.plot(lon_e, lat_e, linestyle="-.", **kwargs_e)[0])
+            mappables.append(ax.plot(lon_e, lat_e, **kwargs_e)[0])
         return mappables
 
     def first_obs(self):

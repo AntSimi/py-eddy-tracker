@@ -35,8 +35,8 @@ ax = fig.add_axes([0.03, 0.03, 0.94, 0.94])
 ax.set_aspect("equal")
 ax.set_xlim(0, 360)
 ax.set_ylim(-80, 80)
-a.display(ax, label="Anticyclonic", color="r", lw=1)
-c.display(ax, label="Cyclonic", color="b", lw=1)
+a.display(ax, label="Anticyclonic ({nb_obs} eddies)", color="r", lw=1)
+c.display(ax, label="Cyclonic ({nb_obs} eddies)", color="b", lw=1)
 ax.legend(loc="upper right")
 
 # %%

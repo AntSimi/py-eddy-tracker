@@ -133,8 +133,10 @@ update_axes(ax)
 # the maximum mean speed. See figure 1 of https://doi.org/10.1175/JTECH-D-14-00019.1
 
 ax = start_axes("Detected Eddies")
-a.display(ax, color="r", linewidth=0.75, label="Anticyclonic", ref=-10)
-c.display(ax, color="b", linewidth=0.75, label="Cyclonic", ref=-10)
+a.display(
+    ax, color="r", linewidth=0.75, label="Anticyclonic ({nb_obs} eddies)", ref=-10
+)
+c.display(ax, color="b", linewidth=0.75, label="Cyclonic ({nb_obs} eddies)", ref=-10)
 ax.legend()
 update_axes(ax)
 

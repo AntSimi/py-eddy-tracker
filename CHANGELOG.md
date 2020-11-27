@@ -16,7 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add method to inspect contour rejection (which are not in eddies)
 - Grid interp could be "nearest" or "bilinear" 
 ### Changed
-
+- Now to have object informations in plot label used python ```fomat``` style, several key are available : 
+    - "t0"
+    - "t1"
+    - "nb_obs"
+    - "nb_tracks" (only for tracked eddies)
 ### Removed
 
 

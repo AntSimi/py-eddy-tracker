@@ -36,6 +36,6 @@ ax.set_aspect("equal")
 ax.grid()
 eddy.plot(ax, color="r", lw=0.5, label="track")
 eddy.index(range(0, len(eddy), 40)).display(
-    ax, intern_only=True, label="observations every 40"
+    ax, intern_only=True, label="observations every 40 days"
 )
 ax.legend()

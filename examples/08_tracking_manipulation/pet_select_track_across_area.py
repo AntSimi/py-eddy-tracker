@@ -29,8 +29,10 @@ ax.set_xlim(-1, 9)
 ax.set_ylim(36, 40)
 ax.set_aspect("equal")
 ax.grid()
-c.plot(ax, color="gray", lw=0.1, ref=-10, label="all tracks")
-c_subset.plot(ax, color="red", lw=0.2, ref=-10, label="selected tracks")
+c.plot(ax, color="gray", lw=0.1, ref=-10, label="All tracks ({nb_tracks} tracks)")
+c_subset.plot(
+    ax, color="red", lw=0.2, ref=-10, label="selected tracks ({nb_tracks} tracks)"
+)
 ax.plot(
     (x0, x0, x1, x1, x0),
     (y0, y1, y1, y0, y0),

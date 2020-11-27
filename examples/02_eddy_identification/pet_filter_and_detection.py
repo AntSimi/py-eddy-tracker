@@ -52,8 +52,16 @@ merge_t = a_tot.merge(c_tot)
 # Display the two detections
 ax = start_axes("Eddies detected over ADT")
 m = g.display(ax, "adt", vmin=-0.15, vmax=0.15)
-merge_f.display(ax, lw=0.75, label="Eddies in the filtered grid", ref=-10, color="k")
-merge_t.display(ax, lw=0.75, label="Eddies without filter", ref=-10, color="r")
+merge_f.display(
+    ax,
+    lw=0.75,
+    label="Eddies in the filtered grid ({nb_obs} eddies)",
+    ref=-10,
+    color="k",
+)
+merge_t.display(
+    ax, lw=0.75, label="Eddies without filter ({nb_obs} eddies)", ref=-10, color="r"
+)
 ax.legend()
 update_axes(ax, m)
 
