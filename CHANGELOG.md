@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add method to found close tracks in an other atlas
 - Allow to give a x reference when we display grid to be able to change xlim
 - Add option to EddyId to select data index like `--indexs time=5 depth=2`
 - Add a method to merge several indexs type for eddy obs
@@ -26,16 +27,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.2.0] - 2020-09-16
 
-### Added
-
-### Changed
-
-### Removed
-
 ## [3.1.0] - 2020-06-25
-
-### Added
-
-### Changed
-
-### Removed

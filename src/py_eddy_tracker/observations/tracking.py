@@ -70,6 +70,15 @@ class TrackEddiesObservations(EddiesObservations):
         self.__obs_by_track = None
         self.__nb_track = None
 
+    def iter_track(self):
+        """
+        Yield track
+        """
+        for i0, nb in zip(self.index_from_track, self.nb_obs_by_track):
+            if nb == 0:
+                continue
+            yield self.index(slice(i0, i0 + nb))
+
     @property
     def nb_tracks(self):
         """
@@ -491,6 +500,13 @@ class TrackEddiesObservations(EddiesObservations):
                 new.track = id_translate[new.track]
         return new
 
+    @staticmethod
+    def re_reference_index(index, ref):
+        if isinstance(ref, slice):
+            return index + ref.start
+        else:
+            return ref[index]
+
     def shape_polygon(self, intern=False):
         """
         Get polygons which enclosed each track
@@ -527,6 +543,28 @@ class TrackEddiesObservations(EddiesObservations):
             if ref is not None:
                 x, y = wrap_longitude(x, y, ref, cut=True)
         return ax.plot(x, y, **kwargs)
+
+    def close_tracks(self, other, nb_obs_min=10, **kwargs):
+        """
+        Get close from another atlas.
+
+        :param self other: Atlas to compare
+        :param int nb_obs_min: Minimal number of overlap for one track
+        :param dict kwargs: keyword arguments for match function
+        :return: return other atlas reduce to common track with self
+
+        .. warning::
+            It could be a costly operation for huge dataset
+        """
+        p0, p1 = self.period
+        indexs = list()
+        for i_self, i_other, t0, t1 in self.align_on(other, bins=range(p0, p1 + 2)):
+            i, j, s = self.index(i_self).match(other.index(i_other), **kwargs)
+            indexs.append(other.re_reference_index(j, i_other))
+        indexs = concatenate(indexs)
+        tr, nb = unique(other.track[indexs], return_counts=True)
+        return other.extract_ids(tr[nb >= nb_obs_min])
+
 
     def format_label(self, label):
         t0, t1 = self.period
