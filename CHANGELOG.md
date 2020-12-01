@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add an implementation of visvalingam algorithm to simplify polygons with low modification
 - Add method to found close tracks in an other atlas
 - Allow to give a x reference when we display grid to be able to change xlim
 - Add option to EddyId to select data index like `--indexs time=5 depth=2`

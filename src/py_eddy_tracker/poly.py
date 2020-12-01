@@ -3,6 +3,8 @@
 Method for polygon
 """
 
+import heapq
+
 from numba import njit, prange
 from numba import types as numba_types
 from numpy import array, concatenate, empty, nan, ones, pi, where
@@ -647,3 +649,83 @@ def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
             y_start,
             vertices,
         )
+
+
+@njit(cache=True)
+def tri_area2(x, y, i0, i1, i2):
+    """Double area of triangle
+
+    :param array x:
+    :param array y:
+    :param int i0: indice of first point
+    :param int i1: indice of second point
+    :param int i2: indice of third point
+    :return: area
+    :rtype: float
+    """
+    x0, y0 = x[i0], y[i0]
+    x1, y1 = x[i1], y[i1]
+    x2, y2 = x[i2], y[i2]
+    p_area2 = (x0 - x2) * (y1 - y0) - (x0 - x1) * (y2 - y0)
+    return abs(p_area2)
+
+
+@njit(cache=True)
+def visvalingam(x, y, nb_pt=18):
+    """Polygon simplification with visvalingam algorithm
+
+    :param array x:
+    :param array y:
+    :param int nb_pt: array size of out
+    :return: New (x, y) array
+    :rtype: array,array
+    """
+    nb = x.shape[0]
+    i0, i1 = nb - 3, nb - 2
+    h = [(tri_area2(x, y, i0, i1, 0), (i0, i1, 0))]
+    i0 = i1
+    i1 = 0
+    i_previous = empty(nb - 1, dtype=numba_types.int32)
+    i_next = empty(nb - 1, dtype=numba_types.int32)
+    i_previous[0] = -1
+    i_next[0] = -1
+    for i in range(1, nb - 1):
+        i_previous[i] = -1
+        i_next[i] = -1
+        heapq.heappush(h, (tri_area2(x, y, i0, i1, i), (i0, i1, i)))
+        i0 = i1
+        i1 = i
+    # we continue until we are equal to nb_pt
+    while len(h) >= nb_pt:
+        # We pop lower area
+        _, (i0, i1, i2) = heapq.heappop(h)
+        # We check if triangle is valid(i0 or i2 not removed)
+        i_p, i_n = i_previous[i0], i_next[i2]
+        if i_p == -1 and i_n == -1:
+            # We store reference of delete point
+            i_previous[i1] = i0
+            i_next[i1] = i2
+            continue
+        elif i_p == -1:
+            i2 = i_n
+        elif i_n == -1:
+            i0 = i_p
+        else:
+            # in this case we replace two point
+            i0, i2 = i_p, i_n
+        heapq.heappush(h, (tri_area2(x, y, i0, i1, i2), (i0, i1, i2)))
+    nb_out = 0
+    for i in i_next:
+        if i == -1:
+            nb_out += 1
+    nb_out += 1
+    x_new, y_new = empty(nb_out, dtype=x.dtype), empty(nb_out, dtype=y.dtype)
+    j = 0
+    for i, i_n in enumerate(i_next):
+        if i_n == -1:
+            x_new[j] = x[i]
+            y_new[j] = y[i]
+            j += 1
+    x_new[j] = x_new[0]
+    y_new[j] = y_new[0]
+    return x_new, y_new
