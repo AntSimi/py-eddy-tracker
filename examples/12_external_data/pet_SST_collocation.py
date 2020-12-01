@@ -1,6 +1,6 @@
 """
 Collocating external data
-==========================
+=========================
 
 Script will use py-eddy-tracker methods to upload external data (sea surface temperature, SST)
 in a common structure with altimetry.
