@@ -714,12 +714,7 @@ def visvalingam(x, y, nb_pt=18):
             # in this case we replace two point
             i0, i2 = i_p, i_n
         heapq.heappush(h, (tri_area2(x, y, i0, i1, i2), (i0, i1, i2)))
-    nb_out = 0
-    for i in i_next:
-        if i == -1:
-            nb_out += 1
-    nb_out += 1
-    x_new, y_new = empty(nb_out, dtype=x.dtype), empty(nb_out, dtype=y.dtype)
+    x_new, y_new = empty(nb_pt, dtype=x.dtype), empty(nb_pt, dtype=y.dtype)
     j = 0
     for i, i_n in enumerate(i_next):
         if i_n == -1:
