@@ -566,7 +566,6 @@ class TrackEddiesObservations(EddiesObservations):
         tr, nb = unique(other.track[indexs], return_counts=True)
         return other.extract_ids(tr[nb >= nb_obs_min])
 
-
     def format_label(self, label):
         t0, t1 = self.period
         return label.format(
