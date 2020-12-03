@@ -1794,7 +1794,8 @@ class EddiesObservations(object):
             y_v = self[yname] if isinstance(yname, str) else yname
             y_v = y_v[mask]
             y_, _ = histogram(v, bins=bins, weights=y_v)
-            y = y_ / y
+            with errstate(divide="ignore", invalid="ignore"):
+                y = y_ / y
         return x, y
 
     def format_label(self, label):

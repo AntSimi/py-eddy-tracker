@@ -28,7 +28,7 @@ from numpy import (
 )
 from Polygon import Polygon
 
-from .. import VAR_DESCR_inv
+from .. import VAR_DESCR_inv, __version__
 from ..generic import build_index, cumsum_by_track, distance, split_line, wrap_longitude
 from ..poly import create_vertice_from_2darray, merge, polygon_overlap
 from .observation import EddiesObservations
@@ -212,6 +212,7 @@ class TrackEddiesObservations(EddiesObservations):
         h_nc.Metadata_Conventions = "Unidata Dataset Discovery v1.0"
         h_nc.comment = "Surface product; mesoscale eddies"
         h_nc.framework_used = "https://github.com/AntSimi/py-eddy-tracker"
+        h_nc.framework_version = __version__
         h_nc.standard_name_vocabulary = (
             "NetCDF Climate and Forecast (CF) Metadata Convention Standard Name Table"
         )
