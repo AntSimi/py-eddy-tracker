@@ -40,6 +40,7 @@ Welcome to py-eddy-tracker's documentation!
 
    api
    Source (Git) <https://github.com/AntSimi/py-eddy-tracker>
+   changelog
 
 
 Indices and tables
