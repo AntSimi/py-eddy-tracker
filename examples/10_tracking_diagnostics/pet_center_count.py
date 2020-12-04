@@ -2,7 +2,8 @@
 Count center
 ============
 
-Do Geo stat with center and compare with frequency method show: :ref:`sphx_glr_python_module_10_tracking_diagnostics_pet_pixel_used.py`
+Do Geo stat with center and compare with frequency method
+show: :ref:`sphx_glr_python_module_10_tracking_diagnostics_pet_pixel_used.py`
 """
 import py_eddy_tracker_sample
 from matplotlib import pyplot as plt

@@ -15,6 +15,11 @@ class AreaTracker(Model):
         super().__init__(*args, **kwargs)
         self.cmin = cmin
 
+    def merge(self, *args, **kwargs):
+        eddies = super().merge(*args, **kwargs)
+        eddies.cmin = self.cmin
+        return eddies
+
     @classmethod
     def needed_variable(cls):
         vars = ["longitude", "latitude"]
