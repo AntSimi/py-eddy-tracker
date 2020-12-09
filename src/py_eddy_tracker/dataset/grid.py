@@ -68,6 +68,7 @@ from ..poly import (
     get_pixel_in_regular,
     poly_area,
     poly_contain_poly,
+    visvalingam,
     winding_number_poly,
 )
 
@@ -602,6 +603,7 @@ class GridDataset(object):
         step=0.005,
         shape_error=55,
         sampling=50,
+        sampling_method="visvalingam",
         pixel_limit=None,
         precision=None,
         force_height_unit=None,
@@ -618,6 +620,7 @@ class GridDataset(object):
         :param float,int step: Height between two layers in m
         :param float,int shape_error: Maximal error allowed for outter contour in %
         :param int sampling: Number of points to store contours and speed profile
+        :param str sampling_method: Method to resample 'uniform' or 'visvalingam'
         :param (int,int),None pixel_limit:
             Min and max number of pixels inside the inner and the outer contour to be considered as an eddy
         :param float,None precision: Truncate values at the defined precision in m
@@ -693,6 +696,7 @@ class GridDataset(object):
         self.contours = Contours(x, y, data, levels, wrap_x=self.is_circular())
 
         out_sampling = dict(fixed_size=sampling)
+        resample = visvalingam if sampling_method == "visvalingam" else uniform_resample
         track_extra_variables = [
             "height_max_speed_contour",
             "height_external_contour",
@@ -832,10 +836,10 @@ class GridDataset(object):
                     obs.amplitude[:] = amp.amplitude
                     obs.speed_average[:] = max_average_speed
                     obs.num_point_e[:] = contour.lon.shape[0]
-                    xy_e = uniform_resample(contour.lon, contour.lat, **out_sampling)
+                    xy_e = resample(contour.lon, contour.lat, **out_sampling)
                     obs.contour_lon_e[:], obs.contour_lat_e[:] = xy_e
                     obs.num_point_s[:] = speed_contour.lon.shape[0]
-                    xy_s = uniform_resample(
+                    xy_s = resample(
                         speed_contour.lon, speed_contour.lat, **out_sampling
                     )
                     obs.contour_lon_s[:], obs.contour_lat_s[:] = xy_s

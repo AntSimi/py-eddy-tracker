@@ -671,12 +671,12 @@ def tri_area2(x, y, i0, i1, i2):
 
 
 @njit(cache=True)
-def visvalingam(x, y, nb_pt=18):
+def visvalingam(x, y, fixed_size=18):
     """Polygon simplification with visvalingam algorithm
 
     :param array x:
     :param array y:
-    :param int nb_pt: array size of out
+    :param int fixed_size: array size of out
     :return: New (x, y) array
     :rtype: array,array
     """
@@ -696,7 +696,7 @@ def visvalingam(x, y, nb_pt=18):
         i0 = i1
         i1 = i
     # we continue until we are equal to nb_pt
-    while len(h) >= nb_pt:
+    while len(h) >= fixed_size:
         # We pop lower area
         _, (i0, i1, i2) = heapq.heappop(h)
         # We check if triangle is valid(i0 or i2 not removed)
@@ -714,13 +714,14 @@ def visvalingam(x, y, nb_pt=18):
             # in this case we replace two point
             i0, i2 = i_p, i_n
         heapq.heappush(h, (tri_area2(x, y, i0, i1, i2), (i0, i1, i2)))
-    x_new, y_new = empty(nb_pt, dtype=x.dtype), empty(nb_pt, dtype=y.dtype)
+    x_new, y_new = empty(fixed_size, dtype=x.dtype), empty(fixed_size, dtype=y.dtype)
     j = 0
     for i, i_n in enumerate(i_next):
         if i_n == -1:
             x_new[j] = x[i]
             y_new[j] = y[i]
             j += 1
-    x_new[j] = x_new[0]
-    y_new[j] = y_new[0]
+    # we copy first value to fill array end
+    x_new[j:] = x_new[0]
+    y_new[j:] = y_new[0]
     return x_new, y_new

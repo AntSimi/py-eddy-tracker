@@ -79,6 +79,19 @@ def eddy_id(args=None):
     parser.add_argument("--height_unit", default=None, help="Force height unit")
     parser.add_argument("--speed_unit", default=None, help="Force speed unit")
     parser.add_argument("--unregular", action="store_true", help="if grid is unregular")
+    parser.add_argument(
+        "--sampling",
+        default=50,
+        type=int,
+        help="Array size used to build contour, first and last point will be the same",
+    )
+    parser.add_argument(
+        "--sampling_method",
+        default="visvalingam",
+        type=str,
+        choices=("visvalingam", "uniform"),
+        help="Method to resample contour",
+    )
     help = "Output will be wrote in zarr"
     parser.add_argument("--zarr", action="store_true", help=help)
     help = "Indexs to select grid : --indexs time=2, will select third step along time dimensions"
@@ -109,6 +122,8 @@ def eddy_id(args=None):
         cut_wavelength=args.cut_wavelength,
         filter_order=args.filter_order,
         indexs=args.indexs,
+        sampling=args.sampling,
+        sampling_method=args.sampling_method,
         **kwargs,
     )
     out_name = date.strftime("%(path)s/%(sign_type)s_%Y%m%d.nc")
