@@ -54,7 +54,7 @@ intersphinx_mapping = {
 sphinx_gallery_conf = {
     "examples_dirs": "../examples",  # path to your example scripts
     "gallery_dirs": "python_module",
-    "capture_repr": ("_repr_html_",),
+    "capture_repr": ("_repr_html_", "__repr__"),
     "backreferences_dir": "gen_modules/backreferences",
     "doc_module": ("py_eddy_tracker",),
     "reference_url": {
