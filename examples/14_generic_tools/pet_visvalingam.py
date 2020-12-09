@@ -4,7 +4,6 @@ Visvalingam algorithm
 """
 import matplotlib.animation as animation
 from matplotlib import pyplot as plt
-from matplotlib import rc
 from numba import njit
 from numpy import array, empty
 
@@ -12,8 +11,6 @@ from py_eddy_tracker import data
 from py_eddy_tracker.generic import uniform_resample
 from py_eddy_tracker.observations.observation import EddiesObservations
 from py_eddy_tracker.poly import vertice_overlap, visvalingam
-
-rc("animation", html="jshtml")
 
 
 @njit(cache=True)
@@ -95,4 +92,5 @@ for i, obs in enumerate(a):
     texts.append(axs[i].set_title("", fontsize=8))
 axs[0].legend(fontsize=8)
 title = fig.suptitle("")
-ani = animation.FuncAnimation(fig, update_line, 27)
+anim = animation.FuncAnimation(fig, update_line, 27)
+anim
