@@ -4,6 +4,7 @@ Base class to manage eddy observation
 """
 import logging
 from datetime import datetime
+from io import BufferedReader
 from tarfile import ExFileObject
 from tokenize import TokenError
 
@@ -200,11 +201,14 @@ class EddiesObservations(object):
         infos = self.get_infos()
         return f"""<b>{infos['nb_obs']} observations from {infos['t0']} to {infos['t1']} </b>"""
 
+    def parse_varname(self, name):
+        return self[name] if isinstance(name, str) else name
+
     def hist(self, varname, x, bins, percent=False, mean=False, nb=False):
         """Build histograms.
 
-        :param str varname: variable to use to compute stat
-        :param str x: variable to use to know in which bins
+        :param str,array varname: variable to use to compute stat
+        :param str,array x: variable to use to know in which bins
         :param array bins:
         :param bool percent: normalize by sum of all bins
         :param bool mean: compute mean by bins
@@ -212,14 +216,15 @@ class EddiesObservations(object):
         :return: value by bins
         :rtype: array
         """
+        x = self.parse_varname(x)
         if nb:
-            v = hist_numba(self[x], bins=bins)[0]
+            v = hist_numba(x, bins=bins)[0]
         else:
-            v = histogram(self[x], bins=bins, weights=self[varname])[0]
+            v = histogram(x, bins=bins, weights=self.parse_varname(varname))[0]
         if percent:
             v = v.astype("f4") / v.sum() * 100
         elif mean:
-            v /= hist_numba(self[x], bins=bins)[0]
+            v /= hist_numba(x, bins=bins)[0]
         return v
 
     @staticmethod
@@ -777,7 +782,7 @@ class EddiesObservations(object):
         array_dim = "NbSample"
         if isinstance(filename, bytes):
             filename = filename.astype(str)
-        if isinstance(filename, ExFileObject):
+        if isinstance(filename, (ExFileObject, BufferedReader)):
             filename.seek(0)
             args, kwargs = ("in-mem-file",), dict(memory=filename.read())
         else:
@@ -1626,7 +1631,7 @@ class EddiesObservations(object):
             x = (x - ref) % 360 + ref
         kwargs = kwargs.copy()
         if name is not None and "c" not in kwargs:
-            v = self[name] if isinstance(name, str) else name
+            v = self.parse_varname(name)
             kwargs["c"] = v * factor
         return ax.scatter(x, self.latitude, **kwargs)
 
@@ -1671,7 +1676,7 @@ class EddiesObservations(object):
         if "facecolors" not in kwargs:
             kwargs = kwargs.copy()
             cmap = get_cmap(cmap, lut)
-            v = (self[varname] if isinstance(varname, str) else varname) * factor
+            v = self.parse_varname(varname) * factor
             if vmin is None:
                 vmin = v.min()
             if vmax is None:
@@ -1783,7 +1788,7 @@ class EddiesObservations(object):
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.bins_stat
         """
-        v = self[xname] if isinstance(xname, str) else xname
+        v = self.parse_varname(xname)
         mask = self.merge_filters(mask)
         v = v[mask]
         if bins is None:
@@ -1791,7 +1796,7 @@ class EddiesObservations(object):
         y, x = hist_numba(v, bins=bins)
         x = (x[1:] + x[:-1]) / 2
         if method == "mean":
-            y_v = self[yname] if isinstance(yname, str) else yname
+            y_v = self.parse_varname(yname)
             y_v = y_v[mask]
             y_, _ = histogram(v, bins=bins, weights=y_v)
             with errstate(divide="ignore", invalid="ignore"):
@@ -1948,10 +1953,10 @@ class EddiesObservations(object):
 
     def grid_box_stat(self, bins, varname, method=50, data=None, filter=slice(None)):
         """
-        Compute mean of eddies in each bin
+        Get percentile of eddies in each bin
 
         :param (numpy.array,numpy.array) bins: bins (grid) to count
-        :param str varname: variable to apply the method
+        :param str varname: variable to apply the method if data is None and will be output name
         :param str,float method: method to apply. If float, use ?
         :param array data: Array used to compute stat if defined
         :param array,mask,slice filter: keep the data selected with the filter
@@ -1999,7 +2004,7 @@ class EddiesObservations(object):
         Return the mean of the eddies' variable in each bin
 
         :param (numpy.array,numpy.array) bins: bins (grid) to compute the mean on
-        :param str varname: name of variable to compute the mean on
+        :param str varname: name of variable to compute the mean on and output grid_name
         :param array data: Array used to compute stat if defined
         :return: return the gridde mean variable
         :rtype: py_eddy_tracker.dataset.grid.RegularGridDataset
