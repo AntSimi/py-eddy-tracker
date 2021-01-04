@@ -1,6 +1,7 @@
 import logging
 
-from numpy import ma
+from numba import njit
+from numpy import empty, ma, ones
 
 from ..observations.observation import EddiesObservations as Model
 
@@ -29,11 +30,8 @@ class AreaTracker(Model):
     def tracking(self, other):
         shape = (self.shape[0], other.shape[0])
         i, j, c = self.match(other, intern=False)
-        cost_mat = ma.empty(shape, dtype="f4")
-        cost_mat.mask = ma.ones(shape, dtype="bool")
-        m = c > self.cmin
-        i, j, c = i[m], j[m], c[m]
-        cost_mat[i, j] = 1 - c
+        cost_mat = ma.array(empty(shape, dtype="f4"), mask=ones(shape, dtype="bool"))
+        mask_cmin(i, j, c, self.cmin, cost_mat.data, cost_mat.mask)
 
         i_self, i_other = self.solve_function(cost_mat)
         i_self, i_other = self.post_process_link(other, i_self, i_other)
@@ -55,3 +53,13 @@ class AreaTracker(Model):
             if nb_virtual_extend > 0:
                 virtual[key][nb_dead:] = obs_to_extend[key]
         return virtual
+
+
+@njit(cache=True)
+def mask_cmin(i, j, c, cmin, cost_mat, mask):
+    for k in range(c.shape[0]):
+        c_ = c[k]
+        if c_ > cmin:
+            i_, j_ = i[k], j[k]
+            cost_mat[i_, j_] = 1 - c_
+            mask[i_, j_] = False

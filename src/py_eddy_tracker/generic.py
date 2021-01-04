@@ -83,7 +83,7 @@ def build_index(groups):
             first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
     last_index = zeros(amplitude, dtype=numba_types.int_)
     last_index[:-1] = first_index[1:]
-    last_index[-1] = i + 2
+    last_index[-1] = i + 1
     return first_index, last_index, i0
 
 

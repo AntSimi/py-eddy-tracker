@@ -28,7 +28,6 @@ setup(
     scripts=[
         "src/scripts/EddySubSetter",
         "src/scripts/EddyTranslate",
-        "src/scripts/EddyTracking",
         "src/scripts/EddyFinalTracking",
         "src/scripts/EddyMergeCorrespondances",
     ],
@@ -43,6 +42,7 @@ setup(
             "EddyFrequency = py_eddy_tracker.appli.eddies:get_frequency_grid",
             "EddyInfos = py_eddy_tracker.appli.eddies:display_infos",
             "EddyCircle = py_eddy_tracker.appli.eddies:eddies_add_circle",
+            "EddyTracking = py_eddy_tracker.appli.eddies:eddies_tracking",
             # network
             "EddyNetworkGroup = py_eddy_tracker.appli.network:build_network",
             "EddyNetworkBuildPath = py_eddy_tracker.appli.network:divide_network",

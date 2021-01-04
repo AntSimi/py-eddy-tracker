@@ -321,7 +321,7 @@ def bbox_intersection(x0, y0, x1, y1):
                 continue
             i.append(i0)
             j.append(i1)
-    return array(i), array(j)
+    return array(i, dtype=numba_types.int32), array(j, dtype=numba_types.int32)
 
 
 @njit(cache=True)

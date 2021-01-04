@@ -32,9 +32,16 @@ def build_network():
         action="store_true",
         help="Use intern contour instead of outter contour",
     )
+
+    parser.memory_arg()
     args = parser.parse_args()
 
-    n = Network(args.identification_regex, window=args.window, intern=args.intern)
+    n = Network(
+        args.identification_regex,
+        window=args.window,
+        intern=args.intern,
+        memory=args.memory,
+    )
     group = n.group_observations(minimal_area=True)
     n.build_dataset(group).write_file(filename=args.out)
 

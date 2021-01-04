@@ -91,7 +91,7 @@ g.contours.display(ax, only_unused=True)
 update_axes(ax)
 
 # %%
-# Creteria for rejecting a contour
+# Criteria for rejecting a contour
 # 0. - Accepted (green)
 # 1. - Rejection for shape error (red)
 # 2. - Masked value within contour (blue)

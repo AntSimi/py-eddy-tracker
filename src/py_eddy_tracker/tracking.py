@@ -67,6 +67,7 @@ class Correspondances(list):
         class_method=None,
         class_kw=None,
         previous_correspondance=None,
+        memory=False,
     ):
         """Initiate tracking
 
@@ -74,6 +75,7 @@ class Correspondances(list):
         :param class class_method: A class which tell how to track
         :param dict class_kw: keyword argument to setup class
         :param Correspondances previous_correspondance: A previous correspondance object if you want continue tracking
+        :param bool memory: identification file are load in memory before to be open with netcdf
         """
         super().__init__()
         # Correspondance dtype
@@ -88,6 +90,7 @@ class Correspondances(list):
         else:
             self.class_method = class_method
         self.class_kw = dict() if class_kw is None else class_kw
+        self.memory = memory
 
         # To count ID
         self.current_id = 0
@@ -171,7 +174,11 @@ class Correspondances(list):
         self.previous_obs = self.current_obs
         kwargs = kwargs.copy()
         kwargs.update(self.class_kw)
-        self.current_obs = self.class_method.load_file(dataset, *args, **kwargs)
+        if self.memory:
+            with open(dataset, "rb") as h:
+                self.current_obs = self.class_method.load_file(h, *args, **kwargs)
+        else:
+            self.current_obs = self.class_method.load_file(dataset, *args, **kwargs)
 
     def merge_correspondance(self, other):
         # Verify compliance of file
@@ -712,53 +719,29 @@ class Correspondances(list):
         Returns: Unused Eddies
 
         """
-        self.reset_dataset_cache()
-        self.swap_dataset(self.datasets[0], raw_data=raw_data)
-
         nb_dataset = len(self.datasets)
-        # Get the number of obs unused
-        nb_obs = 0
-        list_mask = list()
         has_virtual = "virtual" in self[0].dtype.names
-        logger.debug("Count unused data ...")
-        for i, filename in enumerate(self.datasets):
+        eddies = list()
+        for i, dataset in enumerate(self.datasets):
             last_dataset = i == (nb_dataset - 1)
             if has_virtual and not last_dataset:
                 m_in = ~self[i]["virtual"]
             else:
                 m_in = slice(None)
             if i == 0:
-                eddies_used = self[i]["in"]
+                index_used = self[i]["in"]
             elif last_dataset:
-                eddies_used = self[i - 1]["out"]
+                index_used = self[i - 1]["out"]
             else:
-                eddies_used = unique(
+                index_used = unique(
                     concatenate((self[i - 1]["out"], self[i]["in"][m_in]))
                 )
-            if not isinstance(filename, str):
-                filename = filename.astype(str)
-            with Dataset(filename) as h:
-                nb_obs_day = len(h.dimensions["obs"])
-            m = ones(nb_obs_day, dtype="bool")
-            m[eddies_used] = False
-            list_mask.append(m)
-            nb_obs += m.sum()
-        logger.debug("Count unused data OK")
-        eddies = EddiesObservations(
-            size=nb_obs,
-            track_extra_variables=self.current_obs.track_extra_variables,
-            track_array_variables=self.current_obs.track_array_variables,
-            array_variables=self.current_obs.array_variables,
-            raw_data=raw_data,
-        )
-        j = 0
-        for i, dataset in enumerate(self.datasets):
-            logger.debug("Loaf file : (%d) %s", i, dataset)
-            current_obs = self.class_method.load_file(dataset, raw_data=raw_data)
-            if i == 0:
-                eddies.sign_type = current_obs.sign_type
-            unused_obs = current_obs.obs[list_mask[i]]
-            nb = unused_obs.shape[0]
-            eddies.obs[j : j + nb] = unused_obs
-            j += nb
-        return eddies
+
+            logger.debug("Load file : %s", dataset)
+            if self.memory:
+                with open(dataset, "rb") as h:
+                    current_obs = self.class_method.load_file(h, raw_data=raw_data)
+            else:
+                current_obs = self.class_method.load_file(dataset, raw_data=raw_data)
+            eddies.append(current_obs.index(index_used, reverse=True))
+        return EddiesObservations.concatenate(eddies)

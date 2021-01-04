@@ -15,38 +15,81 @@ from .tracking import TrackEddiesObservations
 logger = logging.getLogger("pet")
 
 
-class Network:
-    __slots__ = ("window", "filenames", "contour_name", "nb_input", "xname", "yname")
-    # To be used like a buffer
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
+class Buffer(metaclass=Singleton):
+    __slots__ = (
+        "buffersize",
+        "contour_name",
+        "xname",
+        "yname",
+        "memory",
+    )
     DATA = dict()
     FLIST = list()
-    NOGROUP = TrackEddiesObservations.NOGROUP
 
-    def __init__(self, input_regex, window=5, intern=False):
-        self.window = window
+    def __init__(self, buffersize, intern=False, memory=False):
+        self.buffersize = buffersize
         self.contour_name = EddiesObservations.intern(intern, public_label=True)
         self.xname, self.yname = EddiesObservations.intern(intern)
-        self.filenames = glob(input_regex)
-        self.filenames.sort()
-        self.nb_input = len(self.filenames)
+        self.memory = memory
 
     def load_contour(self, filename):
         if filename not in self.DATA:
-            if len(self.FLIST) > self.window:
+            if len(self.FLIST) > self.buffersize:
                 self.DATA.pop(self.FLIST.pop(0))
-            e = EddiesObservations.load_file(filename, include_vars=self.contour_name)
+            if self.memory:
+                # Only if netcdf
+                with open(filename, "rb") as h:
+                    e = EddiesObservations.load_file(h, include_vars=self.contour_name)
+            else:
+                e = EddiesObservations.load_file(
+                    filename, include_vars=self.contour_name
+                )
+            self.FLIST.append(filename)
             self.DATA[filename] = e[self.xname], e[self.yname]
         return self.DATA[filename]
+
+
+class Network:
+    __slots__ = (
+        "window",
+        "filenames",
+        "nb_input",
+        "buffer",
+        "memory",
+    )
+
+    NOGROUP = TrackEddiesObservations.NOGROUP
+
+    def __init__(self, input_regex, window=5, intern=False, memory=False):
+        """
+        Class to group observations by network
+        """
+        self.window = window
+        self.buffer = Buffer(window, intern, memory)
+        self.filenames = glob(input_regex)
+        self.filenames.sort()
+        self.nb_input = len(self.filenames)
+        self.memory = memory
 
     def get_group_array(self, results, nb_obs):
         """With a loop on all pair of index, we will label each obs with a group
         number
         """
-        nb_obs = array(nb_obs)
+        nb_obs = array(nb_obs, dtype="u4")
         day_start = nb_obs.cumsum() - nb_obs
         gr = empty(nb_obs.sum(), dtype="u4")
         gr[:] = self.NOGROUP
 
+        merge_id = list()
         id_free = 1
         for i, j, ii, ij in results:
             gr_i = gr[slice(day_start[i], day_start[i] + nb_obs[i])]
@@ -66,9 +109,14 @@ class Network:
             if m.any():
                 # Merge of group, ref over etu
                 for i_, j_ in zip(ii[m], ij[m]):
-                    gr_i_, gr_j_ = gr_i[i_], gr_j[j_]
-                    gr[gr == gr_i_] = gr_j_
-        return gr
+                    merge_id.append((gr_i[i_], gr_j[j_]))
+
+        gr_transfer = arange(id_free, dtype="u4")
+        for i, j in merge_id:
+            gr_i, gr_j = gr_transfer[i], gr_transfer[j]
+            if gr_i != gr_j:
+                apply_replace(gr_transfer, gr_i, gr_j)
+        return gr_transfer[gr]
 
     def group_observations(self, **kwargs):
         results, nb_obs = list(), list()
@@ -78,11 +126,11 @@ class Network:
             if display_iteration:
                 print(f"{filename} compared to {self.window} next", end="\r")
             # Load observations with function to buffered observations
-            xi, yi = self.load_contour(filename)
+            xi, yi = self.buffer.load_contour(filename)
             # Append number of observations by filename
             nb_obs.append(xi.shape[0])
             for j in range(i + 1, min(self.window + i + 1, self.nb_input)):
-                xj, yj = self.load_contour(self.filenames[j])
+                xj, yj = self.buffer.load_contour(self.filenames[j])
                 ii, ij = bbox_intersection(xi, yi, xj, yj)
                 m = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs) > 0.2
                 results.append((i, j, ii[m], ij[m]))
@@ -109,7 +157,12 @@ class Network:
         for filename in self.filenames:
             if display_iteration:
                 print(f"Load {filename} to copy", end="\r")
-            e = EddiesObservations.load_file(filename, raw_data=True)
+            if self.memory:
+                # Only if netcdf
+                with open(filename, "rb") as h:
+                    e = EddiesObservations.load_file(h, raw_data=True)
+            else:
+                e = EddiesObservations.load_file(filename, raw_data=True)
             stop = i + len(e)
             sl = slice(i, stop)
             for element in elements:
@@ -132,3 +185,11 @@ def get_next_index(gr):
         new_index[i] = i_gr[g]
         i_gr[g] += 1
     return new_index
+
+
+@njit(cache=True)
+def apply_replace(x, x0, x1):
+    nb = x.shape[0]
+    for i in range(nb):
+        if x[i] == x0:
+            x[i] = x1

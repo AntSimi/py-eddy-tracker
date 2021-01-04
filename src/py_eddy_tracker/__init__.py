@@ -85,6 +85,13 @@ class EddyParser(ArgumentParser):
             help="Levels : DEBUG, INFO, WARNING," " ERROR, CRITICAL",
         )
 
+    def memory_arg(self):
+        self.add_argument(
+            "--memory",
+            action="store_true",
+            help="Load file in memory before to read with netCDF library",
+        )
+
     def parse_args(self, *args, **kwargs):
         logger = start_logger()
         # Parsing

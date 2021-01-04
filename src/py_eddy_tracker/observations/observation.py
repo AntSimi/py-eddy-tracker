@@ -33,6 +33,7 @@ from numpy import (
     isnan,
     linspace,
     ma,
+    nan,
     ndarray,
     ones,
     percentile,
@@ -615,8 +616,12 @@ class EddiesObservations(object):
         )
         if isinstance(filename, zarr.storage.MutableMapping):
             return cls.load_from_zarr(filename, **kwargs)
-        end = b".zarr" if isinstance(filename_, bytes) else ".zarr"
-        if filename_.endswith(end):
+        if isinstance(filename, (bytes, str)):
+            end = b".zarr" if isinstance(filename_, bytes) else ".zarr"
+            zarr_file = filename_.endswith(end)
+        else:
+            zarr_file = False
+        if zarr_file:
             return cls.load_from_zarr(filename, **kwargs)
         else:
             return cls.load_from_netcdf(filename, **kwargs)
@@ -644,8 +649,8 @@ class EddiesObservations(object):
         :return: Obsevations selected
         :return type: class
         """
-        # FIXME must be investigate, in zarr no dimensions name (or could be add in attr)
-        array_dim = 50
+        # FIXME
+        array_dim = -1
         if isinstance(filename, zarr.storage.MutableMapping):
             h_zarr = filename
         else:
@@ -655,6 +660,10 @@ class EddiesObservations(object):
         var_list = cls.build_var_list(list(h_zarr.keys()), remove_vars, include_vars)
 
         nb_obs = getattr(h_zarr, var_list[0]).shape[0]
+        dims = list(cls.zarr_dimension(filename))
+        if len(dims) == 2 and nb_obs in dims:
+            # FIXME must be investigate, in zarr no dimensions name (or could be add in attr)
+            array_dim = dims[1] if nb_obs == dims[0] else dims[0]
         if indexs is not None and "obs" in indexs:
             sl = indexs["obs"]
             sl = slice(sl.start, min(sl.stop, nb_obs))
@@ -667,7 +676,7 @@ class EddiesObservations(object):
                 logger.warning("step of slice won't be use")
         logger.debug("%d observations will be load", nb_obs)
         kwargs = dict()
-        dims = cls.zarr_dimension(filename)
+
         if array_dim in dims:
             kwargs["track_array_variables"] = array_dim
             kwargs["array_variables"] = list()
@@ -1197,8 +1206,7 @@ class EddiesObservations(object):
         """Write something (TODO)"""
         mask = ~cost.mask
         # Count number of link by self obs and other obs
-        self_links = mask.sum(axis=1)
-        other_links = mask.sum(axis=0)
+        self_links, other_links = sum_row_column(mask)
         max_links = max(self_links.max(), other_links.max())
         if max_links > 5:
             logger.warning("One observation have %d links", max_links)
@@ -1299,7 +1307,7 @@ class EddiesObservations(object):
         return mask
 
     def solve_function(self, cost_matrix):
-        return where(self.solve_simultaneous(cost_matrix))
+        return numba_where(self.solve_simultaneous(cost_matrix))
 
     def post_process_link(self, other, i_self, i_other):
         if unique(i_other).shape[0] != i_other.shape[0]:
@@ -1594,11 +1602,6 @@ class EddiesObservations(object):
         :return: same object with selected observations
         :rtype: self
         """
-        # ça n'existe plus ça??
-        # full_path=False,
-        # remove_incomplete=False,
-        # compress_id=False,
-        # reject_virtual=False
 
         nb_obs = mask.sum()
         new = self.__class__.new_like(self, nb_obs)
@@ -2228,7 +2231,6 @@ def grid_box_stat(x_c, y_c, grid, mask, x, y, value, circular=False, method=50):
         if i_ != i0 or j_ != j0:
             # apply method and store result
             grid[i_, j_] = percentile(values, method)
-            # grid[i_, j_] = len(values)
             mask[i_, j_] = False
             # start new group
             i0, j0 = i_, j_
@@ -2251,12 +2253,14 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
     :param bool circular: True if grid is wrappable
     :param str method: 'mean', 'max'
     """
+    # FIXME : how does it work on grid bound
     nb = result.shape[0]
     xstep, ystep = x_c[1] - x_c[0], y_c[1] - y_c[0]
     x0, y0 = x_c - xstep / 2.0, y_c - ystep / 2.0
     nb_x = x_c.shape[0]
     max_method = "max" == method
     mean_method = "mean" == method
+    count_method = "count" == method
     for elt in range(nb):
         v = create_vertice(x[elt], y[elt])
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
@@ -2264,11 +2268,18 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
         )
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
 
-        if mean_method:
+        if count_method:
+            result[elt] = i.shape[0]
+        elif mean_method:
             v_sum = 0
             for i_, j_ in zip(i, j):
                 v_sum += grid[i_, j_]
-            result[elt] = v_sum / i.shape[0]
+            nb_ = i.shape[0]
+            # FIXME : how does it work on grid bound,
+            if nb_ == 0:
+                result[elt] = nan
+            else:
+                result[elt] = v_sum / nb_
         elif max_method:
             v_max = -1e40
             for i_, j_ in zip(i, j):
@@ -2286,3 +2297,25 @@ class VirtualEddiesObservations(EddiesObservations):
         elements = super().elements
         elements.extend(["track", "segment_size", "dlon", "dlat"])
         return list(set(elements))
+
+
+@njit(cache=True)
+def numba_where(mask):
+    """Usefull when mask is close to be empty"""
+    return where(mask)
+
+
+@njit(cache=True)
+def sum_row_column(mask):
+    """
+    Compute sum on row and column at same time
+    """
+    nb_x, nb_y = mask.shape
+    row_sum = zeros(nb_x, dtype=numba_types.int32)
+    column_sum = zeros(nb_y, dtype=numba_types.int32)
+    for i in range(nb_x):
+        for j in range(nb_y):
+            if mask[i, j]:
+                row_sum[i] += 1
+                column_sum[j] += 1
+    return row_sum, column_sum
