@@ -27,11 +27,7 @@ def build_network():
     parser.add_argument(
         "--window", "-w", type=int, help="Half time window to search eddy", default=1
     )
-    parser.add_argument(
-        "--intern",
-        action="store_true",
-        help="Use intern contour instead of outter contour",
-    )
+    parser.contour_intern_arg()
 
     parser.memory_arg()
     args = parser.parse_args()
@@ -50,11 +46,7 @@ def divide_network():
     parser = EddyParser("Separate path for a same group")
     parser.add_argument("input", help="input network file")
     parser.add_argument("out", help="output file")
-    parser.add_argument(
-        "--intern",
-        action="store_true",
-        help="Use intern contour instead of outter contour",
-    )
+    parser.contour_intern_arg()
     parser.add_argument(
         "--window", "-w", type=int, help="Half time window to search eddy", default=1
     )

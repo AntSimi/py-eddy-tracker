@@ -76,11 +76,7 @@ def get_frequency_grid():
     parser = EddyParser("Compute eddy frequency")
     parser.add_argument("observations", help="Input observations to compute frequency")
     parser.add_argument("out", help="Grid output file")
-    parser.add_argument(
-        "--intern",
-        help="Use speed contour instead of effective contour",
-        action="store_true",
-    )
+    parser.contour_intern_arg()
     parser.add_argument(
         "--xrange", nargs="+", type=float, help="Horizontal range : START,STOP,STEP"
     )

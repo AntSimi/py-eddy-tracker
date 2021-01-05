@@ -92,6 +92,13 @@ class EddyParser(ArgumentParser):
             help="Load file in memory before to read with netCDF library",
         )
 
+    def contour_intern_arg(self):
+        self.add_argument(
+            "--intern",
+            action="store_true",
+            help="Use intern contour instead of outter contour",
+        )
+
     def parse_args(self, *args, **kwargs):
         logger = start_logger()
         # Parsing

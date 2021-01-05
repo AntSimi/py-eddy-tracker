@@ -177,11 +177,7 @@ def anim():
     )
     parser.add_argument("filename", help="eddy atlas")
     parser.add_argument("id", help="Track id to anim", type=int, nargs="*")
-    parser.add_argument(
-        "--intern",
-        action="store_true",
-        help="display intern contour inplace of outter contour",
-    )
+    parser.contour_intern_arg()
     parser.add_argument(
         "--keep_step", default=25, help="number maximal of step displayed", type=int
     )
