@@ -18,6 +18,7 @@ Added
 - Identification file could be load in memory before to be read with netcdf library to get speed up in case of slow disk
 - Add a filter option in EddyId to be able to remove fine scale (like noise) with same filter order than high scale
   filter
+- Add **EddyQuickCompare** to have few figures about several datasets in comparison based on match function
 
 [3.3.0] - 2020-12-03
 --------------------

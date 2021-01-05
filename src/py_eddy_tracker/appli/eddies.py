@@ -12,11 +12,11 @@ from os.path import join as join_path
 from re import compile as re_compile
 
 from netCDF4 import Dataset
-from numpy import bytes_, empty, unique
+from numpy import bincount, bytes_, empty, in1d, unique
 from yaml import safe_load
 
 from .. import EddyParser
-from ..observations.observation import EddiesObservations
+from ..observations.observation import EddiesObservations, reverse_index
 from ..observations.tracking import TrackEddiesObservations
 from ..tracking import Correspondances
 
@@ -373,3 +373,137 @@ def track(
     short_track.write_file(
         filename="%(path)s/%(sign_type)s_track_too_short.nc", **kw_write
     )
+
+
+def get_group(
+    dataset1,
+    dataset2,
+    index1,
+    index2,
+    score,
+    invalid=2,
+    low=10,
+    high=60,
+):
+    group1, group2 = dict(), dict()
+    m_valid = (score * 100) >= invalid
+    i1, i2, score = index1[m_valid], index2[m_valid], score[m_valid] * 100
+    # Eddies with no association & scores < invalid
+    group1["nomatch"] = reverse_index(i1, len(dataset1))
+    group2["nomatch"] = reverse_index(i2, len(dataset2))
+    # Select all eddies involved in multiple associations
+    i1_, nb1 = unique(i1, return_counts=True)
+    i2_, nb2 = unique(i2, return_counts=True)
+    i1_multi = i1_[nb1 >= 2]
+    i2_multi = i2_[nb2 >= 2]
+    m_multi = in1d(i1, i1_multi) + in1d(i2, i2_multi)
+    group1["multi_match"] = unique(i1[m_multi])
+    group2["multi_match"] = unique(i2[m_multi])
+
+    # Low scores
+    m_low = score <= low
+    m_low *= ~m_multi
+    group1["low"] = i1[m_low]
+    group2["low"] = i2[m_low]
+    # Intermediate scores
+    m_i = (score > low) * (score <= high)
+    m_i *= ~m_multi
+    group1["intermediate"] = i1[m_i]
+    group2["intermediate"] = i2[m_i]
+    # High scores
+    m_high = score > high
+    m_high *= ~m_multi
+    group1["high"] = i1[m_high]
+    group2["high"] = i2[m_high]
+
+    def get_twin(j2, j1):
+        # True only if j1 is used only one
+        m = bincount(j1)[j1] == 1
+        # We keep only link of this mask j1 have exactly one parent
+        j2_ = j2[m]
+        # We count parent times
+        m_ = (bincount(j2_)[j2_] == 2) * (bincount(j2)[j2_] == 2)
+        # we fill first mask with second one
+        m[m] = m_
+        return m
+
+    m1 = get_twin(i1, i2)
+    m2 = get_twin(i2, i1)
+    group1["parent"] = unique(i1[m1])
+    group2["parent"] = unique(i2[m2])
+    group1["twin"] = i1[m2]
+    group2["twin"] = i2[m1]
+
+    m = ~m1 * ~m2 * m_multi
+    group1["complex"] = unique(i1[m])
+    group2["complex"] = unique(i2[m])
+
+    return group1, group2
+
+
+def quick_compare():
+    parser = EddyParser(
+        "Tool to have a quick comparison between several identification"
+    )
+    parser.add_argument("ref", help="Identification file of reference")
+    parser.add_argument("others", nargs="+", help="Identifications files to compare")
+    parser.add_argument("--high", default=40, type=float)
+    parser.add_argument("--low", default=20, type=float)
+    parser.add_argument("--invalid", default=5, type=float)
+    parser.contour_intern_arg()
+    args = parser.parse_args()
+
+    kw = dict(
+        include_vars=[
+            "longitude",
+            *EddiesObservations.intern(args.intern, public_label=True),
+        ]
+    )
+
+    ref = EddiesObservations.load_file(args.ref, **kw)
+    print(f"[ref] {args.ref} -> {len(ref)} obs")
+    groups_ref, groups_other = dict(), dict()
+    others = {other: EddiesObservations.load_file(other, **kw) for other in args.others}
+    for i, other_ in enumerate(args.others):
+        other = others[other_]
+        print(f"[{i}] {other_} -> {len(other)} obs")
+        gr1, gr2 = get_group(
+            ref,
+            other,
+            *ref.match(other, intern=args.intern),
+            invalid=args.invalid,
+            low=args.low,
+            high=args.high,
+        )
+        groups_ref[other_] = gr1
+        groups_other[other_] = gr2
+
+    def display(value, ref=None):
+        outs = list()
+        for v in value:
+            if ref:
+                outs.append(f"{v/ref * 100:.1f}% ({v})")
+            else:
+                outs.append(v)
+        return "".join([f"{v:^15}" for v in outs])
+
+    keys = list(gr1.keys())
+    print("     ", display(keys))
+    for i, v in enumerate(groups_ref.values()):
+        print(
+            f"[{i:2}] ",
+            display(
+                (v_.sum() if v_.dtype == "bool" else v_.shape[0] for v_ in v.values()),
+                ref=len(ref),
+            ),
+        )
+
+    print(display(keys))
+    for i, (k, v) in enumerate(groups_other.items()):
+        print(
+            f"[{i:2}] ",
+            display(
+                (v_.sum() if v_.dtype == "bool" else v_.shape[0] for v_ in v.values()),
+                ref=len(others[k]),
+            ),
+        )

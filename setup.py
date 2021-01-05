@@ -43,6 +43,7 @@ setup(
             "EddyInfos = py_eddy_tracker.appli.eddies:display_infos",
             "EddyCircle = py_eddy_tracker.appli.eddies:eddies_add_circle",
             "EddyTracking = py_eddy_tracker.appli.eddies:eddies_tracking",
+            "EddyQuickCompare = py_eddy_tracker.appli.eddies:quick_compare",
             # network
             "EddyNetworkGroup = py_eddy_tracker.appli.network:build_network",
             "EddyNetworkBuildPath = py_eddy_tracker.appli.network:divide_network",
