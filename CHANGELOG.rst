@@ -9,6 +9,16 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 [Unreleased]
 ------------
 
+Fixed
+^^^^^
+- Use `safe_load` for yaml load
+
+Added
+^^^^^
+- Identification file could be load in memory before to be read with netcdf library to get speed up in case of slow disk
+- Add a filter option in EddyId to be able to remove fine scale (like noise) with same filter order than high scale
+  filter
+
 [3.3.0] - 2020-12-03
 --------------------
 Added
