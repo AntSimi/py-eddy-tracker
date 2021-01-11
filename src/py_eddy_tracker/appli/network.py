@@ -53,10 +53,10 @@ def divide_network():
     args = parser.parse_args()
     contour_name = TrackEddiesObservations.intern(args.intern, public_label=True)
     e = TrackEddiesObservations.load_file(
-        args.input, include_vars=("time", "track", *contour_name)
+        args.input,
+        include_vars=("time", "track", "latitude", "longitude", *contour_name),
     )
-    e.split_network(intern=args.intern, window=args.window)
-    # split_network(args.input, args.out)
+    ids = e.split_network(intern=args.intern, window=args.window)
 
 
 def split_network(input, output):

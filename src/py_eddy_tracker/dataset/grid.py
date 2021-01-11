@@ -1163,6 +1163,9 @@ class RegularGridDataset(GridDataset):
 
     @classmethod
     def with_array(cls, coordinates, datas, variables_description=None, **kwargs):
+        """
+        Geo matrix data must be ordered like this (X,Y) and masked with numpy.ma.array
+        """
         vd = dict() if variables_description is None else variables_description
         x_name, y_name = coordinates[0], coordinates[1]
         obj = cls("array", x_name, y_name, unset=True, **kwargs)

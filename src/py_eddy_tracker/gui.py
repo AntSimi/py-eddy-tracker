@@ -146,6 +146,11 @@ class GUI:
         # param
         self.param_ax = self.figure.add_axes((0, 0, 1, 0.15), facecolor="0.2")
 
+    def hide_path(self, state):
+        for name in self.datasets:
+            self.m[name]["path_previous"].set_visible(state)
+            self.m[name]["path_future"].set_visible(state)
+
     def draw(self):
         self.m["mini_ax"] = self.figure.add_axes((0.3, 0.85, 0.4, 0.15), zorder=80)
         self.m["mini_ax"].grid()

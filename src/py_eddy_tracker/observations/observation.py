@@ -456,16 +456,16 @@ class EddiesObservations(object):
         for obs in self.obs:
             yield obs
 
-    def iter_on(self, xname: str, bins=None):
+    def iter_on(self, xname, bins=None):
         """
         Yield observation group for each bin.
 
-        :param str xname:
+        :param str,array xname:
         :param array bins: bounds of each bin ,
         :return: Group observations
         :rtype: self.__class__
         """
-        x = self[xname]
+        x = self[xname] if isinstance(xname, str) else xname
         d = x[1:] - x[:-1]
         if bins is None:
             bins = arange(x.min(), x.max() + 2)

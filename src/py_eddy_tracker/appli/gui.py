@@ -44,7 +44,7 @@ class Anim:
         self.fig = pyplot.figure(figsize=figsize, **kwargs)
         t0, t1 = self.period
         self.fig.suptitle(f"{t0} -> {t1}")
-        self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9))
+        self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9), projection="full_axes")
         self.ax.set_xlim(x_min, x_max), self.ax.set_ylim(y_min, y_max)
         self.ax.set_aspect("equal")
         self.ax.grid()
@@ -192,6 +192,11 @@ def anim():
     parser.add_argument(
         "--infinity_loop", action="store_true", help="Press Escape key to stop loop"
     )
+    parser.add_argument(
+        "--first_centered",
+        action="store_true",
+        help="Longitude will be centered on first obs, if there are only one group.",
+    )
     args = parser.parse_args()
     variables = ["time", "track", "longitude", "latitude"]
     variables.extend(TrackEddiesObservations.intern(args.intern, public_label=True))
@@ -203,6 +208,14 @@ def anim():
                 "You need to specify id to display or ask explicity all with --all option"
             )
         eddies = eddies.extract_ids(args.id)
+        if args.first_centered:
+            # TODO: include observatin class
+            x0 = eddies.lon[0]
+            eddies.lon[:] = (eddies.lon - x0 + 180) % 360 + x0 - 180
+            eddies.contour_lon_e[:] = (
+                (eddies.contour_lon_e.T - eddies.lon + 180) % 360 + eddies.lon - 180
+            ).T
+
     a = Anim(
         eddies,
         intern=args.intern,
@@ -217,6 +230,7 @@ def gui_parser():
     parser = EddyParser("Eddy atlas GUI")
     parser.add_argument("atlas", nargs="+")
     parser.add_argument("--med", action="store_true")
+    parser.add_argument("--nopath", action="store_true", help="Don't draw path")
     return parser.parse_args()
 
 
@@ -228,4 +242,5 @@ def guieddy():
     g = GUI(**atlas)
     if args.med:
         g.med()
+    g.hide_path(not args.nopath)
     g.show()
