@@ -626,27 +626,6 @@ class TrackEddiesObservations(EddiesObservations):
             m = local_ids["next_obs"] == -1
             local_ids["next_obs"][m] += i_s
         return ids
-        # ids_sort = ids[new_i]
-        # # To be able to follow indices sorting
-        # reverse_sort = empty(new_i.shape[0], dtype="u4")
-        # reverse_sort[new_i] = arange(new_i.shape[0])
-        # # Redirect indices
-        # m = ids_sort["next_obs"] != -1
-        # ids_sort["next_obs"][m] = reverse_sort[
-        #     ids_sort["next_obs"][m]
-        # ]
-        # m = ids_sort["previous_obs"] != -1
-        # ids_sort["previous_obs"][m] = reverse_sort[
-        #     ids_sort["previous_obs"][m]
-        # ]
-        # # print(ids_sort)
-        # display_network(
-        #     x[new_i],
-        #     y[new_i],
-        #     ids_sort["track"],
-        #     ids_sort["time"],
-        #     ids_sort["next_cost"],
-        # )
 
     def set_tracks(self, x, y, ids, window):
         """
@@ -670,6 +649,8 @@ class TrackEddiesObservations(EddiesObservations):
                 continue
             self.follow_obs(i, track_id, used, ids, polygons, *time_index, window)
             track_id += 1
+            # Search a possible ancestor
+            self.previous_obs(i, ids, polygons, *time_index, window)
 
     @classmethod
     def follow_obs(cls, i_next, track_id, used, ids, *args):
@@ -695,6 +676,29 @@ class TrackEddiesObservations(EddiesObservations):
             i_next = i_next_
 
     @staticmethod
+    def previous_obs(i_current, ids, polygons, time_s, time_e, time_ref, window):
+        time_cur = ids["time"][i_current]
+        t0, t1 = time_cur - 1 - time_ref, max(time_cur - window - time_ref, 0)
+        for t_step in range(t0, t1 - 1, -1):
+            i0, i1 = time_s[t_step], time_e[t_step]
+            # No observation at the time step
+            if i0 == i1:
+                continue
+            # Intersection / union, to be able to separte in case of multiple inside
+            c = polygon_overlap(polygons[i_current], polygons[i0:i1], minimal_area=True)
+            # We remove low overlap
+            c[c < 0.1] = 0
+            # We get index of maximal overlap
+            i = c.argmax()
+            c_i = c[i]
+            # No overlap found
+            if c_i == 0:
+                continue
+            ids["previous_cost"][i_current] = c_i
+            ids["previous_obs"][i_current] = i0 + i
+            break
+
+    @staticmethod
     def next_obs(i_current, ids, polygons, time_s, time_e, time_ref, window):
         time_max = time_e.shape[0] - 1
         time_cur = ids["time"][i_current]
@@ -707,7 +711,7 @@ class TrackEddiesObservations(EddiesObservations):
             if i0 == i1:
                 continue
             # Intersection / union, to be able to separte in case of multiple inside
-            c = polygon_overlap(polygons[i_current], polygons[i0:i1])
+            c = polygon_overlap(polygons[i_current], polygons[i0:i1], minimal_area=True)
             # We remove low overlap
             c[c < 0.1] = 0
             # We get index of maximal overlap
