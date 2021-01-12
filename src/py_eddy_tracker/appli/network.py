@@ -50,7 +50,7 @@ def divide_network():
         args.input,
         include_vars=("time", "track", "latitude", "longitude", *contour_name),
     )
-    ids = e.split_network(intern=args.intern, window=args.window)
+    ids = e.split_network(intern=args.intern, window=args.window, minimal_area=False)
     e = e.add_fields(("sub_track",))
     e.sub_track[:] = ids["track"]
     e.write_file(filename=args.out)

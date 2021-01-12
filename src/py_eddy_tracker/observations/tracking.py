@@ -626,7 +626,7 @@ class TrackEddiesObservations(EddiesObservations):
             local_ids["next_obs"][m] += i_s
         return ids
 
-    def set_tracks(self, x, y, ids, window):
+    def set_tracks(self, x, y, ids, window, **kwargs):
         """
         Will split one group in tracks
 
@@ -645,20 +645,20 @@ class TrackEddiesObservations(EddiesObservations):
             # If observation already in one track, we go to the next one
             if used[i]:
                 continue
-            self.follow_obs(i, track_id, used, ids, x, y, *time_index, window)
+            self.follow_obs(i, track_id, used, ids, x, y, *time_index, window, **kwargs)
             track_id += 1
             # Search a possible ancestor
-            self.previous_obs(i, ids, x, y, *time_index, window)
+            self.previous_obs(i, ids, x, y, *time_index, window, **kwargs)
 
     @classmethod
-    def follow_obs(cls, i_next, track_id, used, ids, *args):
+    def follow_obs(cls, i_next, track_id, used, ids, *args, **kwargs):
         while i_next != -1:
             # Flag
             used[i_next] = True
             # Assign id
             ids["track"][i_next] = track_id
             # Search next
-            i_next_ = cls.next_obs(i_next, ids, *args)
+            i_next_ = cls.next_obs(i_next, ids, *args, **kwargs)
             if i_next_ == -1:
                 break
             ids["next_obs"][i_next] = i_next_
@@ -674,7 +674,7 @@ class TrackEddiesObservations(EddiesObservations):
             i_next = i_next_
 
     @staticmethod
-    def previous_obs(i_current, ids, x, y, time_s, time_e, time_ref, window):
+    def previous_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
         time_cur = ids["time"][i_current]
         t0, t1 = time_cur - 1 - time_ref, max(time_cur - window - time_ref, 0)
         for t_step in range(t0, t1 - 1, -1):
@@ -688,9 +688,9 @@ class TrackEddiesObservations(EddiesObservations):
             if len(ii) == 0:
                 continue
             c = zeros(len(xj))
-            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=True)
+            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
             # We remove low overlap
-            c[c < 0.1] = 0
+            c[c < 0.01] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]
@@ -702,7 +702,7 @@ class TrackEddiesObservations(EddiesObservations):
             break
 
     @staticmethod
-    def next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window):
+    def next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
         time_max = time_e.shape[0] - 1
         time_cur = ids["time"][i_current]
         t0, t1 = time_cur + 1 - time_ref, min(time_cur + window - time_ref, time_max)
@@ -719,9 +719,9 @@ class TrackEddiesObservations(EddiesObservations):
             if len(ii) == 0:
                 continue
             c = zeros(len(xj))
-            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=True)
+            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
             # We remove low overlap
-            c[c < 0.1] = 0
+            c[c < 0.01] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]
