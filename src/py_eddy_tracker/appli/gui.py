@@ -8,8 +8,9 @@ from datetime import datetime
 from itertools import chain
 
 from matplotlib import pyplot
+from matplotlib.animation import FuncAnimation
 from matplotlib.collections import LineCollection
-from numpy import where
+from numpy import arange, where
 
 from .. import EddyParser
 from ..gui import GUI
@@ -20,7 +21,6 @@ logger = logging.getLogger("pet")
 
 
 class Anim:
-
     def __init__(
         self, eddy, intern=False, sleep_event=0.1, graphic_information=False, **kwargs
     ):
@@ -262,6 +262,7 @@ def anim():
     parser.add_argument(
         "--vmax", default=None, type=float, help="Upper bound to color contour"
     )
+    parser.add_argument("--avi", help="Filename to save animation (avi)")
     args = parser.parse_args()
     variables = ["time", "track", "longitude", "latitude", args.field]
     variables.extend(TrackEddiesObservations.intern(args.intern, public_label=True))
@@ -293,7 +294,12 @@ def anim():
         range_color=(args.vmin, args.vmax),
         graphic_information=logger.getEffectiveLevel() == logging.DEBUG,
     )
-    a.show(infinity_loop=args.infinity_loop)
+    if args.avi is None:
+        a.show(infinity_loop=args.infinity_loop)
+    else:
+        kwargs = dict(frames=arange(*a.period), interval=50)
+        ani = FuncAnimation(a.fig, a.func_animation, **kwargs)
+        ani.save(args.avi, fps=30, extra_args=["-vcodec", "libx264"])
 
 
 def gui_parser():

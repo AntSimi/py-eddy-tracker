@@ -20,6 +20,7 @@ Added
   filter
 - Add **EddyQuickCompare** to have few figures about several datasets in comparison based on match function
 - Color field for contour in **EddyAnim** could be choose
+- Save EddyAnim in mp4
 
 [3.3.0] - 2020-12-03
 --------------------
