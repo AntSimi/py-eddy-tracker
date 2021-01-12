@@ -26,11 +26,10 @@ from numpy import (
     where,
     zeros,
 )
-from Polygon import Polygon
 
 from .. import VAR_DESCR_inv, __version__
 from ..generic import build_index, cumsum_by_track, distance, split_line, wrap_longitude
-from ..poly import create_vertice_from_2darray, merge, polygon_overlap
+from ..poly import bbox_intersection, merge, vertice_overlap
 from .observation import EddiesObservations
 
 logger = logging.getLogger("pet")
@@ -642,15 +641,14 @@ class TrackEddiesObservations(EddiesObservations):
         used = zeros(nb, dtype="bool")
         track_id = 1
         # build all polygon (need to check if wrap is needed)
-        polygons = [Polygon(create_vertice_from_2darray(x, y, i)) for i in range(nb)]
         for i in range(nb):
             # If observation already in one track, we go to the next one
             if used[i]:
                 continue
-            self.follow_obs(i, track_id, used, ids, polygons, *time_index, window)
+            self.follow_obs(i, track_id, used, ids, x, y, *time_index, window)
             track_id += 1
             # Search a possible ancestor
-            self.previous_obs(i, ids, polygons, *time_index, window)
+            self.previous_obs(i, ids, x, y, *time_index, window)
 
     @classmethod
     def follow_obs(cls, i_next, track_id, used, ids, *args):
@@ -676,7 +674,7 @@ class TrackEddiesObservations(EddiesObservations):
             i_next = i_next_
 
     @staticmethod
-    def previous_obs(i_current, ids, polygons, time_s, time_e, time_ref, window):
+    def previous_obs(i_current, ids, x, y, time_s, time_e, time_ref, window):
         time_cur = ids["time"][i_current]
         t0, t1 = time_cur - 1 - time_ref, max(time_cur - window - time_ref, 0)
         for t_step in range(t0, t1 - 1, -1):
@@ -685,7 +683,12 @@ class TrackEddiesObservations(EddiesObservations):
             if i0 == i1:
                 continue
             # Intersection / union, to be able to separte in case of multiple inside
-            c = polygon_overlap(polygons[i_current], polygons[i0:i1], minimal_area=True)
+            xi, yi, xj, yj = x[[i_current]], y[[i_current]], x[i0:i1], y[i0:i1]
+            ii, ij = bbox_intersection(xi, yi, xj, yj)
+            if len(ii) == 0:
+                continue
+            c = zeros(len(xj))
+            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=True)
             # We remove low overlap
             c[c < 0.1] = 0
             # We get index of maximal overlap
@@ -699,7 +702,7 @@ class TrackEddiesObservations(EddiesObservations):
             break
 
     @staticmethod
-    def next_obs(i_current, ids, polygons, time_s, time_e, time_ref, window):
+    def next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window):
         time_max = time_e.shape[0] - 1
         time_cur = ids["time"][i_current]
         t0, t1 = time_cur + 1 - time_ref, min(time_cur + window - time_ref, time_max)
@@ -711,7 +714,12 @@ class TrackEddiesObservations(EddiesObservations):
             if i0 == i1:
                 continue
             # Intersection / union, to be able to separte in case of multiple inside
-            c = polygon_overlap(polygons[i_current], polygons[i0:i1], minimal_area=True)
+            xi, yi, xj, yj = x[[i_current]], y[[i_current]], x[i0:i1], y[i0:i1]
+            ii, ij = bbox_intersection(xi, yi, xj, yj)
+            if len(ii) == 0:
+                continue
+            c = zeros(len(xj))
+            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=True)
             # We remove low overlap
             c[c < 0.1] = 0
             # We get index of maximal overlap
