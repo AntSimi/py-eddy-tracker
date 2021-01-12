@@ -3,20 +3,24 @@
 Entry point of graphic user interface
 """
 
+import logging
 from datetime import datetime
+from itertools import chain
 
 from matplotlib import pyplot
 from matplotlib.collections import LineCollection
-from numpy import arange, empty, where
+from numpy import where
 
 from .. import EddyParser
-from ..generic import flatten_line_matrix
 from ..gui import GUI
 from ..observations.tracking import TrackEddiesObservations
 from ..poly import create_vertice
 
+logger = logging.getLogger("pet")
+
 
 class Anim:
+
     def __init__(
         self, eddy, intern=False, sleep_event=0.1, graphic_information=False, **kwargs
     ):
@@ -29,11 +33,32 @@ class Anim:
         self.period = self.eddy.period
         self.sleep_event = sleep_event
         self.mappables = list()
+        self.field_color = None
+        self.time_field = False
         self.setup(**kwargs)
 
-    def setup(self, cmap="jet", nb_step=25, figsize=(8, 6), **kwargs):
-        cmap = pyplot.get_cmap(cmap)
-        self.colors = cmap(arange(nb_step + 1) / nb_step)
+    def setup(
+        self,
+        cmap="jet",
+        lut=None,
+        field_color="time",
+        range_color=(None, None),
+        nb_step=25,
+        figsize=(8, 6),
+        **kwargs,
+    ):
+        self.field_color = self.eddy[field_color].astype("f4")
+        rg = range_color
+        if rg[0] is None and rg[1] is None and field_color == "time":
+            self.time_field = True
+        else:
+            rg = (
+                self.field_color.min() if rg[0] is None else rg[0],
+                self.field_color.max() if rg[1] is None else rg[1],
+            )
+            self.field_color = (self.field_color - rg[0]) / (rg[1] - rg[0])
+
+        self.colors = pyplot.get_cmap(cmap, lut=lut)
         self.nb_step = nb_step
 
         x_min, x_max = self.x_core.min() - 2, self.x_core.max() + 2
@@ -51,6 +76,8 @@ class Anim:
         # init mappable
         self.txt = self.ax.text(x_min + 0.05 * d_x, y_min + 0.05 * d_y, "", zorder=10)
         self.segs = list()
+        self.t_segs = list()
+        self.c_segs = list()
         self.contour = LineCollection([], zorder=1)
         self.ax.add_collection(self.contour)
 
@@ -89,8 +116,9 @@ class Anim:
                     if dt < 0:
                         # self.sleep_event = dt_draw * 1.01
                         dt = 1e-10
+                if dt == 0:
+                    dt = 1e-10
                 self.fig.canvas.start_event_loop(dt)
-
                 if self.now > t1:
                     break
             if infinity_loop:
@@ -118,20 +146,41 @@ class Anim:
     def update(self):
         m = self.t == self.now
         if m.sum():
-            self.segs.append(
-                create_vertice(
-                    flatten_line_matrix(self.x[m]), flatten_line_matrix(self.y[m])
+            segs = list()
+            t = list()
+            c = list()
+            for i in where(m)[0]:
+                segs.append(create_vertice(self.x[i], self.y[i]))
+                c.append(self.field_color[i])
+                t.append(self.now)
+            self.segs.append(segs)
+            self.c_segs.append(c)
+            self.t_segs.append(t)
+        self.contour.set_paths(chain(*self.segs))
+        if self.time_field:
+            self.contour.set_color(
+                self.colors(
+                    [
+                        (self.nb_step - self.now + i) / self.nb_step
+                        for i in chain(*self.c_segs)
+                    ]
                 )
             )
         else:
-            self.segs.append(empty((0, 2)))
-        self.contour.set_paths(self.segs)
-        self.contour.set_color(self.colors[-len(self.segs) :])
-        self.contour.set_lw(arange(len(self.segs)) / len(self.segs) * 2.5)
+            self.contour.set_color(self.colors(list(chain(*self.c_segs))))
+        # linewidth will be link to time delay
+        self.contour.set_lw(
+            [
+                (1 - (self.now - i) / self.nb_step) * 2.5 if i <= self.now else 0
+                for i in chain(*self.t_segs)
+            ]
+        )
+        # Update date txt and info
         txt = f"{self.now}"
         if self.graphic_informations:
             txt += f"- {1/self.sleep_event:.0f} frame/s"
         self.txt.set_text(txt)
+        # Update id txt
         for i in where(m)[0]:
             mappable = self.ax.text(
                 self.x_core[i], self.y_core[i], self.track[i], fontsize=8
@@ -143,6 +192,8 @@ class Anim:
         # Remove first segment to keep only T contour
         if len(self.segs) > self.nb_step:
             self.segs.pop(0)
+            self.t_segs.pop(0)
+            self.c_segs.pop(0)
 
     def draw_contour(self):
         # select contour for this time step
@@ -165,8 +216,13 @@ class Anim:
         elif event.key == "right" and self.pause:
             self.next()
         elif event.key == "left" and self.pause:
+            # we remove 2 step to add 1 so we rewind of only one
             self.segs.pop(-1)
             self.segs.pop(-1)
+            self.t_segs.pop(-1)
+            self.t_segs.pop(-1)
+            self.c_segs.pop(-1)
+            self.c_segs.pop(-1)
             self.prev()
 
 
@@ -197,11 +253,22 @@ def anim():
         action="store_true",
         help="Longitude will be centered on first obs, if there are only one group.",
     )
+    parser.add_argument(
+        "--field", default="time", help="Field use to color contour instead of time"
+    )
+    parser.add_argument(
+        "--vmin", default=None, type=float, help="Inferior bound to color contour"
+    )
+    parser.add_argument(
+        "--vmax", default=None, type=float, help="Upper bound to color contour"
+    )
     args = parser.parse_args()
-    variables = ["time", "track", "longitude", "latitude"]
+    variables = ["time", "track", "longitude", "latitude", args.field]
     variables.extend(TrackEddiesObservations.intern(args.intern, public_label=True))
 
-    eddies = TrackEddiesObservations.load_file(args.filename, include_vars=variables)
+    eddies = TrackEddiesObservations.load_file(
+        args.filename, include_vars=set(variables)
+    )
     if not args.all:
         if len(args.id) == 0:
             raise Exception(
@@ -222,6 +289,9 @@ def anim():
         sleep_event=args.time_sleep,
         cmap=args.cmap,
         nb_step=args.keep_step,
+        field_color=args.field,
+        range_color=(args.vmin, args.vmax),
+        graphic_information=logger.getEffectiveLevel() == logging.DEBUG,
     )
     a.show(infinity_loop=args.infinity_loop)
 

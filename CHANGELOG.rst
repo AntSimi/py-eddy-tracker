@@ -19,6 +19,7 @@ Added
 - Add a filter option in EddyId to be able to remove fine scale (like noise) with same filter order than high scale
   filter
 - Add **EddyQuickCompare** to have few figures about several datasets in comparison based on match function
+- Color field for contour in **EddyAnim** could be choose
 
 [3.3.0] - 2020-12-03
 --------------------
