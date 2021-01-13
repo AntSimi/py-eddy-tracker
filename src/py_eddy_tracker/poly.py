@@ -452,7 +452,7 @@ def polygon_overlap(p0, p1, minimal_area=False):
 
     :param list(Polygon) p0: List of polygon to compare with p1 list
     :param list(Polygon) p1: List of polygon to compare with p0 list
-    :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union
+    :param bool minimal_area: If True, function will compute intersection/smaller polygon, else intersection/union
     :return: Result of cost function
     :rtype: array
     """
@@ -462,10 +462,10 @@ def polygon_overlap(p0, p1, minimal_area=False):
         p_ = p1[i]
         # Area of intersection
         intersection = (p0 & p_).area()
-        # we divide intersection with the little one result from 0 to 1
+        # we divide the intersection by the smaller area, result from 0 to 1
         if minimal_area:
             cost[i] = intersection / min(p0.area(), p_.area())
-        # we divide intersection with polygon merging result from 0 to 1
+        # we divide the intersection by the merged polygons area, result from 0 to 1
         else:
             cost[i] = intersection / (p0 + p_).area()
     return cost
