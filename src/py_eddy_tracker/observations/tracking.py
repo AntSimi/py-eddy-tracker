@@ -620,9 +620,9 @@ class TrackEddiesObservations(EddiesObservations):
             sl = slice(i_s, i_e)
             local_ids = ids[sl]
             self.set_tracks(self[xname][sl], self[yname][sl], local_ids, **kwargs)
-            m = local_ids["previous_obs"] == -1
+            m = local_ids["previous_obs"] != -1
             local_ids["previous_obs"][m] += i_s
-            m = local_ids["next_obs"] == -1
+            m = local_ids["next_obs"] != -1
             local_ids["next_obs"][m] += i_s
         return ids
 

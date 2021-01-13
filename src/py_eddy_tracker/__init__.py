@@ -374,13 +374,33 @@ VAR_DESCR = dict(
             long_name="Trajectory number", comment="Trajectory identification number"
         ),
     ),
-    sub_track=dict(
+    segment=dict(
         attr_name=None,
-        nc_name="sub_track",
+        nc_name="segment",
         nc_type="uint32",
         nc_dims=("obs",),
         nc_attr=dict(
             long_name="Segment Number", comment="Segment number inside a group"
+        ),
+    ),
+    previous_obs=dict(
+        attr_name=None,
+        nc_name="previous_obs",
+        nc_type="int32",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            long_name="Previous obs index",
+            comment="Index of previous obs, if there are a spliting",
+        ),
+    ),
+    next_obs=dict(
+        attr_name=None,
+        nc_name="next_obs",
+        nc_type="int32",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            long_name="Next obs index",
+            comment="Index of next obs, if there are a merging",
         ),
     ),
     n=dict(

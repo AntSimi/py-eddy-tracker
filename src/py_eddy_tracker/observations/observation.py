@@ -144,6 +144,27 @@ class EddiesObservations(object):
         "height_inner_contour",
     ]
 
+    COLORS = [
+        "sienna",
+        "red",
+        "darkorange",
+        "gold",
+        "palegreen",
+        "limegreen",
+        "forestgreen",
+        "mediumblue",
+        "dodgerblue",
+        "lightskyblue",
+        "violet",
+        "blueviolet",
+        "darkmagenta",
+        "darkgrey",
+        "dimgrey",
+        "steelblue",
+    ]
+
+    NB_COLORS = len(COLORS)
+
     def __init__(
         self,
         size=0,
@@ -553,9 +574,9 @@ class EddiesObservations(object):
     def copy(self):
         return self.__copy__()
 
-    @staticmethod
-    def new_like(eddies, new_size: int):
-        return eddies.__class__(
+    @classmethod
+    def new_like(cls, eddies, new_size: int):
+        return cls(
             new_size,
             track_extra_variables=eddies.track_extra_variables,
             track_array_variables=eddies.track_array_variables,

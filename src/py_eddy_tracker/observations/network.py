@@ -6,7 +6,7 @@ import logging
 from glob import glob
 
 from numba import njit
-from numpy import arange, array, bincount, empty, uint32, unique
+from numpy import arange, array, bincount, empty, ones, uint32, unique
 
 from ..poly import bbox_intersection, vertice_overlap
 from .observation import EddiesObservations
@@ -56,6 +56,97 @@ class Buffer(metaclass=Singleton):
             self.FLIST.append(filename)
             self.DATA[filename] = e[self.xname], e[self.yname]
         return self.DATA[filename]
+
+
+class NetworkObservations(EddiesObservations):
+
+    __slots__ = tuple()
+
+    NOGROUP = 0
+
+    @property
+    def elements(self):
+        elements = super().elements
+        elements.extend(["track", "segment", "next_obs", "previous_obs"])
+        return list(set(elements))
+
+    @classmethod
+    def from_split_network(cls, group_dataset, indexs, **kwargs):
+        """
+        Build a NetworkObservations object with Group dataset and indexs
+
+        :param TrackEddiesObservations group_dataset: Group dataset
+        :param indexs: result from split_network
+        return NetworkObservations
+        """
+        index_order = indexs.argsort(order=("group", "track", "time"))
+        network = cls.new_like(group_dataset, len(group_dataset), **kwargs)
+        network.sign_type = group_dataset.sign_type
+        for field in group_dataset.elements:
+            if field not in network.elements:
+                continue
+            network[field][:] = group_dataset[field][index_order]
+        network.segment[:] = indexs["track"][index_order]
+        # n & p must be re-index
+        n, p = indexs["next_obs"][index_order], indexs["previous_obs"][index_order]
+        translate = empty(index_order.max() + 1, dtype="i4")
+        translate[index_order] = arange(index_order.shape[0])
+        m = n != -1
+        n[m] = translate[n[m]]
+        m = p != -1
+        p[m] = translate[p[m]]
+        network.next_obs[:] = n
+        network.previous_obs[:] = p
+        return network
+
+    def relative(self, i_obs, order=2, direct=True, only_past=False, only_future=False):
+        pass
+
+    def only_one_network(self):
+        """
+        Raise a warning or error?
+        if there are more than one network
+        """
+        # TODO
+        pass
+
+    def display_timeline(self, ax, event=False):
+        """
+        Must be call on only one network
+        """
+        self.only_one_network()
+        j = 0
+        line_kw = dict(
+            ls="-",
+            marker=".",
+            markersize=6,
+            zorder=1,
+            lw=3,
+        )
+        for i, b0, b1 in self.iter_on("segment"):
+            x = self.time[i]
+            if x.shape[0] == 0:
+                continue
+            y = b0 * ones(x.shape)
+            line = ax.plot(x, y, **line_kw, color=self.COLORS[j % self.NB_COLORS])[0]
+            if event:
+                event_kw = dict(color=line.get_color(), ls="-", zorder=1)
+                i_n, i_p = (
+                    self.next_obs[i.stop - 1],
+                    self.previous_obs[i.start],
+                )
+                if i_n != -1:
+                    ax.plot(
+                        (x[-1], self.time[i_n]), (b0, self.segment[i_n]), **event_kw
+                    )
+                    ax.plot(x[-1], b0, color="k", marker=">", markersize=10, zorder=-1)
+                if i_p != -1:
+                    ax.plot((x[0], self.time[i_p]), (b0, self.segment[i_p]), **event_kw)
+                    ax.plot(x[0], b0, color="k", marker="*", markersize=12, zorder=-1)
+            j += 1
+
+    def insert_virtual(self):
+        pass
 
 
 class Network:
