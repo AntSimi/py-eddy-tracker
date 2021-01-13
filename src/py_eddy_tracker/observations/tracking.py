@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Class to manage observations gathered in track
+Class to manage observations gathered in trajectories
 """
 import logging
 from datetime import datetime, timedelta
@@ -123,7 +123,7 @@ class TrackEddiesObservations(EddiesObservations):
         return content
 
     def add_distance(self):
-        """Add a field of distance (m) between to consecutive observation, 0 for the last observation of each track"""
+        """Add a field of distance (m) between two consecutive observations, 0 for the last observation of each track"""
         if "distance_next" in self.observations.dtype.descr:
             return self
         new = self.add_fields(("distance_next",))
@@ -181,7 +181,7 @@ class TrackEddiesObservations(EddiesObservations):
             )
 
     def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
-        """Select eddies which are longer than nb_min"""
+        """Select the trajectories longer than nb_min"""
         mask = nb_obs >= nb_min
         nb_obs_select = mask.sum()
         logger.info("Selection of %d observations", nb_obs_select)
@@ -226,9 +226,9 @@ class TrackEddiesObservations(EddiesObservations):
 
     def extract_with_period(self, period, **kwargs):
         """
-        Extract with a period
+        Extract within a time period
 
-        :param (int,int) period: two date to define period, must be specify from 1/1/1950
+        :param (int,int) period: two dates to define the period, must be specify from 1/1/1950
         :param dict kwargs: look at :py:meth:`extract_with_mask`
         :return: Return all eddy tracks which are in bounds
         :rtype: TrackEddiesObservations
@@ -251,9 +251,9 @@ class TrackEddiesObservations(EddiesObservations):
 
     def get_azimuth(self, equatorward=False):
         """
-        Return azimuth for each tracks.
+        Return azimuth for each track.
 
-        Azimuth is compute with first and last observation
+        Azimuth is computed with first and last observation
 
         :param bool equatorward: If True,  Poleward are positive and equatorward negative
         :rtype: array
@@ -285,7 +285,7 @@ class TrackEddiesObservations(EddiesObservations):
         """
         if self.__first_index_of_track is None:
             s = self.tracks.max() + 1
-            # Doesn't work => core dump with numba, maybe he wait i8 instead of u4
+            # Doesn't work => core dump with numba, maybe he wants i8 instead of u4
             # self.__first_index_of_track = -ones(s, self.tracks.dtype)
             # self.__obs_by_track = zeros(s, self.observation_number.dtype)
             self.__first_index_of_track = -ones(s, "i8")
@@ -333,12 +333,12 @@ class TrackEddiesObservations(EddiesObservations):
 
     @property
     def lifetime(self):
-        """Return for each observation lifetime"""
+        """Return lifetime for each observation"""
         return self.nb_obs_by_track.repeat(self.nb_obs_by_track)
 
     @property
     def age(self):
-        """Return for each observation age in %, will be [0:100]"""
+        """Return age in % for each observation, will be [0:100]"""
         return self.n.astype("f4") / (self.lifetime - 1) * 100.0
 
     def extract_ids(self, tracks):
@@ -347,10 +347,10 @@ class TrackEddiesObservations(EddiesObservations):
 
     def extract_toward_direction(self, west=True, delta_lon=None):
         """
-        Get eddy which go in same direction
+        Get trajectories going in the same direction
 
-        :param bool west: Only eastward eddy if True return westward
-        :param None,float delta_lon: Only eddy with more than delta_lon span in longitude
+        :param bool west: Only eastward eddies if True return westward
+        :param None,float delta_lon: Only eddies with more than delta_lon span in longitude
         :return: Only eastern eddy
         :rtype: __class__
 
@@ -397,10 +397,10 @@ class TrackEddiesObservations(EddiesObservations):
 
     def extract_with_length(self, bounds):
         """
-        Return all observations in [b0:b1]
+        Return the observations within trajectories lasting between [b0:b1]
 
-        :param (int,int) bounds: length min and max of selected eddies, if use of -1 this bound is not used
-        :return: Return all eddy tracks which have length between bounds
+        :param (int,int) bounds: length min and max of the desired trajectories, if -1 this bound is not used
+        :return: Return all trajectories having length between bounds
         :rtype: TrackEddiesObservations
 
         .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_with_length
@@ -460,11 +460,11 @@ class TrackEddiesObservations(EddiesObservations):
         Extract a subset of observations
 
         :param array(bool) mask: mask to select observations
-        :param bool full_path: extract full path if only one part is selected
-        :param bool remove_incomplete: delete path which are not fully selected
-        :param bool compress_id: resample track number to use a little range
-        :param bool reject_virtual: if track are only virtual in selection we remove track
-        :return: same object with selected observations
+        :param bool full_path: extract the full trajectory if only one part is selected
+        :param bool remove_incomplete: delete trajectory if not fully selected
+        :param bool compress_id: resample trajectory number to use a smaller range
+        :param bool reject_virtual: if only virtual are selected, the trajectory is removed
+        :return: same object with the selected observations
         :rtype: self.__class__
         """
         if full_path and remove_incomplete:
@@ -509,7 +509,9 @@ class TrackEddiesObservations(EddiesObservations):
 
     def shape_polygon(self, intern=False):
         """
-        Get polygons which enclosed each track
+        Get the polygon enclosing each trajectory.
+
+        The polygon merges the non-overlapping bounds of the specified contours
 
         :param bool intern: If True use speed contour instead of effective contour
         :rtype: list(array, array)
@@ -519,9 +521,9 @@ class TrackEddiesObservations(EddiesObservations):
 
     def display_shape(self, ax, ref=None, intern=False, **kwargs):
         """
-        This function will draw shape of each track
+        This function will draw the shape of each trajectory
 
-        :param matplotlib.axes.Axes ax: ax where drawed
+        :param matplotlib.axes.Axes ax: ax to draw
         :param float,int ref: if defined all coordinates will be wrapped with ref like west boundary
         :param bool intern: If True use speed contour instead of effective contour
         :param dict kwargs: keyword arguments for Axes.plot
@@ -546,10 +548,10 @@ class TrackEddiesObservations(EddiesObservations):
 
     def close_tracks(self, other, nb_obs_min=10, **kwargs):
         """
-        Get close from another atlas.
+        Get close trajectories from another atlas.
 
         :param self other: Atlas to compare
-        :param int nb_obs_min: Minimal number of overlap for one track
+        :param int nb_obs_min: Minimal number of overlap for one trajectory
         :param dict kwargs: keyword arguments for match function
         :return: return other atlas reduce to common track with self
 
@@ -576,10 +578,10 @@ class TrackEddiesObservations(EddiesObservations):
 
     def plot(self, ax, ref=None, **kwargs):
         """
-        This function will draw path of each track
+        This function will draw path of each trajectory
 
-        :param matplotlib.axes.Axes ax: ax where drawed
-        :param float,int ref: if defined all coordinates will be wrapped with ref like west boundary
+        :param matplotlib.axes.Axes ax: ax to draw
+        :param float,int ref: if defined, all coordinates will be wrapped with ref like west boundary
         :param dict kwargs: keyword arguments for Axes.plot
         :return: matplotlib mappable
         """
@@ -594,7 +596,7 @@ class TrackEddiesObservations(EddiesObservations):
         return ax.plot(x, y, **kwargs)
 
     def split_network(self, intern=True, **kwargs):
-        """Divide each group in track"""
+        """Return each group (network) divided in segments"""
         track_s, track_e, track_ref = build_index(self.tracks)
         ids = empty(
             len(self),
@@ -609,9 +611,13 @@ class TrackEddiesObservations(EddiesObservations):
             ],
         )
         ids["group"], ids["time"] = self.tracks, self.time
-        # To store id track
+        # Initialisation
+        # To store the id of the segments, the backward and forward cost associations
         ids["track"], ids["previous_cost"], ids["next_cost"] = 0, 0, 0
+        # To store the indexes of the backward and forward observations associated
         ids["previous_obs"], ids["next_obs"] = -1, -1
+        # At the end, ids["previous_obs"] == -1 means the start of a non-split segment
+        # and ids["next_obs"] == -1 means the end of a non-merged segment
 
         xname, yname = self.intern(intern)
         for i_s, i_e in zip(track_s, track_e):
@@ -619,16 +625,18 @@ class TrackEddiesObservations(EddiesObservations):
                 continue
             sl = slice(i_s, i_e)
             local_ids = ids[sl]
+            # built segments with local indices
             self.set_tracks(self[xname][sl], self[yname][sl], local_ids, **kwargs)
-            m = local_ids["previous_obs"] == -1
+            # shift the local indices to the total indexation for the used observations
+            m = local_ids["previous_obs"] != -1
             local_ids["previous_obs"][m] += i_s
-            m = local_ids["next_obs"] == -1
+            m = local_ids["next_obs"] != -1
             local_ids["next_obs"][m] += i_s
         return ids
 
     def set_tracks(self, x, y, ids, window, **kwargs):
         """
-        Will split one group in tracks
+        Will split one group (network) in segments
 
         :param array x: coordinates of group
         :param array y: coordinates of group
@@ -640,18 +648,21 @@ class TrackEddiesObservations(EddiesObservations):
         nb = x.shape[0]
         used = zeros(nb, dtype="bool")
         track_id = 1
-        # build all polygon (need to check if wrap is needed)
+        # build all polygons (need to check if wrap is needed)
         for i in range(nb):
-            # If observation already in one track, we go to the next one
+            # If the observation is already in one track, we go to the next one
             if used[i]:
                 continue
+            # Search a possible continuation (forward)
             self.follow_obs(i, track_id, used, ids, x, y, *time_index, window, **kwargs)
             track_id += 1
-            # Search a possible ancestor
+            # Search a possible ancestor (backward)
             self.previous_obs(i, ids, x, y, *time_index, window, **kwargs)
 
     @classmethod
     def follow_obs(cls, i_next, track_id, used, ids, *args, **kwargs):
+        """Associate the observations to the segments"""
+
         while i_next != -1:
             # Flag
             used[i_next] = True
@@ -675,6 +686,8 @@ class TrackEddiesObservations(EddiesObservations):
 
     @staticmethod
     def previous_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
+        """Backward association of observations to the segments"""
+
         time_cur = ids["time"][i_current]
         t0, t1 = time_cur - 1 - time_ref, max(time_cur - window - time_ref, 0)
         for t_step in range(t0, t1 - 1, -1):
@@ -682,7 +695,7 @@ class TrackEddiesObservations(EddiesObservations):
             # No observation at the time step
             if i0 == i1:
                 continue
-            # Intersection / union, to be able to separte in case of multiple inside
+            # Search for overlaps
             xi, yi, xj, yj = x[[i_current]], y[[i_current]], x[i0:i1], y[i0:i1]
             ii, ij = bbox_intersection(xi, yi, xj, yj)
             if len(ii) == 0:
@@ -703,6 +716,7 @@ class TrackEddiesObservations(EddiesObservations):
 
     @staticmethod
     def next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
+        """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1
         time_cur = ids["time"][i_current]
         t0, t1 = time_cur + 1 - time_ref, min(time_cur + window - time_ref, time_max)
@@ -713,7 +727,7 @@ class TrackEddiesObservations(EddiesObservations):
             # No observation at the time step
             if i0 == i1:
                 continue
-            # Intersection / union, to be able to separte in case of multiple inside
+            # Search for overlaps
             xi, yi, xj, yj = x[[i_current]], y[[i_current]], x[i0:i1], y[i0:i1]
             ii, ij = bbox_intersection(xi, yi, xj, yj)
             if len(ii) == 0:

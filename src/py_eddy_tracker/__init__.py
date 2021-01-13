@@ -197,7 +197,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             units="degrees_east",
             axis="X",
-            comment="Longitude center of the fitted circle",
+            comment="Longitude center of the fit circle",
             long_name="Eddy Center Longitude",
             standard_name="longitude",
         ),
@@ -214,7 +214,7 @@ VAR_DESCR = dict(
             axis="Y",
             long_name="Eddy Center Latitude",
             standard_name="latitude",
-            comment="Latitude center of the fitted circle",
+            comment="Latitude center of the fit circle",
         ),
     ),
     lon_max=dict(
