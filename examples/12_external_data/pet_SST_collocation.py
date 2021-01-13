@@ -27,7 +27,7 @@ extent = [27, 42, 40.5, 47]
 
 # %%
 # Loading data
-# -----------------------------
+# ------------
 sst = RegularGridDataset(filename=filename_sst, x_name="lon", y_name="lat")
 alti = RegularGridDataset(
     data.get_path(filename_alt), x_name="longitude", y_name="latitude"
@@ -58,14 +58,14 @@ def update_axes(ax, mappable=None, unit=""):
 
 # %%
 # ADT first display
-# -----------------------------
+# -----------------
 ax = start_axes("SLA", extent=extent)
 m = sst.display(ax, "sla", vmin=0.05, vmax=0.35)
 update_axes(ax, m, unit="[m]")
 
 # %%
 # SST first display
-# -----------------------------
+# -----------------
 
 # %%
 # We can now plot SST from `sst`
