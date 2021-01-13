@@ -26,11 +26,10 @@ from numpy import (
     where,
     zeros,
 )
-from Polygon import Polygon
 
 from .. import VAR_DESCR_inv, __version__
 from ..generic import build_index, cumsum_by_track, distance, split_line, wrap_longitude
-from ..poly import create_vertice_from_2darray, merge, polygon_overlap
+from ..poly import bbox_intersection, merge, vertice_overlap
 from .observation import EddiesObservations
 
 logger = logging.getLogger("pet")
@@ -512,7 +511,7 @@ class TrackEddiesObservations(EddiesObservations):
         """
         Get the polygon enclosing each trajectory.
 
-        The polygon merges the non-overlapping bounds of the specified contours 
+        The polygon merges the non-overlapping bounds of the specified contours
 
         :param bool intern: If True use speed contour instead of effective contour
         :rtype: list(array, array)
@@ -581,7 +580,7 @@ class TrackEddiesObservations(EddiesObservations):
         """
         This function will draw path of each trajectory
 
-        :param matplotlib.axes.Axes ax: ax to draw 
+        :param matplotlib.axes.Axes ax: ax to draw
         :param float,int ref: if defined, all coordinates will be wrapped with ref like west boundary
         :param dict kwargs: keyword arguments for Axes.plot
         :return: matplotlib mappable
@@ -612,7 +611,7 @@ class TrackEddiesObservations(EddiesObservations):
             ],
         )
         ids["group"], ids["time"] = self.tracks, self.time
-        # Initialisation 
+        # Initialisation
         # To store the id of the segments, the backward and forward cost associations
         ids["track"], ids["previous_cost"], ids["next_cost"] = 0, 0, 0
         # To store the indexes of the backward and forward observations associated
@@ -635,7 +634,7 @@ class TrackEddiesObservations(EddiesObservations):
             local_ids["next_obs"][m] += i_s
         return ids
 
-    def set_tracks(self, x, y, ids, window):
+    def set_tracks(self, x, y, ids, window, **kwargs):
         """
         Will split one group (network) in segments
 
@@ -650,19 +649,18 @@ class TrackEddiesObservations(EddiesObservations):
         used = zeros(nb, dtype="bool")
         track_id = 1
         # build all polygons (need to check if wrap is needed)
-        polygons = [Polygon(create_vertice_from_2darray(x, y, i)) for i in range(nb)]
         for i in range(nb):
             # If the observation is already in one track, we go to the next one
             if used[i]:
                 continue
             # Search a possible continuation (forward)
-            self.follow_obs(i, track_id, used, ids, polygons, *time_index, window)
+            self.follow_obs(i, track_id, used, ids, x, y, *time_index, window, **kwargs)
             track_id += 1
             # Search a possible ancestor (backward)
-            self.previous_obs(i, ids, polygons, *time_index, window)
+            self.previous_obs(i, ids, x, y, *time_index, window, **kwargs)
 
     @classmethod
-    def follow_obs(cls, i_next, track_id, used, ids, *args):
+    def follow_obs(cls, i_next, track_id, used, ids, *args, **kwargs):
         """Associate the observations to the segments"""
 
         while i_next != -1:
@@ -671,7 +669,7 @@ class TrackEddiesObservations(EddiesObservations):
             # Assign id
             ids["track"][i_next] = track_id
             # Search next
-            i_next_ = cls.next_obs(i_next, ids, *args)
+            i_next_ = cls.next_obs(i_next, ids, *args, **kwargs)
             if i_next_ == -1:
                 break
             ids["next_obs"][i_next] = i_next_
@@ -687,7 +685,7 @@ class TrackEddiesObservations(EddiesObservations):
             i_next = i_next_
 
     @staticmethod
-    def previous_obs(i_current, ids, polygons, time_s, time_e, time_ref, window):
+    def previous_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
         """Backward association of observations to the segments"""
 
         time_cur = ids["time"][i_current]
@@ -697,10 +695,15 @@ class TrackEddiesObservations(EddiesObservations):
             # No observation at the time step
             if i0 == i1:
                 continue
-            # Intersection / union, to be able to separte in case of multiple inside
-            c = polygon_overlap(polygons[i_current], polygons[i0:i1], minimal_area=True)
+            # Search for overlaps
+            xi, yi, xj, yj = x[[i_current]], y[[i_current]], x[i0:i1], y[i0:i1]
+            ii, ij = bbox_intersection(xi, yi, xj, yj)
+            if len(ii) == 0:
+                continue
+            c = zeros(len(xj))
+            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
             # We remove low overlap
-            c[c < 0.1] = 0
+            c[c < 0.01] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]
@@ -712,7 +715,7 @@ class TrackEddiesObservations(EddiesObservations):
             break
 
     @staticmethod
-    def next_obs(i_current, ids, polygons, time_s, time_e, time_ref, window):
+    def next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
         """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1
         time_cur = ids["time"][i_current]
@@ -724,10 +727,15 @@ class TrackEddiesObservations(EddiesObservations):
             # No observation at the time step
             if i0 == i1:
                 continue
-            # Intersection / union, to be able to separate in case of multiple obs inside the current polygon in next_step
-            c = polygon_overlap(polygons[i_current], polygons[i0:i1], minimal_area=True)
-            # We remove low overlap TO DO : add the value as a parameter (default 0.1)?
-            c[c < 0.1] = 0
+            # Search for overlaps
+            xi, yi, xj, yj = x[[i_current]], y[[i_current]], x[i0:i1], y[i0:i1]
+            ii, ij = bbox_intersection(xi, yi, xj, yj)
+            if len(ii) == 0:
+                continue
+            c = zeros(len(xj))
+            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
+            # We remove low overlap
+            c[c < 0.01] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]
