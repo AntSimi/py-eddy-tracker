@@ -6,7 +6,7 @@ Entry point to create and manipulate observations network
 import logging
 
 from .. import EddyParser
-from ..observations.network import Network
+from ..observations.network import Network, NetworkObservations
 from ..observations.tracking import TrackEddiesObservations
 
 logger = logging.getLogger("pet")
@@ -50,7 +50,13 @@ def divide_network():
         args.input,
         include_vars=("time", "track", "latitude", "longitude", *contour_name),
     )
-    ids = e.split_network(intern=args.intern, window=args.window, minimal_area=False)
-    e = e.add_fields(("segment",))
-    e.segment[:] = ids["track"]
-    e.write_file(filename=args.out)
+    n = NetworkObservations.from_split_network(
+        e, e.split_network(intern=args.intern, window=args.window)
+    )
+    n.write_file(filename=args.out)
+
+
+def subsample_network():
+    parser = EddyParser("Sub sample")
+    parser.add_argument("input", help="input network file")
+    parser.add_argument("out", help="output file")

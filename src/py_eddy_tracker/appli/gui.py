@@ -4,7 +4,7 @@ Entry point of graphic user interface
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import chain
 
 from matplotlib import pyplot
@@ -176,7 +176,7 @@ class Anim:
             ]
         )
         # Update date txt and info
-        txt = f"{self.now}"
+        txt = f"{(timedelta(int(self.now)) + datetime(1950,1,1)).strftime('%Y/%m/%d')}"
         if self.graphic_informations:
             txt += f"- {1/self.sleep_event:.0f} frame/s"
         self.txt.set_text(txt)
@@ -262,7 +262,7 @@ def anim():
     parser.add_argument(
         "--vmax", default=None, type=float, help="Upper bound to color contour"
     )
-    parser.add_argument("--avi", help="Filename to save animation (avi)")
+    parser.add_argument("--mp4", help="Filename to save animation (mp4)")
     args = parser.parse_args()
     variables = ["time", "track", "longitude", "latitude", args.field]
     variables.extend(TrackEddiesObservations.intern(args.intern, public_label=True))
@@ -284,6 +284,10 @@ def anim():
                 (eddies.contour_lon_e.T - eddies.lon + 180) % 360 + eddies.lon - 180
             ).T
 
+    kw = dict()
+    if args.mp4:
+        kw["figsize"] = (16, 9)
+        kw["dpi"] = 120
     a = Anim(
         eddies,
         intern=args.intern,
@@ -293,13 +297,14 @@ def anim():
         field_color=args.field,
         range_color=(args.vmin, args.vmax),
         graphic_information=logger.getEffectiveLevel() == logging.DEBUG,
+        **kw,
     )
-    if args.avi is None:
+    if args.mp4 is None:
         a.show(infinity_loop=args.infinity_loop)
     else:
         kwargs = dict(frames=arange(*a.period), interval=50)
         ani = FuncAnimation(a.fig, a.func_animation, **kwargs)
-        ani.save(args.avi, fps=30, extra_args=["-vcodec", "libx264"])
+        ani.save(args.mp4, fps=30, extra_args=["-vcodec", "libx264"])
 
 
 def gui_parser():

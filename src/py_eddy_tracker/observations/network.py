@@ -8,6 +8,7 @@ from glob import glob
 from numba import njit
 from numpy import arange, array, bincount, empty, ones, uint32, unique
 
+from ..generic import build_index
 from ..poly import bbox_intersection, vertice_overlap
 from .observation import EddiesObservations
 from .tracking import TrackEddiesObservations
@@ -89,18 +90,75 @@ class NetworkObservations(EddiesObservations):
         network.segment[:] = indexs["track"][index_order]
         # n & p must be re-index
         n, p = indexs["next_obs"][index_order], indexs["previous_obs"][index_order]
-        translate = empty(index_order.max() + 1, dtype="i4")
+        # we add 2 for -1 index return index -1
+        translate = -ones(index_order.max() + 2, dtype="i4")
         translate[index_order] = arange(index_order.shape[0])
-        m = n != -1
-        n[m] = translate[n[m]]
-        m = p != -1
-        p[m] = translate[p[m]]
-        network.next_obs[:] = n
-        network.previous_obs[:] = p
+        network.next_obs[:] = translate[n]
+        network.previous_obs[:] = translate[p]
         return network
 
+    def infos(self, label=""):
+        return f"{len(self)} obs {unique(self.segment).shape[0]} segments"
+
+    def obs_relative_order(self, i_obs):
+        self.only_one_network()
+        return self.segment_relative_order(self.segment[i_obs])
+
+    def connexions(self):
+        self.only_one_network()
+        segments_connexion = dict()
+
+        def add_seg(father, child):
+            if father not in segments_connexion:
+                segments_connexion[father] = list()
+            segments_connexion[father].append(child)
+
+        for i, seg, _ in self.iter_on("segment"):
+            if i.start == i.stop:
+                continue
+            i_p, i_n = self.previous_obs[i.start], self.next_obs[i.stop - 1]
+            # segment of interaction
+            p_seg, n_seg = self.segment[i_p], self.segment[i_n]
+            # Where segment are called
+            if i_p != -1:
+                add_seg(p_seg, seg)
+                add_seg(seg, p_seg)
+            if i_n != -1:
+                add_seg(n_seg, seg)
+                add_seg(seg, n_seg)
+        return segments_connexion
+
+    @classmethod
+    def __close_segment(cls, father, shift, connexions, distance):
+        i_father = father - shift
+        if distance[i_father] == -1:
+            distance[i_father] = 0
+        d_target = distance[i_father] + 1
+        for son in connexions.get(father, list()):
+            i_son = son - shift
+            d_son = distance[i_son]
+            if d_son == -1 or d_son > d_target:
+                distance[i_son] = d_target
+            else:
+                continue
+            cls.__close_segment(son, shift, connexions, distance)
+
+    def segment_relative_order(self, seg_origine):
+        i_s, i_e, i_ref = build_index(self.segment)
+        segment_connexions = self.connexions()
+        relative_tr = -ones(i_s.shape, dtype="i4")
+        self.__close_segment(seg_origine, i_ref, segment_connexions, relative_tr)
+        d = -ones(self.shape)
+        for i0, i1, v in zip(i_s, i_e, relative_tr):
+            if i0 == i1:
+                continue
+            d[i0:i1] = v
+        return d
+
     def relative(self, i_obs, order=2, direct=True, only_past=False, only_future=False):
-        pass
+        d = self.segment_relative_order(self.segment[i_obs])
+        m = (d <= order) * (d != -1)
+        return self.extract_with_mask(m)
 
     def only_one_network(self):
         """
@@ -110,7 +168,7 @@ class NetworkObservations(EddiesObservations):
         # TODO
         pass
 
-    def display_timeline(self, ax, event=False):
+    def display_timeline(self, ax, event=True):
         """
         Must be call on only one network
         """
@@ -123,30 +181,138 @@ class NetworkObservations(EddiesObservations):
             zorder=1,
             lw=3,
         )
+        mappables = dict(lines=list())
+        if event:
+            mappables.update(self.event_timeline(ax))
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
             if x.shape[0] == 0:
                 continue
             y = b0 * ones(x.shape)
             line = ax.plot(x, y, **line_kw, color=self.COLORS[j % self.NB_COLORS])[0]
-            if event:
-                event_kw = dict(color=line.get_color(), ls="-", zorder=1)
-                i_n, i_p = (
-                    self.next_obs[i.stop - 1],
-                    self.previous_obs[i.start],
-                )
-                if i_n != -1:
-                    ax.plot(
-                        (x[-1], self.time[i_n]), (b0, self.segment[i_n]), **event_kw
-                    )
-                    ax.plot(x[-1], b0, color="k", marker=">", markersize=10, zorder=-1)
-                if i_p != -1:
-                    ax.plot((x[0], self.time[i_p]), (b0, self.segment[i_p]), **event_kw)
-                    ax.plot(x[0], b0, color="k", marker="*", markersize=12, zorder=-1)
+            mappables["lines"].append(line)
             j += 1
+
+        return mappables
+
+    def event_timeline(self, ax):
+        j = 0
+        # TODO : fill mappables dict
+        mappables = dict()
+        for i, b0, b1 in self.iter_on("segment"):
+            x = self.time[i]
+            if x.shape[0] == 0:
+                continue
+            event_kw = dict(color=self.COLORS[j % self.NB_COLORS], ls="-", zorder=1)
+            i_n, i_p = (
+                self.next_obs[i.stop - 1],
+                self.previous_obs[i.start],
+            )
+            if i_n != -1:
+                ax.plot((x[-1], self.time[i_n]), (b0, self.segment[i_n]), **event_kw)
+                ax.plot(x[-1], b0, color="k", marker=">", markersize=10, zorder=-1)
+            if i_p != -1:
+                ax.plot((x[0], self.time[i_p]), (b0, self.segment[i_p]), **event_kw)
+                ax.plot(x[0], b0, color="k", marker="*", markersize=12, zorder=-1)
+            j += 1
+        return mappables
+
+    def scatter_timeline(self, ax, name, factor=1, event=True, **kwargs):
+        """
+        Must be call on only one network
+        """
+        self.only_one_network()
+        mappables = dict()
+        if event:
+            mappables.update(self.event_timeline(ax))
+        if "c" not in kwargs:
+            v = self.parse_varname(name)
+            kwargs["c"] = v * factor
+        mappables["scatter"] = ax.scatter(self.time, self.segment, **kwargs)
+        return mappables
 
     def insert_virtual(self):
         pass
+
+    def merging_event(self):
+        pass
+
+    def spliting_event(self):
+        pass
+
+    def fully_connected(self):
+        self.only_one_network()
+
+    def remove_dead_branch(self, nobs=3):
+        """"""
+        # TODO: bug when spliting
+        self.only_one_network()
+
+        segments_keep = list()
+        interaction_segments = dict()
+        segments_connexion = dict()
+        for i, b0, b1 in self.iter_on("segment"):
+            nb = i.stop - i.start
+            i_p, i_n = self.previous_obs[i.start], self.next_obs[i.stop - 1]
+            seg = self.segment[i.start]
+            # segment of interaction
+            p_seg, n_seg = self.segment[i_p], self.segment[i_n]
+            if nb >= nobs:
+                segments_keep.append(seg)
+            else:
+                interaction_segments[seg] = (
+                    p_seg if i_p != -1 else -1,
+                    n_seg if i_n != -1 else -1,
+                )
+            # Where segment are called
+            if i_p != -1:
+                if p_seg not in segments_connexion:
+                    segments_connexion[p_seg] = list()
+                segments_connexion[p_seg].append(seg)
+            if i_n != -1:
+                if n_seg not in segments_connexion:
+                    segments_connexion[n_seg] = list()
+                segments_connexion[n_seg].append(seg)
+        print(interaction_segments)
+        print(segments_connexion)
+        print(segments_keep)
+        return self.extract_segment(tuple(segments_keep))
+
+    def extract_segment(self, segments):
+        mask = ones(self.shape, dtype="bool")
+        for i, b0, b1 in self.iter_on("segment"):
+            if b0 not in segments:
+                mask[i] = False
+        return self.extract_with_mask(mask)
+
+    def extract_with_mask(self, mask):
+        """
+        Extract a subset of observations.
+
+        :param array(bool) mask: mask to select observations
+        :return: same object with selected observations
+        :rtype: self
+        """
+        nb_obs = mask.sum()
+        new = self.__class__.new_like(self, nb_obs)
+        new.sign_type = self.sign_type
+        if nb_obs == 0:
+            logger.warning("Empty dataset will be created")
+        else:
+            for field in self.obs.dtype.descr:
+                if field in ("next_obs", "previous_obs"):
+                    continue
+                logger.debug("Copy of field %s ...", field)
+                var = field[0]
+                new.obs[var] = self.obs[var][mask]
+            # n & p must be re-index
+            n, p = self.next_obs[mask], self.previous_obs[mask]
+            # we add 2 for -1 index return index -1
+            translate = -ones(len(self) + 1, dtype="i4")
+            translate[:-1][mask] = arange(nb_obs)
+            new.next_obs[:] = translate[n]
+            new.previous_obs[:] = translate[p]
+        return new
 
 
 class Network:
