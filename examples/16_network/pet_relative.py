@@ -15,6 +15,11 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 # ---------
 # Load data where observations are put in same network but no segmentation
 e = TrackEddiesObservations.load_file(data.get_path("c568803.nc"))
+# FIXME : Must be rewrote
+e.lon[:] = (e.lon + 180) % 360 - 180
+e.contour_lon_e[:] = ((e.contour_lon_e.T - e.lon + 180) % 360 - 180 + e.lon).T
+e.contour_lon_s[:] = ((e.contour_lon_s.T - e.lon + 180) % 360 - 180 + e.lon).T
+##############
 n = NetworkObservations.from_split_network(e, e.split_network(intern=False, window=5))
 
 # %%
@@ -113,18 +118,46 @@ cb.set_label("Relative order")
 # %%
 fig = plt.figure(figsize=(15, 5))
 ax = fig.add_axes([0.04, 0.06, 0.90, 0.88])
-close_to_i = n.relative(i, order=1)
-ax.set_title(f"Close segments ({close_to_i.infos()})")
-_ = close_to_i.display_timeline(ax)
+close_to_i1 = n.relative(i, order=1)
+ax.set_title(f"Close segments ({close_to_i1.infos()})")
+_ = close_to_i1.display_timeline(ax)
 # %%
 fig = plt.figure(figsize=(15, 5))
 ax = fig.add_axes([0.04, 0.06, 0.90, 0.88])
-close_to_i = n.relative(i, order=2)
-ax.set_title(f"Close segments ({close_to_i.infos()})")
-_ = close_to_i.display_timeline(ax)
+close_to_i2 = n.relative(i, order=2)
+ax.set_title(f"Close segments ({close_to_i2.infos()})")
+_ = close_to_i2.display_timeline(ax)
 # %%
 fig = plt.figure(figsize=(15, 5))
 ax = fig.add_axes([0.04, 0.06, 0.90, 0.88])
-close_to_i = n.relative(i, order=3)
-ax.set_title(f"Close segments ({close_to_i.infos()})")
-_ = close_to_i.display_timeline(ax)
+close_to_i3 = n.relative(i, order=3)
+ax.set_title(f"Close segments ({close_to_i3.infos()})")
+_ = close_to_i3.display_timeline(ax)
+
+# %%
+# Display track on map
+# --------------------
+fig = plt.figure(figsize=(15, 8))
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+close_to_i2.plot(ax)
+_ = ax.set_xlim(-10, 20), ax.set_ylim(-37, -21), ax.grid()
+
+# %%
+# Get merging event
+# -----------------
+fig = plt.figure(figsize=(15, 8))
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+merging = close_to_i2.merging_event()
+merging.display(ax)
+ax.set_xlim(-10, 20), ax.set_ylim(-37, -21), ax.grid()
+merging
+
+# %%
+# Get spliting event
+# ------------------
+fig = plt.figure(figsize=(15, 8))
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+spliting = close_to_i2.spliting_event()
+spliting.display(ax)
+ax.set_xlim(-10, 20), ax.set_ylim(-37, -21), ax.grid()
+spliting

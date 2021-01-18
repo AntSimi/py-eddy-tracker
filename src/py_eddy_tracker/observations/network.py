@@ -8,7 +8,7 @@ from glob import glob
 from numba import njit
 from numpy import arange, array, bincount, empty, ones, uint32, unique
 
-from ..generic import build_index
+from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
 from .observation import EddiesObservations
 from .tracking import TrackEddiesObservations
@@ -232,16 +232,84 @@ class NetworkObservations(EddiesObservations):
         return mappables
 
     def insert_virtual(self):
+        # TODO
         pass
 
     def merging_event(self):
-        pass
+        indices = list()
+        for i, b0, b1 in self.iter_on("segment"):
+            nb = i.stop - i.start
+            if nb == 0:
+                continue
+            i_n = self.next_obs[i.stop - 1]
+            if i_n != -1:
+                indices.append(i.stop - 1)
+        indices = list(set(indices))
+        nb = len(indices)
+        new = EddiesObservations(
+            nb,
+            track_extra_variables=self.track_extra_variables,
+            track_array_variables=self.track_array_variables,
+            array_variables=self.array_variables,
+            only_variables=self.only_variables,
+            raw_data=self.raw_data,
+        )
+
+        for k in new.obs.dtype.names:
+            new[k][:] = self[k][indices]
+        new.sign_type = self.sign_type
+        return new
 
     def spliting_event(self):
-        pass
+        indices = list()
+        for i, b0, b1 in self.iter_on("segment"):
+            nb = i.stop - i.start
+            if nb == 0:
+                continue
+            i_p = self.previous_obs[i.start]
+            if i_p != -1:
+                indices.append(i.start)
+        indices = list(set(indices))
+        nb = len(indices)
+        new = EddiesObservations(
+            nb,
+            track_extra_variables=self.track_extra_variables,
+            track_array_variables=self.track_array_variables,
+            array_variables=self.array_variables,
+            only_variables=self.only_variables,
+            raw_data=self.raw_data,
+        )
+
+        for k in new.obs.dtype.names:
+            new[k][:] = self[k][indices]
+        new.sign_type = self.sign_type
+        return new
 
     def fully_connected(self):
         self.only_one_network()
+        # TODO
+
+    def plot(self, ax, ref=None, **kwargs):
+        """
+        This function will draw path of each trajectory
+
+        :param matplotlib.axes.Axes ax: ax to draw
+        :param float,int ref: if defined, all coordinates will be wrapped with ref like west boundary
+        :param dict kwargs: keyword arguments for Axes.plot
+        :return: a list of matplotlib mappables
+        """
+        mappables = list()
+        if "label" in kwargs:
+            kwargs["label"] = self.format_label(kwargs["label"])
+        for i, b0, b1 in self.iter_on("segment"):
+            nb = i.stop - i.start
+            if nb == 0:
+                continue
+            x, y = self.lon[i], self.lat[i]
+            if ref is not None:
+                x, y = wrap_longitude(x, y, ref, cut=True)
+            mappables.append(ax.plot(x, y, **kwargs)[0])
+        return mappables
 
     def remove_dead_branch(self, nobs=3):
         """"""
