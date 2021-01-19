@@ -11,7 +11,7 @@ from numpy import arange, array, bincount, empty, ones, uint32, unique
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
 from .observation import EddiesObservations
-from .tracking import TrackEddiesObservations
+from .tracking import TrackEddiesObservations, track_median_filter
 
 logger = logging.getLogger("pet")
 
@@ -168,7 +168,17 @@ class NetworkObservations(EddiesObservations):
         # TODO
         pass
 
-    def display_timeline(self, ax, event=True):
+    def median_filter(self, half_window, xfield, yfield, inplace=True):
+        # FIXME: segments is not enough with several network
+        result = track_median_filter(
+            half_window, self[xfield], self[yfield], self.segment
+        )
+        if inplace:
+            self[yfield][:] = result
+            return self
+        return result
+
+    def display_timeline(self, ax, event=True, field=None, method=None):
         """
         Must be call on only one network
         """
@@ -183,21 +193,33 @@ class NetworkObservations(EddiesObservations):
         )
         mappables = dict(lines=list())
         if event:
-            mappables.update(self.event_timeline(ax))
+            mappables.update(self.event_timeline(ax, field=field, method=method))
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
             if x.shape[0] == 0:
                 continue
-            y = b0 * ones(x.shape)
+            if field is None:
+                y = b0 * ones(x.shape)
+            else:
+                if method == "all":
+                    y = self[field][i]
+                else:
+                    y = self[field][i].mean() * ones(x.shape)
             line = ax.plot(x, y, **line_kw, color=self.COLORS[j % self.NB_COLORS])[0]
             mappables["lines"].append(line)
             j += 1
 
         return mappables
 
-    def event_timeline(self, ax):
+    def event_timeline(self, ax, field=None, method=None):
         j = 0
         # TODO : fill mappables dict
+        y_seg = dict()
+        if field is not None and method != "all":
+            for i, b0, _ in self.iter_on("segment"):
+                y = self[field][i]
+                if y.shape[0] != 0:
+                    y_seg[b0] = y.mean()
         mappables = dict()
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
@@ -208,12 +230,33 @@ class NetworkObservations(EddiesObservations):
                 self.next_obs[i.stop - 1],
                 self.previous_obs[i.start],
             )
+            if field is None:
+                y0 = b0
+            else:
+                if method == "all":
+                    y0 = self[field][i.stop - 1]
+                else:
+                    y0 = y_seg[b0]
             if i_n != -1:
-                ax.plot((x[-1], self.time[i_n]), (b0, self.segment[i_n]), **event_kw)
-                ax.plot(x[-1], b0, color="k", marker=">", markersize=10, zorder=-1)
+                seg_next = self.segment[i_n]
+                y1 = (
+                    seg_next
+                    if field is None
+                    else (self[field][i_n] if method == "all" else y_seg[seg_next])
+                )
+                ax.plot((x[-1], self.time[i_n]), (y0, y1), **event_kw)[0]
+                ax.plot(x[-1], y0, color="k", marker=">", markersize=10, zorder=-1)[0]
             if i_p != -1:
-                ax.plot((x[0], self.time[i_p]), (b0, self.segment[i_p]), **event_kw)
-                ax.plot(x[0], b0, color="k", marker="*", markersize=12, zorder=-1)
+                seg_previous = self.segment[i_p]
+                if field is not None and method == "all":
+                    y0 = self[field][i.start]
+                y1 = (
+                    seg_previous
+                    if field is None
+                    else (self[field][i_p] if method == "all" else y_seg[seg_previous])
+                )
+                ax.plot((x[0], self.time[i_p]), (y0, y1), **event_kw)[0]
+                ax.plot(x[0], y0, color="k", marker="*", markersize=12, zorder=-1)[0]
             j += 1
         return mappables
 
@@ -235,55 +278,70 @@ class NetworkObservations(EddiesObservations):
         # TODO
         pass
 
+    def extract_event(self, indices):
+        nb = len(indices)
+        new = EddiesObservations(
+            nb,
+            track_extra_variables=self.track_extra_variables,
+            track_array_variables=self.track_array_variables,
+            array_variables=self.array_variables,
+            only_variables=self.only_variables,
+            raw_data=self.raw_data,
+        )
+
+        for k in new.obs.dtype.names:
+            new[k][:] = self[k][indices]
+        new.sign_type = self.sign_type
+        return new
+
+    def segment_track_array(self):
+        return build_unique_array(self.segment, self.track)
+
+    def birth_event(self):
+        # FIXME how to manage group 0
+        indices = list()
+        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+            nb = i.stop - i.start
+            if nb == 0:
+                continue
+            i_p = self.previous_obs[i.start]
+            if i_p == -1:
+                indices.append(i.start)
+        return self.extract_event(list(set(indices)))
+
+    def death_event(self):
+        # FIXME how to manage group 0
+        indices = list()
+        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+            nb = i.stop - i.start
+            if nb == 0:
+                continue
+            i_n = self.next_obs[i.stop - 1]
+            if i_n == -1:
+                indices.append(i.stop - 1)
+        return self.extract_event(list(set(indices)))
+
     def merging_event(self):
         indices = list()
-        for i, b0, b1 in self.iter_on("segment"):
+        for i, b0, b1 in self.iter_on(self.segment_track_array()):
             nb = i.stop - i.start
             if nb == 0:
                 continue
             i_n = self.next_obs[i.stop - 1]
             if i_n != -1:
                 indices.append(i.stop - 1)
-        indices = list(set(indices))
-        nb = len(indices)
-        new = EddiesObservations(
-            nb,
-            track_extra_variables=self.track_extra_variables,
-            track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables,
-            only_variables=self.only_variables,
-            raw_data=self.raw_data,
-        )
-
-        for k in new.obs.dtype.names:
-            new[k][:] = self[k][indices]
-        new.sign_type = self.sign_type
-        return new
+        return self.extract_event(list(set(indices)))
 
     def spliting_event(self):
         indices = list()
-        for i, b0, b1 in self.iter_on("segment"):
+        for i, b0, b1 in self.iter_on(self.segment_track_array()):
             nb = i.stop - i.start
             if nb == 0:
                 continue
             i_p = self.previous_obs[i.start]
             if i_p != -1:
                 indices.append(i.start)
-        indices = list(set(indices))
-        nb = len(indices)
-        new = EddiesObservations(
-            nb,
-            track_extra_variables=self.track_extra_variables,
-            track_array_variables=self.track_array_variables,
-            array_variables=self.array_variables,
-            only_variables=self.only_variables,
-            raw_data=self.raw_data,
-        )
-
-        for k in new.obs.dtype.names:
-            new[k][:] = self[k][indices]
-        new.sign_type = self.sign_type
-        return new
+        return self.extract_event(list(set(indices)))
 
     def fully_connected(self):
         self.only_one_network()
@@ -463,14 +521,16 @@ class Network:
             print()
 
         gr = self.get_group_array(results, nb_obs)
+        nb_alone, nb_obs, nb_gr = (gr == self.NOGROUP).sum(), len(gr), len(unique(gr))
         logger.info(
-            f"{(gr == self.NOGROUP).sum()} alone / {len(gr)} obs, {len(unique(gr))} groups"
+            f"{nb_alone} alone / {nb_obs} obs, {nb_gr} groups, "
+            f"{nb_alone *100./nb_obs:.2f} % alone, {(nb_obs - nb_alone) / (nb_gr - 1):.1f} obs/group"
         )
         return gr
 
     def build_dataset(self, group):
         nb_obs = group.shape[0]
-        model = EddiesObservations.load_file(self.filenames[-1], raw_data=True)
+        model = TrackEddiesObservations.load_file(self.filenames[-1], raw_data=True)
         eddies = TrackEddiesObservations.new_like(model, nb_obs)
         eddies.sign_type = model.sign_type
         # Get new index to re-order observation by group
@@ -485,9 +545,9 @@ class Network:
             if self.memory:
                 # Only if netcdf
                 with open(filename, "rb") as h:
-                    e = EddiesObservations.load_file(h, raw_data=True)
+                    e = TrackEddiesObservations.load_file(h, raw_data=True)
             else:
-                e = EddiesObservations.load_file(filename, raw_data=True)
+                e = TrackEddiesObservations.load_file(filename, raw_data=True)
             stop = i + len(e)
             sl = slice(i, stop)
             for element in elements:
@@ -495,7 +555,6 @@ class Network:
             i = stop
         if display_iteration:
             print()
-        eddies = eddies.add_fields(("track",))
         eddies.track[new_i] = group
         return eddies
 
@@ -518,3 +577,18 @@ def apply_replace(x, x0, x1):
     for i in range(nb):
         if x[i] == x0:
             x[i] = x1
+
+
+@njit(cache=True)
+def build_unique_array(id1, id2):
+    k = 0
+    new_id = empty(id1.shape, dtype=id1.dtype)
+    id1_previous = id1[0]
+    id2_previous = id2[0]
+    for i in range(id1.shape[0]):
+        id1_, id2_ = id1[i], id2[i]
+        if id1_ != id1_previous or id2_ != id2_previous:
+            k += 1
+        new_id[i] = k
+        id1_previous, id2_previous = id1_, id2_
+    return new_id

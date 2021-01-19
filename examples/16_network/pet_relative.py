@@ -4,9 +4,12 @@ Network basic manipulation
 """
 
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
+from numpy import arange
 
 import py_eddy_tracker.gui
 from py_eddy_tracker import data
+from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
@@ -30,13 +33,41 @@ n = NetworkObservations.from_split_network(e, e.split_network(intern=False, wind
 # Display timeline
 fig = plt.figure(figsize=(15, 5))
 ax = fig.add_axes([0.04, 0.04, 0.92, 0.92])
-n.display_timeline(ax)
+_ = n.display_timeline(ax)
 
 # %%
 # Display timeline without event
 fig = plt.figure(figsize=(15, 5))
 ax = fig.add_axes([0.04, 0.04, 0.92, 0.92])
-n.display_timeline(ax, event=False)
+_ = n.display_timeline(ax, event=False)
+
+# %%
+# Timeline by latitude mean
+# -------------------------
+fig = plt.figure(figsize=(15, 5))
+ax = fig.add_axes([0.04, 0.04, 0.92, 0.92])
+_ = n.display_timeline(ax, field="latitude")
+
+# %%
+# Timeline by radius mean
+# -----------------------
+fig = plt.figure(figsize=(15, 5))
+ax = fig.add_axes([0.04, 0.04, 0.92, 0.92])
+_ = n.display_timeline(ax, field="radius_e")
+
+# %%
+# Timeline by latitude
+# --------------------
+fig = plt.figure(figsize=(15, 5))
+ax = fig.add_axes([0.04, 0.05, 0.92, 0.92])
+_ = n.display_timeline(ax, field="lat", method="all")
+
+# %%
+fig = plt.figure(figsize=(15, 5))
+ax = fig.add_axes([0.04, 0.05, 0.92, 0.92])
+n_copy = n.copy()
+n_copy.median_filter(15, "time", "latitude")
+_ = n_copy.display_timeline(ax, field="lat", method="all")
 
 # %%
 # Parameters timeline
@@ -138,9 +169,12 @@ _ = close_to_i3.display_timeline(ax)
 # Display track on map
 # --------------------
 fig = plt.figure(figsize=(15, 8))
-ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
 close_to_i2.plot(ax)
-_ = ax.set_xlim(-10, 20), ax.set_ylim(-37, -21), ax.grid()
+ax.set_xlim(-13, 20), ax.set_ylim(-36.5, -20), ax.grid()
+ax = fig.add_axes([0.08, 0.67, 0.55, 0.3])
+_ = close_to_i2.display_timeline(ax, field="latitude")
+
 
 # %%
 # Get merging event
@@ -161,3 +195,23 @@ spliting = close_to_i2.spliting_event()
 spliting.display(ax)
 ax.set_xlim(-10, 20), ax.set_ylim(-37, -21), ax.grid()
 spliting
+
+# %%
+# Get birth event
+# ------------------
+fig = plt.figure(figsize=(15, 8))
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+birth = close_to_i2.birth_event()
+birth.display(ax)
+ax.set_xlim(-10, 20), ax.set_ylim(-37, -21), ax.grid()
+birth
+
+# %%
+# Get death event
+# ------------------
+fig = plt.figure(figsize=(15, 8))
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+death = close_to_i2.death_event()
+death.display(ax)
+ax.set_xlim(-10, 20), ax.set_ylim(-37, -21), ax.grid()
+death

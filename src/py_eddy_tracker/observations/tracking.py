@@ -432,13 +432,13 @@ class TrackEddiesObservations(EddiesObservations):
             return self
 
     def median_filter(self, half_window, xfield, yfield, inplace=True):
-        track = self.track
-        x = self.obs[xfield]
-        y = self.obs[yfield]
-        result = track_median_filter(half_window, x, y, track)
+        result = track_median_filter(
+            half_window, self[xfield], self[yfield], self.track
+        )
         if inplace:
-            self.obs[yfield] = result
+            self[yfield][:] = result
             return self
+        return result
 
     def position_filter(self, median_half_window, loess_half_window):
         self.median_filter(median_half_window, "time", "lon").loess_filter(
@@ -620,9 +620,12 @@ class TrackEddiesObservations(EddiesObservations):
         # and ids["next_obs"] == -1 means the end of a non-merged segment
 
         xname, yname = self.intern(intern)
+        display_iteration = logger.getEffectiveLevel() == logging.INFO
         for i_s, i_e in zip(track_s, track_e):
             if i_s == i_e or self.tracks[i_s] == self.NOGROUP:
                 continue
+            if display_iteration:
+                print(f"Network obs from {i_s} to {i_e} on {track_e[-1]}", end="\r")
             sl = slice(i_s, i_e)
             local_ids = ids[sl]
             # built segments with local indices
@@ -632,6 +635,8 @@ class TrackEddiesObservations(EddiesObservations):
             local_ids["previous_obs"][m] += i_s
             m = local_ids["next_obs"] != -1
             local_ids["next_obs"][m] += i_s
+        if display_iteration:
+            print()
         return ids
 
     def set_tracks(self, x, y, ids, window, **kwargs):
