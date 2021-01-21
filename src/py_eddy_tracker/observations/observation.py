@@ -363,7 +363,7 @@ class EddiesObservations(object):
 
     def add_rotation_type(self):
         new = self.add_fields(("type_cyc",))
-        new.type_cyc = self.sign_type
+        new.type_cyc[:] = self.sign_type
         return new
 
     def circle_contour(self, only_virtual=False):
@@ -1905,6 +1905,19 @@ class EddiesObservations(object):
         xname, yname = self.intern(intern)
         return convexs(self[xname], self[yname])
 
+    def contains(self, x, y, intern=False):
+        """
+        Return index of contour which contain (x,y)
+
+        :param array x: longitude
+        :param array y: latitude
+        :param bool intern: If true use speed contour instead of effective contour
+        :return: indexs, -1 if no index
+        :rtype: array[int32]
+        """
+        xname, yname = self.intern(intern)
+        return poly_indexs(x, y, self[xname], self[yname])
+
     def inside(self, x, y, intern=False):
         """
         True for each point inside the effective contour of an eddy
@@ -2179,6 +2192,33 @@ def grid_count_pixel_in(
 
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
         grid_count_(grid, i, j)
+
+
+@njit(cache=True)
+def poly_indexs(x_p, y_p, x_c, y_c):
+    """
+    index of contour for each postion inside a contour, -1 in case of no contour
+
+    :param array x_p: longitude to test
+    :param array y_p: latitude to test
+    :param array x_c: longitude of contours
+    :param array y_c: latitude of contours
+    """
+    nb_p = x_p.shape[0]
+    nb_c = x_c.shape[0]
+    indexs = -ones(nb_p, dtype=numba_types.int32)
+    for i in range(nb_c):
+        x_c_min, y_c_min = x_c[i].min(), y_c[i].min()
+        x_c_max, y_c_max = x_c[i].max(), y_c[i].max()
+        v = create_vertice(x_c[i], y_c[i])
+        for j in range(nb_p):
+            if indexs[j] != -1:
+                continue
+            x, y = x_p[j], y_p[j]
+            if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
+                if winding_number_poly(x, y, v) != 0:
+                    indexs[j] = i
+    return indexs
 
 
 @njit(cache=True)
