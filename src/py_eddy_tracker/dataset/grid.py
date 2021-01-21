@@ -249,8 +249,6 @@ class GridDataset(object):
         "x_bounds",
         "y_bounds",
         "centered",
-        "xinterp",
-        "yinterp",
         "x_dim",
         "y_dim",
         "coordinates",
@@ -293,8 +291,6 @@ class GridDataset(object):
         self.y_dim = None
         self.centered = centered
         self.contours = None
-        self.xinterp = None
-        self.yinterp = None
         self.filename = filename
         self.coordinates = x_name, y_name
         self.vars = dict()
@@ -399,7 +395,6 @@ class GridDataset(object):
             self.vars[y_name] = h.variables[y_name][sl_y]
 
         self.setup_coordinates()
-        self.init_pos_interpolator()
 
     @staticmethod
     def c_to_bounds(c):
@@ -1188,11 +1183,6 @@ class RegularGridDataset(GridDataset):
         obj.global_attrs = dict(history="Grid setup with an array")
         obj.setup_coordinates()
         return obj
-
-    def init_pos_interpolator(self):
-        """Create function to have a quick index interpolator"""
-        self.xinterp = arange(self.x_bounds.shape[0])
-        self.yinterp = arange(self.y_bounds.shape[0])
 
     def bbox_indice(self, vertices):
         return bbox_indice_regular(
