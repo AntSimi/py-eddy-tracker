@@ -23,7 +23,6 @@ from numpy import (
     radians,
     sin,
     unique,
-    where,
     zeros,
 )
 
@@ -167,18 +166,35 @@ class TrackEddiesObservations(EddiesObservations):
                 or var in self.array_variables
             ):
                 continue
-            # to normalize longitude before interpolation
-            if var == "lon":
-                lon = self.lon
-                first = where(self.n == 0)[0]
-                nb_obs = empty(first.shape, dtype="u4")
-                nb_obs[:-1] = first[1:] - first[:-1]
-                nb_obs[-1] = lon.shape[0] - first[-1]
-                lon0 = (lon[first] - 180).repeat(nb_obs)
-                self.lon[:] = (lon - lon0) % 360 + lon0
             self.obs[var][mask] = interp(
                 index[mask], index[~mask], self.obs[var][~mask]
             )
+
+    def normalize_longitude(self):
+        """Normalize all longitude
+
+        Normalize longitude field and in the same range :
+        - longitude_max
+        - contour_lon_e (how to do if in raw)
+        - contour_lon_s (how to do if in raw)
+        """
+        lon0 = (self.lon[self.index_from_track] - 180).repeat(self.nb_obs_by_track)
+        logger.debug("Normalize longitude")
+        self.lon[:] = (self.lon - lon0) % 360 + lon0
+        if "lon_max" in self.obs.dtype.names:
+            logger.debug("Normalize longitude_max")
+            self.lon_max[:] = (self.lon_max - self.lon + 180) % 360 + self.lon - 180
+        if not self.raw_data:
+            if "contour_lon_e" in self.obs.dtype.names:
+                logger.debug("Normalize effective contour longitude")
+                self.contour_lon_e[:] = (
+                    (self.contour_lon_e.T - self.lon + 180) % 360 + self.lon - 180
+                ).T
+            if "contour_lon_s" in self.obs.dtype.names:
+                logger.debug("Normalize speed contour longitude")
+                self.contour_lon_s[:] = (
+                    (self.contour_lon_s.T - self.lon + 180) % 360 + self.lon - 180
+                ).T
 
     def extract_longer_eddies(self, nb_min, nb_obs, compress_id=True):
         """Select the trajectories longer than nb_min"""

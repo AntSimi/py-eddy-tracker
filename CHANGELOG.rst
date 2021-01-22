@@ -9,6 +9,11 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 [Unreleased]
 ------------
 
+Changed
+^^^^^^^
+- `TrackEddiesObservations.filled_by_interpolation` method stop to normalize longitude, to continue to have same
+  beahviour you must call before `TrackEddiesObservations.normalize_longitude`
+
 Fixed
 ^^^^^
 - Use `safe_load` for yaml load

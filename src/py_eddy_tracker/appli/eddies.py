@@ -359,8 +359,10 @@ def track(
     # We flag obs
     if c.virtual:
         long_track["virtual"][:] = long_track["time"] == 0
+        long_track.normalize_longitude()
         long_track.filled_by_interpolation(long_track["virtual"] == 1)
         short_track["virtual"][:] = short_track["time"] == 0
+        short_track.normalize_longitude()
         short_track.filled_by_interpolation(short_track["virtual"] == 1)
 
     logger.info("Longer track saved have %d obs", c.nb_obs_by_tracks.max())
