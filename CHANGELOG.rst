@@ -24,7 +24,7 @@ Added
 - Add a filter option in EddyId to be able to remove fine scale (like noise) with same filter order than high scale
   filter
 - Add **EddyQuickCompare** to have few figures about several datasets in comparison based on match function
-- Color field for contour in **EddyAnim** could be choose
+- Color and text field for contour in **EddyAnim** could be choose
 - Save EddyAnim in mp4
 - Add method to get eddy contour which enclosed obs defined with (x,y) coordinates
 

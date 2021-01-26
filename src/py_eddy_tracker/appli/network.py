@@ -51,7 +51,8 @@ def divide_network():
         include_vars=("time", "track", "latitude", "longitude", *contour_name),
     )
     n = NetworkObservations.from_split_network(
-        e, e.split_network(intern=args.intern, window=args.window)
+        TrackEddiesObservations.load_file(args.input, raw_data=True),
+        e.split_network(intern=args.intern, window=args.window),
     )
     n.write_file(filename=args.out)
 
