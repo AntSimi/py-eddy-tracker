@@ -29,11 +29,13 @@ def start_axes(title):
     ax.set_title(title, weight="bold")
     return ax
 
+
 def update_axes(ax, mappable=None):
     ax.grid()
     ax.update_env()
     if mappable:
         return plt.colorbar(mappable, cax=ax.figure.add_axes([0.94, 0.05, 0.01, 0.9]))
+
 
 # %%
 # All

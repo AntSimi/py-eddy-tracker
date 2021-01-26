@@ -19,10 +19,15 @@ from py_eddy_tracker.observations.network import NetworkObservations
 # %%
 class VideoAnimation(FuncAnimation):
     def _repr_html_(self, *args, **kwargs):
+        """To get video in html and have a player"""
         return self.to_html5_video()
 
     def save(self, *args, **kwargs):
         if args[0].endswith("gif"):
+            # In this case gif is use to create thumbnail which are not use but consume same time than video
+            # So we create an empty file, to save time
+            with open(args[0], "w") as h:
+                pass
             return
         return super().save(*args, **kwargs)
 
@@ -114,7 +119,7 @@ a = Anim(
 a.ax.set_xlim(19, 30), a.ax.set_ylim(32, 35.25)
 a.ax.update_env()
 a.txt.set_position((21.5, 32.7))
-kwargs = dict(frames=np.arange(*a.period), interval=100, blit=True)
+kwargs = dict(frames=np.arange(*a.period), interval=100)
 ani = VideoAnimation(a.fig, a.func_animation, **kwargs)
 
 # %%
