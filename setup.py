@@ -47,6 +47,7 @@ setup(
             # network
             "EddyNetworkGroup = py_eddy_tracker.appli.network:build_network",
             "EddyNetworkBuildPath = py_eddy_tracker.appli.network:divide_network",
+            "EddyNetworkSubSetter = py_eddy_tracker.appli.network:subset_network",
             # anim/gui
             "EddyAnim = py_eddy_tracker.appli.gui:anim",
             "GUIEddy = py_eddy_tracker.appli.gui:guieddy",

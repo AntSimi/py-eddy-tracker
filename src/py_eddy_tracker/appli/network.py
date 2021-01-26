@@ -56,7 +56,24 @@ def divide_network():
     n.write_file(filename=args.out)
 
 
-def subsample_network():
-    parser = EddyParser("Sub sample")
+def subset_network():
+    parser = EddyParser("Subset network")
     parser.add_argument("input", help="input network file")
     parser.add_argument("out", help="output file")
+    parser.add_argument(
+        "--inverse_selection",
+        action="store_true",
+        help="Extract the inverse of selection",
+    )
+    parser.add_argument(
+        "-l",
+        "--length",
+        nargs=2,
+        type=int,
+        help="Nb of day which must be cover by network, first minimum number of day and last maximum number of day,"
+        "if value is negative, this bound won't be used",
+    )
+    args = parser.parse_args()
+    n = NetworkObservations.load_file(args.input)
+    n = n.longer_than(*args.length)
+    n.write_file(filename=args.out)
