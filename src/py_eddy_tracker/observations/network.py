@@ -6,12 +6,12 @@ import logging
 from glob import glob
 
 from numba import njit
-from numpy import arange, array, bincount, empty, ones, uint32, unique
+from numpy import arange, array, bincount, empty, ones, uint32, unique, zeros
 
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
 from .observation import EddiesObservations
-from .tracking import TrackEddiesObservations, track_median_filter
+from .tracking import TrackEddiesObservations, track_loess_filter, track_median_filter
 
 logger = logging.getLogger("pet")
 
@@ -70,6 +70,26 @@ class NetworkObservations(EddiesObservations):
         elements = super().elements
         elements.extend(["track", "segment", "next_obs", "previous_obs"])
         return list(set(elements))
+
+    def longer_than(self, nb_day_min=-1, nb_day_max=-1):
+        """
+        Select network on time duration
+
+        :param int nb_day_min: Minimal number of day which must be covered by one network, if negative -> not used
+        :param int nb_day_max: Maximal number of day which must be covered by one network, if negative -> not used
+        """
+        if nb_day_max < 0:
+            nb_day_max = 1000000000000
+        mask = zeros(self.shape, dtype="bool")
+        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+            nb = i.stop - i.start
+            if nb == 0:
+                continue
+            t = self.time[i]
+            dt = t.max() - t.min()
+            if nb_day_min <= dt <= nb_day_max:
+                mask[i] = True
+        return self.extract_with_mask(mask)
 
     @classmethod
     def from_split_network(cls, group_dataset, indexs, **kwargs):
@@ -160,6 +180,13 @@ class NetworkObservations(EddiesObservations):
         m = (d <= order) * (d != -1)
         return self.extract_with_mask(m)
 
+    def numbering_segment(self):
+        """
+        New numbering of segment
+        """
+        for i, _, _ in self.iter_on("track"):
+            new_numbering(self.segment[i])
+
     def only_one_network(self):
         """
         Raise a warning or error?
@@ -168,17 +195,35 @@ class NetworkObservations(EddiesObservations):
         # TODO
         pass
 
+    def position_filter(self, median_half_window, loess_half_window):
+        self.median_filter(median_half_window, "time", "lon").loess_filter(
+            loess_half_window, "time", "lon"
+        )
+        self.median_filter(median_half_window, "time", "lat").loess_filter(
+            loess_half_window, "time", "lat"
+        )
+
+    def loess_filter(self, half_window, xfield, yfield, inplace=True):
+        result = track_loess_filter(
+            half_window, self.obs[xfield], self.obs[yfield], self.segment_track_array()
+        )
+        if inplace:
+            self.obs[yfield] = result
+            return self
+        return result
+
     def median_filter(self, half_window, xfield, yfield, inplace=True):
-        # FIXME: segments is not enough with several network
         result = track_median_filter(
-            half_window, self[xfield], self[yfield], self.segment
+            half_window, self[xfield], self[yfield], self.segment_track_array()
         )
         if inplace:
             self[yfield][:] = result
             return self
         return result
 
-    def display_timeline(self, ax, event=True, field=None, method=None):
+    def display_timeline(
+        self, ax, event=True, field=None, method=None, factor=1, **kwargs
+    ):
         """
         Must be call on only one network
         """
@@ -191,9 +236,12 @@ class NetworkObservations(EddiesObservations):
             zorder=1,
             lw=3,
         )
+        line_kw.update(kwargs)
         mappables = dict(lines=list())
         if event:
-            mappables.update(self.event_timeline(ax, field=field, method=method))
+            mappables.update(
+                self.event_timeline(ax, field=field, method=method, factor=factor)
+            )
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
             if x.shape[0] == 0:
@@ -202,16 +250,16 @@ class NetworkObservations(EddiesObservations):
                 y = b0 * ones(x.shape)
             else:
                 if method == "all":
-                    y = self[field][i]
+                    y = self[field][i] * factor
                 else:
-                    y = self[field][i].mean() * ones(x.shape)
+                    y = self[field][i].mean() * ones(x.shape) * factor
             line = ax.plot(x, y, **line_kw, color=self.COLORS[j % self.NB_COLORS])[0]
             mappables["lines"].append(line)
             j += 1
 
         return mappables
 
-    def event_timeline(self, ax, field=None, method=None):
+    def event_timeline(self, ax, field=None, method=None, factor=1):
         j = 0
         # TODO : fill mappables dict
         y_seg = dict()
@@ -219,7 +267,7 @@ class NetworkObservations(EddiesObservations):
             for i, b0, _ in self.iter_on("segment"):
                 y = self[field][i]
                 if y.shape[0] != 0:
-                    y_seg[b0] = y.mean()
+                    y_seg[b0] = y.mean() * factor
         mappables = dict()
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
@@ -234,7 +282,7 @@ class NetworkObservations(EddiesObservations):
                 y0 = b0
             else:
                 if method == "all":
-                    y0 = self[field][i.stop - 1]
+                    y0 = self[field][i.stop - 1] * factor
                 else:
                     y0 = y_seg[b0]
             if i_n != -1:
@@ -242,18 +290,26 @@ class NetworkObservations(EddiesObservations):
                 y1 = (
                     seg_next
                     if field is None
-                    else (self[field][i_n] if method == "all" else y_seg[seg_next])
+                    else (
+                        self[field][i_n] * factor
+                        if method == "all"
+                        else y_seg[seg_next]
+                    )
                 )
                 ax.plot((x[-1], self.time[i_n]), (y0, y1), **event_kw)[0]
                 ax.plot(x[-1], y0, color="k", marker=">", markersize=10, zorder=-1)[0]
             if i_p != -1:
                 seg_previous = self.segment[i_p]
                 if field is not None and method == "all":
-                    y0 = self[field][i.start]
+                    y0 = self[field][i.start] * factor
                 y1 = (
                     seg_previous
                     if field is None
-                    else (self[field][i_p] if method == "all" else y_seg[seg_previous])
+                    else (
+                        self[field][i_p] * factor
+                        if method == "all"
+                        else y_seg[seg_previous]
+                    )
                 )
                 ax.plot((x[0], self.time[i_p]), (y0, y1), **event_kw)[0]
                 ax.plot(x[0], y0, color="k", marker="*", markersize=12, zorder=-1)[0]
@@ -300,7 +356,7 @@ class NetworkObservations(EddiesObservations):
     def birth_event(self):
         # FIXME how to manage group 0
         indices = list()
-        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array()):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -312,7 +368,7 @@ class NetworkObservations(EddiesObservations):
     def death_event(self):
         # FIXME how to manage group 0
         indices = list()
-        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array()):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -323,7 +379,7 @@ class NetworkObservations(EddiesObservations):
 
     def merging_event(self):
         indices = list()
-        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array()):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -334,7 +390,7 @@ class NetworkObservations(EddiesObservations):
 
     def spliting_event(self):
         indices = list()
-        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array()):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -425,6 +481,9 @@ class NetworkObservations(EddiesObservations):
         if nb_obs == 0:
             logger.warning("Empty dataset will be created")
         else:
+            logger.info(
+                f"{nb_obs} observations will be extract ({nb_obs * 100. / self.shape[0]}%)"
+            )
             for field in self.obs.dtype.descr:
                 if field in ("next_obs", "previous_obs"):
                     continue
@@ -592,3 +651,15 @@ def build_unique_array(id1, id2):
         new_id[i] = k
         id1_previous, id2_previous = id1_, id2_
     return new_id
+
+
+@njit(cache=True)
+def new_numbering(segs):
+    nb = len(segs)
+    s0 = segs[0]
+    j = 0
+    for i in range(nb):
+        if segs[i] != s0:
+            s0 = segs[i]
+            j += 1
+        segs[i] = j
