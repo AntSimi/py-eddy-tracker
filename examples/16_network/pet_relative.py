@@ -4,12 +4,8 @@ Network basic manipulation
 """
 
 from matplotlib import pyplot as plt
-from matplotlib.animation import FuncAnimation
-from numpy import arange
 
-import py_eddy_tracker.gui
 from py_eddy_tracker import data
-from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
