@@ -34,6 +34,7 @@ class Anim:
         self.sleep_event = sleep_event
         self.mappables = list()
         self.field_color = None
+        self.field_txt = None
         self.time_field = False
         self.setup(**kwargs)
 
@@ -42,12 +43,14 @@ class Anim:
         cmap="jet",
         lut=None,
         field_color="time",
+        field_txt="track",
         range_color=(None, None),
         nb_step=25,
         figsize=(8, 6),
         **kwargs,
     ):
         self.field_color = self.eddy[field_color].astype("f4")
+        self.field_txt = self.eddy[field_txt]
         rg = range_color
         if rg[0] is None and rg[1] is None and field_color == "time":
             self.time_field = True
@@ -183,7 +186,7 @@ class Anim:
         # Update id txt
         for i in where(m)[0]:
             mappable = self.ax.text(
-                self.x_core[i], self.y_core[i], self.track[i], fontsize=8
+                self.x_core[i], self.y_core[i], self.field_txt[i], fontsize=8
             )
             self.mappables.append(mappable)
             self.ax.draw_artist(mappable)
