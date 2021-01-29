@@ -166,7 +166,7 @@ _ = close_to_i3.display_timeline(ax)
 # --------------------
 fig = plt.figure(figsize=(15, 8))
 ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
-close_to_i2.plot(ax)
+close_to_i2.plot(ax, color_cycle=close_to_i2.COLORS)
 ax.set_xlim(-13, 20), ax.set_ylim(-36.5, -20), ax.grid()
 ax = fig.add_axes([0.08, 0.67, 0.55, 0.3])
 _ = close_to_i2.display_timeline(ax, field="latitude")

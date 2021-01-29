@@ -26,7 +26,7 @@ class VideoAnimation(FuncAnimation):
         if args[0].endswith("gif"):
             # In this case gif is use to create thumbnail which are not use but consume same time than video
             # So we create an empty file, to save time
-            with open(args[0], "w") as h:
+            with open(args[0], "w") as _:
                 pass
             return
         return super().save(*args, **kwargs)
@@ -132,7 +132,7 @@ _ = close_to_i3.display_timeline(ax)
 ax = start_axes("")
 n_copy = close_to_i3.copy()
 n_copy.position_filter(2, 4)
-n_copy.plot(ax)
+n_copy.plot(ax, color_cycle=n_copy.COLORS)
 update_axes(ax)
 
 # %%
@@ -151,12 +151,14 @@ n_copy.median_filter(2, "time", "radius_s")
 for b0, b1 in [
     (datetime(i, 1, 1), datetime(i, 12, 31)) for i in (2004, 2005, 2006, 2007)
 ]:
-    b0_, b1_ = (b0 - datetime(1950, 1, 1)).days - 10, (
-        b1 - datetime(1950, 1, 1)
-    ).days + 10
+    ref, delta = datetime(1950, 1, 1), 20
+    b0_, b1_ = (b0 - ref).days, (b1 - ref).days
     ax = timeline_axes()
-    ax.set_xlim(b0_, b1_)
+    ax.set_xlim(b0_ - delta, b1_ + delta)
     ax.set_ylim(10, 115)
+    ax.axvline(b0_, color="k", lw=1.5, ls="--"), ax.axvline(
+        b1_, color="k", lw=1.5, ls="--"
+    )
     n_copy.display_timeline(
         ax, field="radius_e", method="all", lw=4, markersize=8, factor=1e-3
     )

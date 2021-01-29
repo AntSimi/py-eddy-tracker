@@ -19,6 +19,7 @@ bins = ((-10, 37, step), (30, 46, step))
 kw_time = dict(cmap="terrain_r", factor=100.0 / n.nb_days, name="count")
 kw_ratio = dict(cmap=plt.get_cmap("coolwarm_r", 10))
 
+
 # %%
 # Function
 def start_axes(title):
