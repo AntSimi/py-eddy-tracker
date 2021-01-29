@@ -403,6 +403,26 @@ VAR_DESCR = dict(
             comment="Index of next obs, if there are a merging",
         ),
     ),
+    previous_cost=dict(
+        attr_name=None,
+        nc_name="previous_cost",
+        nc_type="float32",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            long_name="Previous cost for previous obs",
+            comment="",
+        ),
+    ),
+    next_cost=dict(
+        attr_name=None,
+        nc_name="next_cost",
+        nc_type="float32",
+        nc_dims=("obs",),
+        nc_attr=dict(
+            long_name="Next cost for next obs",
+            comment="",
+        ),
+    ),
     n=dict(
         attr_name=None,
         nc_name="observation_number",

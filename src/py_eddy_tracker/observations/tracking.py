@@ -678,7 +678,7 @@ class TrackEddiesObservations(EddiesObservations):
             self.follow_obs(i, track_id, used, ids, x, y, *time_index, window, **kwargs)
             track_id += 1
             # Search a possible ancestor (backward)
-            self.previous_obs(i, ids, x, y, *time_index, window, **kwargs)
+            self.get_previous_obs(i, ids, x, y, *time_index, window, **kwargs)
 
     @classmethod
     def follow_obs(cls, i_next, track_id, used, ids, *args, **kwargs):
@@ -690,7 +690,7 @@ class TrackEddiesObservations(EddiesObservations):
             # Assign id
             ids["track"][i_next] = track_id
             # Search next
-            i_next_ = cls.next_obs(i_next, ids, *args, **kwargs)
+            i_next_ = cls.get_next_obs(i_next, ids, *args, **kwargs)
             if i_next_ == -1:
                 break
             ids["next_obs"][i_next] = i_next_
@@ -706,7 +706,9 @@ class TrackEddiesObservations(EddiesObservations):
             i_next = i_next_
 
     @staticmethod
-    def previous_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
+    def get_previous_obs(
+        i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs
+    ):
         """Backward association of observations to the segments"""
 
         time_cur = ids["time"][i_current]
@@ -736,7 +738,7 @@ class TrackEddiesObservations(EddiesObservations):
             break
 
     @staticmethod
-    def next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
+    def get_next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
         """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1
         time_cur = ids["time"][i_current]

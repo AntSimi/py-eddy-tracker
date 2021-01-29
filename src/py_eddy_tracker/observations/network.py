@@ -68,8 +68,26 @@ class NetworkObservations(EddiesObservations):
     @property
     def elements(self):
         elements = super().elements
-        elements.extend(["track", "segment", "next_obs", "previous_obs"])
+        elements.extend(
+            [
+                "track",
+                "segment",
+                "next_obs",
+                "previous_obs",
+                "next_cost",
+                "previous_cost",
+            ]
+        )
         return list(set(elements))
+
+    def astype(self, cls):
+        new = cls.new_like(self, self.shape)
+        print()
+        for k in new.obs.dtype.names:
+            if k in self.obs.dtype.names:
+                new[k][:] = self[k][:]
+        new.sign_type = self.sign_type
+        return new
 
     def longer_than(self, nb_day_min=-1, nb_day_max=-1):
         """
@@ -81,7 +99,7 @@ class NetworkObservations(EddiesObservations):
         if nb_day_max < 0:
             nb_day_max = 1000000000000
         mask = zeros(self.shape, dtype="bool")
-        for i, b0, b1 in self.iter_on(self.segment_track_array()):
+        for i, b0, b1 in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -115,6 +133,8 @@ class NetworkObservations(EddiesObservations):
         translate[index_order] = arange(index_order.shape[0])
         network.next_obs[:] = translate[n]
         network.previous_obs[:] = translate[p]
+        network.next_cost[:] = indexs["next_cost"][index_order]
+        network.previous_cost[:] = indexs["previous_cost"][index_order]
         return network
 
     def infos(self, label=""):
@@ -205,7 +225,7 @@ class NetworkObservations(EddiesObservations):
 
     def loess_filter(self, half_window, xfield, yfield, inplace=True):
         result = track_loess_filter(
-            half_window, self.obs[xfield], self.obs[yfield], self.segment_track_array()
+            half_window, self.obs[xfield], self.obs[yfield], self.segment_track_array
         )
         if inplace:
             self.obs[yfield] = result
@@ -214,7 +234,7 @@ class NetworkObservations(EddiesObservations):
 
     def median_filter(self, half_window, xfield, yfield, inplace=True):
         result = track_median_filter(
-            half_window, self[xfield], self[yfield], self.segment_track_array()
+            half_window, self[xfield], self[yfield], self.segment_track_array
         )
         if inplace:
             self[yfield][:] = result
@@ -316,18 +336,59 @@ class NetworkObservations(EddiesObservations):
             j += 1
         return mappables
 
-    def scatter_timeline(self, ax, name, factor=1, event=True, **kwargs):
+    def mean_by_segment(self, y, **kw):
+        kw["dtype"] = y.dtype
+        return self.map_segment(lambda x: x.mean(), y, **kw)
+
+    def map_segment(self, method, y, same=True, **kw):
+        if same:
+            out = empty(y.shape, **kw)
+        else:
+            out = list()
+        for i, b0, b1 in self.iter_on(self.segment_track_array):
+            res = method(y[i])
+            if same:
+                out[i] = res
+            else:
+                if isinstance(i, slice):
+                    if i.start == i.stop:
+                        continue
+                elif len(i) == 0:
+                    continue
+                out.append(res)
+        if not same:
+            out = array(out)
+        return out
+
+    def scatter_timeline(
+        self,
+        ax,
+        name,
+        factor=1,
+        event=True,
+        yfield=None,
+        yfactor=1,
+        method=None,
+        **kwargs,
+    ):
         """
         Must be call on only one network
         """
         self.only_one_network()
+        y = (self.segment if yfield is None else self[yfield]) * yfactor
+        if method == "all":
+            pass
+        else:
+            y = self.mean_by_segment(y)
         mappables = dict()
         if event:
-            mappables.update(self.event_timeline(ax))
+            mappables.update(
+                self.event_timeline(ax, field=yfield, method=method, factor=yfactor)
+            )
         if "c" not in kwargs:
             v = self.parse_varname(name)
             kwargs["c"] = v * factor
-        mappables["scatter"] = ax.scatter(self.time, self.segment, **kwargs)
+        mappables["scatter"] = ax.scatter(self.time, y, **kwargs)
         return mappables
 
     def insert_virtual(self):
@@ -350,13 +411,14 @@ class NetworkObservations(EddiesObservations):
         new.sign_type = self.sign_type
         return new
 
+    @property
     def segment_track_array(self):
         return build_unique_array(self.segment, self.track)
 
     def birth_event(self):
         # FIXME how to manage group 0
         indices = list()
-        for i, _, _ in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -368,7 +430,7 @@ class NetworkObservations(EddiesObservations):
     def death_event(self):
         # FIXME how to manage group 0
         indices = list()
-        for i, _, _ in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -379,7 +441,7 @@ class NetworkObservations(EddiesObservations):
 
     def merging_event(self):
         indices = list()
-        for i, _, _ in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -390,7 +452,7 @@ class NetworkObservations(EddiesObservations):
 
     def spliting_event(self):
         indices = list()
-        for i, _, _ in self.iter_on(self.segment_track_array()):
+        for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
@@ -403,7 +465,7 @@ class NetworkObservations(EddiesObservations):
         self.only_one_network()
         # TODO
 
-    def plot(self, ax, ref=None, **kwargs):
+    def plot(self, ax, ref=None, color_cycle=None, **kwargs):
         """
         This function will draw path of each trajectory
 
@@ -412,17 +474,25 @@ class NetworkObservations(EddiesObservations):
         :param dict kwargs: keyword arguments for Axes.plot
         :return: a list of matplotlib mappables
         """
+        nb_colors = 0
+        if color_cycle is not None:
+            kwargs = kwargs.copy()
+            nb_colors = len(color_cycle)
         mappables = list()
         if "label" in kwargs:
             kwargs["label"] = self.format_label(kwargs["label"])
-        for i, b0, b1 in self.iter_on("segment"):
+        j = 0
+        for i, _, _ in self.iter_on("segment"):
             nb = i.stop - i.start
             if nb == 0:
                 continue
+            if nb_colors:
+                kwargs["color"] = color_cycle[j % nb_colors]
             x, y = self.lon[i], self.lat[i]
             if ref is not None:
                 x, y = wrap_longitude(x, y, ref, cut=True)
             mappables.append(ax.plot(x, y, **kwargs)[0])
+            j += 1
         return mappables
 
     def remove_dead_branch(self, nobs=3):
