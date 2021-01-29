@@ -143,10 +143,9 @@ update_axes(ax)
 # %%
 # Display the speed radius of the detected eddies
 ax = start_axes("Speed Radius (km)")
-a.scatter(ax, "radius_s", vmin=10, vmax=50, s=80, ref=-10, cmap="magma_r", factor=0.001)
-m = c.scatter(
-    ax, "radius_s", vmin=10, vmax=50, s=80, ref=-10, cmap="magma_r", factor=0.001
-)
+kwargs = dict(vmin=10, vmax=50, s=80, ref=-10, cmap="magma_r", factor=0.001)
+a.scatter(ax, "radius_s", **kwargs)
+m = c.scatter(ax, "radius_s", **kwargs)
 update_axes(ax, m)
 
 # %%
@@ -154,7 +153,5 @@ update_axes(ax, m)
 ax = start_axes("Effective Radius (km)")
 kwargs = dict(vmin=10, vmax=80, cmap="magma_r", factor=0.001, lut=14, ref=-10)
 a.filled(ax, "effective_radius", **kwargs)
-m = c.filled(
-    ax, "radius_e", vmin=10, vmax=80, cmap="magma_r", factor=0.001, lut=14, ref=-10
-)
+m = c.filled(ax, "radius_e", **kwargs)
 update_axes(ax, m)

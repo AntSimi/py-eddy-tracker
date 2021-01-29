@@ -619,7 +619,7 @@ class TrackEddiesObservations(EddiesObservations):
             dtype=[
                 ("group", self.tracks.dtype),
                 ("time", self.time.dtype),
-                ("track", "u2"),
+                ("track", "u4"),
                 ("previous_cost", "f4"),
                 ("next_cost", "f4"),
                 ("previous_obs", "i4"),

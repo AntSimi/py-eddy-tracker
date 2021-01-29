@@ -7,7 +7,7 @@ import heapq
 
 from numba import njit, prange
 from numba import types as numba_types
-from numpy import array, concatenate, empty, nan, ones, pi, where
+from numpy import arctan, array, concatenate, empty, nan, ones, pi, where
 from numpy.linalg import lstsq
 from Polygon import Polygon
 
@@ -471,6 +471,7 @@ def polygon_overlap(p0, p1, minimal_area=False):
     return cost
 
 
+# FIXME: only one function are needed
 @njit(cache=True)
 def fit_circle(x, y):
     """
@@ -515,6 +516,62 @@ def fit_circle(x, y):
 
     err = shape_error(x, y, x0, y0, radius)
     return x0, y0, radius, err
+
+
+@njit(cache=True)
+def fit_ellips(x, y):
+    r"""
+    From a polygon, function will fit an ellips.
+
+    Must be call with local coordinates (in m, to get a radius in m).
+
+    .. math:: (\frac{x - x_0}{a})^2 + (\frac{y - y_0}{b})^2 = 1
+
+    .. math:: (\frac{x^2 - 2 * x * x_0 + x_0 ^2}{a^2}) + \frac{y^2 - 2 * y * y_0 + y_0 ^2}{b^2}) = 1
+
+    In case of angle
+    https://en.wikipedia.org/wiki/Ellipse
+
+    """
+    # x,y = x[1:],y[1:]
+    nb = x.shape[0]
+    datas = ones((nb, 5), dtype=x.dtype)
+    datas[:, 0] = x ** 2
+    datas[:, 1] = x * y
+    datas[:, 2] = y ** 2
+    datas[:, 3] = x
+    datas[:, 4] = y
+    (a, b, c, d, e), _, _, _ = lstsq(datas, ones(nb, dtype=x.dtype))
+    det = b ** 2 - 4 * a * c
+    if det > 0:
+        print(det)
+    x0 = (2 * c * d - b * e) / det
+    y0 = (2 * a * e - b * d) / det
+
+    A = (
+        -(
+            (
+                2
+                * (a * e ** 2 + c * d ** 2 - b * d * e - det)
+                * (a + c + ((a - c) ** 2 + b ** 2) ** 0.5)
+            )
+            ** 0.5
+        )
+        / det
+    )
+    B = (
+        -(
+            (
+                2
+                * (a * e ** 2 + c * d ** 2 - b * d * e - det)
+                * (a + c - ((a - c) ** 2 + b ** 2) ** 0.5)
+            )
+            ** 0.5
+        )
+        / det
+    )
+    theta = arctan((c - a - ((a - c) ** 2 + b ** 2) ** 0.5) / b)
+    return x0, y0, A, B, theta
 
 
 @njit(cache=True)
