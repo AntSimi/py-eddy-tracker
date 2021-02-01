@@ -548,29 +548,12 @@ def fit_ellips(x, y):
     x0 = (2 * c * d - b * e) / det
     y0 = (2 * a * e - b * d) / det
 
-    A = (
-        -(
-            (
-                2
-                * (a * e ** 2 + c * d ** 2 - b * d * e - det)
-                * (a + c + ((a - c) ** 2 + b ** 2) ** 0.5)
-            )
-            ** 0.5
-        )
-        / det
-    )
-    B = (
-        -(
-            (
-                2
-                * (a * e ** 2 + c * d ** 2 - b * d * e - det)
-                * (a + c - ((a - c) ** 2 + b ** 2) ** 0.5)
-            )
-            ** 0.5
-        )
-        / det
-    )
-    theta = arctan((c - a - ((a - c) ** 2 + b ** 2) ** 0.5) / b)
+    AB1 = 2 * (a * e ** 2 + c * d ** 2 - b * d * e - det)
+    AB2 = a + c
+    AB3 = ((a - c) ** 2 + b ** 2) ** 0.5
+    A = -((AB1 * (AB2 + AB3)) ** 0.5) / det
+    B = -((AB1 * (AB2 - AB3)) ** 0.5) / det
+    theta = arctan((c - a - AB3) / b)
     return x0, y0, A, B, theta
 
 
