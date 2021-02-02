@@ -8,7 +8,7 @@ from datetime import datetime
 from cv2 import filter2D
 from matplotlib.path import Path as BasePath
 from netCDF4 import Dataset
-from numba import njit
+from numba import njit, prange
 from numba import types as numba_types
 from numpy import (
     arange,
@@ -21,6 +21,7 @@ from numpy import (
     errstate,
     exp,
     float_,
+    floor,
     histogram2d,
     int8,
     int_,
@@ -37,6 +38,7 @@ from numpy import (
     ones,
     percentile,
     pi,
+    radians,
     round_,
     sin,
     sinc,
@@ -242,8 +244,6 @@ class GridDataset(object):
     """
 
     __slots__ = (
-        "_x_var",
-        "_y_var",
         "x_c",
         "y_c",
         "x_bounds",
@@ -258,8 +258,6 @@ class GridDataset(object):
         "variables_description",
         "global_attrs",
         "vars",
-        "interpolators",
-        "speed_coef",
         "contours",
     )
 
@@ -295,7 +293,6 @@ class GridDataset(object):
         self.coordinates = x_name, y_name
         self.vars = dict()
         self.indexs = dict() if indexs is None else indexs
-        self.interpolators = dict()
         if centered is None:
             logger.warning(
                 "We assume pixel position of grid is center for %s", filename
@@ -1955,6 +1952,123 @@ class RegularGridDataset(GridDataset):
         return interp2d_geo(
             self.x_c, self.y_c, g, m, lons, lats, nearest=method == "nearest"
         )
+
+    def uv_for_advection(self, u_name, v_name, time_step=600, backward=False):
+        """
+        Get U,V to be used in degrees with precomputed time step
+
+        :param str,array u_name: U field to advect obs
+        :param str,array v_name: V field to advect obs
+        :param int time_step: Number of second for each advection
+        """
+        u = (self.grid(u_name) if isinstance(u_name, str) else u_name).copy()
+        v = (self.grid(v_name) if isinstance(v_name, str) else v_name).copy()
+        # N seconds / 1 degrees in m
+        coef = time_step * 180 / pi / self.EARTH_RADIUS
+        u *= coef / cos(radians(self.y_c))
+        v *= coef
+        if backward:
+            u = -u
+            v = -v
+        m = u.mask + v.mask
+        return u, v, m
+
+@njit(cache=True)
+def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
+    # Grid coordinates
+    x_ref, y_ref = x_g[0], y_g[0]
+    x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    # On each particule
+    for i in prange(x.size):
+        # If particule are not valid => continue
+        if isnan(x[i]) or isnan(y[i]):
+            continue
+        # Iterate on whole steps
+        for _ in range(nb_step):
+            # k1, slope at origin
+            u1, v1 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x[i], y[i])
+            if isnan(u1) or isnan(v1):
+                x[i], y[i] = nan, nan
+                break
+            # k2, slope at middle with first guess position
+            x1, y1 = x[i] + u1*.5, y[i] + v1*.5
+            u2, v2 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x1, y1)
+            if isnan(u2) or isnan(v2):
+                x[i], y[i] = nan, nan
+                break
+            # k3, slope at middle with update guess position
+            x2, y2 = x[i] + u2 * .5, y[i] + v2 * .5
+            u3, v3 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x2, y2)
+            if isnan(u3) or isnan(v3):
+                x[i], y[i] = nan, nan
+                break
+            # k4, slope at end with update guess position
+            x3, y3 = x2 + u3, y2 + v3
+            u4, v4 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x3, y3)
+            if isnan(u4) or isnan(v4):
+                x[i], y[i] = nan, nan
+                break
+            dx = (u1 + 2 * u2 + 2 * u3 + u4) / 6
+            dy = (v1 + 2 * v2 + 2 * v3 + v4) / 6
+            # # Compute new x,y
+            x[i] += dx
+            y[i] += dy
+
+
+@njit(cache=True)
+def get_uv(x0, y0, x_step, y_step, u,v, m, x,y):
+    i, j = (x - x0) / x_step, (y - y0) / y_step
+    i0, j0 = int(floor(i)), int(floor(j))
+    i1, j1 = i0 + 1, j0 + 1
+    if m[i0, j0] or m[i0, j1] or m[i1, j0] or m[i1, j1]:
+        return nan, nan
+    # Extract value for u and v
+    u00, u01, u10, u11 = u[i0, j0], u[i0, j1], u[i1, j0], u[i1, j1]
+    v00, v01, v10, v11 = v[i0, j0], v[i0, j1], v[i1, j0], v[i1, j1]
+    xd, yd = i - i0, j - j0
+    xd_i, yd_i = 1 - xd, 1 - yd
+    u = (u00 * xd_i + u10 * xd) * yd_i + (u01 * xd_i + u11 * xd) * yd
+    v = (v00 * xd_i + v10 * xd) * yd_i + (v01 * xd_i + v11 * xd) * yd
+    return u, v
+
+@njit(cache=True)
+def advect(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
+    # Grid coordinates
+    x_ref, y_ref = x_g[0], y_g[0]
+    x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    # Indices which should be never exist
+    i0_old, j0_old = -100000, -100000
+    # On each particule
+    for i in prange(x.size):
+        # If particule are not valid => continue
+        if isnan(x[i]) or isnan(y[i]):
+            continue
+        # Iterate on whole steps
+        for _ in range(nb_step):
+            # Compute coordinates in indice referentiel
+            x_, y_ = (x[i] - x_ref) / x_step, (y[i] - y_ref) / y_step
+            # corner bottom left Indice
+            i0_, j0_ = int(floor(x_)), int(floor(y_))
+            i0, j0 = i0_, j0_
+            i1 = i0 + 1
+            # corner are the same need only a new xd and yd
+            if i0 != i0_old or j0 != j0_old:
+                j1 = j0 + 1
+                # If one of nearest pixel is invalid
+                if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
+                    x[i], y[i] = nan, nan
+                    break
+                # Extract value for u and v
+                u00, u01, u10, u11 = u_g[i0, j0], u_g[i0, j1], u_g[i1, j0], u_g[i1, j1]
+                v00, v01, v10, v11 = v_g[i0, j0], v_g[i0, j1], v_g[i1, j0], v_g[i1, j1]
+                # Need to be store only on change
+                i0_old, j0_old = i0, j0
+            # Compute distance
+            xd, yd = x_ - i0_, y_ - j0_
+            xd_i, yd_i = 1 - xd, 1 - yd
+            # Compute new x,y
+            x[i] += (u00 * xd_i + u10 * xd) * yd_i + (u01 * xd_i + u11 * xd) * yd
+            y[i] += (v00 * xd_i + v10 * xd) * yd_i + (v01 * xd_i + v11 * xd) * yd
 
 
 @njit(cache=True, fastmath=True)
