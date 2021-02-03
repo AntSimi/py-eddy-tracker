@@ -61,9 +61,25 @@ class Buffer(metaclass=Singleton):
 
 class NetworkObservations(EddiesObservations):
 
-    __slots__ = tuple()
+    __slots__ = ("_index_network",)
 
     NOGROUP = 0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._index_network = None
+
+    def network_slice(self, id_network):
+        """
+        Return slice for one network
+
+        :param int id_network: id to identify network
+        """
+        if self._index_network is None:
+            self._index_network = build_index(self.track)
+        i = id_network - self._index_network[2]
+        i_start, i_stop = self._index_network[0][i], self._index_network[1][i]
+        return slice(i_start, i_stop)
 
     @property
     def elements(self):
@@ -461,9 +477,56 @@ class NetworkObservations(EddiesObservations):
                 indices.append(i.start)
         return self.extract_event(list(set(indices)))
 
+    def dissociate_network(self):
+        """
+        Dissociate network with no known interaction (spliting/merging)
+        """
+        self.only_one_network()
+        tags = self.tag_segment()
+        # FIXME : Ok if only one network
+        self.track[:] = tags[self.segment - 1]
+
+        self.obs.sort(order=("track", "segment", "time"))
+        self._index_network = None
+
+        # FIXME
+        # n & p must be re-index
+        # n, p = self.next_obs[mask], self.previous_obs[mask]
+        # we add 2 for -1 index return index -1
+        # translate = -ones(len(self) + 1, dtype="i4")
+        # translate[:-1][mask] = arange(nb_obs)
+        # new.next_obs[:] = translate[n]
+        # new.previous_obs[:] = translate[p]
+
+    def network(self, id_network):
+        return self.extract_with_mask(self.network_slice(id_network))
+
+    @classmethod
+    def __tag_segment(cls, seg, tag, groups, connexions):
+        if groups[seg] != 0:
+            return
+        groups[seg] = tag
+        segs = connexions.get(seg + 1, None)
+        if segs is not None:
+            for seg in segs:
+                cls.__tag_segment(seg - 1, tag, groups, connexions)
+
+    def tag_segment(self):
+        self.only_one_network()
+        nb = self.segment.max()
+        sub_group = zeros(nb, dtype="u4")
+        c = self.connexions()
+        j = 1
+        for i in range(nb):
+            if sub_group[i] != 0:
+                continue
+            self.__tag_segment(i, j, sub_group, c)
+            j += 1
+        return sub_group
+
     def fully_connected(self):
         self.only_one_network()
-        # TODO
+        return self.tag_segment().shape[0] == 1
 
     def plot(self, ax, ref=None, color_cycle=None, **kwargs):
         """
@@ -545,7 +608,10 @@ class NetworkObservations(EddiesObservations):
         :return: same object with selected observations
         :rtype: self
         """
-        nb_obs = mask.sum()
+        if isinstance(mask, slice):
+            nb_obs = mask.stop - mask.start
+        else:
+            nb_obs = mask.sum()
         new = self.__class__.new_like(self, nb_obs)
         new.sign_type = self.sign_type
         if nb_obs == 0:
