@@ -1973,6 +1973,64 @@ class RegularGridDataset(GridDataset):
         m = u.mask + v.mask
         return u, v, m
 
+    def advect(self, x, y, u_name, v_name, nb_step=10, rk4=False, **kw):
+        """
+        At each call it will update position in place with u & v field
+
+        It's a dummy advection which use only one layer of current
+        :param array x: Longitude of obs to move
+        :param array y: Latitude of obs to move
+        :param str,array u_name: U field to advect obs
+        :param str,array v_name: V field to advect obs
+        :param int nb_step: Number of iteration before to release data
+        :param int time_step: Number of second for each advection
+        """
+        u, v, m = self.uv_for_advection(u_name, v_name, **kw)
+        advect_ = advect_rk4 if rk4 else advect
+        while True:
+            advect_(self.x_c, self.y_c, u, v, m, x, y, nb_step)
+            yield x, y
+
+    def filament(
+        self, x, y, u_name, v_name, nb_step=10, filament_size=6, rk4=False, **kw
+    ):
+        """
+        Produce filament with concatenation of advection
+
+        It's a dummy advection which use only one layer of current
+        :param array x: Longitude of obs to move
+        :param array y: Latitude of obs to move
+        :param str,array u_name: U field to advect obs
+        :param str,array v_name: V field to advect obs
+        :param int nb_step: Number of iteration before to release data
+        :param int time_step: Number of second for each advection
+        :param int filament_size: Number of point by filament
+        :return: x,y for a line
+        """
+        u, v, m = self.uv_for_advection(u_name, v_name, **kw)
+        x, y = x.copy(), y.copy()
+        nb = x.shape[0]
+        filament_size_ = filament_size + 1
+        f_x = empty(nb * filament_size_, dtype="f4")
+        f_y = empty(nb * filament_size_, dtype="f4")
+        f_x[:] = nan
+        f_y[:] = nan
+        f_x[::filament_size_] = x
+        f_y[::filament_size_] = y
+        advect_ = advect_rk4 if rk4 else advect
+        while True:
+            # Shift position
+            f_x[1:] = f_x[:-1]
+            f_y[1:] = f_y[:-1]
+            # Remove last position
+            f_x[filament_size::filament_size_] = nan
+            f_y[filament_size::filament_size_] = nan
+            advect_(self.x_c, self.y_c, u, v, m, x, y, nb_step)
+            f_x[::filament_size_] = x
+            f_y[::filament_size_] = y
+            yield f_x, f_y
+
+
 @njit(cache=True)
 def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
     # Grid coordinates
@@ -1981,42 +2039,64 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
     # On each particule
     for i in prange(x.size):
         # If particule are not valid => continue
-        if isnan(x[i]) or isnan(y[i]):
+        x_, y_ = x[i], y[i]
+        if isnan(x_) or isnan(y_):
             continue
         # Iterate on whole steps
         for _ in range(nb_step):
             # k1, slope at origin
-            u1, v1 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x[i], y[i])
+            u1, v1 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x_, y_)
             if isnan(u1) or isnan(v1):
-                x[i], y[i] = nan, nan
+                x_, y_ = nan, nan
                 break
             # k2, slope at middle with first guess position
-            x1, y1 = x[i] + u1*.5, y[i] + v1*.5
-            u2, v2 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x1, y1)
+            u2, v2 = get_uv(
+                x_ref,
+                y_ref,
+                x_step,
+                y_step,
+                u_g,
+                v_g,
+                m_g,
+                x_ + u1 * 0.5,
+                y_ + v1 * 0.5,
+            )
             if isnan(u2) or isnan(v2):
-                x[i], y[i] = nan, nan
+                x_, y_ = nan, nan
                 break
             # k3, slope at middle with update guess position
-            x2, y2 = x[i] + u2 * .5, y[i] + v2 * .5
-            u3, v3 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x2, y2)
+            u3, v3 = get_uv(
+                x_ref,
+                y_ref,
+                x_step,
+                y_step,
+                u_g,
+                v_g,
+                m_g,
+                x_ + u2 * 0.5,
+                y_ + v2 * 0.5,
+            )
             if isnan(u3) or isnan(v3):
-                x[i], y[i] = nan, nan
+                x_, y_ = nan, nan
                 break
             # k4, slope at end with update guess position
-            x3, y3 = x2 + u3, y2 + v3
-            u4, v4 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x3, y3)
+            u4, v4 = get_uv(
+                x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x_ + u3, y_ + v3
+            )
             if isnan(u4) or isnan(v4):
-                x[i], y[i] = nan, nan
+                x_, y_ = nan, nan
                 break
             dx = (u1 + 2 * u2 + 2 * u3 + u4) / 6
             dy = (v1 + 2 * v2 + 2 * v3 + v4) / 6
-            # # Compute new x,y
-            x[i] += dx
-            y[i] += dy
+            # Compute new x,y
+            x_ += dx
+            y_ += dy
+        x[i] = x_
+        y[i] = y_
 
 
 @njit(cache=True)
-def get_uv(x0, y0, x_step, y_step, u,v, m, x,y):
+def get_uv(x0, y0, x_step, y_step, u, v, m, x, y):
     i, j = (x - x0) / x_step, (y - y0) / y_step
     i0, j0 = int(floor(i)), int(floor(j))
     i1, j1 = i0 + 1, j0 + 1
@@ -2030,6 +2110,7 @@ def get_uv(x0, y0, x_step, y_step, u,v, m, x,y):
     u = (u00 * xd_i + u10 * xd) * yd_i + (u01 * xd_i + u11 * xd) * yd
     v = (v00 * xd_i + v10 * xd) * yd_i + (v01 * xd_i + v11 * xd) * yd
     return u, v
+
 
 @njit(cache=True)
 def advect(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
@@ -2158,3 +2239,267 @@ def has_value(grid, i_x, i_y, value, below=False):
             if grid[i, j] > value:
                 return True
     return False
+
+
+class GridCollection:
+    def __init__(self):
+        self.datasets = list()
+
+    @classmethod
+    def from_netcdf_cube(cls, filename, x_name, y_name, t_name):
+        new = cls()
+        with Dataset(filename) as h:
+            for i, t in enumerate(h.variables[t_name][:]):
+                d = RegularGridDataset(filename, x_name, y_name, indexs={t_name: i})
+                d.add_uv("adt")
+                new.datasets.append((t, d))
+        return new
+
+    def filament(
+        self,
+        x,
+        y,
+        u_name,
+        v_name,
+        t_init,
+        nb_step=10,
+        time_step=600,
+        filament_size=6,
+        rk4=False,
+        **kw,
+    ):
+        """
+        Produce filament with concatenation of advection
+
+        It's a dummy advection which use only one layer of current
+        :param array x: Longitude of obs to move
+        :param array y: Latitude of obs to move
+        :param str,array u_name: U field to advect obs
+        :param str,array v_name: V field to advect obs
+        :param int nb_step: Number of iteration before to release data
+        :param int time_step: Number of second for each advection
+        :param int filament_size: Number of point by filament
+        :return: x,y for a line
+        """
+        x, y = x.copy(), y.copy()
+        nb = x.shape[0]
+        filament_size_ = filament_size + 1
+        f_x = empty(nb * filament_size_, dtype="f4")
+        f_y = empty(nb * filament_size_, dtype="f4")
+        f_x[:] = nan
+        f_y[:] = nan
+        f_x[::filament_size_] = x
+        f_y[::filament_size_] = y
+
+        backward = kw.get("backward", False)
+        if backward:
+            generator = self.get_previous_time_step(t_init)
+            dt = -nb_step * time_step
+            t_step = -time_step
+        else:
+            generator = self.get_next_time_step(t_init)
+            dt = nb_step * time_step
+            t_step = time_step
+        t0, d0 = generator.__next__()
+        u0, v0, m0 = d0.uv_for_advection(u_name, v_name, time_step, **kw)
+        t1, d1 = generator.__next__()
+        u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
+        t0 = t0 * 86400
+        t1 = t1 * 86400
+        t = t_init * 86400
+        advect_ = advect_t_rk4 if rk4 else advect_t
+        while True:
+            # Shift position
+            f_x[1:] = f_x[:-1]
+            f_y[1:] = f_y[:-1]
+            # Remove last position
+            f_x[filament_size::filament_size_] = nan
+            f_y[filament_size::filament_size_] = nan
+
+            if (backward and t <= t1) or (not backward and t >= t1):
+                t0, u0, v0, m0 = t1, u1, v1, m1
+                t1, d1 = generator.__next__()
+                t1 = t1 * 86400
+                u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
+            w = 1 - (arange(t, t + dt, t_step) - t0) / (t1 - t0)
+            half_w = t_step / 2.0 / (t1 - t0)
+            advect_(d0.x_c, d0.y_c, u0, v0, m0, u1, v1, m1, x, y, w, half_w=half_w)
+            f_x[::filament_size_] = x
+            f_y[::filament_size_] = y
+            t += dt
+            yield t, f_x, f_y
+
+    def advect(
+        self,
+        x,
+        y,
+        u_name,
+        v_name,
+        t_init,
+        nb_step=10,
+        time_step=600,
+        rk4=False,
+        **kw,
+    ):
+        backward = kw.get("backward", False)
+        if backward:
+            generator = self.get_previous_time_step(t_init)
+            dt = -nb_step * time_step
+            t_step = -time_step
+        else:
+            generator = self.get_next_time_step(t_init)
+            dt = nb_step * time_step
+            t_step = time_step
+        t0, d0 = generator.__next__()
+        u0, v0, m0 = d0.uv_for_advection(u_name, v_name, time_step, **kw)
+        t1, d1 = generator.__next__()
+        u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
+        t0 = t0 * 86400
+        t1 = t1 * 86400
+        t = t_init * 86400
+        advect_ = advect_t_rk4 if rk4 else advect_t
+        while True:
+            if (backward and t <= t1) or (not backward and t >= t1):
+                t0, u0, v0, m0 = t1, u1, v1, m1
+                t1, d1 = generator.__next__()
+                t1 = t1 * 86400
+                u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
+            w = 1 - (arange(t, t + dt, t_step) - t0) / (t1 - t0)
+            half_w = t_step / 2.0 / (t1 - t0)
+            advect_(d0.x_c, d0.y_c, u0, v0, m0, u1, v1, m1, x, y, w, half_w=half_w)
+            t += dt
+            yield t, x, y
+
+    def get_next_time_step(self, t_init):
+        first = True
+        for i, (t, dataset) in enumerate(self.datasets):
+            if t < t_init:
+                continue
+            if first:
+                first = False
+                yield self.datasets[i - 1]
+            yield t, dataset
+
+    def get_previous_time_step(self, t_init):
+        first = True
+        i = len(self.datasets)
+        for t, dataset in reversed(self.datasets):
+            i -= 1
+            if t > t_init:
+                continue
+            if first:
+                first = False
+                yield self.datasets[i + 1]
+            yield t, dataset
+
+
+@njit(cache=True)
+def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, weigths, half_w=0):
+    # Grid coordinates
+    x_ref, y_ref = x_g[0], y_g[0]
+    x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    # Indices which should be never exist
+    i0_old, j0_old = -100000, -100000
+    # On each particule
+    for i in prange(x.size):
+        # If particule are not valid => continue
+        if isnan(x[i]) or isnan(y[i]):
+            continue
+        # Iterate on whole steps
+        for w in weigths:
+            # Compute coordinates in indice referentiel
+            x_, y_ = (x[i] - x_ref) / x_step, (y[i] - y_ref) / y_step
+            # corner bottom left Indice
+            i0_, j0_ = int(floor(x_)), int(floor(y_))
+            i0, j0 = i0_, j0_
+            i1 = i0 + 1
+            # corner are the same need only a new xd and yd
+            if i0 != i0_old or j0 != j0_old:
+                j1 = j0 + 1
+                # If one of nearest pixel is invalid
+                if (
+                    m_g0[i0, j0]
+                    or m_g0[i0, j1]
+                    or m_g0[i1, j0]
+                    or m_g0[i1, j1]
+                    or m_g1[i0, j0]
+                    or m_g1[i0, j1]
+                    or m_g1[i1, j0]
+                    or m_g1[i1, j1]
+                ):
+                    x[i], y[i] = nan, nan
+                    break
+                # Extract value for u and v
+                u000, u001 = u_g0[i0, j0], u_g0[i0, j1]
+                u010, u011 = u_g0[i1, j0], u_g0[i1, j1]
+                v000, v001 = v_g0[i0, j0], v_g0[i0, j1]
+                v010, v011 = v_g0[i1, j0], v_g0[i1, j1]
+                u100, u101 = u_g1[i0, j0], u_g1[i0, j1]
+                u110, u111 = u_g1[i1, j0], u_g1[i1, j1]
+                v100, v101 = v_g1[i0, j0], v_g1[i0, j1]
+                v110, v111 = v_g1[i1, j0], v_g1[i1, j1]
+                # Need to be store only on change
+                i0_old, j0_old = i0, j0
+            # Compute distance
+            xd, yd = x_ - i0_, y_ - j0_
+            xd_i, yd_i = 1 - xd, 1 - yd
+            # Compute new x,y
+            dx0 = (u000 * xd_i + u010 * xd) * yd_i + (u001 * xd_i + u011 * xd) * yd
+            dx1 = (u100 * xd_i + u110 * xd) * yd_i + (u101 * xd_i + u111 * xd) * yd
+            dy0 = (v000 * xd_i + v010 * xd) * yd_i + (v001 * xd_i + v011 * xd) * yd
+            dy1 = (v100 * xd_i + v110 * xd) * yd_i + (v101 * xd_i + v111 * xd) * yd
+            x[i] += dx0 * w + dx1 * (1 - w)
+            y[i] += dy0 * w + dy1 * (1 - w)
+
+
+@njit(cache=True)
+def advect_t_rk4(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, weigths, half_w):
+    # Grid coordinates
+    x_ref, y_ref = x_g[0], y_g[0]
+    x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    # On each particule
+    for i in prange(x.size):
+        # If particule are not valid => continue
+        x_, y_ = x[i], y[i]
+        if isnan(x_) or isnan(y_):
+            continue
+        # Iterate on whole steps
+        for w in weigths:
+            # k1, slope at origin
+            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x_, y_)
+            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x_, y_)
+            u1, v1 = u0_ * w + u1_ * (1 - w), v0_ * w + v1_ * (1 - w)
+            if isnan(u1) or isnan(v1):
+                x_, y_ = nan, nan
+                break
+            # k2, slope at middle with first guess position
+            x1, y1 = x_ + u1 * 0.5, y_ + v1 * 0.5
+            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x1, y1)
+            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x1, y1)
+            w_ = w - half_w
+            u2, v2 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
+            if isnan(u2) or isnan(v2):
+                x_, y_ = nan, nan
+                break
+            # k3, slope at middle with update guess position
+            x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
+            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x2, y2)
+            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x2, y2)
+            u3, v3 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
+            if isnan(u3) or isnan(v3):
+                x_, y_ = nan, nan
+                break
+            # k4, slope at end with update guess position
+            x3, y3 = x_ + u3, y_ + v3
+            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x3, y3)
+            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x3, y3)
+            w_ -= half_w
+            u4, v4 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
+            if isnan(u4) or isnan(v4):
+                x_, y_ = nan, nan
+                break
+            dx = (u1 + 2 * u2 + 2 * u3 + u4) / 6
+            dy = (v1 + 2 * v2 + 2 * v3 + v4) / 6
+            x_ += dx
+            y_ += dy
+        x[i], y[i] = x_, y_
