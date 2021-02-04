@@ -446,23 +446,25 @@ class NetworkObservations(EddiesObservations):
         self,
         ax,
         name="time",
-        s=25,
         factor=1,
         ref=None,
         edgecolor_cycle=None,
-        cmap="Spectral_r",
         **kwargs,
     ):
         """
-        This function will scatter the path of each trajectory
+        This function will scatter the path of each network, with the merging and splitting events
 
-        :param matplotlib.axes.Axes ax: ax to draw
-        :param float,int ref: if defined, all coordinates will be wrapped with ref like west boundary
-        :param dict kwargs: keyword arguments for Axes.plot
-        :return: a list of matplotlib mappables
+        :param matplotlib.axes.Axes ax: matplotlib axe used to draw
+        :param str,array,None name:
+            variable used to fill the contour, if None all elements have the same color
+        :param float,None ref: if define use like west bound
+        :param float factor: multiply value by
+        :param list edgecolor_cycle: list of colors
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
+        :return: a dict of scattered mappables
         """
         mappables = dict()
-        nb_colors = len(edgecolor_cycle) if edgecolor_cycle != None else None
+        nb_colors = len(edgecolor_cycle) if edgecolor_cycle else None
         x = self.longitude
         if ref is not None:
             x = (x - ref) % 360 + ref
