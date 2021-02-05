@@ -5,6 +5,7 @@ Network basic manipulation
 
 from matplotlib import pyplot as plt
 
+import py_eddy_tracker.gui
 from py_eddy_tracker import data
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
@@ -106,11 +107,8 @@ cb.set_label("Speed radius (km)")
 # Remove dead branch
 # ------------------
 # Remove all tiny segment with less than N obs which didn't join two segments
-#
-# .. warning::
-#     Must be explore, no solution to solve all the case
 
-n_clean = n.remove_dead_branch(nobs=51)
+n_clean = n.remove_dead_end(nobs=10)
 fig = plt.figure(figsize=(15, 8))
 ax = fig.add_axes([0.04, 0.54, 0.90, 0.40])
 ax.set_title(f"Original network ({n.infos()})")
