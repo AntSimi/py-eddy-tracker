@@ -1,0 +1,21 @@
+channels:
+  - conda-forge
+dependencies:
+  - python=3.7
+  - ffmpeg
+  - matplotlib
+  - netCDF4
+  - numba
+  - numpy
+  - opencv-python
+  - pint
+  - polygon3
+  - pyyaml
+  - requests
+  - scipy
+  - zarr
+  - sphinx-gallery
+  - pyeddytrackersample
+  - sphinx_rtd_theme
+  - sphinx>=3.1
+
