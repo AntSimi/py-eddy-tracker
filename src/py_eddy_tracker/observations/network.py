@@ -407,6 +407,88 @@ class NetworkObservations(EddiesObservations):
         mappables["scatter"] = ax.scatter(self.time, y, **kwargs)
         return mappables
 
+    def event_map(self, ax, **kwargs):
+        """Add the merging and splitting events """
+        j = 0
+        mappables = dict()
+        symbol_kw = dict(
+            markersize=10,
+            color="k",
+        )
+        symbol_kw.update(kwargs)
+        symbol_kw_split = symbol_kw.copy()
+        symbol_kw_split["markersize"] += 5
+        for i, b0, b1 in self.iter_on("segment"):
+            nb = i.stop - i.start
+            if nb == 0:
+                continue
+            event_kw = dict(color=self.COLORS[j % self.NB_COLORS], ls="-", **kwargs)
+            i_n, i_p = (
+                self.next_obs[i.stop - 1],
+                self.previous_obs[i.start],
+            )
+
+            if i_n != -1:
+                y0, y1 = self.lat[i.stop - 1], self.lat[i_n]
+                x0, x1 = self.lon[i.stop - 1], self.lon[i_n]
+                ax.plot((x0, x1), (y0, y1), **event_kw)[0]
+                ax.plot(x0, y0, marker="s", **symbol_kw)[0]
+            if i_p != -1:
+                y0, y1 = self.lat[i.start], self.lat[i_p]
+                x0, x1 = self.lon[i.start], self.lon[i_p]
+                ax.plot((x0, x1), (y0, y1), **event_kw)[0]
+                ax.plot(x0, y0, marker="*", **symbol_kw_split)[0]
+
+            j += 1
+        return mappables
+
+    def scatter(
+        self,
+        ax,
+        name="time",
+        factor=1,
+        ref=None,
+        edgecolor_cycle=None,
+        **kwargs,
+    ):
+        """
+        This function will scatter the path of each network, with the merging and splitting events
+
+        :param matplotlib.axes.Axes ax: matplotlib axe used to draw
+        :param str,array,None name:
+            variable used to fill the contour, if None all elements have the same color
+        :param float,None ref: if define use like west bound
+        :param float factor: multiply value by
+        :param list edgecolor_cycle: list of colors
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
+        :return: a dict of scattered mappables
+        """
+        mappables = dict()
+        nb_colors = len(edgecolor_cycle) if edgecolor_cycle else None
+        x = self.longitude
+        if ref is not None:
+            x = (x - ref) % 360 + ref
+        kwargs = kwargs.copy()
+        if nb_colors:
+            edgecolors = list()
+            seg_previous = self.segment[0]
+            j = 0
+            for seg in self.segment:
+                if seg != seg_previous:
+                    j += 1
+                edgecolors.append(edgecolor_cycle[j % nb_colors])
+                seg_previous = seg
+            mappables["edges"] = ax.scatter(
+                x, self.latitude, edgecolor=edgecolors, **kwargs
+            )
+            kwargs.pop("linewidths", None)
+            kwargs["lw"] = 0
+        if name is not None and "c" not in kwargs:
+            v = self.parse_varname(name)
+            kwargs["c"] = v * factor
+        mappables["scatter"] = ax.scatter(x, self.latitude, **kwargs)
+        return mappables
+
     def insert_virtual(self):
         # TODO
         pass
