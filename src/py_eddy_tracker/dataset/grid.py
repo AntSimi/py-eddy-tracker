@@ -1953,7 +1953,7 @@ class RegularGridDataset(GridDataset):
             self.x_c, self.y_c, g, m, lons, lats, nearest=method == "nearest"
         )
 
-    def uv_for_advection(self, u_name, v_name, time_step=600, backward=False):
+    def uv_for_advection(self, u_name, v_name, time_step=600, backward=False, factor=1):
         """
         Get U,V to be used in degrees with precomputed time step
 
@@ -1961,8 +1961,8 @@ class RegularGridDataset(GridDataset):
         :param str,array v_name: V field to advect obs
         :param int time_step: Number of second for each advection
         """
-        u = (self.grid(u_name) if isinstance(u_name, str) else u_name).copy()
-        v = (self.grid(v_name) if isinstance(v_name, str) else v_name).copy()
+        u = (self.grid(u_name) if isinstance(u_name, str) else u_name).copy() * factor
+        v = (self.grid(v_name) if isinstance(v_name, str) else v_name).copy() * factor
         # N seconds / 1 degrees in m
         coef = time_step * 180 / pi / self.EARTH_RADIUS
         u *= coef / cos(radians(self.y_c))
@@ -2050,39 +2050,20 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
                 x_, y_ = nan, nan
                 break
             # k2, slope at middle with first guess position
-            u2, v2 = get_uv(
-                x_ref,
-                y_ref,
-                x_step,
-                y_step,
-                u_g,
-                v_g,
-                m_g,
-                x_ + u1 * 0.5,
-                y_ + v1 * 0.5,
-            )
+            x1, y1 = x_ + u1 * 0.5, y_ + v1 * 0.5
+            u2, v2 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x1, y1)
             if isnan(u2) or isnan(v2):
                 x_, y_ = nan, nan
                 break
             # k3, slope at middle with update guess position
-            u3, v3 = get_uv(
-                x_ref,
-                y_ref,
-                x_step,
-                y_step,
-                u_g,
-                v_g,
-                m_g,
-                x_ + u2 * 0.5,
-                y_ + v2 * 0.5,
-            )
+            x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
+            u3, v3 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x2, y2)
             if isnan(u3) or isnan(v3):
                 x_, y_ = nan, nan
                 break
             # k4, slope at end with update guess position
-            u4, v4 = get_uv(
-                x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x_ + u3, y_ + v3
-            )
+            x3, y3 = x_ + u3, y_ + v3
+            u4, v4 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x3, y3)
             if isnan(u4) or isnan(v4):
                 x_, y_ = nan, nan
                 break
@@ -2246,14 +2227,31 @@ class GridCollection:
         self.datasets = list()
 
     @classmethod
-    def from_netcdf_cube(cls, filename, x_name, y_name, t_name):
+    def from_netcdf_cube(cls, filename, x_name, y_name, t_name, heigth=None):
         new = cls()
         with Dataset(filename) as h:
             for i, t in enumerate(h.variables[t_name][:]):
                 d = RegularGridDataset(filename, x_name, y_name, indexs={t_name: i})
-                d.add_uv("adt")
+                if heigth is not None:
+                    d.add_uv(heigth)
                 new.datasets.append((t, d))
         return new
+
+    @classmethod
+    def from_netcdf_list(cls, filenames, t, x_name, y_name, indexs=None, heigth=None):
+        new = cls()
+        for i, t in enumerate(t):
+            d = RegularGridDataset(filenames[i], x_name, y_name, indexs=indexs)
+            if heigth is not None:
+                d.add_uv(heigth)
+            new.datasets.append((t, d))
+        return new
+
+    def __getitem__(self, item):
+        for t, d in self.datasets:
+            if t == item:
+                return d
+        raise KeyError(item)
 
     def filament(
         self,
