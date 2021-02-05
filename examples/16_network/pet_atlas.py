@@ -1,6 +1,6 @@
 """
-Network analyse
-===============
+Network Analysis
+================
 """
 from matplotlib import pyplot as plt
 from numpy import ma
@@ -21,7 +21,7 @@ kw_ratio = dict(cmap=plt.get_cmap("coolwarm_r", 10))
 
 
 # %%
-# Function
+# Functions
 def start_axes(title):
     fig = plt.figure(figsize=(13, 5))
     ax = fig.add_axes([0.03, 0.03, 0.90, 0.94], projection="full_axes")
@@ -41,6 +41,7 @@ def update_axes(ax, mappable=None):
 # %%
 # All
 # ---
+# Display the % of time each pixel (1/10°) is within an anticyclonic network
 ax = start_axes("")
 g_all = n.grid_count(bins)
 m = g_all.display(ax, **kw_time, vmin=0, vmax=75)
@@ -49,12 +50,16 @@ update_axes(ax, m).set_label("Pixel used in % of time")
 # %%
 # Network longer than 10 days
 # ---------------------------
+# Display the % of time each pixel (1/10°) is within an anticyclonic network
+# which total lifetime in longer than 10 days
 ax = start_axes("")
 n10 = n.longer_than(10)
 g_10 = n10.grid_count(bins)
 m = g_10.display(ax, **kw_time, vmin=0, vmax=75)
 update_axes(ax, m).set_label("Pixel used in % of time")
 
+# Display the ratio between the short and total presence.
+# Red = mostly short networks
 ax = start_axes("")
 m = g_10.display(
     ax,
@@ -67,12 +72,17 @@ update_axes(ax, m).set_label("Pixel used in % all atlas")
 # %%
 # Network longer than 20 days
 # ---------------------------
+# Display the % of time each pixel (1/10°) is within an anticyclonic network
+# which total lifetime in longer than 20 days
 ax = start_axes("")
 n20 = n.longer_than(20)
 g_20 = n20.grid_count(bins)
 m = g_20.display(ax, **kw_time, vmin=0, vmax=75)
 update_axes(ax, m).set_label("Pixel used in % of time")
 
+# %%
+# Display the ratio between the short and total presence.
+# Red = mostly short networks
 ax = start_axes("")
 m = g_20.display(
     ax,
@@ -82,6 +92,11 @@ m = g_20.display(
     name=g_20.vars["count"] * 100.0 / g_all.vars["count"]
 )
 update_axes(ax, m).set_label("Pixel used in % all atlas")
+
+# %%
+# Display the ratio between the short and total presence.
+# Red = mostly short networks
+# Networks shorter than 365 days are masked
 ax = start_axes("")
 m = g_20.display(
     ax,
@@ -93,6 +108,11 @@ m = g_20.display(
     )
 )
 update_axes(ax, m).set_label("Pixel used in % all atlas")
+# %%
+# Display the ratio between the short and total presence.
+# Red = mostly short networks
+# Networks longer than 365 days are masked
+# -> Coastal areas are mostly populated by short networks
 ax = start_axes("")
 m = g_20.display(
     ax,
@@ -110,11 +130,13 @@ update_axes(ax, m).set_label("Pixel used in % all atlas")
 # %%
 # All merging
 # -----------
+# Display the occurence of merging events
 ax = start_axes("")
 g_all_merging = n.merging_event().grid_count(bins)
 m = g_all_merging.display(ax, **kw_time, vmin=0, vmax=0.2)
 update_axes(ax, m).set_label("Pixel used in % of time")
 # %%
+# Ratio merging events / eddy presence
 ax = start_axes("")
 m = g_all_merging.display(
     ax,
@@ -126,8 +148,8 @@ m = g_all_merging.display(
 update_axes(ax, m).set_label("Pixel used in % all atlas")
 
 # %%
-# Merging in network longer than 10 days
-# --------------------------------------
+# Merging in networks longer than 10 days
+# ---------------------------------------
 ax = start_axes("")
 g_10_merging = n10.merging_event().grid_count(bins)
 m = g_10_merging.display(ax, **kw_time, vmin=0, vmax=0.2)

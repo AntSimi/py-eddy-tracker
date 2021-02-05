@@ -186,7 +186,11 @@ class Anim:
         # Update id txt
         for i in where(m)[0]:
             mappable = self.ax.text(
-                self.x_core[i], self.y_core[i], self.field_txt[i], fontsize=8
+                self.x_core[i],
+                self.y_core[i],
+                self.field_txt[i],
+                fontsize=12,
+                fontweight="demibold",
             )
             self.mappables.append(mappable)
             self.ax.draw_artist(mappable)

@@ -4,12 +4,17 @@ Replay segmentation
 Case from figure 10 from https://doi.org/10.1002/2017JC013158
 
 """
+
+# %%
+# Again with the Ierapetra Eddy
+
 from datetime import datetime, timedelta
 
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
+from matplotlib import colors
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
@@ -75,7 +80,7 @@ class MyTrackEddiesObservations(TrackEddiesObservations):
         """
         Method to overwrite behaviour in merging.
 
-        We will give the point to the older one
+        We will give the point to the older one instead of the maximum overlap ratio
         """
         while i_next != -1:
             # Flag
@@ -116,14 +121,14 @@ def get_obs(dataset):
 # %%
 # Get original network, we will isolate only relative at order *2*
 n = NetworkObservations.load_file(
-    "/tmp/Anticyclonic_seg.nc"
-    # "/data/adelepoulle/work/Eddies/20201217_network_build/tracking/med/Anticyclonic_seg.nc"
+    "/data/adelepoulle/work/Eddies/20201217_network_build/tracking/med/Anticyclonic_seg.nc"
 )
 
 n = n.extract_with_mask(n.track == n.track[get_obs(n)])
 n_ = n.relative(get_obs(n), order=2)
 
 # %%
+# Display the default segmentation
 ax = start_axes(n_.infos())
 n_.plot(ax, color_cycle=n.COLORS)
 update_axes(ax)
@@ -143,8 +148,9 @@ n_ = n_.relative(get_obs(n_), order=2)
 n_.numbering_segment()
 
 # %%
-# New version
-# -----------
+# New segmentation
+# ----------------
+# "The oldest wins" method produce a very long segment
 ax = start_axes(n_.infos())
 n_.plot(ax, color_cycle=n_.COLORS)
 update_axes(ax)
@@ -154,8 +160,8 @@ ax.xaxis.set_major_formatter(formatter), ax.grid()
 _ = n_.display_timeline(ax)
 
 # %%
-# Parameter timeline
-# ------------------
+# Parameters timeline
+# -------------------
 kw = dict(s=35, cmap=plt.get_cmap("Spectral_r", 8), zorder=10)
 ax = timeline_axes()
 n_.median_filter(15, "time", "latitude")
