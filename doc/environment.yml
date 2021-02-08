@@ -1,0 +1,8 @@
+dependencies:
+  - python=3.7
+  - conda-forge::ffmpeg
+  - conda-forge::opencv
+  - pip:
+    - sphinx-gallery
+    - sphinx_rtd_theme
+    - sphinx>=3.1

@@ -69,16 +69,20 @@ class NetworkObservations(EddiesObservations):
         super().__init__(*args, **kwargs)
         self._index_network = None
 
+    @property
+    def index_network(self):
+        if self._index_network is None:
+            self._index_network = build_index(self.track)
+        return self._index_network
+
     def network_slice(self, id_network):
         """
         Return slice for one network
 
         :param int id_network: id to identify network
         """
-        if self._index_network is None:
-            self._index_network = build_index(self.track)
-        i = id_network - self._index_network[2]
-        i_start, i_stop = self._index_network[0][i], self._index_network[1][i]
+        i = id_network - self.index_network[2]
+        i_start, i_stop = self.index_network[0][i], self.index_network[1][i]
         return slice(i_start, i_stop)
 
     @property
@@ -228,8 +232,9 @@ class NetworkObservations(EddiesObservations):
         Raise a warning or error?
         if there are more than one network
         """
-        # TODO
-        pass
+        _, i_start, _ = self.index_network
+        if len(i_start) > 1:
+            raise Exception("Several network")
 
     def position_filter(self, median_half_window, loess_half_window):
         self.median_filter(median_half_window, "time", "lon").loess_filter(
@@ -568,17 +573,19 @@ class NetworkObservations(EddiesObservations):
         # FIXME : Ok if only one network
         self.track[:] = tags[self.segment - 1]
 
-        self.obs.sort(order=("track", "segment", "time"))
+        i_sort = self.obs.argsort(order=("track", "segment", "time"), kind="mergesort")
+        # Sort directly obs, with hope to save memory
+        self.obs.sort(order=("track", "segment", "time"), kind="mergesort")
         self._index_network = None
 
-        # FIXME
         # n & p must be re-index
-        # n, p = self.next_obs[mask], self.previous_obs[mask]
+        n, p = self.next_obs, self.previous_obs
         # we add 2 for -1 index return index -1
-        # translate = -ones(len(self) + 1, dtype="i4")
-        # translate[:-1][mask] = arange(nb_obs)
-        # new.next_obs[:] = translate[n]
-        # new.previous_obs[:] = translate[p]
+        nb_obs = len(self)
+        translate = -ones(nb_obs + 1, dtype="i4")
+        translate[:-1][i_sort] = arange(nb_obs)
+        self.next_obs[:] = translate[n]
+        self.previous_obs[:] = translate[p]
 
     def network(self, id_network):
         return self.extract_with_mask(self.network_slice(id_network))
@@ -640,40 +647,27 @@ class NetworkObservations(EddiesObservations):
             j += 1
         return mappables
 
-    def remove_dead_branch(self, nobs=3):
-        """"""
-        # TODO: bug when spliting
+    def remove_dead_end(self, nobs=3, recursive=0, mask=None):
+        """
+        .. warning::
+            It will remove short segment which splits than merges with same segment
+        """
         self.only_one_network()
-
         segments_keep = list()
-        interaction_segments = dict()
-        segments_connexion = dict()
+        connexions = self.connexions()
         for i, b0, b1 in self.iter_on("segment"):
             nb = i.stop - i.start
-            i_p, i_n = self.previous_obs[i.start], self.next_obs[i.stop - 1]
-            seg = self.segment[i.start]
-            # segment of interaction
-            p_seg, n_seg = self.segment[i_p], self.segment[i_n]
-            if nb >= nobs:
-                segments_keep.append(seg)
-            else:
-                interaction_segments[seg] = (
-                    p_seg if i_p != -1 else -1,
-                    n_seg if i_n != -1 else -1,
-                )
-            # Where segment are called
-            if i_p != -1:
-                if p_seg not in segments_connexion:
-                    segments_connexion[p_seg] = list()
-                segments_connexion[p_seg].append(seg)
-            if i_n != -1:
-                if n_seg not in segments_connexion:
-                    segments_connexion[n_seg] = list()
-                segments_connexion[n_seg].append(seg)
-        print(interaction_segments)
-        print(segments_connexion)
-        print(segments_keep)
-        return self.extract_segment(tuple(segments_keep))
+            if mask and mask[i].any():
+                segments_keep.append(b0)
+                continue
+            if nb < nobs and len(connexions.get(b0, tuple())) < 2:
+                continue
+            segments_keep.append(b0)
+        if recursive > 0:
+            return self.extract_segment(segments_keep).remove_dead_end(
+                nobs, recursive - 1
+            )
+        return self.extract_segment(segments_keep)
 
     def extract_segment(self, segments):
         mask = ones(self.shape, dtype="bool")
