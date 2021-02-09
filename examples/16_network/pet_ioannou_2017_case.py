@@ -4,12 +4,18 @@ Ioannou case
 Figure 10 from https://doi.org/10.1002/2017JC013158
 
 """
+
+# %%
+# We want to find the Ierapetra Eddy described above in the networks
+
+# %%
 from datetime import datetime, timedelta
 
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
+from matplotlib import colors
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
@@ -62,6 +68,8 @@ def update_axes(ax, mappable=None):
 
 
 # %%
+# We know the position and the time of a specific eddy
+# `n.extract_with_mask` give us the corresponding network
 n = NetworkObservations.load_file(
     "med/Anticyclonic_seg.nc"
 )
@@ -77,6 +85,7 @@ ioannou_case = n.extract_with_mask(n.track == n.track[i])
 print(ioannou_case.infos())
 
 # %%
+# It seems that this network is huge! Our case is in purple...
 ax = start_axes()
 ioannou_case.plot(ax)
 update_axes(ax)
@@ -84,6 +93,7 @@ update_axes(ax)
 # %%
 # Full Timeline
 # -------------
+# The network span for many years... How to cut the interesting part?
 fig = plt.figure(figsize=(15, 5))
 ax = fig.add_axes([0.04, 0.05, 0.92, 0.92])
 ax.xaxis.set_major_formatter(formatter), ax.grid()
@@ -93,6 +103,7 @@ _ = ioannou_case.display_timeline(ax)
 # %%
 # Sub network and new numbering
 # -----------------------------
+# Here we chose to keep only the order 3 segments relatives to our chosen eddy
 i = np.where(
     (ioannou_case.lat > 33)
     * (ioannou_case.lat < 34)
@@ -107,10 +118,14 @@ close_to_i3.numbering_segment()
 # %%
 # Anim
 # ----
+# Quick movie to see better!
+cmap = colors.ListedColormap(
+    list(close_to_i3.COLORS), name="from_list", N=close_to_i3.segment.max()
+)
 a = Anim(
     close_to_i3,
     figsize=(12, 4),
-    cmap="Spectral_r",
+    cmap=cmap,
     nb_step=7,
     dpi=55,
     field_color="segment",
@@ -136,8 +151,8 @@ n_copy.plot(ax, color_cycle=n_copy.COLORS)
 update_axes(ax)
 
 # %%
-# Local Timeline
-# --------------
+# Latitude Timeline
+# -----------------
 ax = timeline_axes(f"Close segments ({close_to_i3.infos()})")
 n_copy = close_to_i3.copy()
 n_copy.median_filter(15, "time", "latitude")
@@ -146,6 +161,7 @@ _ = n_copy.display_timeline(ax, field="lat", method="all")
 # %%
 # Local radius timeline
 # ---------------------
+# Effective (bold) and Speed (thin) Radius together
 n_copy.median_filter(2, "time", "radius_e")
 n_copy.median_filter(2, "time", "radius_s")
 for b0, b1 in [
@@ -167,14 +183,16 @@ for b0, b1 in [
     )
 
 # %%
-# Parameter timeline
-# ------------------
+# Parameters timeline
+# -------------------
+# Effective Radius
 kw = dict(s=35, cmap=plt.get_cmap("Spectral_r", 8), zorder=10)
 ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, "radius_e", factor=1e-3, vmin=20, vmax=100, **kw)
 cb = update_axes(ax, m["scatter"])
 cb.set_label("Effective radius (km)")
 # %%
+# Shape error
 ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, "shape_error_e", vmin=14, vmax=70, **kw)
 cb = update_axes(ax, m["scatter"])

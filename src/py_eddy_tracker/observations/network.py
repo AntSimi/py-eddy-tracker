@@ -338,7 +338,7 @@ class NetworkObservations(EddiesObservations):
                     )
                 )
                 ax.plot((x[-1], self.time[i_n]), (y0, y1), **event_kw)[0]
-                ax.plot(x[-1], y0, color="k", marker=">", markersize=10, zorder=-1)[0]
+                ax.plot(x[-1], y0, color="k", marker="H", markersize=10, zorder=-1)[0]
             if i_p != -1:
                 seg_previous = self.segment[i_p]
                 if field is not None and method == "all":
@@ -422,7 +422,7 @@ class NetworkObservations(EddiesObservations):
         )
         symbol_kw.update(kwargs)
         symbol_kw_split = symbol_kw.copy()
-        symbol_kw_split["markersize"] += 5
+        symbol_kw_split["markersize"] += 4
         for i, b0, b1 in self.iter_on("segment"):
             nb = i.stop - i.start
             if nb == 0:
@@ -437,7 +437,7 @@ class NetworkObservations(EddiesObservations):
                 y0, y1 = self.lat[i.stop - 1], self.lat[i_n]
                 x0, x1 = self.lon[i.stop - 1], self.lon[i_n]
                 ax.plot((x0, x1), (y0, y1), **event_kw)[0]
-                ax.plot(x0, y0, marker="s", **symbol_kw)[0]
+                ax.plot(x0, y0, marker="H", **symbol_kw)[0]
             if i_p != -1:
                 y0, y1 = self.lat[i.start], self.lat[i_p]
                 x0, x1 = self.lon[i.start], self.lon[i_p]
