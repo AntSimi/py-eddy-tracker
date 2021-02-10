@@ -69,6 +69,7 @@ def update_axes(ax, mappable=None):
 
 # %%
 # We know the position and the time of a specific eddy
+#
 # `n.extract_with_mask` give us the corresponding network
 n = NetworkObservations.load_file(
     "med/Anticyclonic_seg.nc"

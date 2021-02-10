@@ -17,7 +17,7 @@ n = NetworkObservations.load_file(
 step = 1 / 10.0
 bins = ((-10, 37, step), (30, 46, step))
 kw_time = dict(cmap="terrain_r", factor=100.0 / n.nb_days, name="count")
-kw_ratio = dict(cmap=plt.get_cmap("coolwarm_r", 10))
+kw_ratio = dict(cmap=plt.get_cmap("magma_r", 10))
 
 
 # %%
@@ -58,8 +58,10 @@ g_10 = n10.grid_count(bins)
 m = g_10.display(ax, **kw_time, vmin=0, vmax=75)
 update_axes(ax, m).set_label("Pixel used in % of time")
 
+# %%
 # Display the ratio between the short and total presence.
-# Red = mostly short networks
+#
+# Light = mostly short networks
 ax = start_axes("")
 m = g_10.display(
     ax,
@@ -73,7 +75,7 @@ update_axes(ax, m).set_label("Pixel used in % all atlas")
 # Network longer than 20 days
 # ---------------------------
 # Display the % of time each pixel (1/10°) is within an anticyclonic network
-# which total lifetime in longer than 20 days
+# which total lifetime is longer than 20 days
 ax = start_axes("")
 n20 = n.longer_than(20)
 g_20 = n20.grid_count(bins)
@@ -82,7 +84,8 @@ update_axes(ax, m).set_label("Pixel used in % of time")
 
 # %%
 # Display the ratio between the short and total presence.
-# Red = mostly short networks
+#
+# Light = mostly short networks
 ax = start_axes("")
 m = g_20.display(
     ax,
@@ -95,7 +98,9 @@ update_axes(ax, m).set_label("Pixel used in % all atlas")
 
 # %%
 # Display the ratio between the short and total presence.
-# Red = mostly short networks
+#
+# Light = mostly short networks
+#
 # Networks shorter than 365 days are masked
 ax = start_axes("")
 m = g_20.display(
@@ -110,9 +115,10 @@ m = g_20.display(
 update_axes(ax, m).set_label("Pixel used in % all atlas")
 # %%
 # Display the ratio between the short and total presence.
-# Red = mostly short networks
+#
 # Networks longer than 365 days are masked
-# -> Coastal areas are mostly populated by short networks
+#
+# # -> Coastal areas are mostly populated by short networks
 ax = start_axes("")
 m = g_20.display(
     ax,
@@ -133,8 +139,9 @@ update_axes(ax, m).set_label("Pixel used in % all atlas")
 # Display the occurence of merging events
 ax = start_axes("")
 g_all_merging = n.merging_event().grid_count(bins)
-m = g_all_merging.display(ax, **kw_time, vmin=0, vmax=0.2)
+m = g_all_merging.display(ax, **kw_time, vmin=0, vmax=1)
 update_axes(ax, m).set_label("Pixel used in % of time")
+
 # %%
 # Ratio merging events / eddy presence
 ax = start_axes("")
@@ -152,7 +159,7 @@ update_axes(ax, m).set_label("Pixel used in % all atlas")
 # ---------------------------------------
 ax = start_axes("")
 g_10_merging = n10.merging_event().grid_count(bins)
-m = g_10_merging.display(ax, **kw_time, vmin=0, vmax=0.2)
+m = g_10_merging.display(ax, **kw_time, vmin=0, vmax=1)
 update_axes(ax, m).set_label("Pixel used in % of time")
 # %%
 ax = start_axes("")
@@ -160,7 +167,7 @@ m = g_10_merging.display(
     ax,
     **kw_ratio,
     vmin=0,
-    vmax=0.5,
+    vmax=2,
     name=ma.array(
         g_10_merging.vars["count"] * 100.0 / g_10.vars["count"],
         mask=g_10.vars["count"] < 365,

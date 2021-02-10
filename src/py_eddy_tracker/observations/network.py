@@ -113,8 +113,8 @@ class NetworkObservations(EddiesObservations):
         """
         Select network on time duration
 
-        :param int nb_day_min: Minimal number of day which must be covered by one network, if negative -> not used
-        :param int nb_day_max: Maximal number of day which must be covered by one network, if negative -> not used
+        :param int nb_day_min: Minimal number of day covered by one network, if negative -> not used
+        :param int nb_day_max: Maximal number of day covered by one network, if negative -> not used
         """
         if nb_day_max < 0:
             nb_day_max = 1000000000000
@@ -132,7 +132,7 @@ class NetworkObservations(EddiesObservations):
     @classmethod
     def from_split_network(cls, group_dataset, indexs, **kwargs):
         """
-        Build a NetworkObservations object with Group dataset and indexs
+        Build a NetworkObservations object with Group dataset and indexes
 
         :param TrackEddiesObservations group_dataset: Group dataset
         :param indexs: result from split_network
@@ -204,6 +204,9 @@ class NetworkObservations(EddiesObservations):
             cls.__close_segment(son, shift, connexions, distance)
 
     def segment_relative_order(self, seg_origine):
+        """
+        Compute the relative order of each segment to the chosen segment
+        """
         i_s, i_e, i_ref = build_index(self.segment)
         segment_connexions = self.connexions()
         relative_tr = -ones(i_s.shape, dtype="i4")
@@ -216,6 +219,9 @@ class NetworkObservations(EddiesObservations):
         return d
 
     def relative(self, i_obs, order=2, direct=True, only_past=False, only_future=False):
+        """
+        Extract the segments at a certain order.
+        """
         d = self.segment_relative_order(self.segment[i_obs])
         m = (d <= order) * (d != -1)
         return self.extract_with_mask(m)
@@ -234,7 +240,7 @@ class NetworkObservations(EddiesObservations):
         """
         _, i_start, _ = self.index_network
         if len(i_start) > 1:
-            raise Exception("Several network")
+            raise Exception("Several networks")
 
     def position_filter(self, median_half_window, loess_half_window):
         self.median_filter(median_half_window, "time", "lon").loess_filter(
@@ -266,7 +272,15 @@ class NetworkObservations(EddiesObservations):
         self, ax, event=True, field=None, method=None, factor=1, **kwargs
     ):
         """
-        Must be call on only one network
+        Plot a timeline of a network.
+        Must be called on only one network.
+
+        :param matplotlib.axes.Axes ax: matplotlib axe used to draw
+        :param bool event: if True, draw the splitting and merging events
+        :param str,array field: yaxis values, if None, segments are used
+        :param str method: if None, mean values are used
+        :param float factor: to multiply field
+        :return: plot mappable
         """
         self.only_one_network()
         j = 0
@@ -516,6 +530,7 @@ class NetworkObservations(EddiesObservations):
 
     @property
     def segment_track_array(self):
+        """Return a unique segment id when multiple networks are considered"""
         return build_unique_array(self.segment, self.track)
 
     def birth_event(self):
@@ -542,27 +557,65 @@ class NetworkObservations(EddiesObservations):
                 indices.append(i.stop - 1)
         return self.extract_event(list(set(indices)))
 
-    def merging_event(self):
-        indices = list()
+    def merging_event(self, triplet=False):
+        """Return observation after a merging event.
+
+        If `triplet=True` return the eddy after a merging event, the eddy before the merging event,
+        and the eddy stopped due to merging.
+        """
+        idx_m1 = list()
+        if triplet:
+            idx_m0_stop = list()
+            idx_m0 = list()
+
         for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
             i_n = self.next_obs[i.stop - 1]
             if i_n != -1:
-                indices.append(i.stop - 1)
-        return self.extract_event(list(set(indices)))
+                if triplet:
+                    idx_m0_stop.append(i.stop - 1)
+                    idx_m0.append(self.previous_obs[i_n])
+                idx_m1.append(i_n)
 
-    def spliting_event(self):
-        indices = list()
+        if triplet:
+            return (
+                self.extract_event(list(idx_m1)),
+                self.extract_event(list(idx_m0)),
+                self.extract_event(list(idx_m0_stop)),
+            )
+        else:
+            return self.extract_event(list(set(idx_m1)))
+
+    def spliting_event(self, triplet=False):
+        """Return observation before a splitting event.
+
+        If `triplet=True` return the eddy before a splitting event, the eddy after the splitting event,
+        and the eddy starting due to splitting.
+        """
+        idx_s0 = list()
+        if triplet:
+            idx_s1_start = list()
+            idx_s1 = list()
         for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
             i_p = self.previous_obs[i.start]
             if i_p != -1:
-                indices.append(i.start)
-        return self.extract_event(list(set(indices)))
+                if triplet:
+                    idx_s1_start.append(i.start)
+                    idx_s1.append(self.next_obs[i_p])
+                idx_s0.append(i_p)
+        if triplet:
+            return (
+                self.extract_event(list(idx_s0)),
+                self.extract_event(list(idx_s1)),
+                self.extract_event(list(idx_s1_start)),
+            )
+        else:
+            return self.extract_event(list(set(idx_s0)))
 
     def dissociate_network(self):
         """
@@ -655,7 +708,7 @@ class NetworkObservations(EddiesObservations):
         self.only_one_network()
         segments_keep = list()
         connexions = self.connexions()
-        for i, b0, b1 in self.iter_on("segment"):
+        for i, b0, _ in self.iter_on("segment"):
             nb = i.stop - i.start
             if mask and mask[i].any():
                 segments_keep.append(b0)
@@ -852,6 +905,7 @@ def apply_replace(x, x0, x1):
 
 @njit(cache=True)
 def build_unique_array(id1, id2):
+    """Give a unique id for each (id1, id2) with id1 and id2 increasing monotonically"""
     k = 0
     new_id = empty(id1.shape, dtype=id1.dtype)
     id1_previous = id1[0]
