@@ -1,8 +1,11 @@
+channels:
+  - conda-forge
+  - defaults
 dependencies:
   - python=3.7
-  - conda-forge::ffmpeg
-  - conda-forge::opencv
+  - ffmpeg
   - pip:
     - sphinx-gallery
     - sphinx_rtd_theme
     - sphinx>=3.1
+    - pyeddytrackersample
