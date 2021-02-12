@@ -30,7 +30,7 @@ from py_eddy_tracker.observations.network import NetworkObservations
 def start_ax(title="", dpi=90):
     fig = plt.figure(figsize=(16, 9), dpi=dpi)
     ax = fig.add_axes([0, 0, 1, 1], projection="full_axes")
-    ax.set_xlim(0, 32), ax.set_ylim(28, 46), ax.update_env()
+    ax.set_xlim(0, 32), ax.set_ylim(28, 46)
     ax.set_title(title)
     return fig, ax, ax.text(3, 32, "", fontsize=20)
 
