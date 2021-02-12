@@ -6,6 +6,7 @@ opencv-python
 pint
 polygon3
 pyyaml
+requests
 scipy
 zarr
 # doc
