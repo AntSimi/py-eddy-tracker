@@ -8,7 +8,7 @@ Run the identification process for a single day
 Shell/bash command
 ******************
 
-Bash command will allow to process one grid, it will apply a filter and an identification.
+Bash command will allow you to process one grid, it will apply a filter and an identification.
 
 
 .. code-block:: bash
@@ -18,14 +18,14 @@ Bash command will allow to process one grid, it will apply a filter and an ident
         out_directory -v DEBUG
 
 
-Filter could be modify with options *--cut_wavelength* and *--filter_order*. You could also defined height between two isolines with *--isoline_step*, which could
+Filter could be modified with options *--cut_wavelength* and *--filter_order*. You could also define height between two isolines with *--isoline_step*, which could
 improve speed profile quality and detect accurately tiny eddies. You could also use *--fit_errmax* to manage acceptable shape of eddies.
 
 An eddy identification will produce two files in the output directory, one for anticyclonic eddies and the other one for cyclonic.
 
-In regional area which are away from the equator, current could be deduce from height, juste write *None None* inplace of *ugos vgos*
+In regional areas which are away from the Equator, current could be deduced from height, just write *None None* in place of *ugos vgos*
 
-In case of **datacube**, you need to specify index for each layer (time, depth, ...) wiht *--indexs* option like:
+In case of **datacube**, you need to specify index for each layer (time, depth, ...) with *--indexs* option like:
 
 .. code-block:: bash
 
@@ -40,7 +40,7 @@ In case of **datacube**, you need to specify index for each layer (time, depth, 
 Python code
 ***********
 
-If we want customize eddies identification, python module is here.
+If we want to customize eddies identification, the Python module is here.
 
 Activate verbose
 
