@@ -44,6 +44,7 @@ def update_axes(ax, mappable=None):
             orientation="horizontal",
         )
         cb.set_label("Vorticity integration along trajectory at initial position")
+        return cb
 
 
 kw_vorticity = dict(vmin=0, vmax=2e-5, cmap="viridis")
@@ -90,7 +91,8 @@ g.vars["vort"] = v_x - u_y
 # Display vorticity field
 fig, ax, _ = start_ax()
 mappable = g.display(ax, abs(g.grid("vort")), **kw_vorticity)
-update_axes(ax, mappable)
+cb = update_axes(ax, mappable)
+cb.set_label("Vorticity")
 
 # %%
 # Particles

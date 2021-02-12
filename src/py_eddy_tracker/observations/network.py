@@ -6,7 +6,7 @@ import logging
 from glob import glob
 
 from numba import njit
-from numpy import arange, array, bincount, empty, ones, uint32, unique, zeros
+from numpy import arange, array, bincount, empty, in1d, ones, uint32, unique, zeros
 
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
@@ -119,13 +119,12 @@ class NetworkObservations(EddiesObservations):
         if nb_day_max < 0:
             nb_day_max = 1000000000000
         mask = zeros(self.shape, dtype="bool")
-        for i, b0, b1 in self.iter_on(self.segment_track_array):
+        t = self.time
+        for i, b0, b1 in self.iter_on(self.track):
             nb = i.stop - i.start
             if nb == 0:
                 continue
-            t = self.time[i]
-            dt = t.max() - t.min()
-            if nb_day_min <= dt <= nb_day_max:
+            if nb_day_min <= ptp(t[i]) <= nb_day_max:
                 mask[i] = True
         return self.extract_with_mask(mask)
 
@@ -164,8 +163,12 @@ class NetworkObservations(EddiesObservations):
         self.only_one_network()
         return self.segment_relative_order(self.segment[i_obs])
 
-    def connexions(self):
-        self.only_one_network()
+    def connexions(self, multi_network=False):
+        if multi_network:
+            segment = self.segment_track_array
+        else:
+            self.only_one_network()
+            segment = self.segment
         segments_connexion = dict()
 
         def add_seg(father, child):
@@ -173,12 +176,13 @@ class NetworkObservations(EddiesObservations):
                 segments_connexion[father] = list()
             segments_connexion[father].append(child)
 
-        for i, seg, _ in self.iter_on("segment"):
+        previous_obs, next_obs = self.previous_obs, self.next_obs
+        for i, seg, _ in self.iter_on(segment):
             if i.start == i.stop:
                 continue
-            i_p, i_n = self.previous_obs[i.start], self.next_obs[i.stop - 1]
+            i_p, i_n = previous_obs[i.start], next_obs[i.stop - 1]
             # segment of interaction
-            p_seg, n_seg = self.segment[i_p], self.segment[i_n]
+            p_seg, n_seg = segment[i_p], segment[i_n]
             # Where segment are called
             if i_p != -1:
                 add_seg(p_seg, seg)
@@ -395,6 +399,26 @@ class NetworkObservations(EddiesObservations):
             out = array(out)
         return out
 
+    def map_network(self, method, y, same=True, **kw):
+        if same:
+            out = empty(y.shape, **kw)
+        else:
+            out = list()
+        for i, b0, b1 in self.iter_on(self.track):
+            res = method(y[i])
+            if same:
+                out[i] = res
+            else:
+                if isinstance(i, slice):
+                    if i.start == i.stop:
+                        continue
+                elif len(i) == 0:
+                    continue
+                out.append(res)
+        if not same:
+            out = array(out)
+        return out
+
     def scatter_timeline(
         self,
         ax,
@@ -410,7 +434,7 @@ class NetworkObservations(EddiesObservations):
         Must be call on only one network
         """
         self.only_one_network()
-        y = (self.segment if yfield is None else self[yfield]) * yfactor
+        y = (self.segment if yfield is None else self.parse_varname(yfield)) * yfactor
         if method == "all":
             pass
         else:
@@ -536,11 +560,12 @@ class NetworkObservations(EddiesObservations):
     def birth_event(self):
         # FIXME how to manage group 0
         indices = list()
+        previous_obs = self.previous_obs
         for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
-            i_p = self.previous_obs[i.start]
+            i_p = previous_obs[i.start]
             if i_p == -1:
                 indices.append(i.start)
         return self.extract_event(list(set(indices)))
@@ -548,11 +573,12 @@ class NetworkObservations(EddiesObservations):
     def death_event(self):
         # FIXME how to manage group 0
         indices = list()
+        next_obs = self.next_obs
         for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
-            i_n = self.next_obs[i.stop - 1]
+            i_n = next_obs[i.stop - 1]
             if i_n == -1:
                 indices.append(i.stop - 1)
         return self.extract_event(list(set(indices)))
@@ -567,16 +593,16 @@ class NetworkObservations(EddiesObservations):
         if triplet:
             idx_m0_stop = list()
             idx_m0 = list()
-
+        next_obs, previous_obs = self.next_obs, self.previous_obs
         for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
-            i_n = self.next_obs[i.stop - 1]
+            i_n = next_obs[i.stop - 1]
             if i_n != -1:
                 if triplet:
                     idx_m0_stop.append(i.stop - 1)
-                    idx_m0.append(self.previous_obs[i_n])
+                    idx_m0.append(previous_obs[i_n])
                 idx_m1.append(i_n)
 
         if triplet:
@@ -598,15 +624,16 @@ class NetworkObservations(EddiesObservations):
         if triplet:
             idx_s1_start = list()
             idx_s1 = list()
+        next_obs, previous_obs = self.next_obs, self.previous_obs
         for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
-            i_p = self.previous_obs[i.start]
+            i_p = previous_obs[i.start]
             if i_p != -1:
                 if triplet:
                     idx_s1_start.append(i.start)
-                    idx_s1.append(self.next_obs[i_p])
+                    idx_s1.append(next_obs[i_p])
                 idx_s0.append(i_p)
         if triplet:
             return (
@@ -700,32 +727,38 @@ class NetworkObservations(EddiesObservations):
             j += 1
         return mappables
 
-    def remove_dead_end(self, nobs=3, recursive=0, mask=None):
+    def remove_dead_end(self, nobs=3, ndays=0, recursive=0, mask=None):
         """
         .. warning::
             It will remove short segment which splits than merges with same segment
         """
-        self.only_one_network()
         segments_keep = list()
-        connexions = self.connexions()
-        for i, b0, _ in self.iter_on("segment"):
-            nb = i.stop - i.start
+        connexions = self.connexions(multi_network=True)
+        t = self.time
+        for i, b0, _ in self.iter_on(self.segment_track_array):
             if mask and mask[i].any():
                 segments_keep.append(b0)
                 continue
-            if nb < nobs and len(connexions.get(b0, tuple())) < 2:
+            nb = i.stop - i.start
+            dt = t[i.stop - 1] - t[i.start]
+            if (nb < nobs or dt < ndays) and len(connexions.get(b0, tuple())) < 2:
                 continue
             segments_keep.append(b0)
         if recursive > 0:
-            return self.extract_segment(segments_keep).remove_dead_end(
-                nobs, recursive - 1
+            return self.extract_segment(segments_keep, absolute=True).remove_dead_end(
+                nobs, ndays, recursive - 1
             )
-        return self.extract_segment(segments_keep)
+        return self.extract_segment(segments_keep, absolute=True)
 
-    def extract_segment(self, segments):
+    def extract_segment(self, segments, absolute=False):
         mask = ones(self.shape, dtype="bool")
-        for i, b0, b1 in self.iter_on("segment"):
-            if b0 not in segments:
+        segments = array(segments)
+        values = self.segment_track_array if absolute else "segment"
+        keep = ones(values.max() + 1, dtype="bool")
+        v = unique(values)
+        keep[v] = in1d(v, segments)
+        for i, b0, b1 in self.iter_on(values):
+            if not keep[b0]:
                 mask[i] = False
         return self.extract_with_mask(mask)
 
@@ -929,3 +962,8 @@ def new_numbering(segs):
             s0 = segs[i]
             j += 1
         segs[i] = j
+
+
+@njit(cache=True)
+def ptp(values):
+    return values.max() - values.min()
