@@ -79,7 +79,8 @@ def anim_ax(generator, **kw):
     ax = fig.add_axes([0, 0, 1, 1], projection="full_axes")
     ax.set_xlim(19, 30), ax.set_ylim(31, 36.5), ax.grid()
     a.filled(ax, facecolors="r", alpha=0.1), c.filled(ax, facecolors="b", alpha=0.1)
-    return fig, ax.text(21, 32.1, ""), ax.plot([], [], "k", **kw)[0], t
+    line = ax.plot([], [], "k", **kw)[0]
+    return fig, ax.text(21, 32.1, ""), line, t
 
 
 def update(i_frame, t_step):

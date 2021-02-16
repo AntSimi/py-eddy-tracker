@@ -7,8 +7,8 @@ In the current example we didn't remove a mean vorticity.
 
 Method are described here:
 
-    - `Transport by Lagrangian Vortices in the Eastern Pacific <https://doi.org/10.1175/JPO-D-17-0102.1>`_
-    - `Transport by Coherent Lagrangian Vortices`_
+    - Abernathey, Ryan, and George Haller. " Transport by Lagrangian Vortices in the Eastern Pacific", Journal of Physical Oceanography 48, 3 (2018): 667-685, accessed Feb 16, 2021, https://doi.org/10.1175/JPO-D-17-0102.1
+    - `Transport by Coherent Lagrangian Vortices`_, R. Abernathey, Sinha A., Tarshish N., Liu T., Zhang C., Haller G., 2019, Talk a t the Sources and Sinks of Ocean Mesoscale Eddy Energy CLIVAR Workshop
 
 .. _Transport by Coherent Lagrangian Vortices:
     https://usclivar.org/sites/default/files/meetings/2019/presentations/Aberernathey_CLIVAR.pdf
@@ -74,7 +74,7 @@ class VideoAnimation(FuncAnimation):
 # %%
 # Data
 # ----
-# To compute vorticity(:math:`\omega`) we compute u/v field with a stencil and apply the following equation with stencil
+# To compute vorticity (:math:`\omega`) we compute u/v field with a stencil and apply the following equation with stencil
 # method :
 #
 # .. math::
@@ -166,11 +166,11 @@ lavd = RegularGridDataset.with_array(
 
 # %%
 # Display final LAVD with py eddy tracker detection.
-# Period used for LAVD integration(8 days) is too short for a real use, but choose for example efficiency.
+# Period used for LAVD integration (8 days) is too short for a real use, but choose for example efficiency.
 fig, ax, _ = start_ax()
 mappable = lavd.display(ax, "lavd", **kw_vorticity)
 NetworkObservations.load_file(get_path("Anticyclonic_20160515.nc")).display(
     ax, color="k"
 )
 NetworkObservations.load_file(get_path("Cyclonic_20160515.nc")).display(ax, color="k")
-update_axes(ax, mappable)
+_ = update_axes(ax, mappable)
