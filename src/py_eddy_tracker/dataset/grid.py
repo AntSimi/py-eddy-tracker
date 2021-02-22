@@ -1937,6 +1937,14 @@ class RegularGridDataset(GridDataset):
         # self.variables_description[new_name]['infos'] = False
         # self.variables_description[new_name]['kwargs']['dimensions'] = ...
 
+    @staticmethod
+    def get_mask(a):
+        if len(a.mask.shape):
+            m = a.mask
+        else:
+            m = ones(a.shape) if a.mask else zeros(a.shape)
+        return m
+
     def interp(self, grid_name, lons, lats, method="bilinear"):
         """
         Compute z over lons, lats
@@ -1949,10 +1957,7 @@ class RegularGridDataset(GridDataset):
         :return: new z
         """
         g = self.grid(grid_name)
-        if len(g.mask.shape):
-            m = g.mask
-        else:
-            m = ones(g.shape) if g.mask else zeros(g.shape)
+        m = self.get_mask(g)
         return interp2d_geo(
             self.x_c, self.y_c, g, m, lons, lats, nearest=method == "nearest"
         )
@@ -1977,11 +1982,12 @@ class RegularGridDataset(GridDataset):
         m = u.mask + v.mask
         return u, v, m
 
-    def advect(self, x, y, u_name, v_name, nb_step=10, rk4=False, **kw):
+    def advect(self, x, y, u_name, v_name, nb_step=10, rk4=True, **kw):
         """
         At each call it will update position in place with u & v field
 
         It's a dummy advection which use only one layer of current
+
         :param array x: Longitude of obs to move
         :param array y: Latitude of obs to move
         :param str,array u_name: U field to advect obs
@@ -1990,13 +1996,14 @@ class RegularGridDataset(GridDataset):
         :param int time_step: Number of second for each advection
         """
         u, v, m = self.uv_for_advection(u_name, v_name, **kw)
+        m_p = isnan(x) + isnan(y)
         advect_ = advect_rk4 if rk4 else advect
         while True:
-            advect_(self.x_c, self.y_c, u, v, m, x, y, nb_step)
+            advect_(self.x_c, self.y_c, u, v, m, x, y, m_p, nb_step)
             yield x, y
 
     def filament(
-        self, x, y, u_name, v_name, nb_step=10, filament_size=6, rk4=False, **kw
+        self, x, y, u_name, v_name, nb_step=10, filament_size=6, rk4=True, **kw
     ):
         """
         Produce filament with concatenation of advection
@@ -2021,6 +2028,7 @@ class RegularGridDataset(GridDataset):
         f_y[:] = nan
         f_x[::filament_size_] = x
         f_y[::filament_size_] = y
+        mp = isnan(x) + isnan(y)
         advect_ = advect_rk4 if rk4 else advect
         while True:
             # Shift position
@@ -2029,48 +2037,87 @@ class RegularGridDataset(GridDataset):
             # Remove last position
             f_x[filament_size::filament_size_] = nan
             f_y[filament_size::filament_size_] = nan
-            advect_(self.x_c, self.y_c, u, v, m, x, y, nb_step)
+            advect_(self.x_c, self.y_c, u, v, m, x, y, mp, nb_step)
             f_x[::filament_size_] = x
             f_y[::filament_size_] = y
             yield f_x, f_y
 
 
 @njit(cache=True)
-def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
+def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
-    # On each particule
+    # cache
+    i_cache, j_cache = -1000000, -1000000
+    masked = False
+    u00, u01, u10, u11 = 0.0, 0.0, 0.0, 0.0
+    v00, v01, v10, v11 = 0.0, 0.0, 0.0, 0.0
+    # On each particle
     for i in prange(x.size):
-        # If particule are not valid => continue
-        x_, y_ = x[i], y[i]
-        if isnan(x_) or isnan(y_):
+        # If particle are not valid => continue
+        if m[i]:
             continue
+        x_, y_ = x[i], y[i]
         # Iterate on whole steps
         for _ in range(nb_step):
             # k1, slope at origin
-            u1, v1 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x_, y_)
-            if isnan(u1) or isnan(v1):
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x_, y_)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                    ii_, jj_, u_g, v_g, m_g
+                )
+                i_cache, j_cache = ii_, jj_
+            # The 3 following could be in cache operation but this one must be test in any case
+            if masked:
                 x_, y_ = nan, nan
+                m[i] = True
                 break
+            xd, yd = ii - ii_, jj - jj_
+            u1, v1 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # k2, slope at middle with first guess position
             x1, y1 = x_ + u1 * 0.5, y_ + v1 * 0.5
-            u2, v2 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x1, y1)
-            if isnan(u2) or isnan(v2):
-                x_, y_ = nan, nan
-                break
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x1, y1)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                    ii_, jj_, u_g, v_g, m_g
+                )
+                i_cache, j_cache = ii_, jj_
+                if masked:
+                    x_, y_ = nan, nan
+                    m[i] = True
+                    break
+            xd, yd = ii - ii_, jj - jj_
+            u2, v2 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # k3, slope at middle with update guess position
             x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
-            u3, v3 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x2, y2)
-            if isnan(u3) or isnan(v3):
-                x_, y_ = nan, nan
-                break
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x2, y2)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                    ii_, jj_, u_g, v_g, m_g
+                )
+                i_cache, j_cache = ii_, jj_
+                if masked:
+                    x_, y_ = nan, nan
+                    m[i] = True
+                    break
+            xd, yd = ii - ii_, jj - jj_
+            u3, v3 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # k4, slope at end with update guess position
             x3, y3 = x_ + u3, y_ + v3
-            u4, v4 = get_uv(x_ref, y_ref, x_step, y_step, u_g, v_g, m_g, x3, y3)
-            if isnan(u4) or isnan(v4):
-                x_, y_ = nan, nan
-                break
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x3, y3)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                    ii_, jj_, u_g, v_g, m_g
+                )
+                i_cache, j_cache = ii_, jj_
+                if masked:
+                    x_, y_ = nan, nan
+                    m[i] = True
+                    break
+            xd, yd = ii - ii_, jj - jj_
+            u4, v4 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
+            # RK4 compute
             dx = (u1 + 2 * u2 + 2 * u3 + u4) / 6
             dy = (v1 + 2 * v2 + 2 * v3 + v4) / 6
             # Compute new x,y
@@ -2098,7 +2145,7 @@ def get_uv(x0, y0, x_step, y_step, u, v, m, x, y):
 
 
 @njit(cache=True)
-def advect(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
+def advect(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
@@ -2107,7 +2154,7 @@ def advect(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
     # On each particule
     for i in prange(x.size):
         # If particule are not valid => continue
-        if isnan(x[i]) or isnan(y[i]):
+        if m[i]:
             continue
         # Iterate on whole steps
         for _ in range(nb_step):
@@ -2123,6 +2170,7 @@ def advect(x_g, y_g, u_g, v_g, m_g, x, y, nb_step):
                 # If one of nearest pixel is invalid
                 if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
                     x[i], y[i] = nan, nan
+                    m[i] = True
                     break
                 # Extract value for u and v
                 u00, u01, u10, u11 = u_g[i0, j0], u_g[i0, j1], u_g[i1, j0], u_g[i1, j1]
@@ -2251,6 +2299,34 @@ class GridCollection:
             new.datasets.append((t, d))
         return new
 
+    def interp(self, grid_name, t, lons, lats, method="bilinear"):
+        """
+        Compute z over lons, lats
+
+        :param str grid_name: Grid to be interpolated
+        :param float, t: time for interpolation
+        :param lons: new x
+        :param lats: new y
+        :param str method: Could be 'bilinear' or 'nearest'
+
+        :return: new z
+        """
+        # FIXME: we do assumption on time step
+        t0 = int(t)
+        t1 = t0 + 1
+        h0, h1 = self[t0], self[t1]
+        g0, g1 = h0.grid(grid_name), h1.grid(grid_name)
+        m0, m1 = h0.get_mask(g0), h0.get_mask(g1)
+        kw = dict(x=lons, y=lats, nearest=method == "nearest")
+        v0 = interp2d_geo(h0.x_c, h0.y_c, g0, m0, **kw)
+        v1 = interp2d_geo(h1.x_c, h1.y_c, g1, m1, **kw)
+        w = (t - t0) / (t1 - t0)
+        return v1 * w + v0 * (1 - w)
+
+    def __iter__(self):
+        for _, d in self.datasets:
+            yield d
+
     def __getitem__(self, item):
         for t, d in self.datasets:
             if t == item:
@@ -2267,7 +2343,7 @@ class GridCollection:
         nb_step=10,
         time_step=600,
         filament_size=6,
-        rk4=False,
+        rk4=True,
         **kw,
     ):
         """
@@ -2309,6 +2385,7 @@ class GridCollection:
         t0 = t0 * 86400
         t1 = t1 * 86400
         t = t_init * 86400
+        mp = isnan(x) + isnan(y)
         advect_ = advect_t_rk4 if rk4 else advect_t
         while True:
             # Shift position
@@ -2325,7 +2402,7 @@ class GridCollection:
                 u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
             w = 1 - (arange(t, t + dt, t_step) - t0) / (t1 - t0)
             half_w = t_step / 2.0 / (t1 - t0)
-            advect_(d0.x_c, d0.y_c, u0, v0, m0, u1, v1, m1, x, y, w, half_w=half_w)
+            advect_(d0.x_c, d0.y_c, u0, v0, m0, u1, v1, m1, x, y, mp, w, half_w=half_w)
             f_x[::filament_size_] = x
             f_y[::filament_size_] = y
             t += dt
@@ -2340,7 +2417,7 @@ class GridCollection:
         t_init,
         nb_step=10,
         time_step=600,
-        rk4=False,
+        rk4=True,
         **kw,
     ):
         backward = kw.get("backward", False)
@@ -2360,6 +2437,7 @@ class GridCollection:
         t1 = t1 * 86400
         t = t_init * 86400
         advect_ = advect_t_rk4 if rk4 else advect_t
+        mp = isnan(x) + isnan(y)
         while True:
             if (backward and t <= t1) or (not backward and t >= t1):
                 t0, u0, v0, m0 = t1, u1, v1, m1
@@ -2368,7 +2446,7 @@ class GridCollection:
                 u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
             w = 1 - (arange(t, t + dt, t_step) - t0) / (t1 - t0)
             half_w = t_step / 2.0 / (t1 - t0)
-            advect_(d0.x_c, d0.y_c, u0, v0, m0, u1, v1, m1, x, y, w, half_w=half_w)
+            advect_(d0.x_c, d0.y_c, u0, v0, m0, u1, v1, m1, x, y, mp, w, half_w=half_w)
             t += dt
             yield t, x, y
 
@@ -2396,7 +2474,7 @@ class GridCollection:
 
 
 @njit(cache=True)
-def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, weigths, half_w=0):
+def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, half_w=0):
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
@@ -2405,7 +2483,7 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, weigths, half_w
     # On each particule
     for i in prange(x.size):
         # If particule are not valid => continue
-        if isnan(x[i]) or isnan(y[i]):
+        if m[i]:
             continue
         # Iterate on whole steps
         for w in weigths:
@@ -2430,6 +2508,7 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, weigths, half_w
                     or m_g1[i1, j1]
                 ):
                     x[i], y[i] = nan, nan
+                    m[i] = True
                     break
                 # Extract value for u and v
                 u000, u001 = u_g0[i0, j0], u_g0[i0, j1]
@@ -2454,52 +2533,133 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, weigths, half_w
             y[i] += dy0 * w + dy1 * (1 - w)
 
 
-@njit(cache=True)
-def advect_t_rk4(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, weigths, half_w):
+@njit(cache=True, fastmath=True)
+def get_uv_quad(i0, j0, u, v, m):
+    i1, j1 = i0 + 1, j0 + 1
+    if m[i0, j0] or m[i0, j1] or m[i1, j0] or m[i1, j1]:
+        return True, nan, nan, nan, nan, nan, nan, nan, nan
+    # Extract value for u and v
+    u00, u01, u10, u11 = u[i0, j0], u[i0, j1], u[i1, j0], u[i1, j1]
+    v00, v01, v10, v11 = v[i0, j0], v[i0, j1], v[i1, j0], v[i1, j1]
+    return False, u00, u01, u10, u11, v00, v01, v10, v11
+
+
+@njit(cache=True, fastmath=True)
+def get_grid_indices(x0, y0, x_step, y_step, x, y):
+    i, j = (x - x0) / x_step, (y - y0) / y_step
+    i0, j0 = int(floor(i)), int(floor(j))
+    return i0, j0, i, j
+
+
+@njit(cache=True, fastmath=True)
+def interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11):
+    xd_i, yd_i = 1 - xd, 1 - yd
+    u = (u00 * xd_i + u10 * xd) * yd_i + (u01 * xd_i + u11 * xd) * yd
+    v = (v00 * xd_i + v10 * xd) * yd_i + (v01 * xd_i + v11 * xd) * yd
+    return u, v
+
+
+@njit(cache=True, fastmath=True)
+def advect_t_rk4(
+    x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, half_w
+):
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
-    # On each particule
+    # cache
+    i_cache, j_cache = -1000000, -1000000
+    masked0, masked1 = False, False
+    u000, u001, u010, u011 = 0.0, 0.0, 0.0, 0.0
+    v000, v001, v010, v011 = 0.0, 0.0, 0.0, 0.0
+    u100, u101, u110, u111 = 0.0, 0.0, 0.0, 0.0
+    v100, v101, v110, v111 = 0.0, 0.0, 0.0, 0.0
+    # On each particle
     for i in prange(x.size):
-        # If particule are not valid => continue
-        x_, y_ = x[i], y[i]
-        if isnan(x_) or isnan(y_):
+        # If particle are not valid => continue
+        if m[i]:
             continue
+        x_, y_ = x[i], y[i]
         # Iterate on whole steps
         for w in weigths:
             # k1, slope at origin
-            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x_, y_)
-            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x_, y_)
-            u1, v1 = u0_ * w + u1_ * (1 - w), v0_ * w + v1_ * (1 - w)
-            if isnan(u1) or isnan(v1):
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x_, y_)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
+                    ii_, jj_, u_g0, v_g0, m_g0
+                )
+                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
+                    ii_, jj_, u_g1, v_g1, m_g1
+                )
+                i_cache, j_cache = ii_, jj_
+            # The 3 following could be in cache operation but this one must be test in any case
+            if masked0 or masked1:
                 x_, y_ = nan, nan
+                m[i] = True
                 break
+            xd, yd = ii - ii_, jj - jj_
+            u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
+            u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
+            u1, v1 = u0_ * w + u1_ * (1 - w), v0_ * w + v1_ * (1 - w)
             # k2, slope at middle with first guess position
             x1, y1 = x_ + u1 * 0.5, y_ + v1 * 0.5
-            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x1, y1)
-            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x1, y1)
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x1, y1)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
+                    ii_, jj_, u_g0, v_g0, m_g0
+                )
+                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
+                    ii_, jj_, u_g1, v_g1, m_g1
+                )
+                i_cache, j_cache = ii_, jj_
+                if masked0 or masked1:
+                    x_, y_ = nan, nan
+                    m[i] = True
+                    break
+            xd, yd = ii - ii_, jj - jj_
+            u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
+            u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             w_ = w - half_w
             u2, v2 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
-            if isnan(u2) or isnan(v2):
-                x_, y_ = nan, nan
-                break
             # k3, slope at middle with update guess position
             x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
-            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x2, y2)
-            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x2, y2)
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x2, y2)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
+                    ii_, jj_, u_g0, v_g0, m_g0
+                )
+                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
+                    ii_, jj_, u_g1, v_g1, m_g1
+                )
+                i_cache, j_cache = ii_, jj_
+                if masked0 or masked1:
+                    x_, y_ = nan, nan
+                    m[i] = True
+                    break
+            xd, yd = ii - ii_, jj - jj_
+            u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
+            u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             u3, v3 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
-            if isnan(u3) or isnan(v3):
-                x_, y_ = nan, nan
-                break
             # k4, slope at end with update guess position
             x3, y3 = x_ + u3, y_ + v3
-            u0_, v0_ = get_uv(x_ref, y_ref, x_step, y_step, u_g0, v_g0, m_g0, x3, y3)
-            u1_, v1_ = get_uv(x_ref, y_ref, x_step, y_step, u_g1, v_g1, m_g1, x3, y3)
+            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x3, y3)
+            if ii_ != i_cache or jj_ != j_cache:
+                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
+                    ii_, jj_, u_g0, v_g0, m_g0
+                )
+                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
+                    ii_, jj_, u_g1, v_g1, m_g1
+                )
+                i_cache, j_cache = ii_, jj_
+                if masked0 or masked1:
+                    x_, y_ = nan, nan
+                    m[i] = True
+                    break
+            xd, yd = ii - ii_, jj - jj_
+            u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
+            u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             w_ -= half_w
             u4, v4 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
-            if isnan(u4) or isnan(v4):
-                x_, y_ = nan, nan
-                break
+            # RK4 compute
             dx = (u1 + 2 * u2 + 2 * u3 + u4) / 6
             dy = (v1 + 2 * v2 + 2 * v3 + v4) / 6
             x_ += dx

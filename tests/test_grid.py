@@ -1,5 +1,5 @@
 from matplotlib.path import Path
-from numpy import array, ma
+from numpy import array, isnan, ma
 from pytest import approx
 
 from py_eddy_tracker.data import get_path
@@ -69,9 +69,19 @@ def test_interp():
     )
     x0, y0 = array((10,)), array((5,))
     x1, y1 = array((15,)), array((5,))
+    # outside but usable with nearest
+    x2, y2 = array((25,)), array((5,))
+    # Outside for any interpolation
+    x3, y3 = array((25,)), array((16,))
+    x4, y4 = array((55,)), array((25,))
     # Interp nearest
     assert g.interp("z", x0, y0, method="nearest") == 0
     assert g.interp("z", x1, y1, method="nearest") == 2
+    assert isnan(g.interp("z", x4, y4, method="nearest"))
+    assert g.interp("z", x2, y2, method="nearest") == 2
+    assert isnan(g.interp("z", x3, y3, method="nearest"))
+
     # Interp bilinear
     assert g.interp("z", x0, y0) == 1.5
     assert g.interp("z", x1, y1) == 2
+    assert isnan(g.interp("z", x2, y2))

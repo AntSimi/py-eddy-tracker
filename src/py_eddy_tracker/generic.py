@@ -191,7 +191,25 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y, nearest=False):
     :return: z interpolated
     :rtype: array
     """
-    # TODO : Maybe test if we are out of bounds
+    if nearest:
+        return interp2d_nearest(x_g, y_g, z_g, x, y)
+    else:
+        return interp2d_bilinear(x_g, y_g, z_g, m_g, x, y)
+
+
+@njit(cache=True, fastmath=True)
+def interp2d_nearest(x_g, y_g, z_g, x, y):
+    """
+    Nearest interpolation with wrapping if circular
+
+    :param array x_g: coordinates of grid
+    :param array y_g: coordinates of grid
+    :param array z_g: Grid value
+    :param array x: coordinate where interpolate z
+    :param array y: coordinate where interpolate z
+    :return: z interpolated
+    :rtype: array
+    """
     x_ref = x_g[0]
     y_ref = y_g[0]
     x_step = x_g[1] - x_ref
@@ -201,44 +219,78 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y, nearest=False):
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
     z = empty(x.shape, dtype=z_g.dtype)
     for i in prange(x.size):
+        i0 = int(round((x[i] - x_ref) / x_step))
+        j0 = int(round((y[i] - y_ref) / y_step))
+        if is_circular:
+            i0 %= nb_x
+        if i0 >= nb_x or i0 < 0 or j0 < 0 or j0 >= nb_y:
+            z[i] = nan
+            continue
+        z[i] = z_g[i0, j0]
+    return z
+
+
+@njit(cache=True, fastmath=True)
+def interp2d_bilinear(x_g, y_g, z_g, m_g, x, y):
+    """
+    Bilinear interpolation with wrapping if circular
+
+    :param array x_g: coordinates of grid
+    :param array y_g: coordinates of grid
+    :param array z_g: Grid value
+    :param array m_g: Boolean grid, True if value is masked
+    :param array x: coordinate where interpolate z
+    :param array y: coordinate where interpolate z
+    :return: z interpolated
+    :rtype: array
+    """
+    x_ref = x_g[0]
+    y_ref = y_g[0]
+    x_step = x_g[1] - x_ref
+    y_step = y_g[1] - y_ref
+    nb_x = x_g.shape[0]
+    nb_y = y_g.shape[0]
+    is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
+    # Indices which should be never exist
+    i0_old, j0_old, masked = -100000000, -10000000, False
+    z = empty(x.shape, dtype=z_g.dtype)
+    for i in prange(x.size):
         x_ = (x[i] - x_ref) / x_step
         y_ = (y[i] - y_ref) / y_step
         i0 = int(floor(x_))
-        i1 = i0 + 1
-        xd = x_ - i0
         j0 = int(floor(y_))
-        j1 = j0 + 1
-        if is_circular:
-            i0 %= nb_x
-            i1 %= nb_x
-        else:
+        # corner are the same need only a new xd and yd
+        if i0 != i0_old or j0 != j0_old:
+            i1 = i0 + 1
+            j1 = j0 + 1
+            if is_circular:
+                i0 %= nb_x
+                i1 %= nb_x
             if i1 >= nb_x or i0 < 0 or j0 < 0 or j1 >= nb_y:
-                z[i] = nan
-                continue
-
-        yd = y_ - j0
-        z00 = z_g[i0, j0]
-        z01 = z_g[i0, j1]
-        z10 = z_g[i1, j0]
-        z11 = z_g[i1, j1]
-        if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
+                masked = True
+            else:
+                masked = False
+            if not masked:
+                if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
+                    masked = True
+                else:
+                    z00, z01, z10, z11 = (
+                        z_g[i0, j0],
+                        z_g[i0, j1],
+                        z_g[i1, j0],
+                        z_g[i1, j1],
+                    )
+                    masked = False
+            # Need to be store only on change
+            i0_old, j0_old = i0, j0
+        if masked:
             z[i] = nan
         else:
-            if nearest:
-                if xd <= 0.5:
-                    if yd <= 0.5:
-                        z[i] = z00
-                    else:
-                        z[i] = z01
-                else:
-                    if yd <= 0.5:
-                        z[i] = z10
-                    else:
-                        z[i] = z11
-            else:
-                z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (
-                    z01 * (1 - xd) + z11 * xd
-                ) * yd
+            xd = x_ - i0
+            yd = y_ - j0
+            z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (
+                z01 * (1 - xd) + z11 * xd
+            ) * yd
     return z
 
 
