@@ -366,7 +366,7 @@ class EddiesObservations(object):
         new.type_cyc[:] = self.sign_type
         return new
 
-    def circle_contour(self, only_virtual=False):
+    def circle_contour(self, only_virtual=False, factor=1):
         """
         Set contours as a circles from radius and center data.
 
@@ -381,12 +381,12 @@ class EddiesObservations(object):
                 continue
             x, y = obs["lon"], obs["lat"]
             if radius_s:
-                r_s = obs["radius_s"]
+                r_s = obs["radius_s"] * factor
                 obs["contour_lon_s"], obs["contour_lat_s"] = local_to_coordinates(
                     x_norm * r_s, y_norm * r_s, x, y
                 )
             if radius_e:
-                r_e = obs["radius_e"]
+                r_e = obs["radius_e"] * factor
                 obs["contour_lon_e"], obs["contour_lat_e"] = local_to_coordinates(
                     x_norm * r_e, y_norm * r_e, x, y
                 )
