@@ -173,8 +173,8 @@ class NetworkObservations(EddiesObservations):
 
         def add_seg(father, child):
             if father not in segments_connexion:
-                segments_connexion[father] = list()
-            segments_connexion[father].append(child)
+                segments_connexion[father] = set()
+            segments_connexion[father].add(child)
 
         previous_obs, next_obs = self.previous_obs, self.next_obs
         for i, seg, _ in self.iter_on(segment):
