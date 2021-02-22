@@ -6,18 +6,16 @@ from matplotlib import pyplot as plt
 from numpy import ma
 
 import py_eddy_tracker.gui
+from py_eddy_tracker.data import get_path
 from py_eddy_tracker.observations.network import NetworkObservations
 
-n = NetworkObservations.load_file(
-    "/data/adelepoulle/work/Eddies/20201217_network_build/tracking/med/Anticyclonic_seg.nc"
-)
-
+n = NetworkObservations.load_file(get_path("Anticyclonic_seg.nc"))
 # %%
 # Parameters
 step = 1 / 10.0
 bins = ((-10, 37, step), (30, 46, step))
 kw_time = dict(cmap="terrain_r", factor=100.0 / n.nb_days, name="count")
-kw_ratio = dict(cmap=plt.get_cmap("magma_r", 10))
+kw_ratio = dict(cmap=plt.get_cmap("viridis", 10))
 
 
 # %%
@@ -149,16 +147,26 @@ m = g_all_merging.display(
     ax,
     **kw_ratio,
     vmin=0,
-    vmax=1,
+    vmax=5,
     name=g_all_merging.vars["count"] * 100.0 / g_all.vars["count"]
 )
 update_axes(ax, m).set_label("Pixel used in % all atlas")
 
 # %%
+# Merging in networks longer than 10 days, with dead end remove (shorter than 5 days)
+# -----------------------------------------------------------------------------------
+ax = start_axes("")
+merger = n10.remove_dead_end(nobs=10).merging_event()
+g_10_merging = merger.grid_count(bins)
+m = g_10_merging.display(ax, **kw_time, vmin=0, vmax=1)
+update_axes(ax, m).set_label("Pixel used in % of time")
+
+# %%
 # Merging in networks longer than 10 days
 # ---------------------------------------
 ax = start_axes("")
-g_10_merging = n10.merging_event().grid_count(bins)
+merger = n10.merging_event()
+g_10_merging = merger.grid_count(bins)
 m = g_10_merging.display(ax, **kw_time, vmin=0, vmax=1)
 update_axes(ax, m).set_label("Pixel used in % of time")
 # %%
@@ -167,9 +175,51 @@ m = g_10_merging.display(
     ax,
     **kw_ratio,
     vmin=0,
-    vmax=2,
+    vmax=5,
     name=ma.array(
         g_10_merging.vars["count"] * 100.0 / g_10.vars["count"],
+        mask=g_10.vars["count"] < 365,
+    )
+)
+update_axes(ax, m).set_label("Pixel used in % all atlas")
+
+# %%
+# All Spliting
+# ------------
+# Display the occurence of spliting events
+ax = start_axes("")
+g_all_spliting = n.spliting_event().grid_count(bins)
+m = g_all_spliting.display(ax, **kw_time, vmin=0, vmax=1)
+update_axes(ax, m).set_label("Pixel used in % of time")
+
+# %%
+# Ratio merging events / eddy presence
+ax = start_axes("")
+m = g_all_spliting.display(
+    ax,
+    **kw_ratio,
+    vmin=0,
+    vmax=5,
+    name=g_all_spliting.vars["count"] * 100.0 / g_all.vars["count"]
+)
+update_axes(ax, m).set_label("Pixel used in % all atlas")
+
+# %%
+# Spliting in networks longer than 10 days
+# ----------------------------------------
+ax = start_axes("")
+g_10_spliting = n10.spliting_event().grid_count(bins)
+m = g_10_spliting.display(ax, **kw_time, vmin=0, vmax=1)
+update_axes(ax, m).set_label("Pixel used in % of time")
+# %%
+ax = start_axes("")
+m = g_10_spliting.display(
+    ax,
+    **kw_ratio,
+    vmin=0,
+    vmax=5,
+    name=ma.array(
+        g_10_spliting.vars["count"] * 100.0 / g_10.vars["count"],
         mask=g_10.vars["count"] < 365,
     )
 )

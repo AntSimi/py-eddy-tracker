@@ -11,13 +11,14 @@ Case from figure 10 from https://doi.org/10.1002/2017JC013158
 from datetime import datetime, timedelta
 
 import numpy as np
+from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
-from matplotlib import colors
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
+from py_eddy_tracker.data import get_path
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
@@ -120,9 +121,7 @@ def get_obs(dataset):
 
 # %%
 # Get original network, we will isolate only relative at order *2*
-n = NetworkObservations.load_file(
-    "/data/adelepoulle/work/Eddies/20201217_network_build/tracking/med/Anticyclonic_seg.nc"
-)
+n = NetworkObservations.load_file(get_path("Anticyclonic_seg.nc"))
 
 n = n.extract_with_mask(n.track == n.track[get_obs(n)])
 n_ = n.relative(get_obs(n), order=2)

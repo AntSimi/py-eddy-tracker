@@ -12,13 +12,14 @@ Figure 10 from https://doi.org/10.1002/2017JC013158
 from datetime import datetime, timedelta
 
 import numpy as np
+from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
-from matplotlib import colors
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
+from py_eddy_tracker.data import get_path
 from py_eddy_tracker.observations.network import NetworkObservations
 
 
@@ -71,9 +72,7 @@ def update_axes(ax, mappable=None):
 # We know the position and the time of a specific eddy
 #
 # `n.extract_with_mask` give us the corresponding network
-n = NetworkObservations.load_file(
-    "med/Anticyclonic_seg.nc"
-)
+n = NetworkObservations.load_file(get_path("Anticyclonic_seg.nc"))
 i = np.where(
     (n.lat > 33)
     * (n.lat < 34)

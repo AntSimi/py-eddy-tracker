@@ -55,7 +55,7 @@ _ = n.display_timeline(ax, field="latitude")
 
 # %%
 # Timeline by mean Effective Radius
-# -----------------------
+# ---------------------------------
 # The factor argument is applied on the chosen field
 fig = plt.figure(figsize=(15, 5))
 ax = fig.add_axes([0.04, 0.04, 0.92, 0.92])
@@ -237,7 +237,7 @@ s1
 
 # %%
 # Get birth event
-# ------------------
+# ---------------
 # Display the starting position of non-splitted eddies
 fig = plt.figure(figsize=(15, 8))
 ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
@@ -248,7 +248,7 @@ birth
 
 # %%
 # Get death event
-# ------------------
+# ---------------
 # Display the last position of non-merged eddies
 fig = plt.figure(figsize=(15, 8))
 ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")

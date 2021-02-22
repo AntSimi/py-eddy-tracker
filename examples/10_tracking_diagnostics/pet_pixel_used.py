@@ -61,7 +61,7 @@ plt.colorbar(m, cax=fig.add_axes([0.95, 0.27, 0.01, 0.7]))
 
 g_c.vars["count"] = ratio
 m = g_c.display(
-    ax_ratio, name="count", vmin=0.1, vmax=10, norm=LogNorm(), cmap="coolwarm_r"
+    ax_ratio, name="count", norm=LogNorm(vmin=0.1, vmax=10), cmap="coolwarm_r"
 )
 plt.colorbar(m, cax=fig.add_axes([0.95, 0.02, 0.01, 0.2]))
 

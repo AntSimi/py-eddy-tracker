@@ -21,6 +21,7 @@ from py_eddy_tracker.poly import fit_circle_, fit_ellips
 # Load example identification file
 a = EddiesObservations.load_file(data.get_path("Anticyclonic_20190223.nc"))
 
+
 # %%
 # Function to draw circle or ellips from parameter
 def build_circle(x0, y0, r):
