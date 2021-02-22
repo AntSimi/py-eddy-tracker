@@ -1150,6 +1150,10 @@ class RegularGridDataset(GridDataset):
     def setup_coordinates(self):
         super().setup_coordinates()
         self.x_size = self.x_c.shape[0]
+        if len(self.x_c.shape) != 1:
+            raise Exception(
+                "Coordinates in RegularGridDataset must be 1D array, or think to use UnRegularGridDataset"
+            )
         self._x_step = (self.x_c[1:] - self.x_c[:-1]).mean()
         self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
 
