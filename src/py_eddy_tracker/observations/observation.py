@@ -491,7 +491,7 @@ class EddiesObservations(object):
         if bins is None:
             bins = arange(x.min(), x.max() + 2)
         nb_bins = len(bins) - 1
-        i = digitize(x, bins) - 1
+        i = numba_digitize(x, bins) - 1
         # Not monotonous
         if (d < 0).any():
             i_sort = i.argsort()
@@ -2380,3 +2380,30 @@ def sum_row_column(mask):
                 row_sum[i] += 1
                 column_sum[j] += 1
     return row_sum, column_sum
+
+
+@njit(cache=True)
+def numba_digitize(values, bins):
+    # Check if bins are regular
+    nb_bins = bins.shape[0]
+    step = bins[1] - bins[0]
+    bin_previous = bins[1]
+    for i in range(2, nb_bins):
+        bin_current = bins[i]
+        if step != (bin_current - bin_previous):
+            # If bins are not regular
+            return digitize(values, bins)
+        bin_previous = bin_current
+    nb_values = values.shape[0]
+    out = empty(nb_values, dtype=numba_types.int64)
+    up, down = bins[0], bins[-1]
+    for i in range(nb_values):
+        v_ = values[i]
+        if v_ >= down:
+            out[i] = nb_bins
+            continue
+        if v_ < up:
+            out[i] = 0
+            continue
+        out[i] = (v_ - bins[0]) / step + 1
+    return out
