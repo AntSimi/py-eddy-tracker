@@ -490,6 +490,8 @@ class EddiesObservations(object):
         d = x[1:] - x[:-1]
         if bins is None:
             bins = arange(x.min(), x.max() + 2)
+        elif not isinstance(bins, ndarray):
+            bins = array(bins)
         nb_bins = len(bins) - 1
         i = numba_digitize(x, bins) - 1
         # Not monotonous
@@ -1609,7 +1611,9 @@ class EddiesObservations(object):
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.extract_with_area
         """
-        mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
+        lat0 = area.get("llcrnrlat", -90)
+        lat1 = area.get("urcrnrlat", 90)
+        mask = (self.latitude > lat0) * (self.latitude < lat1)
         lon0 = area["llcrnrlon"]
         lon = (self.longitude - lon0) % 360 + lon0
         mask *= (lon > lon0) * (lon < area["urcrnrlon"])
@@ -2195,6 +2199,26 @@ def grid_count_pixel_in(
 
 
 @njit(cache=True)
+def reduce_size(x, y):
+    """
+    Reduce array size if last position is repeated, in order to save compute time
+
+    :param array x: longitude
+    :param array y: latitude
+
+    :return: reduce arrays x,y
+    :rtype: ndarray,ndarray
+    """
+    i = x.shape[0]
+    x0, y0 = x[0], y[0]
+    while True:
+        i -= 1
+        if x[i] != x0 or y[i] != y0:
+            i += 1
+            return x[:i], y[:i]
+
+
+@njit(cache=True)
 def poly_indexs(x_p, y_p, x_c, y_c):
     """
     index of contour for each postion inside a contour, -1 in case of no contour
@@ -2208,9 +2232,10 @@ def poly_indexs(x_p, y_p, x_c, y_c):
     nb_c = x_c.shape[0]
     indexs = -ones(nb_p, dtype=numba_types.int32)
     for i in range(nb_c):
-        x_c_min, y_c_min = x_c[i].min(), y_c[i].min()
-        x_c_max, y_c_max = x_c[i].max(), y_c[i].max()
-        v = create_vertice(x_c[i], y_c[i])
+        x_, y_ = reduce_size(x_c[i], y_c[i])
+        x_c_min, y_c_min = x_.min(), y_.min()
+        x_c_max, y_c_max = x_.max(), y_.max()
+        v = create_vertice(x_, y_)
         for j in range(nb_p):
             if indexs[j] != -1:
                 continue
@@ -2235,9 +2260,10 @@ def insidepoly(x_p, y_p, x_c, y_c):
     nb_c = x_c.shape[0]
     flag = zeros(nb_p, dtype=numba_types.bool_)
     for i in range(nb_c):
-        x_c_min, y_c_min = x_c[i].min(), y_c[i].min()
-        x_c_max, y_c_max = x_c[i].max(), y_c[i].max()
-        v = create_vertice(x_c[i], y_c[i])
+        x_, y_ = reduce_size(x_c[i], y_c[i])
+        x_c_min, y_c_min = x_.min(), y_.min()
+        x_c_max, y_c_max = x_.max(), y_.max()
+        v = create_vertice(x_, y_)
         for j in range(nb_p):
             if flag[j]:
                 continue

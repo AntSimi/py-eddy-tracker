@@ -97,6 +97,4 @@ mappable_tracks = ax.scatter(
 mappable_CONTOUR = ax.plot(
     e.contour_lon_e[INDICES[0]], e.contour_lat_e[INDICES[0]], color=cmap.colors[0]
 )[0]
-ani = VideoAnimation(
-    fig, update, frames=range(1, len(TRACKS), 4), interval=125, blit=True
-)
+ani = VideoAnimation(fig, update, frames=range(1, len(TRACKS), 4), interval=125)
