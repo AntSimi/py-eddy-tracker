@@ -43,6 +43,8 @@ class Buffer(metaclass=Singleton):
         self.memory = memory
 
     def load_contour(self, filename):
+        if isinstance(filename, EddiesObservations):
+            return filename[self.xname], filename[self.yname]
         if filename not in self.DATA:
             if len(self.FLIST) > self.buffersize:
                 self.DATA.pop(self.FLIST.pop(0))
@@ -815,10 +817,18 @@ class Network:
         """
         self.window = window
         self.buffer = Buffer(window, intern, memory)
+        self.memory = memory
+
         self.filenames = glob(input_regex)
         self.filenames.sort()
         self.nb_input = len(self.filenames)
-        self.memory = memory
+
+    @classmethod
+    def from_eddiesobservations(cls, observations, *args, **kwargs):
+        new = cls("", *args, **kwargs)
+        new.filenames = observations
+        new.nb_input = len(new.filenames)
+        return new
 
     def get_group_array(self, results, nb_obs):
         """With a loop on all pair of index, we will label each obs with a group
@@ -849,10 +859,13 @@ class Network:
             if m.any():
                 # Merge of group, ref over etu
                 for i_, j_ in zip(ii[m], ij[m]):
-                    merge_id.append((gr_i[i_], gr_j[j_]))
+                    g0, g1 = gr_i[i_], gr_j[j_]
+                    if g0 > g1:
+                        g0, g1 = g1, g0
+                    merge_id.append((g0, g1))
 
         gr_transfer = arange(id_free, dtype="u4")
-        for i, j in merge_id:
+        for i, j in set(merge_id):
             gr_i, gr_j = gr_transfer[i], gr_transfer[j]
             if gr_i != gr_j:
                 apply_replace(gr_transfer, gr_i, gr_j)

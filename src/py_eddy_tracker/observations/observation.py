@@ -490,6 +490,8 @@ class EddiesObservations(object):
         d = x[1:] - x[:-1]
         if bins is None:
             bins = arange(x.min(), x.max() + 2)
+        elif not isinstance(bins, ndarray):
+            bins = array(bins)
         nb_bins = len(bins) - 1
         i = numba_digitize(x, bins) - 1
         # Not monotonous
@@ -1609,7 +1611,9 @@ class EddiesObservations(object):
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.extract_with_area
         """
-        mask = (self.latitude > area["llcrnrlat"]) * (self.latitude < area["urcrnrlat"])
+        lat0 = area.get("llcrnrlat", -90)
+        lat1 = area.get("urcrnrlat", 90)
+        mask = (self.latitude > lat0) * (self.latitude < lat1)
         lon0 = area["llcrnrlon"]
         lon = (self.longitude - lon0) % 360 + lon0
         mask *= (lon > lon0) * (lon < area["urcrnrlon"])
