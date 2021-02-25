@@ -8,11 +8,11 @@ In the current example we didn't remove a mean vorticity.
 Method are described here:
 
     - Abernathey, Ryan, and George Haller. "Transport by Lagrangian Vortices in the Eastern Pacific",
-    Journal of Physical Oceanography 48, 3 (2018): 667-685, accessed Feb 16, 2021,
-    https://doi.org/10.1175/JPO-D-17-0102.1
+      Journal of Physical Oceanography 48, 3 (2018): 667-685, accessed Feb 16, 2021,
+      https://doi.org/10.1175/JPO-D-17-0102.1
     - `Transport by Coherent Lagrangian Vortices`_,
-    R. Abernathey, Sinha A., Tarshish N., Liu T., Zhang C., Haller G., 2019,
-    Talk a t the Sources and Sinks of Ocean Mesoscale Eddy Energy CLIVAR Workshop
+      R. Abernathey, Sinha A., Tarshish N., Liu T., Zhang C., Haller G., 2019,
+      Talk a t the Sources and Sinks of Ocean Mesoscale Eddy Energy CLIVAR Workshop
 
 .. _Transport by Coherent Lagrangian Vortices:
     https://usclivar.org/sites/default/files/meetings/2019/presentations/Aberernathey_CLIVAR.pdf

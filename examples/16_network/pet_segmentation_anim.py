@@ -85,6 +85,4 @@ cmap = ListedColormap(["gray", *e.COLORS[:-1]], name="from_list", N=vmax)
 mappable_tracks = ax.scatter(
     e.lon, e.lat, c=TRACKS[0], cmap=cmap, vmin=0, vmax=vmax, s=20
 )
-ani = VideoAnimation(
-    fig, update, frames=range(1, len(TRACKS), 4), interval=125, blit=True
-)
+ani = VideoAnimation(fig, update, frames=range(1, len(TRACKS), 4), interval=125)

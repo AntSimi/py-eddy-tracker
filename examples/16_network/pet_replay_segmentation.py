@@ -11,13 +11,11 @@ Case from figure 10 from https://doi.org/10.1002/2017JC013158
 from datetime import datetime, timedelta
 
 import numpy as np
-from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
 
 import py_eddy_tracker.gui
-from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.data import get_path
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
@@ -34,7 +32,7 @@ class VideoAnimation(FuncAnimation):
         if args[0].endswith("gif"):
             # In this case gif is use to create thumbnail which are not use but consume same time than video
             # So we create an empty file, to save time
-            with open(args[0], "w") as h:
+            with open(args[0], "w") as _:
                 pass
             return
         return super().save(*args, **kwargs)
