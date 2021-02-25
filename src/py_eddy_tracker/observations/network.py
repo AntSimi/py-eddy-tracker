@@ -166,6 +166,9 @@ class NetworkObservations(EddiesObservations):
         return self.segment_relative_order(self.segment[i_obs])
 
     def connexions(self, multi_network=False):
+        """
+        create dictionnary for each segments, gives the segments which interact with
+        """
         if multi_network:
             segment = self.segment_track_array
         else:
@@ -650,10 +653,12 @@ class NetworkObservations(EddiesObservations):
         """
         Dissociate network with no known interaction (spliting/merging)
         """
-        self.only_one_network()
-        tags = self.tag_segment()
-        # FIXME : Ok if only one network
-        self.track[:] = tags[self.segment - 1]
+
+        tags = self.tag_segment(multi_network=True)
+        if self.track[0] == 0:
+            tags -= 1
+
+        self.track[:] = tags[self.segment_track_array]
 
         i_sort = self.obs.argsort(order=("track", "segment", "time"), kind="mergesort")
         # Sort directly obs, with hope to save memory
@@ -674,23 +679,40 @@ class NetworkObservations(EddiesObservations):
 
     @classmethod
     def __tag_segment(cls, seg, tag, groups, connexions):
+        """
+        Will set same temporary ID for each connected segment.
+
+        :param int seg: current ID of seg
+        :param ing tag: temporary ID to set for seg and its connexion
+        :param array[int] groups: array where tag will be stored
+        :param dict connexions: gives for one ID of seg all seg connected
+        """
+        # If seg are already used we stop recursivity
         if groups[seg] != 0:
             return
+        # We set tag for this seg
         groups[seg] = tag
-        segs = connexions.get(seg + 1, None)
+        # Get all connexions of this seg
+        segs = connexions.get(seg, None)
         if segs is not None:
             for seg in segs:
-                cls.__tag_segment(seg - 1, tag, groups, connexions)
+                # For each connexion we apply same function
+                cls.__tag_segment(seg, tag, groups, connexions)
 
-    def tag_segment(self):
-        self.only_one_network()
-        nb = self.segment.max()
+    def tag_segment(self, multi_network=False):
+        if multi_network:
+            nb = self.segment_track_array[-1] + 1
+        else:
+            nb = self.segment.max() + 1
         sub_group = zeros(nb, dtype="u4")
-        c = self.connexions()
+        c = self.connexions(multi_network=multi_network)
         j = 1
+        # for each available id
         for i in range(nb):
+            # Skip if already set
             if sub_group[i] != 0:
                 continue
+            # we tag an unset segments and explore all connexions
             self.__tag_segment(i, j, sub_group, c)
             j += 1
         return sub_group
