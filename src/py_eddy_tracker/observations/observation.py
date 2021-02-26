@@ -1712,6 +1712,8 @@ class EddiesObservations(object):
             v = (v - vmin) / (vmax - vmin)
             colors = [cmap(v_) for v_ in v]
             kwargs["facecolors"] = colors
+        if "label" in kwargs:
+            kwargs["label"] = self.format_label(kwargs["label"])
         c = PolyCollection(verts, **kwargs)
         ax.add_collection(c)
         c.cmap = cmap
