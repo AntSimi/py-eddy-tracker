@@ -23,7 +23,6 @@ from numpy import (
     float_,
     floor,
     histogram2d,
-    int8,
     int_,
     interp,
     isnan,
@@ -47,7 +46,7 @@ from numpy import (
 )
 from pint import UnitRegistry
 from scipy.interpolate import RectBivariateSpline, interp1d
-from scipy.ndimage import convolve, gaussian_filter
+from scipy.ndimage import gaussian_filter
 from scipy.signal import welch
 from scipy.spatial import cKDTree
 from scipy.special import j1
@@ -1677,77 +1676,19 @@ class RegularGridDataset(GridDataset):
 
         ...
 
-
         """
         stencil_halfwidth = max(min(int(stencil_halfwidth), 4), 1)
         logger.debug("Stencil half width apply : %d", stencil_halfwidth)
-        # output
-        grad = None
-
-        weights = [
-            array((3, -32, 168, -672, 0, 672, -168, 32, -3)) / 840.0,
-            array((-1, 9, -45, 0, 45, -9, 1)) / 60.0,
-            array((1, -8, 0, 8, -1)) / 12.0,
-            array((-1, 0, 1)) / 2.0,
-            # uncentered kernel
-            # like array((0, -1, 1)) but left value could be default value
-            array((-1, 1)),
-            # like array((-1, 1, 0)) but right value could be default value
-            (1, array((-1, 1))),
-        ]
-        # reduce to stencil selected
-        weights = weights[4 - stencil_halfwidth :]
-        if vertical:
-            data = data.T
-        # Iteration from larger stencil to smaller (to fill matrix)
-        for weight in weights:
-            if isinstance(weight, tuple):
-                # In the case of unbalanced diff
-                shift, weight = weight
-                data_ = data.copy()
-                data_[shift:] = data[:-shift]
-                if not vertical:
-                    data_[:shift] = data[-shift:]
-            else:
-                data_ = data
-            # Delta h
-            d_h = convolve(data_, weights=weight.reshape((-1, 1)), mode=mode)
-            mask = convolve(
-                int8(data_.mask), weights=ones(weight.shape).reshape((-1, 1)), mode=mode
-            )
-            d_h = ma.array(d_h, mask=mask != 0)
-
-            # Delta d
-            if vertical:
-                d_h = d_h.T
-                d = self.EARTH_RADIUS * 2 * pi / 360 * convolve(self.y_c, weight)
-            else:
-                if mode == "wrap":
-                    # Along x axis, we need to close
-                    # we will compute in two part
-                    x = self.x_c % 360
-                    d_degrees = convolve(x, weight, mode=mode)
-                    d_degrees_180 = convolve((x + 180) % 360 - 180, weight, mode=mode)
-                    # Arbitrary, to be sure to be far far away of bound
-                    m = (x < 90) + (x > 270)
-                    d_degrees[m] = d_degrees_180[m]
-                else:
-                    d_degrees = convolve(self.x_c, weight, mode=mode)
-                d = (
-                    self.EARTH_RADIUS
-                    * 2
-                    * pi
-                    / 360
-                    * d_degrees.reshape((-1, 1))
-                    * cos(deg2rad(self.y_c))
-                )
-            if grad is None:
-                # First Gradient
-                grad = d_h / d
-            else:
-                # Fill hole
-                grad[grad.mask] = (d_h / d)[grad.mask]
-        return grad
+        g, m = compute_stencil(
+            self.x_c,
+            self.y_c,
+            data.data,
+            data.mask,
+            self.EARTH_RADIUS,
+            vertical=vertical,
+            stencil_halfwidth=stencil_halfwidth,
+        )
+        return ma.array(g, mask=m)
 
     def add_uv_lagerloef(self, grid_height, uname="u", vname="v", schema=15):
         self.add_uv(grid_height, uname, vname)
@@ -1804,12 +1745,25 @@ class RegularGridDataset(GridDataset):
         self.vars[uname][:, sl] = self.vars[uname][:, sl] * w + u_lagerloef * (1 - w)
 
     def add_uv(self, grid_height, uname="u", vname="v", stencil_halfwidth=4):
-        """Compute a u and v grid
+        r"""Compute a u and v grid
 
         :param str grid_height: grid name where the funtion will apply stencil method
         :param str uname: future name of u
         :param str vname: future name of v
         :param int stencil_halfwidth: largest stencil could be apply (max: 4)
+
+        .. math::
+            u = \frac{g}{f} \frac{dh}{dy}
+
+            v = -\frac{g}{f} \frac{dh}{dx}
+
+        where
+
+        .. math::
+            g = gravity
+
+            f = 2 \Omega sin(\phi)
+
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.add_uv
         """
@@ -2665,3 +2619,125 @@ def advect_t_rk4(
             x_ += dx
             y_ += dy
         x[i], y[i] = x_, y_
+
+
+@njit(
+    [
+        "Tuple((f8[:,:],b1[:,:]))(f8[:],f8[:],f8[:,:],b1[:,:],f8,b1,i1)",
+        "Tuple((f4[:,:],b1[:,:]))(f8[:],f8[:],f4[:,:],b1[:,:],f8,b1,i1)",
+    ],
+    cache=True,
+    fastmath=True,
+)
+def compute_stencil(x, y, h, m, earth_radius, vertical=False, stencil_halfwidth=4):
+    """
+    Compute stencil on RegularGrid
+
+    :param array x: longitude coordinates
+    :param array y: latitude coordinates
+    :param array h: 2D array to derivate
+    :param array m: mask associate to h to know where are invalid data
+    :param float earth_radius: Earth radius in m
+    :param bool vertical: if True stencil will be vertical (along y)
+    :param int stencil_halfwidth: from 1 to 4 to specify maximal kernel usable
+
+
+    stencil_halfwidth:
+
+        - (1) :
+
+            - (-1, 1, 0)
+            - (0, -1, 1)
+            - (-1, 0, 1) / 2
+
+        - (2) : (1, -8, 0, 8, 1) / 12
+        - (3) : (-1, 9, -45, 0, 45, -9, 1) / 60
+        - (4) : (3, -32, 168, -672, 0, 672, -168, 32, 3) / 840
+    """
+    if vertical:
+        # If vertical we transpose matrix and inverse coordinates
+        h = h.T
+        m = m.T
+        x, y = y, x
+    shape = h.shape
+    nb_x, nb_y = shape
+    # Out array
+    m_out = empty(shape, dtype=numba_types.bool_)
+    grad = empty(shape, dtype=h.dtype)
+    # Distance step in degrees
+    d_step = x[1] - x[0]
+    if vertical:
+        is_circular = False
+    else:
+        # Test if matrix is circular
+        is_circular = abs(x[-1] % 360 - (x[0] - d_step) % 360) < 1e-5
+
+    # Compute caracteristic distance, constant when vertical
+    d_ = 360 / (d_step * pi * 2 * earth_radius)
+    for j in range(nb_y):
+        # Buffer of maximal size of stencil (9)
+        if is_circular:
+            h_3, h_2, h_1, h0 = h[-4, j], h[-3, j], h[-2, j], h[-1, j]
+            m_3, m_2, m_1, m0 = m[-4, j], m[-3, j], m[-2, j], m[-1, j]
+        else:
+            m_3, m_2, m_1, m0 = False, False, False, False
+        h1, h2, h3, h4 = h[0, j], h[1, j], h[2, j], h[3, j]
+        m1, m2, m3, m4 = m[0, j], m[1, j], m[2, j], m[3, j]
+        for i in range(nb_x):
+            # Roll value and only last
+            h_4, h_3, h_2, h_1, h0, h1, h2, h3 = h_3, h_2, h_1, h0, h1, h2, h3, h4
+            m_4, m_3, m_2, m_1, m0, m1, m2, m3 = m_3, m_2, m_1, m0, m1, m2, m3, m4
+            i_ = i + 4
+            if i_ >= nb_x:
+                if is_circular:
+                    i_ = i_ % nb_x
+                    m4 = m[i_, j]
+                    h4 = h[i_, j]
+                else:
+                    # When we are out
+                    m4 = False
+            else:
+                m4 = m[i_, j]
+                h4 = h[i_, j]
+
+            # Current value not defined
+            if m0:
+                m_out[i, j] = True
+                continue
+            if not vertical:
+                # For each row we compute distance
+                d_ = 360 / (d_step * cos(deg2rad(y[j])) * pi * 2 * earth_radius)
+            if m1 ^ m_1:
+                # unbalanced kernel
+                if m_1:
+                    grad[i, j] = (h1 - h0) * d_
+                    m_out[i, j] = False
+                    continue
+                if m1:
+                    grad[i, j] = (h0 - h_1) * d_
+                    m_out[i, j] = False
+                    continue
+                continue
+            if m2 or m_2 or stencil_halfwidth == 1:
+                grad[i, j] = (h1 - h_1) / 2 * d_
+                m_out[i, j] = False
+                continue
+            if m3 or m_3 or stencil_halfwidth == 2:
+                grad[i, j] = (h_2 - h2 + 8 * (h1 - h_1)) / 12 * d_
+                m_out[i, j] = False
+                continue
+            if m4 or m_4 or stencil_halfwidth == 3:
+                grad[i, j] = (h3 - h_3 + 9 * (h_2 - h2) + 45 * (h1 - h_1)) / 60 * d_
+                m_out[i, j] = False
+                continue
+            # If all value of buffer are available
+            grad[i, j] = (
+                (3 * (h_4 - h4) + 32 * (h3 - h_3) + 168 * (h_2 - h2) + 672 * (h1 - h_1))
+                / 840
+                * d_
+            )
+            m_out[i, j] = False
+    if vertical:
+        return grad.T, m_out.T
+    else:
+        return grad, m_out

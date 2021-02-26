@@ -7,7 +7,7 @@ Requirements
 
 Before to run tracking, you will need to run identification on every time step of the period (period of your study).
 
-**Advice** : Before to run tracking, displaying some identification file allows one to learn a lot
+**Advice** : Before to run tracking, displaying some identification file allows to learn a lot
 
 Default method
 **************
