@@ -2,7 +2,13 @@
 How do I get set up ?
 =====================
 
-Source are available on github https://github.com/AntSimi/py-eddy-tracker
+You could install stable version with pip
+
+.. code-block:: bash
+
+    pip install pyEddyTracker
+
+Or with source which are available on github https://github.com/AntSimi/py-eddy-tracker
 
 Use python3.
 To avoid problems with installation, use of the virtualenv Python virtual environment is recommended or conda.
