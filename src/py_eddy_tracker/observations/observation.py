@@ -199,6 +199,10 @@ class EddiesObservations(object):
             return False
         return array_equal(self.obs, other.obs)
 
+    ### colors methods
+    def get_color(self, i):
+        return self.COLORS[i % self.NB_COLORS]
+
     @property
     def sign_legend(self):
         return "Cyclonic" if self.sign_type != 1 else "Anticyclonic"

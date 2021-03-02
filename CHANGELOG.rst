@@ -18,6 +18,8 @@ Fixed
 ^^^^^
 - Use `safe_load` for yaml load
 - repr of EddiesObservation when the collection is empty (time attribute empty array)
+- display_timeline and event_timeline can now use colors according to 'y' values.
+- event_timeline now plot all merging event in one plot, instead of one plot per merging. Same for splitting. (avoid bad legend)
 
 Added
 ^^^^^

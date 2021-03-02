@@ -278,7 +278,7 @@ class NetworkObservations(EddiesObservations):
         return result
 
     def display_timeline(
-        self, ax, event=True, field=None, method=None, factor=1, **kwargs
+        self, ax, event=True, field=None, method=None, factor=1, colors_mode="roll", **kwargs
     ):
         """
         Plot a timeline of a network.
@@ -289,6 +289,7 @@ class NetworkObservations(EddiesObservations):
         :param str,array field: yaxis values, if None, segments are used
         :param str method: if None, mean values are used
         :param float factor: to multiply field
+        :param str colors_mode: color of lines. "roll" means looping through colors, "y" means color adapt the y values (for matching color plots)
         :return: plot mappable
         """
         self.only_one_network()
@@ -302,9 +303,10 @@ class NetworkObservations(EddiesObservations):
         )
         line_kw.update(kwargs)
         mappables = dict(lines=list())
+
         if event:
             mappables.update(
-                self.event_timeline(ax, field=field, method=method, factor=factor)
+                self.event_timeline(ax, field=field, method=method, factor=factor, colors_mode=colors_mode)
             )
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
@@ -317,14 +319,25 @@ class NetworkObservations(EddiesObservations):
                     y = self[field][i] * factor
                 else:
                     y = self[field][i].mean() * ones(x.shape) * factor
-            line = ax.plot(x, y, **line_kw, color=self.COLORS[j % self.NB_COLORS])[0]
+
+            if colors_mode == "roll":
+                _color = self.get_color(j)
+            elif colors_mode == "y":
+                _color = self.get_color(b0-1)
+            else:
+                raise NotImplementedError(f"colors_mode '{colors_mode}' not defined")
+
+            line = ax.plot(x, y, **line_kw, color=_color)[0]
             mappables["lines"].append(line)
             j += 1
 
         return mappables
 
-    def event_timeline(self, ax, field=None, method=None, factor=1):
+    def event_timeline(self, ax, field=None, method=None, factor=1, colors_mode="roll"):
+        """mark events in plot"""
         j = 0
+        events = dict(spliting=[], merging=[])
+
         # TODO : fill mappables dict
         y_seg = dict()
         if field is not None and method != "all":
@@ -337,7 +350,16 @@ class NetworkObservations(EddiesObservations):
             x = self.time[i]
             if x.shape[0] == 0:
                 continue
-            event_kw = dict(color=self.COLORS[j % self.NB_COLORS], ls="-", zorder=1)
+
+            if colors_mode == "roll":
+                _color = self.get_color(j)
+            elif colors_mode == "y":
+                _color = self.get_color(b0-1)
+            else:
+                raise NotImplementedError(f"colors_mode '{colors_mode}' not defined")
+
+            event_kw = dict(color=_color, ls="-", zorder=1)
+
             i_n, i_p = (
                 self.next_obs[i.stop - 1],
                 self.previous_obs[i.start],
@@ -361,7 +383,8 @@ class NetworkObservations(EddiesObservations):
                     )
                 )
                 ax.plot((x[-1], self.time[i_n]), (y0, y1), **event_kw)[0]
-                ax.plot(x[-1], y0, color="k", marker="H", markersize=10, zorder=-1)[0]
+                events["merging"].append((x[-1], y0))
+
             if i_p != -1:
                 seg_previous = self.segment[i_p]
                 if field is not None and method == "all":
@@ -376,8 +399,21 @@ class NetworkObservations(EddiesObservations):
                     )
                 )
                 ax.plot((x[0], self.time[i_p]), (y0, y1), **event_kw)[0]
-                ax.plot(x[0], y0, color="k", marker="*", markersize=12, zorder=-1)[0]
+                events["spliting"].append((x[0], y0))
+
             j += 1
+
+        kwargs = dict(color="k", zorder=-1, linestyle=" ")
+        if len(events["spliting"]) > 0:
+            X, Y = list(zip(*events["spliting"]))
+            ref = ax.plot(X, Y, marker="*", markersize=12, label="spliting events", **kwargs)[0]
+            mappables.setdefault("events",[]).append(ref)
+
+        if len(events["merging"]) > 0:
+            X, Y = list(zip(*events["merging"]))
+            ref = ax.plot(X, Y, marker="H", markersize=10, label="merging events", **kwargs)[0]
+            mappables.setdefault("events",[]).append(ref)
+
         return mappables
 
     def mean_by_segment(self, y, **kw):
