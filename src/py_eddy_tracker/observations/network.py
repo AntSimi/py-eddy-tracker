@@ -6,7 +6,18 @@ import logging
 from glob import glob
 
 from numba import njit
-from numpy import arange, array, bincount, empty, in1d, ones, uint32, unique, zeros
+from numpy import (
+    arange,
+    array,
+    bincount,
+    empty,
+    in1d,
+    ones,
+    uint32,
+    unique,
+    where,
+    zeros,
+)
 
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
@@ -70,6 +81,32 @@ class NetworkObservations(EddiesObservations):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._index_network = None
+
+    def find_segments_relative(self, obs, stopped=None, order=1):
+        """
+        find all relative segments within an event from an order.
+
+        :param int obs: indice of event after the event
+        :param int stopped: indice of event before the event
+        :param int order: order of relatives accepted
+
+        :return: all segments relatives
+        :rtype: EddiesObservations
+        """
+
+        # extraction of network where the event is
+        network_id = self.tracks[obs]
+        nw = self.network(network_id)
+
+        # indice of observation in new subnetwork
+        i_obs = where(nw.segment == self.segment[obs])[0][0]
+
+        if stopped is None:
+            return nw.relatives(i_obs, order=order)
+
+        else:
+            i_stopped = where(nw.segment == self.segment[stopped])[0][0]
+            return nw.relatives([i_obs, i_stopped], order=order)
 
     @property
     def index_network(self):
@@ -229,11 +266,37 @@ class NetworkObservations(EddiesObservations):
 
     def relative(self, i_obs, order=2, direct=True, only_past=False, only_future=False):
         """
-        Extract the segments at a certain order.
+        Extract the segments at a certain order from one observation.
+
+        :param list obs: indice of observation for relative computation
+        :param int order: order of relatives wanted. 0 means only observations in obs, 1 means direct relatives, ...
+
+        :return: all segments relatives
+        :rtype: EddiesObservations
         """
+
         d = self.segment_relative_order(self.segment[i_obs])
         m = (d <= order) * (d != -1)
         return self.extract_with_mask(m)
+
+    def relatives(self, obs, order=2, direct=True, only_past=False, only_future=False):
+        """
+        Extract the segments at a certain order from multiple observations.
+
+        :param list obs: indices of observation for relatives computation
+        :param int order: order of relatives wanted. 0 means only observations in obs, 1 means direct relatives, ...
+
+        :return: all segments relatives
+        :rtype: EddiesObservations
+        """
+
+        mask = zeros(self.segment.shape, dtype=bool)
+
+        for i_obs in obs:
+            d = self.segment_relative_order(self.segment[i_obs])
+            mask += (d <= order) * (d != -1)
+
+        return self.extract_with_mask(mask)
 
     def numbering_segment(self):
         """
@@ -278,7 +341,14 @@ class NetworkObservations(EddiesObservations):
         return result
 
     def display_timeline(
-        self, ax, event=True, field=None, method=None, factor=1, **kwargs
+        self,
+        ax,
+        event=True,
+        field=None,
+        method=None,
+        factor=1,
+        colors_mode="roll",
+        **kwargs,
     ):
         """
         Plot a timeline of a network.
@@ -289,6 +359,7 @@ class NetworkObservations(EddiesObservations):
         :param str,array field: yaxis values, if None, segments are used
         :param str method: if None, mean values are used
         :param float factor: to multiply field
+        :param str colors_mode: color of lines. "roll" means looping through colors, "y" means color adapt the y values (for matching color plots)
         :return: plot mappable
         """
         self.only_one_network()
@@ -302,9 +373,16 @@ class NetworkObservations(EddiesObservations):
         )
         line_kw.update(kwargs)
         mappables = dict(lines=list())
+
         if event:
             mappables.update(
-                self.event_timeline(ax, field=field, method=method, factor=factor)
+                self.event_timeline(
+                    ax,
+                    field=field,
+                    method=method,
+                    factor=factor,
+                    colors_mode=colors_mode,
+                )
             )
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
@@ -317,14 +395,25 @@ class NetworkObservations(EddiesObservations):
                     y = self[field][i] * factor
                 else:
                     y = self[field][i].mean() * ones(x.shape) * factor
-            line = ax.plot(x, y, **line_kw, color=self.COLORS[j % self.NB_COLORS])[0]
+
+            if colors_mode == "roll":
+                _color = self.get_color(j)
+            elif colors_mode == "y":
+                _color = self.get_color(b0 - 1)
+            else:
+                raise NotImplementedError(f"colors_mode '{colors_mode}' not defined")
+
+            line = ax.plot(x, y, **line_kw, color=_color)[0]
             mappables["lines"].append(line)
             j += 1
 
         return mappables
 
-    def event_timeline(self, ax, field=None, method=None, factor=1):
+    def event_timeline(self, ax, field=None, method=None, factor=1, colors_mode="roll"):
+        """mark events in plot"""
         j = 0
+        events = dict(spliting=[], merging=[])
+
         # TODO : fill mappables dict
         y_seg = dict()
         if field is not None and method != "all":
@@ -337,7 +426,16 @@ class NetworkObservations(EddiesObservations):
             x = self.time[i]
             if x.shape[0] == 0:
                 continue
-            event_kw = dict(color=self.COLORS[j % self.NB_COLORS], ls="-", zorder=1)
+
+            if colors_mode == "roll":
+                _color = self.get_color(j)
+            elif colors_mode == "y":
+                _color = self.get_color(b0 - 1)
+            else:
+                raise NotImplementedError(f"colors_mode '{colors_mode}' not defined")
+
+            event_kw = dict(color=_color, ls="-", zorder=1)
+
             i_n, i_p = (
                 self.next_obs[i.stop - 1],
                 self.previous_obs[i.start],
@@ -361,7 +459,8 @@ class NetworkObservations(EddiesObservations):
                     )
                 )
                 ax.plot((x[-1], self.time[i_n]), (y0, y1), **event_kw)[0]
-                ax.plot(x[-1], y0, color="k", marker="H", markersize=10, zorder=-1)[0]
+                events["merging"].append((x[-1], y0))
+
             if i_p != -1:
                 seg_previous = self.segment[i_p]
                 if field is not None and method == "all":
@@ -376,8 +475,25 @@ class NetworkObservations(EddiesObservations):
                     )
                 )
                 ax.plot((x[0], self.time[i_p]), (y0, y1), **event_kw)[0]
-                ax.plot(x[0], y0, color="k", marker="*", markersize=12, zorder=-1)[0]
+                events["spliting"].append((x[0], y0))
+
             j += 1
+
+        kwargs = dict(color="k", zorder=-1, linestyle=" ")
+        if len(events["spliting"]) > 0:
+            X, Y = list(zip(*events["spliting"]))
+            ref = ax.plot(
+                X, Y, marker="*", markersize=12, label="spliting events", **kwargs
+            )[0]
+            mappables.setdefault("events", []).append(ref)
+
+        if len(events["merging"]) > 0:
+            X, Y = list(zip(*events["merging"]))
+            ref = ax.plot(
+                X, Y, marker="H", markersize=10, label="merging events", **kwargs
+            )[0]
+            mappables.setdefault("events", []).append(ref)
+
         return mappables
 
     def mean_by_segment(self, y, **kw):
@@ -404,15 +520,40 @@ class NetworkObservations(EddiesObservations):
             out = array(out)
         return out
 
-    def map_network(self, method, y, same=True, **kw):
+    def map_network(self, method, y, same=True, return_dict=False, **kw):
+        """
+        transform data `y` with method `method` for each track.
+
+        :param Callable method: method to apply on each  tracks
+        :param np.array y: data where to apply method
+        :param bool same: if True, return array same size from y. else, return list with track edited
+        :param bool return_dict: if None, mean values are used
+        :param float kw: to multiply field
+        :return: array or dict of result from method for each network
+        """
+
+        if same and return_dict:
+            raise NotImplementedError(
+                "both condition 'same' and 'return_dict' should no be true"
+            )
+
         if same:
             out = empty(y.shape, **kw)
+
+        elif return_dict:
+            out = dict()
+
         else:
             out = list()
+
         for i, b0, b1 in self.iter_on(self.track):
             res = method(y[i])
             if same:
                 out[i] = res
+
+            elif return_dict:
+                out[b0] = res
+
             else:
                 if isinstance(i, slice):
                     if i.start == i.stop:
@@ -420,7 +561,8 @@ class NetworkObservations(EddiesObservations):
                 elif len(i) == 0:
                     continue
                 out.append(res)
-        if not same:
+
+        if not same and not return_dict:
             out = array(out)
         return out
 
@@ -588,7 +730,7 @@ class NetworkObservations(EddiesObservations):
                 indices.append(i.stop - 1)
         return self.extract_event(list(set(indices)))
 
-    def merging_event(self, triplet=False):
+    def merging_event(self, triplet=False, only_index=False):
         """Return observation after a merging event.
 
         If `triplet=True` return the eddy after a merging event, the eddy before the merging event,
@@ -611,13 +753,24 @@ class NetworkObservations(EddiesObservations):
                 idx_m1.append(i_n)
 
         if triplet:
-            return (
-                self.extract_event(list(idx_m1)),
-                self.extract_event(list(idx_m0)),
-                self.extract_event(list(idx_m0_stop)),
-            )
+            if only_index:
+                return (
+                    idx_m1,
+                    idx_m0,
+                    idx_m0_stop,
+                )
+
+            else:
+                return (
+                    self.extract_event(idx_m1),
+                    self.extract_event(idx_m0),
+                    self.extract_event(idx_m0_stop),
+                )
         else:
-            return self.extract_event(list(set(idx_m1)))
+            if only_index:
+                return self.extract_event(set(idx_m1))
+            else:
+                return list(set(idx_m1))
 
     def spliting_event(self, triplet=False):
         """Return observation before a splitting event.

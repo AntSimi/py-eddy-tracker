@@ -3,7 +3,10 @@ Network basic manipulation
 ==========================
 """
 
+import datetime
+
 from matplotlib import pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
 import py_eddy_tracker.gui
 from py_eddy_tracker import data
@@ -185,6 +188,44 @@ ax = fig.add_axes([0.04, 0.06, 0.90, 0.88])
 close_to_i3 = n.relative(i, order=3)
 ax.set_title(f"Close segments ({close_to_i3.infos()})")
 _ = close_to_i3.display_timeline(ax)
+
+# %%
+# Keep relatives to an event
+# --------------------------
+# When you want to investigate one particular event and select only the closest segments
+#
+# First choose an event in the network
+after, before, stopped = n.merging_event(triplet=True, only_index=True)
+i_event = 5
+# %%
+# then see some order of relatives
+@FuncFormatter
+def formatter(x, pos):
+    return (datetime.timedelta(x) + datetime.datetime(1950, 1, 1)).strftime("%d/%m/%Y")
+
+
+max_order = 2
+fig, axs = plt.subplots(
+    max_order + 2, 1, sharex=True, figsize=(15, 5 * (max_order + 2))
+)
+
+axs[0].set_title(f"full network", weight="bold")
+axs[0].xaxis.set_major_formatter(formatter), axs[0].grid()
+mappables = n.display_timeline(axs[0], colors_mode="y")
+axs[0].legend()
+
+for k in range(0, max_order + 1):
+
+    ax = axs[k + 1]
+    sub_network = n.find_segments_relative(after[i_event], stopped[i_event], order=k)
+
+    ax.set_title(f"relatives order={k}", weight="bold")
+    ax.xaxis.set_major_formatter(formatter), ax.grid()
+
+    mappables = sub_network.display_timeline(ax, colors_mode="y")
+    ax.legend()
+    _ = ax.set_ylim(axs[0].get_ylim())
+
 
 # %%
 # Display track on map

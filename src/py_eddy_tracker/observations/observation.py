@@ -200,6 +200,10 @@ class EddiesObservations(object):
             return False
         return array_equal(self.obs, other.obs)
 
+    ### colors methods
+    def get_color(self, i):
+        return self.COLORS[i % self.NB_COLORS]
+
     @property
     def sign_legend(self):
         return "Cyclonic" if self.sign_type != 1 else "Anticyclonic"
@@ -2120,13 +2124,16 @@ class EddiesObservations(object):
     @property
     def period(self):
         """
-        Give the time coverage
+        Give the time coverage. If collection is empty, return nan,nan
 
         :return: first and last date
         :rtype: (int,int)
         """
         if self.period_ is None:
-            self.period_ = self.time.min(), self.time.max()
+            if self.time.size < 1:
+                self.period_ = nan, nan
+            else:
+                self.period_ = self.time.min(), self.time.max()
         return self.period_
 
     @property

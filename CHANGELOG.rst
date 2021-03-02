@@ -17,6 +17,9 @@ Changed
 Fixed
 ^^^^^
 - Use `safe_load` for yaml load
+- repr of EddiesObservation when the collection is empty (time attribute empty array)
+- display_timeline and event_timeline can now use colors according to 'y' values.
+- event_timeline now plot all merging event in one plot, instead of one plot per merging. Same for splitting. (avoid bad legend)
 
 Added
 ^^^^^
@@ -28,6 +31,7 @@ Added
 - Save EddyAnim in mp4
 - Add method to get eddy contour which enclosed obs defined with (x,y) coordinates
 - Add **EddyNetworkSubSetter** to subset network which need special tool and operation after subset
+- Add functions to find relatives segments
 
 [3.3.0] - 2020-12-03
 --------------------
