@@ -2117,13 +2117,16 @@ class EddiesObservations(object):
     @property
     def period(self):
         """
-        Give the time coverage
+        Give the time coverage. If collection is empty, return nan,nan
 
         :return: first and last date
         :rtype: (int,int)
         """
         if self.period_ is None:
-            self.period_ = self.time.min(), self.time.max()
+            if self.time.size < 1:
+                self.period_ = nan, nan
+            else:
+                self.period_ = self.time.min(), self.time.max()
         return self.period_
 
     @property

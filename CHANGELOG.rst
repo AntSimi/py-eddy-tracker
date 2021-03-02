@@ -17,6 +17,7 @@ Changed
 Fixed
 ^^^^^
 - Use `safe_load` for yaml load
+- repr of EddiesObservation when the collection is empty (time attribute empty array)
 
 Added
 ^^^^^
