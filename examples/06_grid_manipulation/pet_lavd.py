@@ -27,7 +27,7 @@ from numpy import arange, meshgrid, zeros
 import py_eddy_tracker.gui
 from py_eddy_tracker.data import get_path
 from py_eddy_tracker.dataset.grid import RegularGridDataset
-from py_eddy_tracker.observations.network import NetworkObservations
+from py_eddy_tracker.observations.observation import EddiesObservations
 
 
 # %%
@@ -62,8 +62,6 @@ class VideoAnimation(FuncAnimation):
         return re.sub(
             r'width="[0-9]*"\sheight="[0-9]*"', 'width="100%" height="100%"', content
         )
-
-        return
 
     def save(self, *args, **kwargs):
         if args[0].endswith("gif"):
@@ -150,7 +148,7 @@ x_g_, y_g_ = arange(0 - step / 2, 36 + step / 2, step), arange(
 # pcolorfast will be faster than pcolormesh, we could use pcolorfast due to x and y are regular
 pcolormesh = ax.pcolorfast(x_g_, y_g_, lavd, **kw_vorticity)
 update_axes(ax, pcolormesh)
-ani = VideoAnimation(ax.figure, update, **kw_video)
+_ = VideoAnimation(ax.figure, update, **kw_video)
 
 # %%
 # Final LAVD
@@ -173,8 +171,8 @@ lavd = RegularGridDataset.with_array(
 # Period used for LAVD integration (8 days) is too short for a real use, but choose for example efficiency.
 fig, ax, _ = start_ax()
 mappable = lavd.display(ax, "lavd", **kw_vorticity)
-NetworkObservations.load_file(get_path("Anticyclonic_20160515.nc")).display(
+EddiesObservations.load_file(get_path("Anticyclonic_20160515.nc")).display(
     ax, color="k"
 )
-NetworkObservations.load_file(get_path("Cyclonic_20160515.nc")).display(ax, color="k")
+EddiesObservations.load_file(get_path("Cyclonic_20160515.nc")).display(ax, color="k")
 _ = update_axes(ax, mappable)

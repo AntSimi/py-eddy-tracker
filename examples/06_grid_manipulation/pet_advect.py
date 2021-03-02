@@ -104,7 +104,7 @@ def update(i_frame, t_step):
 # it could be run backward with `backward=True` option in filament method
 p = g.filament(x, y, "u", "v", **kw_p, filament_size=3)
 fig, txt, l, t = anim_ax(lw=0.5)
-ani = VideoAnimation(fig, update, **kwargs, fargs=(frame_t,))
+_ = VideoAnimation(fig, update, **kwargs, fargs=(frame_t,))
 
 # %%
 # Particle forward
@@ -112,13 +112,13 @@ ani = VideoAnimation(fig, update, **kwargs, fargs=(frame_t,))
 # Forward advection of particles
 p = g.advect(x, y, "u", "v", **kw_p)
 fig, txt, l, t = anim_ax(ls="", marker=".", markersize=1)
-ani = VideoAnimation(fig, update, **kwargs, fargs=(frame_t,))
+_ = VideoAnimation(fig, update, **kwargs, fargs=(frame_t,))
 
 # %%
 # We get last position and run backward until original position
 p = g.advect(x, y, "u", "v", **kw_p, backward=True)
 fig, txt, l, _ = anim_ax(ls="", marker=".", markersize=1)
-ani = VideoAnimation(fig, update, **kwargs, fargs=(-frame_t,))
+_ = VideoAnimation(fig, update, **kwargs, fargs=(-frame_t,))
 
 # %%
 # Particles stat
