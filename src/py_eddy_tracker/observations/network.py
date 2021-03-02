@@ -886,6 +886,7 @@ class Network:
                         g0, g1 = g1, g0
                     merge_id.append((g0, g1))
 
+        # FIXME: how it's work when several merge ? like (0,1), (0,2), (1,3)
         gr_transfer = arange(id_free, dtype="u4")
         for i, j in set(merge_id):
             gr_i, gr_j = gr_transfer[i], gr_transfer[j]

@@ -65,6 +65,7 @@ from ..poly import (
     convexs,
     create_vertice,
     get_pixel_in_regular,
+    reduce_size,
     vertice_overlap,
     winding_number_poly,
 )
@@ -2198,26 +2199,6 @@ def grid_count_pixel_in(
 
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
         grid_count_(grid, i, j)
-
-
-@njit(cache=True)
-def reduce_size(x, y):
-    """
-    Reduce array size if last position is repeated, in order to save compute time
-
-    :param array x: longitude
-    :param array y: latitude
-
-    :return: reduce arrays x,y
-    :rtype: ndarray,ndarray
-    """
-    i = x.shape[0]
-    x0, y0 = x[0], y[0]
-    while True:
-        i -= 1
-        if x[i] != x0 or y[i] != y0:
-            i += 1
-            return x[:i], y[:i]
 
 
 @njit(cache=True)

@@ -765,3 +765,23 @@ def visvalingam(x, y, fixed_size=18):
     x_new[j:] = x_new[0]
     y_new[j:] = y_new[0]
     return x_new, y_new
+
+
+@njit(cache=True)
+def reduce_size(x, y):
+    """
+    Reduce array size if last position is repeated, in order to save compute time
+
+    :param array x: longitude
+    :param array y: latitude
+
+    :return: reduce arrays x,y
+    :rtype: ndarray,ndarray
+    """
+    i = x.shape[0]
+    x0, y0 = x[0], y[0]
+    while True:
+        i -= 1
+        if x[i] != x0 or y[i] != y0:
+            i += 1
+            return x[:i], y[:i]
