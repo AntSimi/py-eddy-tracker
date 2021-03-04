@@ -399,24 +399,26 @@ def get_group(
     i1_multi = i1_[nb1 >= 2]
     i2_multi = i2_[nb2 >= 2]
     m_multi = in1d(i1, i1_multi) + in1d(i2, i2_multi)
-    group1["multi_match"] = unique(i1[m_multi])
-    group2["multi_match"] = unique(i2[m_multi])
 
     # Low scores
-    m_low = score <= low
+    m_low = score < low
     m_low *= ~m_multi
     group1["low"] = i1[m_low]
     group2["low"] = i2[m_low]
     # Intermediate scores
-    m_i = (score > low) * (score <= high)
+    m_i = (score >= low) * (score < high)
     m_i *= ~m_multi
     group1["intermediate"] = i1[m_i]
     group2["intermediate"] = i2[m_i]
     # High scores
-    m_high = score > high
+    m_high = score >= high
     m_high *= ~m_multi
     group1["high"] = i1[m_high]
     group2["high"] = i2[m_high]
+
+    # Here for a nice display order
+    group1["multi_match"] = unique(i1[m_multi])
+    group2["multi_match"] = unique(i2[m_multi])
 
     def get_twin(j2, j1):
         # True only if j1 is used only one
@@ -449,6 +451,11 @@ def quick_compare():
     )
     parser.add_argument("ref", help="Identification file of reference")
     parser.add_argument("others", nargs="+", help="Identifications files to compare")
+    parser.add_argument(
+        "--area",
+        action="store_true",
+        help="Display in percent of area instead percent of observation",
+    )
     parser.add_argument("--high", default=40, type=float)
     parser.add_argument("--low", default=20, type=float)
     parser.add_argument("--invalid", default=5, type=float)
@@ -461,6 +468,8 @@ def quick_compare():
             *EddiesObservations.intern(args.intern, public_label=True),
         ]
     )
+    if args.area:
+        kw["include_vars"].append("speed_area" if args.intern else "effective_area")
 
     ref = EddiesObservations.load_file(args.ref, **kw)
     print(f"[ref] {args.ref} -> {len(ref)} obs")
@@ -484,28 +493,46 @@ def quick_compare():
         outs = list()
         for v in value:
             if ref:
-                outs.append(f"{v/ref * 100:.1f}% ({v})")
+                if args.area:
+                    outs.append(f"{v / ref * 100:.1f}% ({v:.1f}Mkm²)")
+                else:
+                    outs.append(f"{v/ref * 100:.1f}% ({v})")
             else:
                 outs.append(v)
-        return "".join([f"{v:^15}" for v in outs])
+        if args.area:
+            return "".join([f"{v:^16}" for v in outs])
+        else:
+            return "".join([f"{v:^15}" for v in outs])
 
-    keys = list(gr1.keys())
+    def get_values(v, dataset):
+        if args.area:
+            area = dataset["speed_area" if args.intern else "effective_area"]
+            return [area[v_].sum() / 1e12 for v_ in v.values()]
+        else:
+            return [
+                v_.sum() if v_.dtype == "bool" else v_.shape[0] for v_ in v.values()
+            ]
+
+    labels = dict(
+        high=f"{args.high:0.0f} <= high",
+        low=f"{args.invalid:0.0f} <= low < {args.low:0.0f}",
+    )
+
+    keys = [labels.get(key, key) for key in gr1.keys()]
     print("     ", display(keys))
+    if args.area:
+        ref_ = ref["speed_area" if args.intern else "effective_area"].sum() / 1e12
+    else:
+        ref_ = len(ref)
     for i, v in enumerate(groups_ref.values()):
-        print(
-            f"[{i:2}] ",
-            display(
-                (v_.sum() if v_.dtype == "bool" else v_.shape[0] for v_ in v.values()),
-                ref=len(ref),
-            ),
-        )
+        print(f"[{i:2}] ", display(get_values(v, ref), ref=ref_))
 
-    print(display(keys))
+    print("     Point of view of study dataset")
+    print("     ", display(keys))
     for i, (k, v) in enumerate(groups_other.items()):
-        print(
-            f"[{i:2}] ",
-            display(
-                (v_.sum() if v_.dtype == "bool" else v_.shape[0] for v_ in v.values()),
-                ref=len(others[k]),
-            ),
-        )
+        other = others[k]
+        if args.area:
+            ref_ = other["speed_area" if args.intern else "effective_area"].sum() / 1e12
+        else:
+            ref_ = len(other)
+        print(f"[{i:2}] ", display(get_values(v, other), ref=ref_))
