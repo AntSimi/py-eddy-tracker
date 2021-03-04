@@ -570,7 +570,7 @@ class TrackEddiesObservations(EddiesObservations):
         p0, p1 = self.period
         indexs = list()
         for i_self, i_other, t0, t1 in self.align_on(other, bins=range(p0, p1 + 2)):
-            i, j, s = self.index(i_self).match(other.index(i_other), **kwargs)
+            i, j, s = self.match(other, i_self=i_self, i_other=i_other, **kwargs)
             indexs.append(other.re_reference_index(j, i_other))
         indexs = concatenate(indexs)
         tr, nb = unique(other.track[indexs], return_counts=True)

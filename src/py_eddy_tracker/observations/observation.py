@@ -488,8 +488,7 @@ class EddiesObservations(object):
 
         :param str,array xname:
         :param array bins: bounds of each bin ,
-        :return: Group observations
-        :rtype: self.__class__
+        :return: index or mask, bound low, bound up
         """
         x = self[xname] if isinstance(xname, str) else xname
         d = x[1:] - x[:-1]
@@ -498,10 +497,18 @@ class EddiesObservations(object):
         elif not isinstance(bins, ndarray):
             bins = array(bins)
         nb_bins = len(bins) - 1
-        i = numba_digitize(x, bins) - 1
+
         # Not monotonous
         if (d < 0).any():
+            # If bins cover a small part of value
+            test, translate, x = iter_mode_reduce(x, bins)
+            # convert value in bins number
+            i = numba_digitize(x, bins) - 1
+            # Order by bins
             i_sort = i.argsort()
+            # If in reduce mode we will translate i_sort in full array index
+            i_sort_ = translate[i_sort] if test else i_sort
+            # Bound for each bins in sorting view
             i0, i1, _ = build_index(i[i_sort])
             m = ~(i0 == i1)
             i0, i1 = i0[m], i1[m]
@@ -509,8 +516,9 @@ class EddiesObservations(object):
                 i_bins = i[i_sort[i0_]]
                 if i_bins == -1 or i_bins == nb_bins:
                     continue
-                yield i_sort[i0_:i1_], bins[i_bins], bins[i_bins + 1]
+                yield i_sort_[i0_:i1_], bins[i_bins], bins[i_bins + 1]
         else:
+            i = numba_digitize(x, bins) - 1
             i0, i1, _ = build_index(i)
             m = ~(i0 == i1)
             i0, i1 = i0[m], i1[m]
@@ -522,10 +530,8 @@ class EddiesObservations(object):
         """
         Align the time indexes of two datasets.
         """
-        iter_self, iter_other = (
-            self.iter_on(var_name, **kwargs),
-            other.iter_on(var_name, **kwargs),
-        )
+        iter_self = self.iter_on(var_name, **kwargs)
+        iter_other = other.iter_on(var_name, **kwargs)
         indexs_other, b0_other, b1_other = iter_other.__next__()
         for indexs_self, b0_self, b1_self in iter_self:
             if b0_self > b0_other:
@@ -1038,10 +1044,23 @@ class EddiesObservations(object):
             labels = [VAR_DESCR[label]["nc_name"] for label in labels]
         return labels
 
-    def match(self, other, method="overlap", intern=False, cmin=0, **kwargs):
+    def match(
+        self,
+        other,
+        i_self=None,
+        i_other=None,
+        method="overlap",
+        intern=False,
+        cmin=0,
+        **kwargs,
+    ):
         """Return index and score computed on the effective contour.
 
         :param EddiesObservations other: Observations to compare
+        :param array[bool,int],None i_self:
+            Index or mask to subset observations, it could avoid to build a specific dataset.
+        :param array[bool,int],None i_other:
+            Index or mask to subset observations, it could avoid to build a specific dataset.
         :param str method:
             - "overlap": the score is computed with contours;
             - "circle": circles are computed and used for score (TODO)
@@ -1054,25 +1073,20 @@ class EddiesObservations(object):
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.match
         """
-        # if method is "overlap" method will use contour to compute score,
-        # if method is "circle" method will apply a formula of circle overlap
         x_name, y_name = self.intern(intern)
+        if i_self is None:
+            i_self = slice(None)
+        if i_other is None:
+            i_other = slice(None)
         if method == "overlap":
-            i, j = bbox_intersection(
-                self[x_name], self[y_name], other[x_name], other[y_name]
-            )
-            c = vertice_overlap(
-                self[x_name][i],
-                self[y_name][i],
-                other[x_name][j],
-                other[y_name][j],
-                **kwargs,
-            )
+            x0, y0 = self[x_name][i_self], self[y_name][i_self]
+            x1, y1 = other[x_name][i_other], other[y_name][i_other]
+            i, j = bbox_intersection(x0, y0, x1, y1)
+            c = vertice_overlap(x0[i], y0[i], x1[j], y1[j], **kwargs)
         elif method == "close_center":
-            i, j, c = close_center(
-                self.latitude, self.longitude, other.latitude, other.longitude, **kwargs
-            )
-
+            x0, y0 = self.longitude[i_self], self.latitude[i_self]
+            x1, y1 = other.longitude[i_other], other.latitude[i_other]
+            i, j, c = close_center(x0, y0, x1, y1, **kwargs)
         m = c >= cmin  # ajout >= pour garder la cmin dans la sélection
         return i[m], j[m], c[m]
 
@@ -2438,3 +2452,41 @@ def numba_digitize(values, bins):
             continue
         out[i] = (v_ - bins[0]) / step + 1
     return out
+
+
+@njit(cache=True)
+def iter_mode_reduce(x, bins):
+    """
+    Test if we could use a reduce mode
+
+    :param array x: array to divide in group
+    :param array bins: array which defined bounds between each group
+    :return: If reduce mode, translator, and reduce x
+    """
+    nb = x.shape[0]
+    # If we use less than half value
+    limit = nb // 2
+    # low and up
+    x0, x1 = bins[0], bins[-1]
+    m = empty(nb, dtype=numba_types.bool_)
+    # To count number of value cover by bins
+    c = 0
+    for i in range(nb):
+        x_ = x[i]
+        test = (x_ >= x0) * (x_ <= x1)
+        m[i] = test
+        if test:
+            c += 1
+            # If number value exceed limit
+            if c > limit:
+                return False, empty(0, dtype=numba_types.int_), x
+    # Indices to be able to translate in full index array
+    indices = empty(c, dtype=numba_types.int_)
+    x_ = empty(c, dtype=x.dtype)
+    j = 0
+    for i in range(nb):
+        if m[i]:
+            indices[j] = i
+            x_[j] = x[i]
+            j += 1
+    return True, indices, x_
