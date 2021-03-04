@@ -2369,6 +2369,7 @@ class GridCollection:
         u_name,
         v_name,
         t_init,
+        mask_particule=None,
         nb_step=10,
         time_step=600,
         rk4=True,
@@ -2391,7 +2392,10 @@ class GridCollection:
         t1 = t1 * 86400
         t = t_init * 86400
         advect_ = advect_t_rk4 if rk4 else advect_t
-        mp = isnan(x) + isnan(y)
+        if mask_particule is None:
+            mask_particule = isnan(x) + isnan(y)
+        else:
+            mask_particule += isnan(x) + isnan(y)
         while True:
             if (backward and t <= t1) or (not backward and t >= t1):
                 t0, u0, v0, m0 = t1, u1, v1, m1
@@ -2400,7 +2404,21 @@ class GridCollection:
                 u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
             w = 1 - (arange(t, t + dt, t_step) - t0) / (t1 - t0)
             half_w = t_step / 2.0 / (t1 - t0)
-            advect_(d0.x_c, d0.y_c, u0, v0, m0, u1, v1, m1, x, y, mp, w, half_w=half_w)
+            advect_(
+                d0.x_c,
+                d0.y_c,
+                u0,
+                v0,
+                m0,
+                u1,
+                v1,
+                m1,
+                x,
+                y,
+                mask_particule,
+                w,
+                half_w=half_w,
+            )
             t += dt
             yield t, x, y
 
