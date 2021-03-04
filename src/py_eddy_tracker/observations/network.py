@@ -10,6 +10,7 @@ from numpy import (
     arange,
     array,
     bincount,
+    concatenate,
     empty,
     in1d,
     ones,
@@ -298,6 +299,30 @@ class NetworkObservations(EddiesObservations):
 
         return self.extract_with_mask(mask)
 
+    def close_network(self, other, nb_obs_min=10, **kwargs):
+        """
+        Get close network from another atlas.
+
+        :param self other: Atlas to compare
+        :param int nb_obs_min: Minimal number of overlap for one trajectory
+        :param dict kwargs: keyword arguments for match function
+        :return: return other atlas reduce to common track with self
+
+        .. warning::
+            It could be a costly operation for huge dataset
+        """
+        p0, p1 = self.period
+        indexs = list()
+        for i_self, i_other, t0, t1 in self.align_on(other, bins=range(p0, p1 + 2)):
+            i, j, s = self.index(i_self).match(other.index(i_other), **kwargs)
+            indexs.append(other.re_reference_index(j, i_other))
+        indexs = concatenate(indexs)
+        tr, nb = unique(other.track[indexs], return_counts=True)
+        m = zeros(other.track.shape, dtype=bool)
+        for i in tr[nb >= nb_obs_min]:
+            m[other.network_slice(i)] = True
+        return other.extract_with_mask(m)
+
     def numbering_segment(self):
         """
         New numbering of segment
@@ -359,7 +384,9 @@ class NetworkObservations(EddiesObservations):
         :param str,array field: yaxis values, if None, segments are used
         :param str method: if None, mean values are used
         :param float factor: to multiply field
-        :param str colors_mode: color of lines. "roll" means looping through colors, "y" means color adapt the y values (for matching color plots)
+        :param str colors_mode:
+            color of lines. "roll" means looping through colors,
+            "y" means color adapt the y values (for matching color plots)
         :return: plot mappable
         """
         self.only_one_network()

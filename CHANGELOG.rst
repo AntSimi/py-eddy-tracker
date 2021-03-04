@@ -31,7 +31,9 @@ Added
 - Save EddyAnim in mp4
 - Add method to get eddy contour which enclosed obs defined with (x,y) coordinates
 - Add **EddyNetworkSubSetter** to subset network which need special tool and operation after subset
-- Add functions to find relatives segments
+- Network:
+    - Add method to find relatives segments
+    - Add method to get cloase network in an other atlas
 
 [3.3.0] - 2020-12-03
 --------------------

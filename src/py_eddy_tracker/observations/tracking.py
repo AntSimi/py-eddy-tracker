@@ -516,13 +516,6 @@ class TrackEddiesObservations(EddiesObservations):
                 new.track = id_translate[new.track]
         return new
 
-    @staticmethod
-    def re_reference_index(index, ref):
-        if isinstance(ref, slice):
-            return index + ref.start
-        else:
-            return ref[index]
-
     def shape_polygon(self, intern=False):
         """
         Get the polygon enclosing each trajectory.

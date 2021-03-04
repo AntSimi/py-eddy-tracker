@@ -200,8 +200,8 @@ class EddiesObservations(object):
             return False
         return array_equal(self.obs, other.obs)
 
-    ### colors methods
     def get_color(self, i):
+        """Return colors like a cyclic list"""
         return self.COLORS[i % self.NB_COLORS]
 
     @property
@@ -1075,6 +1075,21 @@ class EddiesObservations(object):
 
         m = c >= cmin  # ajout >= pour garder la cmin dans la sélection
         return i[m], j[m], c[m]
+
+    @staticmethod
+    def re_reference_index(index, ref):
+        """
+        Shift index with ref
+
+        :param array,int index: local index to re ref
+        :param slice,array ref:
+            reference could be a slice in this case we juste add start to index
+            or could be indexs and in this case we need to translate
+        """
+        if isinstance(ref, slice):
+            return index + ref.start
+        else:
+            return ref[index]
 
     @classmethod
     def cost_function_common_area(cls, xy_in, xy_out, distance, intern=False):
