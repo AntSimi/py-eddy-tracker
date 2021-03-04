@@ -263,6 +263,7 @@ def anim():
     parser.add_argument(
         "--field", default="time", help="Field use to color contour instead of time"
     )
+    parser.add_argument("--txt_field", default="track", help="Field use to text eddy")
     parser.add_argument(
         "--vmin", default=None, type=float, help="Inferior bound to color contour"
     )
@@ -271,7 +272,9 @@ def anim():
     )
     parser.add_argument("--mp4", help="Filename to save animation (mp4)")
     args = parser.parse_args()
-    variables = ["time", "track", "longitude", "latitude", args.field]
+    variables = list(
+        set(["time", "track", "longitude", "latitude", args.field, args.txt_field])
+    )
     variables.extend(TrackEddiesObservations.intern(args.intern, public_label=True))
 
     eddies = TrackEddiesObservations.load_file(
@@ -302,6 +305,7 @@ def anim():
         cmap=args.cmap,
         nb_step=args.keep_step,
         field_color=args.field,
+        field_txt=args.txt_field,
         range_color=(args.vmin, args.vmax),
         graphic_information=logger.getEffectiveLevel() == logging.DEBUG,
         **kw,
