@@ -323,12 +323,18 @@ class NetworkObservations(EddiesObservations):
             m[other.network_slice(i)] = True
         return other.extract_with_mask(m)
 
-    def numbering_segment(self):
+    def numbering_segment(self, start=0):
         """
         New numbering of segment
         """
         for i, _, _ in self.iter_on("track"):
             new_numbering(self.segment[i])
+
+    def numbering_network(self, start=1):
+        """
+        New numbering of network
+        """
+        new_numbering(self.track, start)
 
     def only_one_network(self):
         """
@@ -1169,10 +1175,10 @@ def build_unique_array(id1, id2):
 
 
 @njit(cache=True)
-def new_numbering(segs):
+def new_numbering(segs, start=0):
     nb = len(segs)
     s0 = segs[0]
-    j = 0
+    j = start
     for i in range(nb):
         if segs[i] != s0:
             s0 = segs[i]

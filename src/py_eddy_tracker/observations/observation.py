@@ -777,10 +777,10 @@ class EddiesObservations(object):
         :param zarr_dataset handler_zarr:
         :param array handler_eddies:
         :param slice zarr_dataset sl_obs:
-        :param int zarr_dataset buffer_size:
-        :param float zarr_dataset factor:
-        :param bool zarr_dataset raw_data:
-        :param None,float zarr_dataset scale_factor:
+        :param int buffer_size:
+        :param float factor:
+        :param bool raw_data:
+        :param None,float scale_factor:
         :param None,float add_offset:
         """
         i_start, i_stop = sl_obs.start, sl_obs.stop
