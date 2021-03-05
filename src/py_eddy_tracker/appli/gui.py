@@ -9,6 +9,7 @@ from itertools import chain
 
 from matplotlib import pyplot
 from matplotlib.animation import FuncAnimation
+from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
 from numpy import arange, where
 
@@ -36,6 +37,8 @@ class Anim:
         self.field_color = None
         self.field_txt = None
         self.time_field = False
+        self.txt = None
+        self.ax = None
         self.setup(**kwargs)
 
     def setup(
@@ -47,41 +50,55 @@ class Anim:
         range_color=(None, None),
         nb_step=25,
         figsize=(8, 6),
+        position=(0.05, 0.05, 0.9, 0.9),
         **kwargs,
     ):
-        self.field_color = self.eddy[field_color].astype("f4")
-        self.field_txt = self.eddy[field_txt]
-        rg = range_color
-        if rg[0] is None and rg[1] is None and field_color == "time":
-            self.time_field = True
-        else:
-            rg = (
-                self.field_color.min() if rg[0] is None else rg[0],
-                self.field_color.max() if rg[1] is None else rg[1],
-            )
-            self.field_color = (self.field_color - rg[0]) / (rg[1] - rg[0])
-
-        self.colors = pyplot.get_cmap(cmap, lut=lut)
+        # To text each visible eddy
+        if field_txt:
+            self.field_txt = self.eddy[field_txt]
+        if field_color:
+            # To color each visible eddy
+            self.field_color = self.eddy[field_color].astype("f4")
+            rg = range_color
+            if rg[0] is None and rg[1] is None and field_color == "time":
+                self.time_field = True
+            else:
+                rg = (
+                    self.field_color.min() if rg[0] is None else rg[0],
+                    self.field_color.max() if rg[1] is None else rg[1],
+                )
+                self.field_color = (self.field_color - rg[0]) / (rg[1] - rg[0])
+            self.colors = pyplot.get_cmap(cmap, lut=lut)
         self.nb_step = nb_step
 
-        x_min, x_max = self.x_core.min() - 2, self.x_core.max() + 2
-        d_x = x_max - x_min
-        y_min, y_max = self.y_core.min() - 2, self.y_core.max() + 2
-        d_y = y_max - y_min
         # plot
-        self.fig = pyplot.figure(figsize=figsize, **kwargs)
+        if "figure" in kwargs:
+            self.fig = kwargs.pop("figure")
+        else:
+            self.fig = pyplot.figure(figsize=figsize, **kwargs)
         t0, t1 = self.period
         self.fig.suptitle(f"{t0} -> {t1}")
-        self.ax = self.fig.add_axes((0.05, 0.05, 0.9, 0.9), projection="full_axes")
-        self.ax.set_xlim(x_min, x_max), self.ax.set_ylim(y_min, y_max)
-        self.ax.set_aspect("equal")
-        self.ax.grid()
-        # init mappable
-        self.txt = self.ax.text(x_min + 0.05 * d_x, y_min + 0.05 * d_y, "", zorder=10)
+        if isinstance(position, Axes):
+            self.ax = position
+        else:
+            x_min, x_max = self.x_core.min() - 2, self.x_core.max() + 2
+            d_x = x_max - x_min
+            y_min, y_max = self.y_core.min() - 2, self.y_core.max() + 2
+            d_y = y_max - y_min
+            self.ax = self.fig.add_axes(position, projection="full_axes")
+            self.ax.set_xlim(x_min, x_max), self.ax.set_ylim(y_min, y_max)
+            self.ax.set_aspect("equal")
+            self.ax.grid()
+            self.txt = self.ax.text(
+                x_min + 0.05 * d_x, y_min + 0.05 * d_y, "", zorder=10
+            )
         self.segs = list()
         self.t_segs = list()
         self.c_segs = list()
-        self.contour = LineCollection([], zorder=1)
+        if field_color is None:
+            self.contour = LineCollection([], zorder=1, color="gray")
+        else:
+            self.contour = LineCollection([], zorder=1)
         self.ax.add_collection(self.contour)
 
         self.fig.canvas.draw()
@@ -148,29 +165,33 @@ class Anim:
 
     def update(self):
         m = self.t == self.now
+        color = self.field_color is not None
         if m.sum():
             segs = list()
             t = list()
             c = list()
             for i in where(m)[0]:
                 segs.append(create_vertice(self.x[i], self.y[i]))
-                c.append(self.field_color[i])
+                if color:
+                    c.append(self.field_color[i])
                 t.append(self.now)
             self.segs.append(segs)
-            self.c_segs.append(c)
+            if color:
+                self.c_segs.append(c)
             self.t_segs.append(t)
         self.contour.set_paths(chain(*self.segs))
-        if self.time_field:
-            self.contour.set_color(
-                self.colors(
-                    [
-                        (self.nb_step - self.now + i) / self.nb_step
-                        for i in chain(*self.c_segs)
-                    ]
+        if color:
+            if self.time_field:
+                self.contour.set_color(
+                    self.colors(
+                        [
+                            (self.nb_step - self.now + i) / self.nb_step
+                            for i in chain(*self.c_segs)
+                        ]
+                    )
                 )
-            )
-        else:
-            self.contour.set_color(self.colors(list(chain(*self.c_segs))))
+            else:
+                self.contour.set_color(self.colors(list(chain(*self.c_segs))))
         # linewidth will be link to time delay
         self.contour.set_lw(
             [
@@ -179,28 +200,32 @@ class Anim:
             ]
         )
         # Update date txt and info
-        txt = f"{(timedelta(int(self.now)) + datetime(1950,1,1)).strftime('%Y/%m/%d')}"
-        if self.graphic_informations:
-            txt += f"- {1/self.sleep_event:.0f} frame/s"
-        self.txt.set_text(txt)
+        if self.txt is not None:
+            txt = f"{(timedelta(int(self.now)) + datetime(1950,1,1)).strftime('%Y/%m/%d')}"
+            if self.graphic_informations:
+                txt += f"- {1/self.sleep_event:.0f} frame/s"
+            self.txt.set_text(txt)
+            self.ax.draw_artist(self.txt)
         # Update id txt
-        for i in where(m)[0]:
-            mappable = self.ax.text(
-                self.x_core[i],
-                self.y_core[i],
-                self.field_txt[i],
-                fontsize=12,
-                fontweight="demibold",
-            )
-            self.mappables.append(mappable)
-            self.ax.draw_artist(mappable)
+        if self.field_txt is not None:
+            for i in where(m)[0]:
+                mappable = self.ax.text(
+                    self.x_core[i],
+                    self.y_core[i],
+                    self.field_txt[i],
+                    fontsize=12,
+                    fontweight="demibold",
+                )
+                self.mappables.append(mappable)
+                self.ax.draw_artist(mappable)
         self.ax.draw_artist(self.contour)
-        self.ax.draw_artist(self.txt)
+
         # Remove first segment to keep only T contour
         if len(self.segs) > self.nb_step:
             self.segs.pop(0)
             self.t_segs.pop(0)
-            self.c_segs.pop(0)
+            if color:
+                self.c_segs.pop(0)
 
     def draw_contour(self):
         # select contour for this time step
