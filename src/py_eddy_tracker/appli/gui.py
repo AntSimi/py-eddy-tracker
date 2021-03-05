@@ -39,6 +39,7 @@ class Anim:
         self.time_field = False
         self.txt = None
         self.ax = None
+        self.kw_label = dict()
         self.setup(**kwargs)
 
     def setup(
@@ -53,6 +54,8 @@ class Anim:
         position=(0.05, 0.05, 0.9, 0.9),
         **kwargs,
     ):
+        self.kw_label["fontsize"] = kwargs.pop("fontsize", 12)
+        self.kw_label["fontweight"] = kwargs.pop("fontweight", "demibold")
         # To text each visible eddy
         if field_txt:
             self.field_txt = self.eddy[field_txt]
@@ -210,11 +213,7 @@ class Anim:
         if self.field_txt is not None:
             for i in where(m)[0]:
                 mappable = self.ax.text(
-                    self.x_core[i],
-                    self.y_core[i],
-                    self.field_txt[i],
-                    fontsize=12,
-                    fontweight="demibold",
+                    self.x_core[i], self.y_core[i], self.field_txt[i], **self.kw_label
                 )
                 self.mappables.append(mappable)
                 self.ax.draw_artist(mappable)
