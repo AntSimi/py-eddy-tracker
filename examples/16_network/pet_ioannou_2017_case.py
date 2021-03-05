@@ -8,6 +8,8 @@ Figure 10 from https://doi.org/10.1002/2017JC013158
 # %%
 # We want to find the Ierapetra Eddy described above in the networks
 
+import re
+
 # %%
 from datetime import datetime, timedelta
 
@@ -19,7 +21,7 @@ from matplotlib.ticker import FuncFormatter
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_remote_sample
 from py_eddy_tracker.observations.network import NetworkObservations
 
 
@@ -27,7 +29,10 @@ from py_eddy_tracker.observations.network import NetworkObservations
 class VideoAnimation(FuncAnimation):
     def _repr_html_(self, *args, **kwargs):
         """To get video in html and have a player"""
-        return self.to_html5_video()
+        content = self.to_html5_video()
+        return re.sub(
+            r'width="[0-9]*"\sheight="[0-9]*"', 'width="100%" height="100%"', content
+        )
 
     def save(self, *args, **kwargs):
         if args[0].endswith("gif"):
@@ -72,7 +77,11 @@ def update_axes(ax, mappable=None):
 # We know the position and the time of a specific eddy
 #
 # `n.extract_with_mask` give us the corresponding network
-n = NetworkObservations.load_file(get_path("Anticyclonic_seg.nc"))
+n = NetworkObservations.load_file(
+    get_remote_sample(
+        "eddies_med_adt_allsat_dt2018_err70_filt500_order1/Anticyclonic_network.nc"
+    )
+)
 i = np.where(
     (n.lat > 33)
     * (n.lat < 34)
@@ -85,9 +94,9 @@ ioannou_case = n.extract_with_mask(n.track == n.track[i])
 print(ioannou_case.infos())
 
 # %%
-# It seems that this network is huge! Our case is in purple...
+# It seems that this network is huge! Our case is visible at 22E 33.5N
 ax = start_axes()
-ioannou_case.plot(ax)
+ioannou_case.plot(ax, color_cycle=ioannou_case.COLORS)
 update_axes(ax)
 
 # %%
@@ -127,7 +136,7 @@ a = Anim(
     figsize=(12, 4),
     cmap=cmap,
     nb_step=7,
-    dpi=55,
+    dpi=80,
     field_color="segment",
     field_txt="segment",
 )

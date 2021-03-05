@@ -787,12 +787,7 @@ class NetworkObservations(EddiesObservations):
 
         if triplet:
             if only_index:
-                return (
-                    idx_m1,
-                    idx_m0,
-                    idx_m0_stop,
-                )
-
+                return (idx_m1, idx_m0, idx_m0_stop)
             else:
                 return (
                     self.extract_event(idx_m1),
@@ -800,10 +795,11 @@ class NetworkObservations(EddiesObservations):
                     self.extract_event(idx_m0_stop),
                 )
         else:
+            idx_m1 = list(set(idx_m1))
             if only_index:
-                return self.extract_event(set(idx_m1))
+                return idx_m1
             else:
-                return list(set(idx_m1))
+                return self.extract_event(idx_m1)
 
     def spliting_event(self, triplet=False):
         """Return observation before a splitting event.
@@ -1107,9 +1103,9 @@ class Network:
         )
         return gr
 
-    def build_dataset(self, group):
+    def build_dataset(self, group, raw_data=True):
         nb_obs = group.shape[0]
-        model = TrackEddiesObservations.load_file(self.filenames[-1], raw_data=True)
+        model = TrackEddiesObservations.load_file(self.filenames[-1], raw_data=raw_data)
         eddies = TrackEddiesObservations.new_like(model, nb_obs)
         eddies.sign_type = model.sign_type
         # Get new index to re-order observation by group
@@ -1124,9 +1120,9 @@ class Network:
             if self.memory:
                 # Only if netcdf
                 with open(filename, "rb") as h:
-                    e = TrackEddiesObservations.load_file(h, raw_data=True)
+                    e = TrackEddiesObservations.load_file(h, raw_data=raw_data)
             else:
-                e = TrackEddiesObservations.load_file(filename, raw_data=True)
+                e = TrackEddiesObservations.load_file(filename, raw_data=raw_data)
             stop = i + len(e)
             sl = slice(i, stop)
             for element in elements:

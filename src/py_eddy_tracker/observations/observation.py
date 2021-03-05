@@ -4,7 +4,7 @@ Base class to manage eddy observation
 """
 import logging
 from datetime import datetime
-from io import BufferedReader
+from io import BufferedReader, BytesIO
 from tarfile import ExFileObject
 from tokenize import TokenError
 
@@ -825,7 +825,7 @@ class EddiesObservations(object):
         array_dim = "NbSample"
         if isinstance(filename, bytes):
             filename = filename.astype(str)
-        if isinstance(filename, (ExFileObject, BufferedReader)):
+        if isinstance(filename, (ExFileObject, BufferedReader, BytesIO)):
             filename.seek(0)
             args, kwargs = ("in-mem-file",), dict(memory=filename.read())
         else:

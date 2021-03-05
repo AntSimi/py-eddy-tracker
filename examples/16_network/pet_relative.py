@@ -215,7 +215,6 @@ mappables = n.display_timeline(axs[0], colors_mode="y")
 axs[0].legend()
 
 for k in range(0, max_order + 1):
-
     ax = axs[k + 1]
     sub_network = n.find_segments_relative(after[i_event], stopped[i_event], order=k)
 

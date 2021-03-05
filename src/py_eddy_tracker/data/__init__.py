@@ -21,13 +21,21 @@ def get_path(name):
 
 
 def get_remote_sample(path):
-    url = (
-        f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}.tar.xz"
-    )
+    if path.startswith("/") or path.startswith("."):
+        content = open(path, "rb").read()
+        if path.endswith(".nc"):
+            return io.BytesIO(content)
+    else:
+        if path.endswith(".nc"):
+            content = requests.get(
+                f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}"
+            ).content
+            return io.BytesIO(content)
+        content = requests.get(
+            f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}.tar.xz"
+        ).content
 
-    content = requests.get(url).content
-
-    # Tar module could manage lzma tar, but it will apply un compress for each extractfile
+    # Tar module could manage lzma tar, but it will apply uncompress for each extractfile
     tar = tarfile.open(mode="r", fileobj=io.BytesIO(lzma.decompress(content)))
     # tar = tarfile.open(mode="r:xz", fileobj=io.BytesIO(content))
     files_content = list()
