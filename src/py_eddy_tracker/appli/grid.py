@@ -87,12 +87,8 @@ def eddy_id(args=None):
     parser.add_argument("--height_unit", default=None, help="Force height unit")
     parser.add_argument("--speed_unit", default=None, help="Force speed unit")
     parser.add_argument("--unregular", action="store_true", help="if grid is unregular")
-    parser.add_argument(
-        "--sampling",
-        default=50,
-        type=int,
-        help="Array size used to build contour, first and last point will be the same",
-    )
+    help = "Array size used to build contour, first and last point will be the same"
+    parser.add_argument("--sampling", default=50, type=int, help=help)
     parser.add_argument(
         "--sampling_method",
         default="visvalingam",
@@ -103,13 +99,19 @@ def eddy_id(args=None):
     help = "Output will be wrote in zarr"
     parser.add_argument("--zarr", action="store_true", help=help)
     help = "Indexs to select grid : --indexs time=2, will select third step along time dimensions"
+    parser.add_argument("--indexs", nargs="*", help=help, action=DictAction)
+    help = "Number of pixel of grid detection which could be in an eddies, you must specify MIN and MAX."
     parser.add_argument(
-        "--indexs",
-        nargs="*",
-        help=help,
-        action=DictAction,
+        "--pixel_limit", nargs="+", default=(5, 2000), type=int, help=help
     )
+    help = "Minimal number of amplitude in number of step"
+    parser.add_argument("--nb_step_min", default=2, type=int, help=help)
     args = parser.parse_args(args) if args else parser.parse_args()
+
+    if len(args.pixel_limit) != 2:
+        raise Exception(
+            "You must define two value minimal number of pixel and maximal number of pixel"
+        )
 
     cut_wavelength = args.cut_wavelength
     nb_cw = len(cut_wavelength)
@@ -123,10 +125,11 @@ def eddy_id(args=None):
     kwargs = dict(
         step=args.isoline_step,
         shape_error=args.fit_errmax,
-        pixel_limit=(5, 2000),
+        pixel_limit=args.pixel_limit,
         force_height_unit=args.height_unit,
         force_speed_unit=args.speed_unit,
         nb_step_to_be_mle=0,
+        nb_step_min=args.nb_step_min,
     )
 
     a, c = identification(
