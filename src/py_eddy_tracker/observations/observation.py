@@ -2221,6 +2221,7 @@ def grid_count_pixel_in(
     for i_ in range(nb):
         x_, y_, x_ref_ = x[i_], y[i_], x_ref[i_]
         x_ = (x_ - x_ref_) % 360 + x_ref_
+        x_, y_ = reduce_size(x_, y_)
         v = create_vertice(x_, y_)
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
             v,
@@ -2232,7 +2233,6 @@ def grid_count_pixel_in(
             is_circular,
             x_size,
         )
-
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
         grid_count_(grid, i, j)
 

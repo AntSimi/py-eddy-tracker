@@ -209,6 +209,7 @@ def winding_number_poly(x, y, xy_poly):
     # loop through all edges of the polygon
     for i_elt in range(nb_elt):
         if i_elt + 1 == nb_elt:
+            # We close polygon with first value (no need to duplicate first value)
             x_next = xy_poly[0, 0]
             y_next = xy_poly[0, 1]
         else:
