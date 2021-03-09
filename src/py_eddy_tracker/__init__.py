@@ -132,7 +132,7 @@ VAR_DESCR = dict(
         nc_dims=("obs",),
         nc_attr=dict(
             long_name="Rotating sense of the eddy",
-            comment="Cyclonic -1; Anti-cyclonic +1",
+            comment="Cyclonic -1; Anticyclonic +1",
         ),
     ),
     segment_size=dict(
@@ -197,7 +197,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             units="degrees_east",
             axis="X",
-            comment="Longitude center of the fit circle",
+            comment="Longitude center of the best fit circle",
             long_name="Eddy Center Longitude",
             standard_name="longitude",
         ),
@@ -214,7 +214,7 @@ VAR_DESCR = dict(
             axis="Y",
             long_name="Eddy Center Latitude",
             standard_name="latitude",
-            comment="Latitude center of the fit circle",
+            comment="Latitude center of the best fit circle",
         ),
     ),
     lon_max=dict(
@@ -268,7 +268,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             long_name="Speed area",
             units="m^2",
-            comment="Area enclosed by speed contour in m^2",
+            comment="Area enclosed by the speed contour in m^2",
         ),
     ),
     effective_area=dict(
@@ -279,7 +279,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             long_name="Effective area",
             units="m^2",
-            comment="Area enclosed by effective contour in m^2",
+            comment="Area enclosed by the effective contour in m^2",
         ),
     ),
     speed_average=dict(
@@ -307,7 +307,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             long_name="Radial Speed Profile",
             units="m/s",
-            comment="Speed average values from effective contour inwards to smallest contour, evenly spaced points",
+            comment="Speed averaged values from the effective contour inwards to the smallest contour, evenly spaced points",
         ),
     ),
     i=dict(
@@ -346,7 +346,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             long_name="Effective Radius",
             units="m",
-            comment="Radius of a circle whose area is equal to that enclosed by the effective contour",
+            comment="Radius of the best fit circle corresponding to the effective contour",
         ),
     ),
     radius_s=dict(
@@ -360,8 +360,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             long_name="Speed Radius",
             units="m",
-            comment="Radius of a circle whose area is equal to that "
-            "enclosed by the contour of maximum circum-average speed",
+            comment="Radius of the best fit circle corresponding to the contour of maximum circum-average speed",
         ),
     ),
     track=dict(
@@ -389,8 +388,8 @@ VAR_DESCR = dict(
         nc_type="int32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Previous obs index",
-            comment="Index of previous obs, if there are a spliting",
+            long_name="Previous observation index",
+            comment="Index of previous observation in a spliting case",
         ),
     ),
     next_obs=dict(
@@ -399,8 +398,8 @@ VAR_DESCR = dict(
         nc_type="int32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Next obs index",
-            comment="Index of next obs, if there are a merging",
+            long_name="Next observation index",
+            comment="Index of next observation in a merging case",
         ),
     ),
     previous_cost=dict(
@@ -409,7 +408,7 @@ VAR_DESCR = dict(
         nc_type="float32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Previous cost for previous obs",
+            long_name="Previous cost for previous observation",
             comment="",
         ),
     ),
@@ -419,7 +418,7 @@ VAR_DESCR = dict(
         nc_type="float32",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Next cost for next obs",
+            long_name="Next cost for next observation",
             comment="",
         ),
     ),
@@ -473,9 +472,9 @@ VAR_DESCR = dict(
         nc_type="u2",
         nc_dims=("obs",),
         nc_attr=dict(
-            longname="number of point for effective contour",
+            long_name="number of points for effective contour",
             units="ordinal",
-            description="Number of point for effective contour, if greater than NbSample, there is a resampling",
+            description="Number of point for effective contour before resampling",
         ),
     ),
     contour_lon_s=dict(
@@ -517,9 +516,9 @@ VAR_DESCR = dict(
         nc_type="u2",
         nc_dims=("obs",),
         nc_attr=dict(
-            longname="number of point for speed contour",
+            long_name="number of point for speed contour",
             units="ordinal",
-            description="Number of point for speed contour, if greater than NbSample, there is a resampling",
+            description="Number of point for speed contour before resampling",
         ),
     ),
     shape_error_e=dict(
@@ -532,8 +531,8 @@ VAR_DESCR = dict(
         nc_dims=("obs",),
         nc_attr=dict(
             units="%",
-            comment="Error criterion between the effective contour and its fit with the circle of same effective radius",
-            long_name="Effective Contour Error",
+            comment="Error criterion between the effective contour and its best fit circle",
+            long_name="Effective Contour Shape Error",
         ),
     ),
     score=dict(
@@ -566,8 +565,8 @@ VAR_DESCR = dict(
         nc_dims=("obs",),
         nc_attr=dict(
             units="%",
-            comment="Error criterion between the speed contour and its fit with the circle of same speed radius",
-            long_name="Speed Contour Error",
+            comment="Error criterion between the speed contour and its best fit circle",
+            long_name="Speed Contour Shape Error",
         ),
     ),
     height_max_speed_contour=dict(
