@@ -451,16 +451,20 @@ def quick_compare():
     )
     parser.add_argument("ref", help="Identification file of reference")
     parser.add_argument("others", nargs="+", help="Identifications files to compare")
-    parser.add_argument(
-        "--area",
-        action="store_true",
-        help="Display in percent of area instead percent of observation",
-    )
+    help = "Display in percent of area instead percent of observation"
+    parser.add_argument("--area", action="store_true", help=help)
+    help = "Use minimal cost function"
+    parser.add_argument("--minimal_area", action="store_true", help=help)
     parser.add_argument("--high", default=40, type=float)
     parser.add_argument("--low", default=20, type=float)
     parser.add_argument("--invalid", default=5, type=float)
+    parser.add_argument(
+        "--path_out", default=None, help="Save each group in separate file"
+    )
     parser.contour_intern_arg()
     args = parser.parse_args()
+    if args.path_out is not None and not exists(args.path_out):
+        mkdir(args.path_out)
 
     kw = dict(
         include_vars=[
@@ -481,7 +485,7 @@ def quick_compare():
         gr1, gr2 = get_group(
             ref,
             other,
-            *ref.match(other, intern=args.intern),
+            *ref.match(other, intern=args.intern, minimal_area=args.minimal_area),
             invalid=args.invalid,
             low=args.low,
             high=args.high,
