@@ -1653,6 +1653,16 @@ class EddiesObservations(object):
         mask *= (lon > lon0) * (lon < area["urcrnrlon"])
         return self.extract_with_mask(mask, **kwargs)
 
+    def time_sub_sample(self, t0, time_step):
+        """
+        Time sub sampling
+
+        :param int,float t0: reference time which will be keep
+        :param int,float time_step: keep every observation spaced by time_step
+        """
+        mask = (self.time - t0) % time_step == 0
+        return self.extract_with_mask(mask)
+
     def extract_with_mask(self, mask):
         """
         Extract a subset of observations.
