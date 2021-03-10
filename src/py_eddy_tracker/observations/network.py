@@ -22,6 +22,7 @@ from numpy import (
 
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
+from .groups import GroupEddiesObservations, get_missing_indices
 from .observation import EddiesObservations
 from .tracking import TrackEddiesObservations, track_loess_filter, track_median_filter
 
@@ -73,7 +74,28 @@ class Buffer(metaclass=Singleton):
         return self.DATA[filename]
 
 
-class NetworkObservations(EddiesObservations):
+@njit(cache=True)
+def fix_next_previous_obs(next_obs, previous_obs, flag_virtual):
+    """when an observation is virtual, we have to fix the previous and next obs
+
+    :param np.array(int)  next_obs    : indice of next observation from network
+    :param np.array(int   previous_obs: indice of previous observation from network
+    :param np.array(bool) flag_virtual: if observation is virtual or not
+    """
+
+    for i_o in range(next_obs.size):
+        if not flag_virtual[i_o]:
+            continue
+
+        # if there is many virtual side by side, there is some values writted multiple times.
+        #   but it should not be slow
+        next_obs[i_o - 1] = i_o
+        next_obs[i_o] = i_o + 1
+        previous_obs[i_o] = i_o - 1
+        previous_obs[i_o + 1] = i_o
+
+
+class NetworkObservations(GroupEddiesObservations):
 
     __slots__ = ("_index_network",)
 
@@ -108,6 +130,25 @@ class NetworkObservations(EddiesObservations):
         else:
             i_stopped = where(nw.segment == self.segment[stopped])[0][0]
             return nw.relatives([i_obs, i_stopped], order=order)
+
+    def get_missing_indices(self, dt):
+        """find indices where observations is missing.
+
+        As network have all untrack observation in tracknumber `self.NOGROUP`,
+            we don't compute them
+
+        :param int,float dt: theorical delta time between 2 observations
+        """
+        return get_missing_indices(
+            self.time, self.track, dt=dt, flag_untrack=True, indice_untrack=self.NOGROUP
+        )
+
+    def fix_next_previous_obs(self):
+        """function used after 'insert_virtual', to correct next_obs and
+        previous obs.
+        """
+
+        fix_next_previous_obs(self.next_obs, self.previous_obs, self.virtual)
 
     @property
     def index_network(self):
@@ -711,10 +752,6 @@ class NetworkObservations(EddiesObservations):
             kwargs["c"] = v * factor
         mappables["scatter"] = ax.scatter(x, self.latitude, **kwargs)
         return mappables
-
-    def insert_virtual(self):
-        # TODO
-        pass
 
     def extract_event(self, indices):
         nb = len(indices)
