@@ -785,4 +785,6 @@ def reduce_size(x, y):
         i -= 1
         if x[i] != x0 or y[i] != y0:
             i += 1
+            # In case of virtual obs all value could be fill with same value, to avoid empty array
+            i = max(3, i)
             return x[:i], y[:i]
