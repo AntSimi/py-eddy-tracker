@@ -16,7 +16,6 @@ from numpy import (
     degrees,
     empty,
     histogram,
-    interp,
     median,
     nan,
     ones,
@@ -29,12 +28,12 @@ from numpy import (
 from .. import VAR_DESCR_inv, __version__
 from ..generic import build_index, cumsum_by_track, distance, split_line, wrap_longitude
 from ..poly import bbox_intersection, merge, vertice_overlap
-from .observation import EddiesObservations
+from .groups import GroupEddiesObservations, get_missing_indices
 
 logger = logging.getLogger("pet")
 
 
-class TrackEddiesObservations(EddiesObservations):
+class TrackEddiesObservations(GroupEddiesObservations):
     """Class to practice Tracking on observations"""
 
     __slots__ = ("__obs_by_track", "__first_index_of_track", "__nb_track")
@@ -76,6 +75,26 @@ class TrackEddiesObservations(EddiesObservations):
             if nb == 0:
                 continue
             yield self.index(slice(i0, i0 + nb))
+
+    def get_missing_indices(self, dt):
+        """find indices where observations is missing.
+
+        :param int,float dt: theorical delta time between 2 observations
+        """
+        return get_missing_indices(
+            self.time,
+            self.track,
+            dt=dt,
+            flag_untrack=False,
+            indice_untrack=self.NOGROUP,
+        )
+
+    def fix_next_previous_obs(self):
+        """function used after 'insert_virtual', to correct next_obs and
+        previous obs.
+        """
+
+        pass
 
     @property
     def nb_tracks(self):
@@ -145,30 +164,6 @@ class TrackEddiesObservations(EddiesObservations):
         d_[:-1] = d
         d_[-1] = 0
         return d_
-
-    def filled_by_interpolation(self, mask):
-        """Filled selected values by interpolation
-
-        :param array(bool) mask: True if must be filled by interpolation
-
-        .. minigallery:: py_eddy_tracker.TrackEddiesObservations.filled_by_interpolation
-        """
-        nb_filled = mask.sum()
-        logger.info("%d obs will be filled (unobserved)", nb_filled)
-
-        nb_obs = len(self)
-        index = arange(nb_obs)
-
-        for field in self.obs.dtype.descr:
-            var = field[0]
-            if (
-                var in ["n", "virtual", "track", "cost_association"]
-                or var in self.array_variables
-            ):
-                continue
-            self.obs[var][mask] = interp(
-                index[mask], index[~mask], self.obs[var][~mask]
-            )
 
     def normalize_longitude(self):
         """Normalize all longitude

@@ -199,6 +199,8 @@ after, before, stopped = n.merging_event(triplet=True, only_index=True)
 i_event = 5
 # %%
 # then see some order of relatives
+
+
 @FuncFormatter
 def formatter(x, pos):
     return (datetime.timedelta(x) + datetime.datetime(1950, 1, 1)).strftime("%d/%m/%Y")
@@ -209,7 +211,7 @@ fig, axs = plt.subplots(
     max_order + 2, 1, sharex=True, figsize=(15, 5 * (max_order + 2))
 )
 
-axs[0].set_title(f"full network", weight="bold")
+axs[0].set_title("full network", weight="bold")
 axs[0].xaxis.set_major_formatter(formatter), axs[0].grid()
 mappables = n.display_timeline(axs[0], colors_mode="y")
 axs[0].legend()
