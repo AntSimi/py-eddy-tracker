@@ -34,6 +34,7 @@ Added
 - Network:
     - Add method to find relatives segments
     - Add method to get cloase network in an other atlas
+- Management of time cube data for advection
 
 [3.3.0] - 2020-12-03
 --------------------
