@@ -69,7 +69,7 @@ sphinx_gallery_conf = {
         "repo": "py-eddy-tracker",
         "branch": "master",
         "binderhub_url": "https://mybinder.org",
-        "dependencies": ["../requirements.txt"],
+        "dependencies": ["environment.yml"],
         # Optional keys
         "use_jupyter_lab": True,
     },
