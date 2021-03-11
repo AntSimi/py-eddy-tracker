@@ -1104,14 +1104,28 @@ class Network:
                     if g0 > g1:
                         g0, g1 = g1, g0
                     merge_id.append((g0, g1))
-
-        # FIXME: how it's work when several merge ? like (0,1), (0,2), (1,3)
-        gr_transfer = arange(id_free, dtype="u4")
-        for i, j in set(merge_id):
-            gr_i, gr_j = gr_transfer[i], gr_transfer[j]
-            if gr_i != gr_j:
-                apply_replace(gr_transfer, gr_i, gr_j)
+        gr_transfer = self.group_translator(id_free, set(merge_id))
         return gr_transfer[gr]
+
+    @staticmethod
+    def group_translator(nb, duos):
+        """
+        Create a translator with all duos
+
+        :param int nb: size of translator
+        :param set((int, int)) duos: set of all group which must be join
+
+        Examples
+        --------
+        >>> NetworkObservations.group_translator(5, ((0, 1), (0, 2), (1, 3)))
+        [3, 3, 3, 3, 5]
+        """
+        translate = arange(nb, dtype="u4")
+        for i, j in sorted(duos):
+            gr_i, gr_j = translate[i], translate[j]
+            if gr_i != gr_j:
+                apply_replace(translate, gr_i, gr_j)
+        return translate
 
     def group_observations(self, **kwargs):
         results, nb_obs = list(), list()
