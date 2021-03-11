@@ -838,7 +838,7 @@ class NetworkObservations(GroupEddiesObservations):
             else:
                 return self.extract_event(idx_m1)
 
-    def spliting_event(self, triplet=False):
+    def spliting_event(self, triplet=False, only_index=False):
         """Return observation before a splitting event.
 
         If `triplet=True` return the eddy before a splitting event, the eddy after the splitting event,
@@ -859,14 +859,23 @@ class NetworkObservations(GroupEddiesObservations):
                     idx_s1_start.append(i.start)
                     idx_s1.append(next_obs[i_p])
                 idx_s0.append(i_p)
+
         if triplet:
-            return (
-                self.extract_event(list(idx_s0)),
-                self.extract_event(list(idx_s1)),
-                self.extract_event(list(idx_s1_start)),
-            )
+            if only_index:
+                return (idx_s0, idx_s1, idx_s1_start)
+            else:
+                return (
+                    self.extract_event(list(idx_s0)),
+                    self.extract_event(list(idx_s1)),
+                    self.extract_event(list(idx_s1_start)),
+                )
+
         else:
-            return self.extract_event(list(set(idx_s0)))
+            idx_s0 = list(set(idx_s0))
+            if only_index:
+                return idx_s0
+            else:
+                return self.extract_event(idx_s0)
 
     def dissociate_network(self):
         """

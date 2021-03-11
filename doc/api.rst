@@ -14,6 +14,7 @@ API reference
    py_eddy_tracker.observations.network
    py_eddy_tracker.observations.observation
    py_eddy_tracker.observations.tracking
+   py_eddy_tracker.observations.groups
    py_eddy_tracker.eddy_feature
    py_eddy_tracker.generic
    py_eddy_tracker.gui
