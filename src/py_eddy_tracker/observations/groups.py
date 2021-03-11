@@ -102,6 +102,7 @@ class GroupEddiesObservations(EddiesObservations, ABC):
             )
 
     def insert_virtual(self):
+        """insert virtual observation on segments where observations were not found"""
 
         dt_theorical = median(self.time[1:] - self.time[:-1])
         indices = self.get_missing_indices(dt_theorical)
@@ -118,11 +119,6 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         mask = zeros(size_obs_corrected, dtype=bool)
         mask[indices_corrected] = 1
 
-        # time2 = np.empty(n.time.size+indices.size, dtype=n.time.dtype)
-        # time2[mask] = -1
-        # time2[~mask] = n.time
-
-        # new_TEO = TrackEddiesObservations.new_like(n, size_obs_corrected)
         new_TEO = self.new_like(self, size_obs_corrected)
         new_TEO.obs[~mask] = self.obs
         new_TEO.filled_by_interpolation(mask)
