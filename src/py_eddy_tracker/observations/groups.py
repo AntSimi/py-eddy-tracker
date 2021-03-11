@@ -125,3 +125,28 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         new_TEO.virtual[:] = mask
         new_TEO.fix_next_previous_obs()
         return new_TEO
+
+    def keep_tracks_by_date(self, date, nb_days):
+        """
+        find tracks which exist at date `date` and lasted at least `nb_days` after.
+
+        if nb_days is negative, it search a tracks which exist at the date,
+            but existed at least `nb_days` before the date
+
+
+        :param int,float date   : date where the tracks must exist
+        :param int,float nb_days: number of time where the tracks must exist. Can be negative
+
+        """
+
+        time = self.time
+
+        mask = zeros(time.shape, dtype=bool)
+
+        for i, b0, b1 in self.iter_on(self.tracks):
+            _time = time[i]
+
+            if date in _time and (date + nb_days) in _time:
+                mask[i] = True
+
+        return self.extract_with_mask(mask)
