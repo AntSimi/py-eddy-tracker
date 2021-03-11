@@ -109,6 +109,28 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
     return m
 
 
+class Table(object):
+    def __init__(self, values):
+        self.values = values
+
+    def _repr_html_(self):
+        rows = list()
+        if isinstance(self.values, ndarray):
+            row = "\n".join([f"<td>{v}</td >" for v in self.values.dtype.names])
+            rows.append(f"<tr>{row}</tr>")
+        for row in self.values:
+            row = "\n".join([f"<td>{v}</td >" for v in row])
+            rows.append(f"<tr>{row}</tr>")
+        rows = "\n".join(rows)
+        return (
+            f'<font size="2">'
+            f'<table class="docutils align-default">'
+            f"{rows}"
+            f"</table>"
+            f"</font>"
+        )
+
+
 class EddiesObservations(object):
     """
     Class to store eddy observations.
@@ -258,6 +280,25 @@ class EddiesObservations(object):
     def box_display(value):
         """Return value evenly spaced with few numbers"""
         return "".join([f"{v_:10.2f}" for v_ in value])
+
+    def field_table(self):
+        """
+        Produce description table of field available in this object
+        """
+        rows = [("Name(Unit)", "Long name", "Scale factor", "Offset")]
+        names = list(self.obs.dtype.names)
+        names.sort()
+        for field in names:
+            infos = VAR_DESCR[field]
+            rows.append(
+                (
+                    f"{infos.get('nc_name', field).capitalize()} ({infos['nc_attr'].get('units', '')})",
+                    infos["nc_attr"].get("long_name", "").capitalize(),
+                    infos.get("scale_factor", ""),
+                    infos.get("add_offset", ""),
+                )
+            )
+        return Table(rows)
 
     def __repr__(self):
         """
