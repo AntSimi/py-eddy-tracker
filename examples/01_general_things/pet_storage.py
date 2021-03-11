@@ -4,15 +4,13 @@ How data is stored
 
 General information about eddies storage.
 
-All eddies files have same structure with more or less field and a way of ordering.
+All files have the same structure, with more or less fields and possible different order.
 
 There are 3 class of files:
 
-- Eddies collections which contains a list of eddies without link between observations
-- Track eddies collections which manage eddies when there are merged in trajectory
-  (track field allow to separate each track)
-- Network eddies collections which manage eddies when there are merged in network
-  (track/segment field allow to separate observations)
+- **Eddies collections** : contain a list of eddies without link between them
+- **Track eddies collections** : manage eddies associated in trajectories, the ```track``` field allows to separate each trajectory
+- **Network eddies collections** : manage eddies associated in networks, the ```track``` and ```segment``` fields allow to separate observations
 """
 
 import py_eddy_tracker_sample
@@ -23,7 +21,7 @@ from py_eddy_tracker.observations.observation import EddiesObservations, Table
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 # %%
-# Eddies could be store in 2 formats with same structures:
+# Eddies can be stored in 2 formats with the same structure:
 #
 # - zarr (https://zarr.readthedocs.io/en/stable/), which allow efficiency in IO,...
 # - NetCDF4 (https://unidata.github.io/netcdf4-python/), well-known format
@@ -32,7 +30,7 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 # array field like contour/profile are 2D column.
 
 # %%
-# Eddies files (zarr or netcdf) could be loaded with `load_file` method:
+# Eddies files (zarr or netcdf) could be loaded with ```load_file``` method:
 eddies_collections = EddiesObservations.load_file(get_path("Cyclonic_20160515.nc"))
 eddies_collections.field_table()
 # offset and scale_factor are used only when data is stored in zarr or netCDF4
@@ -40,7 +38,11 @@ eddies_collections.field_table()
 # %%
 # Field access
 # ------------
+# To access the total field, here ```amplitude```
 eddies_collections.amplitude
+
+# To access only a specific part of the field
+eddies_collections.amplitude[4:15]
 
 # %%
 # Data matrix is a numpy ndarray
@@ -52,35 +54,34 @@ eddies_collections.obs.dtype
 # %%
 # Contour storage
 # ---------------
-# Contour are stored to fixed size for all, contour are resample with an algorithm before to be store in object
-
+# All contours are stored on the same number of points, and are resampled if needed with an algorithm to be stored as objects
 
 # %%
-# Tracks
-# ------
-# Tracks add several field like:
+# Trajectories
+# ------------
+# Tracks eddies collections add several fields :
 #
-# - track : ID which allow to identify path
-# - observation_flag : True if it's an observation to filled a missing detection
-# - observation_number : Age of eddies
-# - cost_association : result of cost function which allow to associate the observation with eddy path
+# - **track** : Trajectory number
+# - **observation_flag** : Flag indicating if the value is interpolated between two observations or not (0: observed eddy, 1: interpolated eddy)"
+# - **observation_number** : Eddy temporal index in a trajectory, days starting at the eddy first detection
+# - **cost_association** : result of the cost function to associate the eddy with the next observation
 eddies_tracks = TrackEddiesObservations.load_file(
     py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
-# In this example some field are removed like effective_contour_longitude, ... in order to save time for doc building
+# In this example some fields are removed (effective_contour_longitude,...) in order to save time for doc building
 eddies_tracks.field_table()
 
 # %%
-# Network
-# -------
-# Network files use some specific field:
+# Networks
+# --------
+# Network files use some specific fields :
 #
-# - track :  ID of network (ID 0 are for lonely eddies/trash)
-# - segment :  ID of path in network (from 0 to N)
-# - previous_obs : Index of the previous observation in the full dataset, if -1 there are no previous observation
-# - next_obs : Index of the next observation in the full dataset, if -1 there are no next observation
-# - previous_cost : Result of cost_function (1 good <> 0 bad) with previous observation
-# - next_cost : Result of cost_function (1 good <> 0 bad) with next observation
+# - track :  ID of network (ID 0 correspond to lonely eddies)
+# - segment :  ID of a segment within a network (from 1 to N)
+# - previous_obs : Index of the previous observation in the full dataset, if -1 there are no previous observation (the segment starts)
+# - next_obs : Index of the next observation in the full dataset, if -1 there are no next observation (the segment ends)
+# - previous_cost : Result of the cost function (1 is a good association, 0 is bad) with previous observation
+# - next_cost : Result of the cost function (1 is a good association, 0 is bad) with next observation
 eddies_network = NetworkObservations.load_file(
     get_remote_sample(
         "eddies_med_adt_allsat_dt2018_err70_filt500_order1/Anticyclonic_network.nc"
@@ -103,3 +104,7 @@ Table(
         ]
     ]
 )
+
+# %%
+# Networks are ordered by increasing network number (`track`), then increasing segment number, then increasing time
+
