@@ -283,16 +283,16 @@ class EddiesObservations(object):
 
     def field_table(self):
         """
-        Produce description table of field available in this object
+        Produce description table of the fields available in this object
         """
-        rows = [("Name(Unit)", "Long name", "Scale factor", "Offset")]
+        rows = [("Name (Unit)", "Long name", "Scale factor", "Offset")]
         names = list(self.obs.dtype.names)
         names.sort()
         for field in names:
             infos = VAR_DESCR[field]
             rows.append(
                 (
-                    f"{infos.get('nc_name', field).capitalize()} ({infos['nc_attr'].get('units', '')})",
+                    f"{infos.get('nc_name', field)} ({infos['nc_attr'].get('units', '')})",
                     infos["nc_attr"].get("long_name", "").capitalize(),
                     infos.get("scale_factor", ""),
                     infos.get("add_offset", ""),

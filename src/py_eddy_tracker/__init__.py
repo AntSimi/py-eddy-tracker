@@ -474,7 +474,7 @@ VAR_DESCR = dict(
         nc_attr=dict(
             long_name="number of points for effective contour",
             units="ordinal",
-            description="Number of point for effective contour before resampling",
+            description="Number of points for effective contour before resampling",
         ),
     ),
     contour_lon_s=dict(
@@ -516,9 +516,9 @@ VAR_DESCR = dict(
         nc_type="u2",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="number of point for speed contour",
+            long_name="number of points for speed contour",
             units="ordinal",
-            description="Number of point for speed contour before resampling",
+            description="Number of points for speed contour before resampling",
         ),
     ),
     shape_error_e=dict(
