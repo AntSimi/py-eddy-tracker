@@ -229,6 +229,7 @@ VAR_DESCR = dict(
             axis="X",
             long_name="Longitude of the SSH maximum",
             standard_name="longitude",
+            comment="Longitude of the inner contour",
         ),
     ),
     lat_max=dict(
@@ -243,6 +244,7 @@ VAR_DESCR = dict(
             axis="Y",
             long_name="Latitude of the SSH maximum",
             standard_name="latitude",
+            comment="Latitude of the inner contour",
         ),
     ),
     amplitude=dict(

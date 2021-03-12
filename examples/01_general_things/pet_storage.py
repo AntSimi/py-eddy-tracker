@@ -107,4 +107,3 @@ Table(
 
 # %%
 # Networks are ordered by increasing network number (`track`), then increasing segment number, then increasing time
-

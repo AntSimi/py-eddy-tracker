@@ -651,7 +651,13 @@ class Contours(object):
             if not overide_color:
                 ax.add_collection(LineCollection(paths, **local_kwargs))
         if display_criterion:
-            colors = {0: "g", 1: "r", 2: "b", 3: "k", 4: "y"}
+            colors = {
+                0: "limegreen",
+                1: "red",
+                2: "mediumblue",
+                3: "black",
+                4: "gold",
+            }
             for k, v in paths.items():
                 local_kwargs = kwargs.copy()
                 local_kwargs.pop("label", None)
