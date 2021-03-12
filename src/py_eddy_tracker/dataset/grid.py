@@ -634,7 +634,6 @@ class GridDataset(object):
         self.init_speed_coef(uname, vname)
 
         # Get unit of h grid
-
         h_units = (
             self.units(grid_height) if force_height_unit is None else force_height_unit
         )
