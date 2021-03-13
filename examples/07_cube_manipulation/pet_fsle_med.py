@@ -2,7 +2,7 @@
 FSLE experiment in med
 ======================
 
-Example to build FSLE, parameter values must be adapted for your case.
+Example to build Finite Size Lyapunov Exponents, parameter values must be adapted for your case.
 
 Example use a method similar to `AVISO flse`_
 
@@ -25,7 +25,7 @@ start_logger().setLevel("ERROR")
 
 # %%
 # ADT in med
-# ---------------------
+# ----------
 c = GridCollection.from_netcdf_cube(
     get_path("dt_med_allsat_phy_l4_2005T2.nc"),
     "longitude",
@@ -36,7 +36,7 @@ c = GridCollection.from_netcdf_cube(
 
 
 # %%
-# Methods to compute fsle
+# Methods to compute FSLE
 # -----------------------
 @njit(cache=True, fastmath=True)
 def check_p(x, y, g, m, dt, dist_init=0.02, dist_max=0.6):
@@ -87,12 +87,32 @@ def build_triplet(x, y, step=0.02):
 
 
 # %%
+# Settings
+# --------
+
+# Step in degrees for ouput
+step_grid_out = 1 / 25.0
+# Initial separation in degrees
+dist_init = 1 / 50.0
+# Final separation in degrees
+dist_max = 1 / 5.0
+# Time of start
+t0 = 20268
+# Number of time step by days
+time_step_by_days = 5
+# Maximal time of advection
+# Here we limit because our data cube cover only 3 month
+nb_days = 85
+# Backward or forward
+backward = True
+
+# %%
 # Particles
 # ---------
-step = 0.02
-t0 = 20268
 x0_, y0_ = -5, 30
-lon_p, lat_p = arange(x0_, x0_ + 43, step), arange(y0_, y0_ + 16, step)
+lon_p, lat_p = arange(x0_, x0_ + 43, step_grid_out), arange(
+    y0_, y0_ + 16, step_grid_out
+)
 x0, y0 = meshgrid(lon_p, lat_p)
 grid_shape = x0.shape
 x0, y0 = x0.reshape(-1), y0.reshape(-1)
@@ -103,26 +123,25 @@ x0, y0 = x0[m], y0[m]
 # %%
 # FSLE
 # ----
-time_step_by_days = 5
+
 # Array to compute fsle
 fsle = zeros(x0.shape[0], dtype="f4")
-x, y = build_triplet(x0, y0)
+x, y = build_triplet(x0, y0, dist_init)
 used = zeros(x.shape[0], dtype="bool")
 
 # advection generator
-kw = dict(t_init=t0, nb_step=1, backward=True, mask_particule=used)
+kw = dict(t_init=t0, nb_step=1, backward=backward, mask_particule=used)
 p = c.advect(x, y, "u", "v", time_step=86400 / time_step_by_days, **kw)
 
-nb_days = 85
 # We check at each step of advection if particle distance is over `dist_max`
 for i in range(time_step_by_days * nb_days):
     t, xt, yt = p.__next__()
     dt = t / 86400.0 - t0
-    check_p(xt, yt, fsle, used, dt, dist_max=0.2, dist_init=step)
+    check_p(xt, yt, fsle, used, dt, dist_max=dist_max, dist_init=dist_init)
 
 # Get index with original_position
-i = ((x0 - x0_) / step).astype("i4")
-j = ((y0 - y0_) / step).astype("i4")
+i = ((x0 - x0_) / step_grid_out).astype("i4")
+j = ((y0 - y0_) / step_grid_out).astype("i4")
 fsle_ = empty(grid_shape, dtype="f4")
 used_ = zeros(grid_shape, dtype="bool")
 fsle_[j, i] = fsle
