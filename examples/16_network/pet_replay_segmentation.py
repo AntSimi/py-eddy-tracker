@@ -28,7 +28,6 @@ def start_axes(title=""):
     ax.set_xlim(19, 29), ax.set_ylim(31, 35.5)
     ax.set_aspect("equal")
     ax.set_title(title, weight="bold")
-    ax.update_env()
     return ax
 
 

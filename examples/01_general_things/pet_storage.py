@@ -10,9 +10,9 @@ There are 3 class of files:
 
 - **Eddies collections** : contain a list of eddies without link between them
 - **Track eddies collections** :
-   manage eddies associated in trajectories, the ```track``` field allows to separate each trajectory
+  manage eddies associated in trajectories, the ```track``` field allows to separate each trajectory
 - **Network eddies collections** :
-   manage eddies associated in networks, the ```track``` and ```segment``` fields allow to separate observations
+  manage eddies associated in networks, the ```track``` and ```segment``` fields allow to separate observations
 """
 
 import py_eddy_tracker_sample
@@ -65,7 +65,7 @@ eddies_collections.obs.dtype
 #
 # - **track** : Trajectory number
 # - **observation_flag** : Flag indicating if the value is interpolated between two observations or not
-#                          (0: observed eddy, 1: interpolated eddy)"
+#   (0: observed eddy, 1: interpolated eddy)"
 # - **observation_number** : Eddy temporal index in a trajectory, days starting at the eddy first detection
 # - **cost_association** : result of the cost function to associate the eddy with the next observation
 eddies_tracks = TrackEddiesObservations.load_file(
@@ -82,7 +82,7 @@ eddies_tracks.field_table()
 # - track :  ID of network (ID 0 correspond to lonely eddies)
 # - segment :  ID of a segment within a network (from 1 to N)
 # - previous_obs : Index of the previous observation in the full dataset,
-#                  if -1 there are no previous observation (the segment starts)
+#   if -1 there are no previous observation (the segment starts)
 # - next_obs : Index of the next observation in the full dataset, if -1 there are no next observation (the segment ends)
 # - previous_cost : Result of the cost function (1 is a good association, 0 is bad) with previous observation
 # - next_cost : Result of the cost function (1 is a good association, 0 is bad) with next observation

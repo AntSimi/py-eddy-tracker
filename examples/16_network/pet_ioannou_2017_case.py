@@ -52,7 +52,6 @@ def start_axes(title=""):
     ax.set_xlim(19, 29), ax.set_ylim(31, 35.5)
     ax.set_aspect("equal")
     ax.set_title(title, weight="bold")
-    ax.update_env()
     return ax
 
 
@@ -122,7 +121,6 @@ a = Anim(
     field_txt="segment",
 )
 a.ax.set_xlim(19, 30), a.ax.set_ylim(32, 35.25)
-a.ax.update_env()
 a.txt.set_position((21.5, 32.7))
 # We display in video only from the 100th day to the 500th
 kwargs = dict(frames=arange(*a.period)[100:501], interval=100)
