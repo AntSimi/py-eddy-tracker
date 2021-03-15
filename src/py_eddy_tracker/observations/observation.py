@@ -383,6 +383,29 @@ class EddiesObservations(object):
             if candidate in handler.dimensions.keys():
                 return candidate
 
+    def remove_fields(self, *fields):
+        """
+        Copy with fields listed remove
+        """
+        nb_obs = self.obs.shape[0]
+        fields = set(fields)
+        only_variables = set(self.obs.dtype.names) - fields
+        track_extra_variables = set(self.track_extra_variables) - fields
+        array_variables = set(self.array_variables) - fields
+        new = self.__class__(
+            size=nb_obs,
+            track_extra_variables=track_extra_variables,
+            track_array_variables=self.track_array_variables,
+            array_variables=array_variables,
+            only_variables=only_variables,
+            raw_data=self.raw_data,
+        )
+        new.sign_type = self.sign_type
+        for name in new.obs.dtype.names:
+            logger.debug("Copy of field %s ...", name)
+            new.obs[name] = self.obs[name]
+        return new
+
     def add_fields(self, fields=list(), array_fields=list()):
         """
         Add a new field.
@@ -401,10 +424,9 @@ class EddiesObservations(object):
             raw_data=self.raw_data,
         )
         new.sign_type = self.sign_type
-        for field in self.obs.dtype.descr:
-            logger.debug("Copy of field %s ...", field)
-            var = field[0]
-            new.obs[var] = self.obs[var]
+        for name in self.obs.dtype.names:
+            logger.debug("Copy of field %s ...", name)
+            new.obs[name] = self.obs[name]
         return new
 
     def add_rotation_type(self):
