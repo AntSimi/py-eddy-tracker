@@ -14,7 +14,7 @@ Example use a method similar to `AVISO flse`_
 
 from matplotlib import pyplot as plt
 from numba import njit
-from numpy import arange, empty, isnan, log2, ma, meshgrid, zeros
+from numpy import arange, arctan2, empty, isnan, log2, ma, meshgrid, ones, pi, zeros
 
 from py_eddy_tracker import start_logger
 from py_eddy_tracker.data import get_path
@@ -39,7 +39,7 @@ c = GridCollection.from_netcdf_cube(
 # Methods to compute FSLE
 # -----------------------
 @njit(cache=True, fastmath=True)
-def check_p(x, y, g, m, dt, dist_init=0.02, dist_max=0.6):
+def check_p(x, y, flse, theta, m_set, m, dt, dist_init=0.02, dist_max=0.6):
     """
     Check if distance between eastern or northern particle to center particle is bigger than `dist_max`
     """
@@ -60,11 +60,17 @@ def check_p(x, y, g, m, dt, dist_init=0.02, dist_max=0.6):
         de = dxe ** 2 + dye ** 2
 
         if dn >= delta or de >= delta:
-            s1 = dxe ** 2 + dxn ** 2 + dye ** 2 + dyn ** 2
+            s1 = dn + de
+            at1 = 2 * (dxe * dxn + dye * dyn)
+            at2 = de - dn
             s2 = ((dxn + dye) ** 2 + (dxe - dyn) ** 2) * (
                 (dxn - dye) ** 2 + (dxe + dyn) ** 2
             )
-            g[i] = 1 / (2 * dt) * log2(1 / (2 * dist_init ** 2) * (s1 + s2 ** 0.5))
+            flse[i] = 1 / (2 * dt) * log2(1 / (2 * dist_init ** 2) * (s1 + s2 ** 0.5))
+            theta[i] = arctan2(at1, at2 + s2) * 180 / pi
+            # To know where value are set
+            m_set[i] = False
+            # To stop partcile advection
             m[i0], m[i_n], m[i_e] = True, True, True
 
 
@@ -110,10 +116,9 @@ backward = True
 # Particles
 # ---------
 x0_, y0_ = -5, 30
-lon_p, lat_p = arange(x0_, x0_ + 43, step_grid_out), arange(
-    y0_, y0_ + 16, step_grid_out
-)
-x0, y0 = meshgrid(lon_p, lat_p)
+lon_p = arange(x0_, x0_ + 43, step_grid_out)
+lat_p = arange(y0_, y0_ + 16, step_grid_out)
+y0, x0 = meshgrid(lat_p, lon_p)
 grid_shape = x0.shape
 x0, y0 = x0.reshape(-1), y0.reshape(-1)
 # Identify all particle not on land
@@ -126,6 +131,8 @@ x0, y0 = x0[m], y0[m]
 
 # Array to compute fsle
 fsle = zeros(x0.shape[0], dtype="f4")
+theta = zeros(x0.shape[0], dtype="f4")
+mask = ones(x0.shape[0], dtype="f4")
 x, y = build_triplet(x0, y0, dist_init)
 used = zeros(x.shape[0], dtype="bool")
 
@@ -137,20 +144,23 @@ p = c.advect(x, y, "u", "v", time_step=86400 / time_step_by_days, **kw)
 for i in range(time_step_by_days * nb_days):
     t, xt, yt = p.__next__()
     dt = t / 86400.0 - t0
-    check_p(xt, yt, fsle, used, dt, dist_max=dist_max, dist_init=dist_init)
+    check_p(xt, yt, fsle, theta, mask, used, dt, dist_max=dist_max, dist_init=dist_init)
 
 # Get index with original_position
 i = ((x0 - x0_) / step_grid_out).astype("i4")
 j = ((y0 - y0_) / step_grid_out).astype("i4")
 fsle_ = empty(grid_shape, dtype="f4")
-used_ = zeros(grid_shape, dtype="bool")
-fsle_[j, i] = fsle
-used_[j, i] = used[::3]
+theta_ = empty(grid_shape, dtype="f4")
+mask_ = ones(grid_shape, dtype="bool")
+fsle_[i, j] = fsle
+theta_[i, j] = theta
+mask_[i, j] = mask
 # Create a grid object
 fsle_custom = RegularGridDataset.with_array(
     coordinates=("lon", "lat"),
     datas=dict(
-        fsle=ma.array(fsle_.T, mask=~used_.T),
+        fsle=ma.array(fsle_, mask=mask_),
+        theta=ma.array(theta_, mask=mask_),
         lon=lon_p,
         lat=lat_p,
     ),
@@ -167,5 +177,17 @@ ax.set_aspect("equal")
 ax.set_title("Finite size lyapunov exponent", weight="bold")
 kw = dict(cmap="viridis_r", vmin=-15, vmax=0)
 m = fsle_custom.display(ax, 1 / fsle_custom.grid("fsle"), **kw)
+ax.grid()
+cb = plt.colorbar(m, cax=fig.add_axes([0.94, 0.05, 0.01, 0.9]))
+# %%
+# Display Theta
+# -------------
+fig = plt.figure(figsize=(13, 5), dpi=150)
+ax = fig.add_axes([0.03, 0.03, 0.90, 0.94])
+ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)
+ax.set_aspect("equal")
+ax.set_title("Theta from finite size lyapunov exponent", weight="bold")
+kw = dict(cmap="Spectral_r", vmin=-180, vmax=180)
+m = fsle_custom.display(ax, fsle_custom.grid("theta"), **kw)
 ax.grid()
 cb = plt.colorbar(m, cax=fig.add_axes([0.94, 0.05, 0.01, 0.9]))
