@@ -282,7 +282,7 @@ def anim():
     parser.add_argument(
         "--first_centered",
         action="store_true",
-        help="Longitude will be centered on first obs, if there are only one group.",
+        help="Longitude will be centered on first obs.",
     )
     parser.add_argument(
         "--field", default="time", help="Field use to color contour instead of time"
@@ -310,13 +310,13 @@ def anim():
                 "You need to specify id to display or ask explicity all with --all option"
             )
         eddies = eddies.extract_ids(args.id)
-        if args.first_centered:
-            # TODO: include observatin class
-            x0 = eddies.lon[0]
-            eddies.lon[:] = (eddies.lon - x0 + 180) % 360 + x0 - 180
-            eddies.contour_lon_e[:] = (
-                (eddies.contour_lon_e.T - eddies.lon + 180) % 360 + eddies.lon - 180
-            ).T
+    if args.first_centered:
+        # TODO: include to observation class
+        x0 = eddies.lon[0]
+        eddies.lon[:] = (eddies.lon - x0 + 180) % 360 + x0 - 180
+        eddies.contour_lon_e[:] = (
+            (eddies.contour_lon_e.T - eddies.lon + 180) % 360 + eddies.lon - 180
+        ).T
 
     kw = dict()
     if args.mp4:
