@@ -3,39 +3,18 @@ Replay segmentation
 ===================
 Case from figure 10 from https://doi.org/10.1002/2017JC013158
 
+Again with the Ierapetra Eddy
 """
-
-# %%
-# Again with the Ierapetra Eddy
-
 from datetime import datetime, timedelta
 
-import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
+from numpy import where
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.data import get_path
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
-
-
-# %%
-# Function used to do quick display
-class VideoAnimation(FuncAnimation):
-    def _repr_html_(self, *args, **kwargs):
-        """To get video in html and have a player"""
-        return self.to_html5_video()
-
-    def save(self, *args, **kwargs):
-        if args[0].endswith("gif"):
-            # In this case gif is use to create thumbnail which are not use but consume same time than video
-            # So we create an empty file, to save time
-            with open(args[0], "w") as _:
-                pass
-            return
-        return super().save(*args, **kwargs)
 
 
 @FuncFormatter
@@ -93,12 +72,6 @@ class MyTrackEddiesObservations(TrackEddiesObservations):
             ids["next_obs"][i_next] = i_next_
             # Target was previously used
             if used[i_next_]:
-                # if ids["next_cost"][i_next] == ids["previous_cost"][i_next_]:
-                #     print(ids[i_next])
-                #     print(ids[i_next_])
-                #     m = ids["track"][i_next_:] == ids["track"][i_next_]
-                #     ids["track"][i_next_:][m] = track_id
-                #     ids["previous_obs"][i_next_] = i_next
                 i_next_ = -1
             else:
                 ids["previous_obs"][i_next_] = i_next
@@ -107,7 +80,7 @@ class MyTrackEddiesObservations(TrackEddiesObservations):
 
 def get_obs(dataset):
     "Function to isolate a specific obs"
-    return np.where(
+    return where(
         (dataset.lat > 33)
         * (dataset.lat < 34)
         * (dataset.lon > 22)
@@ -119,9 +92,7 @@ def get_obs(dataset):
 
 # %%
 # Get original network, we will isolate only relative at order *2*
-n = NetworkObservations.load_file(get_path("Anticyclonic_seg.nc"))
-
-n = n.extract_with_mask(n.track == n.track[get_obs(n)])
+n = NetworkObservations.load_file(get_path("network_med.nc")).network(651)
 n_ = n.relative(get_obs(n), order=2)
 
 # %%

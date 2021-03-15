@@ -8,10 +8,11 @@ import re
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.colors import ListedColormap
-from numpy import ones
+from numpy import ones, where
 
 import py_eddy_tracker.gui
-from py_eddy_tracker import data
+from py_eddy_tracker.data import get_path
+from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 
@@ -21,7 +22,7 @@ class VideoAnimation(FuncAnimation):
         """To get video in html and have a player"""
         content = self.to_html5_video()
         return re.sub(
-            'width="[0-9]*"\sheight="[0-9]*"', 'width="100%" height="100%"', content
+            r'width="[0-9]*"\sheight="[0-9]*"', 'width="100%" height="100%"', content
         )
 
     def save(self, *args, **kwargs):
@@ -32,6 +33,18 @@ class VideoAnimation(FuncAnimation):
                 pass
             return
         return super().save(*args, **kwargs)
+
+
+def get_obs(dataset):
+    "Function to isolate a specific obs"
+    return where(
+        (dataset.lat > 33)
+        * (dataset.lat < 34)
+        * (dataset.lon > 22)
+        * (dataset.lon < 23)
+        * (dataset.time > 20630)
+        * (dataset.time < 20650)
+    )[0][0]
 
 
 # %%
@@ -54,11 +67,16 @@ class MyTrack(TrackEddiesObservations):
 # Load data
 # ---------
 # Load data where observations are put in same network but no segmentation
-e = MyTrack.load_file(data.get_path("c568803.nc"))
-# FIXME : Must be rewrote
-e.lon[:] = (e.lon + 180) % 360 - 180
-e.contour_lon_e[:] = ((e.contour_lon_e.T - e.lon + 180) % 360 - 180 + e.lon).T
-e.contour_lon_s[:] = ((e.contour_lon_s.T - e.lon + 180) % 360 - 180 + e.lon).T
+
+# Get a known network for the demonstration
+n = NetworkObservations.load_file(get_path("network_med.nc")).network(651)
+# We keep only some segment
+n = n.relative(get_obs(n), order=2)
+print(len(n))
+# We convert and order object like segmentation was never happen on observations
+e = n.astype(MyTrack)
+e.obs.sort(order=("track", "time"), kind="stable")
+
 # %%
 # Do segmentation
 # ---------------
@@ -85,10 +103,10 @@ def update(i_frame):
     return (mappable_tracks,)
 
 
-fig = plt.figure(figsize=(15, 8), dpi=60)
+fig = plt.figure(figsize=(16, 9), dpi=60)
 ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
 ax.set_title(f"{len(e)} observations to segment")
-ax.set_xlim(-13, 20), ax.set_ylim(-36.5, -20), ax.grid()
+ax.set_xlim(19, 29), ax.set_ylim(31, 35.5), ax.grid()
 vmax = TRACKS[-1].max()
 cmap = ListedColormap(["gray", *e.COLORS[:-1]], name="from_list", N=vmax)
 mappable_tracks = ax.scatter(

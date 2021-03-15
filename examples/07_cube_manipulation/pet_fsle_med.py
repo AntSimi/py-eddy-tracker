@@ -70,7 +70,7 @@ def check_p(x, y, flse, theta, m_set, m, dt, dist_init=0.02, dist_max=0.6):
             theta[i] = arctan2(at1, at2 + s2) * 180 / pi
             # To know where value are set
             m_set[i] = False
-            # To stop partcile advection
+            # To stop particle advection
             m[i0], m[i_n], m[i_e] = True, True, True
 
 

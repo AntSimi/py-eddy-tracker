@@ -24,7 +24,7 @@ class VideoAnimation(FuncAnimation):
         """To get video in html and have a player"""
         content = self.to_html5_video()
         return re.sub(
-            'width="[0-9]*"\sheight="[0-9]*"', 'width="100%" height="100%"', content
+            r'width="[0-9]*"\sheight="[0-9]*"', 'width="100%" height="100%"', content
         )
 
     def save(self, *args, **kwargs):
@@ -93,7 +93,7 @@ t1 = (datetime(2005, 6, 1) - datetime(1950, 1, 1)).days
 
 # %%
 # Get data from period and area
-e = EddiesObservations.load_file(data.get_path("Anticyclonic_seg.nc"))
+e = EddiesObservations.load_file(data.get_path("network_med.nc"))
 e = e.extract_with_mask((e.time >= t0) * (e.time < t1)).extract_with_area(
     dict(llcrnrlon=25, urcrnrlon=35, llcrnrlat=31, urcrnrlat=37.5)
 )
@@ -134,7 +134,7 @@ def update(frame):
 # ----
 fig = plt.figure(figsize=(16, 9), dpi=50)
 ax = fig.add_axes([0, 0, 1, 1])
-ax.set_aspect("equal"), ax.grid(), ax.set_xlim(26, 34), ax.set_ylim(32, 36.5)
+ax.set_aspect("equal"), ax.grid(), ax.set_xlim(26, 34), ax.set_ylim(31, 35.5)
 groups = ax.scatter(
     e.lon,
     e.lat,
@@ -145,6 +145,6 @@ groups = ax.scatter(
 )
 current_contour = ax.plot([], [], "k", lw=2, label="Current contour")[0]
 matched_contour = ax.plot([], [], "r", lw=1, ls="--", label="Candidate contour")[0]
-txt = ax.text(31.5, 35.5, "", fontsize=25)
+txt = ax.text(29, 35, "", fontsize=25)
 ax.legend(fontsize=25)
 ani = VideoAnimation(fig, update, frames=len(NETWORK_GROUPS), interval=220)

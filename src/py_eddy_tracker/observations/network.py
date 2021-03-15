@@ -905,6 +905,12 @@ class NetworkObservations(GroupEddiesObservations):
     def network(self, id_network):
         return self.extract_with_mask(self.network_slice(id_network))
 
+    def networks(self, id_networks):
+        m = zeros(self.track.shape, dtype=bool)
+        for tr in id_networks:
+            m[self.network_slice(tr)] = True
+        return self.extract_with_mask(m)
+
     @classmethod
     def __tag_segment(cls, seg, tag, groups, connexions):
         """
@@ -981,6 +987,13 @@ class NetworkObservations(GroupEddiesObservations):
 
     def remove_dead_end(self, nobs=3, ndays=0, recursive=0, mask=None):
         """
+        Remove short segment which didn't connect several segment
+
+        :param int nobs: Minimal number of observation to keep segment
+        :param int ndays: Minimal number of days to keep segment
+        :param int recursive: Run  method N times more
+        :param int mask: if one or more observation of segment are select by mask, the segment is keep
+
         .. warning::
             It will remove short segment which splits than merges with same segment
         """

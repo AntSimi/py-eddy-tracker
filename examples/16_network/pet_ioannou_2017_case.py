@@ -3,25 +3,22 @@ Ioannou case
 ============
 Figure 10 from https://doi.org/10.1002/2017JC013158
 
+We want to find the Ierapetra Eddy described above in a network demonstration run.
 """
 
 # %%
-# We want to find the Ierapetra Eddy described above in the networks
-
 import re
-
-# %%
 from datetime import datetime, timedelta
 
-import numpy as np
 from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
+from numpy import arange, where
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
-from py_eddy_tracker.data import get_remote_sample
+from py_eddy_tracker.data import get_path
 from py_eddy_tracker.observations.network import NetworkObservations
 
 
@@ -74,23 +71,8 @@ def update_axes(ax, mappable=None):
 
 
 # %%
-# We know the position and the time of a specific eddy
-#
-# `n.extract_with_mask` give us the corresponding network
-n = NetworkObservations.load_file(
-    get_remote_sample(
-        "eddies_med_adt_allsat_dt2018_err70_filt500_order1/Anticyclonic_network.nc"
-    )
-)
-i = np.where(
-    (n.lat > 33)
-    * (n.lat < 34)
-    * (n.lon > 22)
-    * (n.lon < 23)
-    * (n.time > 20630)
-    * (n.time < 20650)
-)[0][0]
-ioannou_case = n.extract_with_mask(n.track == n.track[i])
+# We know the network ID, we will get directly
+ioannou_case = NetworkObservations.load_file(get_path("network_med.nc")).network(651)
 print(ioannou_case.infos())
 
 # %%
@@ -113,7 +95,7 @@ _ = ioannou_case.display_timeline(ax)
 # Sub network and new numbering
 # -----------------------------
 # Here we chose to keep only the order 3 segments relatives to our chosen eddy
-i = np.where(
+i = where(
     (ioannou_case.lat > 33)
     * (ioannou_case.lat < 34)
     * (ioannou_case.lon > 22)
@@ -128,22 +110,22 @@ close_to_i3.numbering_segment()
 # Anim
 # ----
 # Quick movie to see better!
-cmap = colors.ListedColormap(
-    list(close_to_i3.COLORS), name="from_list", N=close_to_i3.segment.max()
-)
 a = Anim(
     close_to_i3,
     figsize=(12, 4),
-    cmap=cmap,
+    cmap=colors.ListedColormap(
+        list(close_to_i3.COLORS), name="from_list", N=close_to_i3.segment.max() + 1
+    ),
     nb_step=7,
-    dpi=80,
+    dpi=70,
     field_color="segment",
     field_txt="segment",
 )
 a.ax.set_xlim(19, 30), a.ax.set_ylim(32, 35.25)
 a.ax.update_env()
 a.txt.set_position((21.5, 32.7))
-kwargs = dict(frames=np.arange(*a.period), interval=100)
+# We display in video only from the 100th day to the 500th
+kwargs = dict(frames=arange(*a.period)[100:501], interval=100)
 ani = VideoAnimation(a.fig, a.func_animation, **kwargs)
 
 # %%
