@@ -463,8 +463,6 @@ def quick_compare():
     )
     parser.contour_intern_arg()
     args = parser.parse_args()
-    if args.path_out is not None and not exists(args.path_out):
-        mkdir(args.path_out)
 
     kw = dict(
         include_vars=[
@@ -474,6 +472,9 @@ def quick_compare():
     )
     if args.area:
         kw["include_vars"].append("speed_area" if args.intern else "effective_area")
+
+    if args.path_out is not None:
+        kw = dict()
 
     ref = EddiesObservations.load_file(args.ref, **kw)
     print(f"[ref] {args.ref} -> {len(ref)} obs")
@@ -492,6 +493,21 @@ def quick_compare():
         )
         groups_ref[other_] = gr1
         groups_other[other_] = gr2
+
+    if args.path_out is not None:
+        if not exists(args.path_out):
+            mkdir(args.path_out)
+        for i, other_ in enumerate(args.others):
+            dirname_ = f"{args.path_out}/{other_.replace('/', '_')}/"
+            if not exists(dirname_):
+                mkdir(dirname_)
+            for k, v in groups_other[other_].items():
+                basename_ = f"other_{k}.nc"
+                others[other_].index(v).write_file(filename=f"{dirname_}/{basename_}")
+            for k, v in groups_ref[other_].items():
+                basename_ = f"ref_{k}.nc"
+                ref.index(v).write_file(filename=f"{dirname_}/{basename_}")
+        return
 
     def display(value, ref=None):
         outs = list()
