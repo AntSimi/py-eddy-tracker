@@ -2,7 +2,6 @@
 Network group process
 =====================
 """
-# sphinx_gallery_thumbnail_number = 2
 import re
 from datetime import datetime
 
@@ -147,6 +146,8 @@ ani = VideoAnimation(fig, update, frames=len(NETWORK_GROUPS), interval=220)
 # %%
 # Final Result
 # -----------
+
+# sphinx_gallery_thumbnail_number = 2
 fig = plt.figure(figsize=(16, 9))
 ax = fig.add_axes([0, 0, 1, 1])
 ax.set_aspect("equal"), ax.grid(), ax.set_xlim(26, 34), ax.set_ylim(31, 35.5)
