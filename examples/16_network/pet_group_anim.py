@@ -135,16 +135,19 @@ def update(frame):
 fig = plt.figure(figsize=(16, 9), dpi=50)
 ax = fig.add_axes([0, 0, 1, 1])
 ax.set_aspect("equal"), ax.grid(), ax.set_xlim(26, 34), ax.set_ylim(31, 35.5)
-groups = ax.scatter(
-    e.lon,
-    e.lat,
-    c=NETWORK_GROUPS[0][2],
-    cmap=ListedColormap(["gray", *e.COLORS[:-1]], name="from_list", N=30),
-    vmin=0,
-    vmax=30,
-)
+cmap = ListedColormap(["gray", *e.COLORS[:-1]], name="from_list", N=30)
+kw_s = dict(cmap=cmap, vmin=0, vmax=30)
+groups = ax.scatter(e.lon, e.lat, c=NETWORK_GROUPS[0][2], **kw_s)
 current_contour = ax.plot([], [], "k", lw=2, label="Current contour")[0]
 matched_contour = ax.plot([], [], "r", lw=1, ls="--", label="Candidate contour")[0]
 txt = ax.text(29, 35, "", fontsize=25)
 ax.legend(fontsize=25)
 ani = VideoAnimation(fig, update, frames=len(NETWORK_GROUPS), interval=220)
+
+# %%
+# Final Result
+# -----------
+fig = plt.figure(figsize=(16, 9))
+ax = fig.add_axes([0, 0, 1, 1])
+ax.set_aspect("equal"), ax.grid(), ax.set_xlim(26, 34), ax.set_ylim(31, 35.5)
+_ = ax.scatter(e.lon, e.lat, c=NETWORK_GROUPS[-1][2], **kw_s)

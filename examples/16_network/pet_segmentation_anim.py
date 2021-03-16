@@ -116,3 +116,11 @@ mappable_CONTOUR = ax.plot(
     e.contour_lon_e[INDICES[0]], e.contour_lat_e[INDICES[0]], color=cmap.colors[0]
 )[0]
 ani = VideoAnimation(fig, update, frames=range(1, len(TRACKS), 4), interval=125)
+
+# %%
+# Final Result
+# -----------
+fig = plt.figure(figsize=(16, 9))
+ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
+ax.set_xlim(19, 29), ax.set_ylim(31, 35.5), ax.grid()
+_ = ax.scatter(e.lon, e.lat, c=TRACKS[-1], cmap=cmap, vmin=0, vmax=vmax, s=20)
