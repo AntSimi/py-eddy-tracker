@@ -2,7 +2,7 @@
 Network group process
 =====================
 """
-
+# sphinx_gallery_thumbnail_number = 2
 import re
 from datetime import datetime
 
