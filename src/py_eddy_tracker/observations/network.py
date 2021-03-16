@@ -490,6 +490,8 @@ class NetworkObservations(GroupEddiesObservations):
 
         # TODO : fill mappables dict
         y_seg = dict()
+        _time = self.time
+
         if field is not None and method != "all":
             for i, b0, _ in self.iter_on("segment"):
                 y = self[field][i]
@@ -497,7 +499,7 @@ class NetworkObservations(GroupEddiesObservations):
                     y_seg[b0] = y.mean() * factor
         mappables = dict()
         for i, b0, b1 in self.iter_on("segment"):
-            x = self.time[i]
+            x = _time[i]
             if x.shape[0] == 0:
                 continue
 
@@ -532,7 +534,7 @@ class NetworkObservations(GroupEddiesObservations):
                         else y_seg[seg_next]
                     )
                 )
-                ax.plot((x[-1], self.time[i_n]), (y0, y1), **event_kw)[0]
+                ax.plot((x[-1], _time[i_n]), (y0, y1), **event_kw)[0]
                 events["merging"].append((x[-1], y0))
 
             if i_p != -1:
@@ -548,7 +550,7 @@ class NetworkObservations(GroupEddiesObservations):
                         else y_seg[seg_previous]
                     )
                 )
-                ax.plot((x[0], self.time[i_p]), (y0, y1), **event_kw)[0]
+                ax.plot((x[0], _time[i_p]), (y0, y1), **event_kw)[0]
                 events["spliting"].append((x[0], y0))
 
             j += 1
