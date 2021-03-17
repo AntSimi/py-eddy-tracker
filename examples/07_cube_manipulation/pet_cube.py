@@ -1,42 +1,23 @@
 """
-Grid advection
+Time advection
 ==============
 
-Dummy advection which use only static geostrophic current, which didn't solve the complex circulation of the ocean.
+Example which use CMEMS surface current with a Runge-Kutta 4 algorithm to advect particles.
 """
+# sphinx_gallery_thumbnail_number = 2
 import re
+from datetime import datetime, timedelta
 
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from numpy import arange, isnan, meshgrid, ones
 
 import py_eddy_tracker.gui
+from py_eddy_tracker import start_logger
 from py_eddy_tracker.data import get_path
-from py_eddy_tracker.dataset.grid import RegularGridDataset
-from py_eddy_tracker.observations.observation import EddiesObservations
+from py_eddy_tracker.dataset.grid import GridCollection
 
-# %%
-# Load Input grid ADT
-g = RegularGridDataset(
-    get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
-)
-# Compute u/v from height
-g.add_uv("adt")
-
-# %%
-# Load detection files
-a = EddiesObservations.load_file(get_path("Anticyclonic_20160515.nc"))
-c = EddiesObservations.load_file(get_path("Cyclonic_20160515.nc"))
-
-
-# %%
-# Quiver from u/v with eddies
-fig = plt.figure(figsize=(10, 5))
-ax = fig.add_axes([0, 0, 1, 1], projection="full_axes")
-ax.set_xlim(19, 30), ax.set_ylim(31, 36.5), ax.grid()
-x, y = meshgrid(g.x_c, g.y_c)
-a.filled(ax, facecolors="r", alpha=0.1), c.filled(ax, facecolors="b", alpha=0.1)
-_ = ax.quiver(x.T, y.T, g.grid("u"), g.grid("v"), scale=20)
+start_logger().setLevel("ERROR")
 
 
 # %%
@@ -59,6 +40,19 @@ class VideoAnimation(FuncAnimation):
 
 
 # %%
+# Data
+# ----
+# Load Input time grid ADT
+c = GridCollection.from_netcdf_cube(
+    get_path("dt_med_allsat_phy_l4_2005T2.nc"),
+    "longitude",
+    "latitude",
+    "time",
+    # To create U/V variable
+    heigth="adt",
+)
+
+# %%
 # Anim
 # ----
 # Particles setup
@@ -66,65 +60,38 @@ step_p = 1 / 8
 x, y = meshgrid(arange(13, 36, step_p), arange(28, 40, step_p))
 x, y = x.reshape(-1), y.reshape(-1)
 # Remove all original position that we can't advect at first place
-m = ~isnan(g.interp("u", x, y))
+t0 = 20181
+m = ~isnan(c[t0].interp("u", x, y))
 x0, y0 = x[m], y[m]
 x, y = x0.copy(), y0.copy()
-
-# %%
-# Movie properties
-kwargs = dict(frames=arange(51), interval=100)
-kw_p = dict(nb_step=2, time_step=21600)
-frame_t = kw_p["nb_step"] * kw_p["time_step"] / 86400.0
 
 
 # %%
 # Function
 def anim_ax(**kw):
-    t = 0
     fig = plt.figure(figsize=(10, 5), dpi=55)
     axes = fig.add_axes([0, 0, 1, 1], projection="full_axes")
     axes.set_xlim(19, 30), axes.set_ylim(31, 36.5), axes.grid()
-    a.filled(axes, facecolors="r", alpha=0.1), c.filled(axes, facecolors="b", alpha=0.1)
     line = axes.plot([], [], "k", **kw)[0]
-    return fig, axes.text(21, 32.1, ""), line, t
+    return fig, axes.text(21, 32.1, ""), line
 
 
-def update(i_frame, t_step):
-    global t
-    x, y = p.__next__()
-    t += t_step
-    l.set_data(x, y)
-    txt.set_text(f"T0 + {t:.1f} days")
+def update(_):
+    tt, xt, yt = f.__next__()
+    mappable.set_data(xt, yt)
+    d = timedelta(tt / 86400.0) + datetime(1950, 1, 1)
+    txt.set_text(f"{d:%Y/%m/%d-%H}")
 
 
 # %%
-# Filament forward
-# ^^^^^^^^^^^^^^^^
-# Draw 3 last position in one path for each particles.,
-# it could be run backward with `backward=True` option in filament method
-p = g.filament(x, y, "u", "v", **kw_p, filament_size=3)
-fig, txt, l, t = anim_ax(lw=0.5)
-_ = VideoAnimation(fig, update, **kwargs, fargs=(frame_t,))
+f = c.filament(x, y, "u", "v", t_init=t0, nb_step=2, time_step=21600, filament_size=3)
+fig, txt, mappable = anim_ax(lw=0.5)
+ani = VideoAnimation(fig, update, frames=arange(160), interval=100)
+
 
 # %%
-# Particle forward
-# ^^^^^^^^^^^^^^^^^
-# Forward advection of particles
-p = g.advect(x, y, "u", "v", **kw_p)
-fig, txt, l, t = anim_ax(ls="", marker=".", markersize=1)
-_ = VideoAnimation(fig, update, **kwargs, fargs=(frame_t,))
-
-# %%
-# We get last position and run backward until original position
-p = g.advect(x, y, "u", "v", **kw_p, backward=True)
-fig, txt, l, _ = anim_ax(ls="", marker=".", markersize=1)
-_ = VideoAnimation(fig, update, **kwargs, fargs=(-frame_t,))
-
-# %%
-# Particles stat
-# --------------
-
-# %%
+# Particules stat
+# ---------------
 # Time_step settings
 # ^^^^^^^^^^^^^^^^^^
 # Dummy experiment to test advection precision, we run particles 50 days forward and backward with different time step
@@ -132,16 +99,23 @@ _ = VideoAnimation(fig, update, **kwargs, fargs=(-frame_t,))
 fig = plt.figure()
 ax = fig.add_subplot(111)
 kw = dict(
-    bins=arange(0, 50, 0.001),
+    bins=arange(0, 50, 0.002),
     cumulative=True,
     weights=ones(x0.shape) / x0.shape[0] * 100.0,
     histtype="step",
 )
+kw_p = dict(u_name="u", v_name="v", nb_step=1)
 for time_step in (10800, 21600, 43200, 86400):
     x, y = x0.copy(), y0.copy()
-    kw_advect = dict(nb_step=int(50 * 86400 / time_step), time_step=time_step)
-    g.advect(x, y, "u", "v", **kw_advect).__next__()
-    g.advect(x, y, "u", "v", **kw_advect, backward=True).__next__()
+    nb = int(30 * 86400 / time_step)
+    # Go forward
+    p = c.advect(x, y, time_step=time_step, t_init=20181.5, **kw_p)
+    for i in range(nb):
+        t_, _, _ = p.__next__()
+    # Go backward
+    p = c.advect(x, y, time_step=time_step, backward=True, t_init=t_ / 86400.0, **kw_p)
+    for i in range(nb):
+        t_, _, _ = p.__next__()
     d = ((x - x0) ** 2 + (y - y0) ** 2) ** 0.5
     ax.hist(d, **kw, label=f"{86400. / time_step:.0f} time step by day")
 ax.set_xlim(0, 0.25), ax.set_ylim(0, 100), ax.legend(loc="lower right"), ax.grid()
@@ -156,11 +130,17 @@ _ = ax.set_ylabel("Percent of particles with distance lesser than")
 fig = plt.figure()
 ax = fig.add_subplot(111)
 time_step = 10800
-for duration in (5, 50, 100):
+for duration in (10, 40, 80):
     x, y = x0.copy(), y0.copy()
-    kw_advect = dict(nb_step=int(duration * 86400 / time_step), time_step=time_step)
-    g.advect(x, y, "u", "v", **kw_advect).__next__()
-    g.advect(x, y, "u", "v", **kw_advect, backward=True).__next__()
+    nb = int(duration * 86400 / time_step)
+    # Go forward
+    p = c.advect(x, y, time_step=time_step, t_init=20181.5, **kw_p)
+    for i in range(nb):
+        t_, _, _ = p.__next__()
+    # Go backward
+    p = c.advect(x, y, time_step=time_step, backward=True, t_init=t_ / 86400.0, **kw_p)
+    for i in range(nb):
+        t_, _, _ = p.__next__()
     d = ((x - x0) ** 2 + (y - y0) ** 2) ** 0.5
     ax.hist(d, **kw, label=f"Time duration {duration} days")
 ax.set_xlim(0, 0.25), ax.set_ylim(0, 100), ax.legend(loc="lower right"), ax.grid()

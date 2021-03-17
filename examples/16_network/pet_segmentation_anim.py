@@ -2,7 +2,7 @@
 Network segmentation process
 ============================
 """
-
+# sphinx_gallery_thumbnail_number = 2
 import re
 
 from matplotlib import pyplot as plt
@@ -120,8 +120,6 @@ ani = VideoAnimation(fig, update, frames=range(1, len(TRACKS), 4), interval=125)
 # %%
 # Final Result
 # -----------
-
-# sphinx_gallery_thumbnail_number = 2
 fig = plt.figure(figsize=(16, 9))
 ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
 ax.set_xlim(19, 29), ax.set_ylim(31, 35.5), ax.grid()

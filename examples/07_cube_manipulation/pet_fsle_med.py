@@ -31,6 +31,7 @@ c = GridCollection.from_netcdf_cube(
     "longitude",
     "latitude",
     "time",
+    # To create U/V variable
     heigth="adt",
 )
 

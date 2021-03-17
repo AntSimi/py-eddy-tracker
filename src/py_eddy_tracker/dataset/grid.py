@@ -1946,7 +1946,8 @@ class RegularGridDataset(GridDataset):
         :param str,array u_name: U field to advect obs
         :param str,array v_name: V field to advect obs
         :param int nb_step: Number of iteration before to release data
-        :param int time_step: Number of second for each advection
+
+        .. minigallery:: py_eddy_tracker.GridDataset.advect
         """
         u, v, m = self.uv_for_advection(u_name, v_name, **kw)
         m_p = isnan(x) + isnan(y)
@@ -1967,9 +1968,10 @@ class RegularGridDataset(GridDataset):
         :param str,array u_name: U field to advect obs
         :param str,array v_name: V field to advect obs
         :param int nb_step: Number of iteration before to release data
-        :param int time_step: Number of second for each advection
         :param int filament_size: Number of point by filament
         :return: x,y for a line
+
+        .. minigallery:: py_eddy_tracker.GridDataset.filament
         """
         u, v, m = self.uv_for_advection(u_name, v_name, **kw)
         x, y = x.copy(), y.copy()
@@ -2001,6 +2003,9 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
+    nb_x_ = x_g.size - 2
+    nb_x = nb_x_ if is_circular else 0
     # cache
     i_cache, j_cache = -1000000, -1000000
     masked = False
@@ -2015,60 +2020,76 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
         # Iterate on whole steps
         for _ in range(nb_step):
             # k1, slope at origin
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x_, y_)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x_, y_, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
-                    ii_, jj_, u_g, v_g, m_g
-                )
                 i_cache, j_cache = ii_, jj_
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    masked = True
+                else:
+                    masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                        ii_, jj_, u_g, v_g, m_g, nb_x
+                    )
             # The 3 following could be in cache operation but this one must be test in any case
             if masked:
                 x_, y_ = nan, nan
                 m[i] = True
                 break
-            xd, yd = ii - ii_, jj - jj_
             u1, v1 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # k2, slope at middle with first guess position
             x1, y1 = x_ + u1 * 0.5, y_ + v1 * 0.5
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x1, y1)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x1, y1, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
-                    ii_, jj_, u_g, v_g, m_g
-                )
                 i_cache, j_cache = ii_, jj_
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    masked = True
+                else:
+                    masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                        ii_, jj_, u_g, v_g, m_g, nb_x
+                    )
                 if masked:
                     x_, y_ = nan, nan
                     m[i] = True
                     break
-            xd, yd = ii - ii_, jj - jj_
             u2, v2 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # k3, slope at middle with update guess position
             x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x2, y2)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x2, y2, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
-                    ii_, jj_, u_g, v_g, m_g
-                )
                 i_cache, j_cache = ii_, jj_
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    masked = True
+                else:
+                    masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                        ii_, jj_, u_g, v_g, m_g, nb_x
+                    )
                 if masked:
                     x_, y_ = nan, nan
                     m[i] = True
                     break
-            xd, yd = ii - ii_, jj - jj_
             u3, v3 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # k4, slope at end with update guess position
             x3, y3 = x_ + u3, y_ + v3
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x3, y3)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x3, y3, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
-                    ii_, jj_, u_g, v_g, m_g
-                )
                 i_cache, j_cache = ii_, jj_
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    masked = True
+                else:
+                    masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                        ii_, jj_, u_g, v_g, m_g, nb_x
+                    )
                 if masked:
                     x_, y_ = nan, nan
                     m[i] = True
                     break
-            xd, yd = ii - ii_, jj - jj_
             u4, v4 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # RK4 compute
             dx = (u1 + 2 * u2 + 2 * u3 + u4) / 6
@@ -2081,29 +2102,18 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
 
 
 @njit(cache=True)
-def get_uv(x0, y0, x_step, y_step, u, v, m, x, y):
-    i, j = (x - x0) / x_step, (y - y0) / y_step
-    i0, j0 = int(floor(i)), int(floor(j))
-    i1, j1 = i0 + 1, j0 + 1
-    if m[i0, j0] or m[i0, j1] or m[i1, j0] or m[i1, j1]:
-        return nan, nan
-    # Extract value for u and v
-    u00, u01, u10, u11 = u[i0, j0], u[i0, j1], u[i1, j0], u[i1, j1]
-    v00, v01, v10, v11 = v[i0, j0], v[i0, j1], v[i1, j0], v[i1, j1]
-    xd, yd = i - i0, j - j0
-    xd_i, yd_i = 1 - xd, 1 - yd
-    u = (u00 * xd_i + u10 * xd) * yd_i + (u01 * xd_i + u11 * xd) * yd
-    v = (v00 * xd_i + v10 * xd) * yd_i + (v01 * xd_i + v11 * xd) * yd
-    return u, v
-
-
-@njit(cache=True)
 def advect(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
+    nb_x_ = x_g.size - 2
+    nb_x = nb_x_ if is_circular else 0
     # Indices which should be never exist
     i0_old, j0_old = -100000, -100000
+    masked = False
+    u00, u01, u10, u11 = 0.0, 0.0, 0.0, 0.0
+    v00, v01, v10, v11 = 0.0, 0.0, 0.0, 0.0
     # On each particule
     for i in prange(x.size):
         # If particule are not valid => continue
@@ -2111,31 +2121,27 @@ def advect(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
             continue
         # Iterate on whole steps
         for _ in range(nb_step):
-            # Compute coordinates in indice referentiel
-            x_, y_ = (x[i] - x_ref) / x_step, (y[i] - y_ref) / y_step
-            # corner bottom left Indice
-            i0_, j0_ = int(floor(x_)), int(floor(y_))
-            i0, j0 = i0_, j0_
-            i1 = i0 + 1
+            i0, j0, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x[i], y[i], nb_x
+            )
             # corner are the same need only a new xd and yd
             if i0 != i0_old or j0 != j0_old:
-                j1 = j0 + 1
-                # If one of nearest pixel is invalid
-                if m_g[i0, j0] or m_g[i0, j1] or m_g[i1, j0] or m_g[i1, j1]:
-                    x[i], y[i] = nan, nan
-                    m[i] = True
-                    break
-                # Extract value for u and v
-                u00, u01, u10, u11 = u_g[i0, j0], u_g[i0, j1], u_g[i1, j0], u_g[i1, j1]
-                v00, v01, v10, v11 = v_g[i0, j0], v_g[i0, j1], v_g[i1, j0], v_g[i1, j1]
                 # Need to be store only on change
                 i0_old, j0_old = i0, j0
-            # Compute distance
-            xd, yd = x_ - i0_, y_ - j0_
-            xd_i, yd_i = 1 - xd, 1 - yd
+                if not is_circular and (i0 < 0 or i0 > nb_x_):
+                    masked = True
+                else:
+                    masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
+                        i0, j0, u_g, v_g, m_g, nb_x
+                    )
+            if masked:
+                x[i], y[i] = nan, nan
+                m[i] = True
+                break
+            u, v = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
             # Compute new x,y
-            x[i] += (u00 * xd_i + u10 * xd) * yd_i + (u01 * xd_i + u11 * xd) * yd
-            y[i] += (v00 * xd_i + v10 * xd) * yd_i + (v01 * xd_i + v11 * xd) * yd
+            x[i] += u
+            y[i] += v
 
 
 @njit(cache=True, fastmath=True)
@@ -2311,6 +2317,8 @@ class GridCollection:
         :param int time_step: Number of second for each advection
         :param int filament_size: Number of point by filament
         :return: x,y for a line
+
+        .. minigallery:: py_eddy_tracker.GridCollection.filament
         """
         x, y = x.copy(), y.copy()
         nb = x.shape[0]
@@ -2374,6 +2382,20 @@ class GridCollection:
         rk4=True,
         **kw,
     ):
+        """
+        At each call it will update position in place with u & v field
+
+        :param array x: Longitude of obs to move
+        :param array y: Latitude of obs to move
+        :param str,array u_name: U field to advect obs
+        :param str,array v_name: V field to advect obs
+        :param int nb_step: Number of iteration before to release data
+        :param int time_step: Number of second for each advection
+
+        :return: x,y position
+
+        .. minigallery:: py_eddy_tracker.GridCollection.advect
+        """
         backward = kw.get("backward", False)
         if backward:
             generator = self.get_previous_time_step(t_init)
@@ -2449,51 +2471,43 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, hal
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
+    nb_x_ = x_g.size - 2
+    nb_x = nb_x_ if is_circular else 0
     # Indices which should be never exist
     i0_old, j0_old = -100000, -100000
-    # On each particule
+    m0, m1 = False, False
+    u000, u001, u010, u011 = 0.0, 0.0, 0.0, 0.0
+    v000, v001, v010, v011 = 0.0, 0.0, 0.0, 0.0
+    u100, u101, u110, u111 = 0.0, 0.0, 0.0, 0.0
+    v100, v101, v110, v111 = 0.0, 0.0, 0.0, 0.0
+    # On each particle
     for i in prange(x.size):
-        # If particule are not valid => continue
+        # If particle are not valid => continue
         if m[i]:
             continue
         # Iterate on whole steps
         for w in weigths:
-            # Compute coordinates in indice referentiel
-            x_, y_ = (x[i] - x_ref) / x_step, (y[i] - y_ref) / y_step
-            # corner bottom left Indice
-            i0_, j0_ = int(floor(x_)), int(floor(y_))
-            i0, j0 = i0_, j0_
-            i1 = i0 + 1
-            # corner are the same need only a new xd and yd
+            i0, j0, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x[i], y[i], nb_x
+            )
             if i0 != i0_old or j0 != j0_old:
-                j1 = j0 + 1
-                # If one of nearest pixel is invalid
-                if (
-                    m_g0[i0, j0]
-                    or m_g0[i0, j1]
-                    or m_g0[i1, j0]
-                    or m_g0[i1, j1]
-                    or m_g1[i0, j0]
-                    or m_g1[i0, j1]
-                    or m_g1[i1, j0]
-                    or m_g1[i1, j1]
-                ):
-                    x[i], y[i] = nan, nan
-                    m[i] = True
-                    break
-                # Extract value for u and v
-                u000, u001 = u_g0[i0, j0], u_g0[i0, j1]
-                u010, u011 = u_g0[i1, j0], u_g0[i1, j1]
-                v000, v001 = v_g0[i0, j0], v_g0[i0, j1]
-                v010, v011 = v_g0[i1, j0], v_g0[i1, j1]
-                u100, u101 = u_g1[i0, j0], u_g1[i0, j1]
-                u110, u111 = u_g1[i1, j0], u_g1[i1, j1]
-                v100, v101 = v_g1[i0, j0], v_g1[i0, j1]
-                v110, v111 = v_g1[i1, j0], v_g1[i1, j1]
                 # Need to be store only on change
                 i0_old, j0_old = i0, j0
+                if not is_circular and (i0 < 0 or i0 > nb_x_):
+                    m0, m1 = True, True
+                else:
+                    (m0, u000, u001, u010, u011, v000, v001, v010, v011) = get_uv_quad(
+                        i0, j0, u_g0, v_g0, m_g0, nb_x
+                    )
+                    (m1, u100, u101, u110, u111, v100, v101, v110, v111) = get_uv_quad(
+                        i0, j0, u_g1, v_g1, m_g1, nb_x
+                    )
+            if m0 or m1:
+                x[i], y[i] = nan, nan
+                m[i] = True
+                break
             # Compute distance
-            xd, yd = x_ - i0_, y_ - j0_
             xd_i, yd_i = 1 - xd, 1 - yd
             # Compute new x,y
             dx0 = (u000 * xd_i + u010 * xd) * yd_i + (u001 * xd_i + u011 * xd) * yd
@@ -2505,8 +2519,23 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, hal
 
 
 @njit(cache=True, fastmath=True)
-def get_uv_quad(i0, j0, u, v, m):
+def get_uv_quad(i0, j0, u, v, m, nb_x=0):
+    """
+    Return u/v for (i0, j0), (i1, j0), (i0, j1), (i1, j1)
+
+    :param int i0: indices of longitude
+    :param int j0: indices of latitude
+    :param array[float] u: current along x axis
+    :param array[float] v: current along y axis
+    :param array[bool] m: flag to know if position is valid
+    :param int nb_x: If different of 0 we check if wrapping is needed
+
+    :return: if cell is valid 4 u, 4 v
+    :rtype: bool,float,float,float,float,float,float,float,float
+    """
     i1, j1 = i0 + 1, j0 + 1
+    if nb_x != 0:
+        i1 %= nb_x
     if m[i0, j0] or m[i0, j1] or m[i1, j0] or m[i1, j1]:
         return True, nan, nan, nan, nan, nan, nan, nan, nan
     # Extract value for u and v
@@ -2516,14 +2545,45 @@ def get_uv_quad(i0, j0, u, v, m):
 
 
 @njit(cache=True, fastmath=True)
-def get_grid_indices(x0, y0, x_step, y_step, x, y):
+def get_grid_indices(x0, y0, x_step, y_step, x, y, nb_x=0):
+    """
+    Return grid indices and weight
+
+    :param float x0: first longitude
+    :param float y0: first latitude
+    :param float x_step: longitude grid step
+    :param float y_step: latitude grid step
+    :param float x: longitude to interpolate
+    :param float y: latitude to interpolate
+    :param int nb_x: If different of 0 we check if wrapping is needed
+
+    :return: indices and weight
+    :rtype: int,int,float,float
+    """
     i, j = (x - x0) / x_step, (y - y0) / y_step
     i0, j0 = int(floor(i)), int(floor(j))
-    return i0, j0, i, j
+    xd, yd = i - i0, j - j0
+    if nb_x != 0:
+        i0 %= nb_x
+    return i0, j0, xd, yd
 
 
 @njit(cache=True, fastmath=True)
 def interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11):
+    """
+    Return u/v interpolated in cell
+
+    :param float xd: x weight
+    :param float yd: y weight
+    :param float u00: u lower left
+    :param float u01: u upper left
+    :param float u10: u lower right
+    :param float u11: u upper right
+    :param float v00: v lower left
+    :param float v01: v upper left
+    :param float v10: v lower right
+    :param float v11: v upper right
+    """
     xd_i, yd_i = 1 - xd, 1 - yd
     u = (u00 * xd_i + u10 * xd) * yd_i + (u01 * xd_i + u11 * xd) * yd
     v = (v00 * xd_i + v10 * xd) * yd_i + (v01 * xd_i + v11 * xd) * yd
@@ -2537,9 +2597,12 @@ def advect_t_rk4(
     # Grid coordinates
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
+    is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
+    nb_x_ = x_g.size - 2
+    nb_x = nb_x_ if is_circular else 0
     # cache
     i_cache, j_cache = -1000000, -1000000
-    masked0, masked1 = False, False
+    m0, m1 = False, False
     u000, u001, u010, u011 = 0.0, 0.0, 0.0, 0.0
     v000, v001, v010, v011 = 0.0, 0.0, 0.0, 0.0
     u100, u101, u110, u111 = 0.0, 0.0, 0.0, 0.0
@@ -2553,79 +2616,95 @@ def advect_t_rk4(
         # Iterate on whole steps
         for w in weigths:
             # k1, slope at origin
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x_, y_)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x_, y_, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
-                    ii_, jj_, u_g0, v_g0, m_g0
-                )
-                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
-                    ii_, jj_, u_g1, v_g1, m_g1
-                )
                 i_cache, j_cache = ii_, jj_
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    m0, m1 = True, True
+                else:
+                    (m0, u000, u001, u010, u011, v000, v001, v010, v011) = get_uv_quad(
+                        ii_, jj_, u_g0, v_g0, m_g0, nb_x
+                    )
+                    (m1, u100, u101, u110, u111, v100, v101, v110, v111) = get_uv_quad(
+                        ii_, jj_, u_g1, v_g1, m_g1, nb_x
+                    )
             # The 3 following could be in cache operation but this one must be test in any case
-            if masked0 or masked1:
+            if m0 or m1:
                 x_, y_ = nan, nan
                 m[i] = True
                 break
-            xd, yd = ii - ii_, jj - jj_
             u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
             u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             u1, v1 = u0_ * w + u1_ * (1 - w), v0_ * w + v1_ * (1 - w)
             # k2, slope at middle with first guess position
             x1, y1 = x_ + u1 * 0.5, y_ + v1 * 0.5
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x1, y1)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x1, y1, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
-                    ii_, jj_, u_g0, v_g0, m_g0
-                )
-                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
-                    ii_, jj_, u_g1, v_g1, m_g1
-                )
                 i_cache, j_cache = ii_, jj_
-                if masked0 or masked1:
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    m0, m1 = True, True
+                else:
+                    (m0, u000, u001, u010, u011, v000, v001, v010, v011) = get_uv_quad(
+                        ii_, jj_, u_g0, v_g0, m_g0, nb_x
+                    )
+                    (m1, u100, u101, u110, u111, v100, v101, v110, v111) = get_uv_quad(
+                        ii_, jj_, u_g1, v_g1, m_g1, nb_x
+                    )
+                if m0 or m1:
                     x_, y_ = nan, nan
                     m[i] = True
                     break
-            xd, yd = ii - ii_, jj - jj_
             u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
             u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             w_ = w - half_w
             u2, v2 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
             # k3, slope at middle with update guess position
             x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x2, y2)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x2, y2, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
-                    ii_, jj_, u_g0, v_g0, m_g0
-                )
-                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
-                    ii_, jj_, u_g1, v_g1, m_g1
-                )
                 i_cache, j_cache = ii_, jj_
-                if masked0 or masked1:
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    m0, m1 = True, True
+                else:
+                    (m0, u000, u001, u010, u011, v000, v001, v010, v011) = get_uv_quad(
+                        ii_, jj_, u_g0, v_g0, m_g0, nb_x
+                    )
+                    (m1, u100, u101, u110, u111, v100, v101, v110, v111) = get_uv_quad(
+                        ii_, jj_, u_g1, v_g1, m_g1, nb_x
+                    )
+                if m0 or m1:
                     x_, y_ = nan, nan
                     m[i] = True
                     break
-            xd, yd = ii - ii_, jj - jj_
             u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
             u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             u3, v3 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
             # k4, slope at end with update guess position
             x3, y3 = x_ + u3, y_ + v3
-            ii_, jj_, ii, jj = get_grid_indices(x_ref, y_ref, x_step, y_step, x3, y3)
+            ii_, jj_, xd, yd = get_grid_indices(
+                x_ref, y_ref, x_step, y_step, x3, y3, nb_x
+            )
             if ii_ != i_cache or jj_ != j_cache:
-                masked0, u000, u001, u010, u011, v000, v001, v010, v011 = get_uv_quad(
-                    ii_, jj_, u_g0, v_g0, m_g0
-                )
-                masked1, u100, u101, u110, u111, v100, v101, v110, v111 = get_uv_quad(
-                    ii_, jj_, u_g1, v_g1, m_g1
-                )
                 i_cache, j_cache = ii_, jj_
-                if masked0 or masked1:
+                if not is_circular and (ii_ < 0 or ii_ > nb_x_):
+                    m0, m1 = True, True
+                else:
+                    (m0, u000, u001, u010, u011, v000, v001, v010, v011) = get_uv_quad(
+                        ii_, jj_, u_g0, v_g0, m_g0, nb_x
+                    )
+                    (m1, u100, u101, u110, u111, v100, v101, v110, v111) = get_uv_quad(
+                        ii_, jj_, u_g1, v_g1, m_g1, nb_x
+                    )
+                if m0 or m1:
                     x_, y_ = nan, nan
                     m[i] = True
                     break
-            xd, yd = ii - ii_, jj - jj_
             u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
             u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             w_ -= half_w
