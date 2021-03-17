@@ -240,6 +240,59 @@ class NetworkObservations(GroupEddiesObservations):
     def infos(self, label=""):
         return f"{len(self)} obs {unique(self.segment).shape[0]} segments"
 
+    def correct_close_events(self, nb_days_max=20):
+
+        _time = self.time
+        segment = self.segment.copy()
+        segments_connexion = dict()
+
+        previous_obs, next_obs = self.previous_obs, self.next_obs
+
+        # record for every segments, the slice, indice of next obs & indice of previous obs
+        for i, seg, _ in self.iter_on(self.segment):
+            if i.start == i.stop:
+                continue
+
+            i_p, i_n = previous_obs[i.start], next_obs[i.stop - 1]
+            segments_connexion[seg] = [i, i_p, i_n]
+
+        for seg in sorted(segments_connexion.keys()):
+            seg_slice, i_seg_p, i_seg_n = segments_connexion[seg]
+            n_seg = segment[i_seg_n]
+
+            # if segment has splitting
+            if i_seg_n != -1:
+                seg2_slice, i2_seg_p, i2_seg_n = segments_connexion[n_seg]
+                p2_seg = segment[i2_seg_p]
+
+                # if it merge on the first in a certain time
+                if (p2_seg == seg) and (_time[i_seg_n] - _time[i2_seg_p] < nb_days_max):
+
+                    segment[i_seg_n : seg2_slice.stop] = seg
+                    previous_obs[i_seg_n] = seg_slice.stop - 1
+
+        self.segment[:] = segment
+        self.next_obs[:] = next_obs
+        self.previous_obs[:] = previous_obs
+
+        self.sort()
+
+    def sort(self, order=("track", "segment", "time")):
+        """
+        sort observations
+
+        :param tuple order: order or sorting. Passed to `np.argsort`
+        """
+
+        index_order = self.obs.argsort(order=order)
+        for field in self.elements:
+            self[field][:] = self[field][index_order]
+
+        translate = -ones(index_order.max() + 2, dtype="i4")
+        translate[index_order] = arange(index_order.shape[0])
+        self.next_obs[:] = translate[self.next_obs]
+        self.previous_obs[:] = translate[self.previous_obs]
+
     def obs_relative_order(self, i_obs):
         self.only_one_network()
         return self.segment_relative_order(self.segment[i_obs])
