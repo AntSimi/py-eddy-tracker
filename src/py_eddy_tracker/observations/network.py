@@ -241,6 +241,15 @@ class NetworkObservations(GroupEddiesObservations):
         return f"{len(self)} obs {unique(self.segment).shape[0]} segments"
 
     def correct_close_events(self, nb_days_max=20):
+        """
+        transform event where
+            segment A split to B, then A merge into B
+        to
+            segment A split to B, then B merge to A
+        these events are filtered with `nb_days_max`, which the event have to take place in less than `nb_days_max`
+
+        :param float nb_days_max: maximum time to search for splitting-merging event
+        """
 
         _time = self.time
         segment = self.segment.copy()
@@ -258,6 +267,9 @@ class NetworkObservations(GroupEddiesObservations):
 
         for seg in sorted(segments_connexion.keys()):
             seg_slice, i_seg_p, i_seg_n = segments_connexion[seg]
+
+            # the segment ID has to be corrected, because we may have changed it since
+            seg_corrected = segment[seg_slice.stop - 1]
             n_seg = segment[i_seg_n]
 
             # if segment has splitting
@@ -266,10 +278,14 @@ class NetworkObservations(GroupEddiesObservations):
                 p2_seg = segment[i2_seg_p]
 
                 # if it merge on the first in a certain time
-                if (p2_seg == seg) and (_time[i_seg_n] - _time[i2_seg_p] < nb_days_max):
-
-                    segment[i_seg_n : seg2_slice.stop] = seg
+                if (p2_seg == seg_corrected) and (
+                    _time[i_seg_n] - _time[i2_seg_p] < nb_days_max
+                ):
+                    my_slice = slice(i_seg_n, seg2_slice.stop)
+                    segment[my_slice] = seg_corrected
                     previous_obs[i_seg_n] = seg_slice.stop - 1
+
+                    segments_connexion[seg_corrected][0] = my_slice
 
         self.segment[:] = segment
         self.next_obs[:] = next_obs

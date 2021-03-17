@@ -136,6 +136,21 @@ ax = fig.add_axes([0.04, 0.04, 0.90, 0.40])
 ax.set_title(f"Clean network ({n_clean.infos()})")
 _ = n_clean.display_timeline(ax)
 
+
+# %%
+# change splittint-merging events
+# ------------------
+# change event where seg A split to B, then A merge into B, to A split to B then B merge into A
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12), dpi=120)
+
+ax1.set_title(f"Clean network ({n_clean.infos()})")
+n_clean.display_timeline(ax1)
+
+clean_modified = n_clean.copy()
+clean_modified.correct_close_events(100)
+ax2.set_title(f"resplitted network ({clean_modified.infos()})")
+_ = clean_modified.display_timeline(ax2)
+
 # %%
 # For further figure we will use clean path
 n = n_clean
