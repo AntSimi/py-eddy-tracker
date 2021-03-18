@@ -19,6 +19,12 @@ Method is used in :
 
 ### How do I get set up? ###
 
+#### Short story ####
+```bash
+pip install pyeddytracker
+```
+#### Long story ####
+
 To avoid problems with installation, use of the virtualenv Python virtual environment is recommended.
 
 Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, ...), e.g.:

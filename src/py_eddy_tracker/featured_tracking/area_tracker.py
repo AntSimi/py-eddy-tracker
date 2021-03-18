@@ -9,6 +9,13 @@ logger = logging.getLogger("pet")
 
 
 class AreaTracker(Model):
+    """
+    Area Tracker will used overlap to track eddy.
+
+    This tracking will used :py:meth:`~py_eddy_tracker.observations.observation.EddiesObservations.match` method
+    to get a similarity index, which could be between [0:1].
+    You could setup this class with `cmin` option to set a minimal value to valid an association.
+    """
 
     __slots__ = ("cmin",)
 
@@ -28,6 +35,9 @@ class AreaTracker(Model):
         return vars
 
     def tracking(self, other):
+        """
+        Core method to track
+        """
         shape = (self.shape[0], other.shape[0])
         i, j, c = self.match(other, intern=False)
         cost_mat = ma.array(empty(shape, dtype="f4"), mask=ones(shape, dtype="bool"))

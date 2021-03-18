@@ -146,7 +146,7 @@ ani = VideoAnimation(fig, update, frames=len(NETWORK_GROUPS), interval=220)
 
 # %%
 # Final Result
-# -----------
+# ------------
 fig = plt.figure(figsize=(16, 9))
 ax = fig.add_axes([0, 0, 1, 1])
 ax.set_aspect("equal"), ax.grid(), ax.set_xlim(26, 34), ax.set_ylim(31, 35.5)
