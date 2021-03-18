@@ -1666,7 +1666,7 @@ class EddiesObservations(object):
             filename = filename.replace(".nc", ".zarr")
         if filename.endswith(".zarr"):
             zarr_flag = True
-        logger.info("Store in %s", filename)
+        logger.info("Store in %s (%d observations)", filename, len(self))
         if zarr_flag:
             handler = zarr.open(filename, "w")
             self.to_zarr(handler, **kwargs)

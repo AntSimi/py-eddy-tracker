@@ -128,15 +128,13 @@ class GroupEddiesObservations(EddiesObservations, ABC):
 
     def keep_tracks_by_date(self, date, nb_days):
         """
-        find tracks which exist at date `date` and lasted at least `nb_days` after.
+        Find tracks which exist at date `date` and lasted at least `nb_days` after.
 
-        if nb_days is negative, it search a tracks which exist at the date,
-            but existed at least `nb_days` before the date
-
-
-        :param int,float date   : date where the tracks must exist
+        :param int,float date: date where the tracks must exist
         :param int,float nb_days: number of time where the tracks must exist. Can be negative
 
+        If nb_days is negative, it search a tracks which exist at the date,
+        but existed at least `nb_days` before the date
         """
 
         time = self.time

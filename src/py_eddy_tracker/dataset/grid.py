@@ -1963,6 +1963,7 @@ class RegularGridDataset(GridDataset):
         Produce filament with concatenation of advection
 
         It's a dummy advection which use only one layer of current
+
         :param array x: Longitude of obs to move
         :param array y: Latitude of obs to move
         :param str,array u_name: U field to advect obs
@@ -2308,7 +2309,6 @@ class GridCollection:
         """
         Produce filament with concatenation of advection
 
-        It's a dummy advection which use only one layer of current
         :param array x: Longitude of obs to move
         :param array y: Latitude of obs to move
         :param str,array u_name: U field to advect obs

@@ -179,7 +179,7 @@ ax.set_title("Finite size lyapunov exponent", weight="bold")
 kw = dict(cmap="viridis_r", vmin=-15, vmax=0)
 m = fsle_custom.display(ax, 1 / fsle_custom.grid("fsle"), **kw)
 ax.grid()
-cb = plt.colorbar(m, cax=fig.add_axes([0.94, 0.05, 0.01, 0.9]))
+_ = plt.colorbar(m, cax=fig.add_axes([0.94, 0.05, 0.01, 0.9]))
 # %%
 # Display Theta
 # -------------
@@ -191,4 +191,4 @@ ax.set_title("Theta from finite size lyapunov exponent", weight="bold")
 kw = dict(cmap="Spectral_r", vmin=-180, vmax=180)
 m = fsle_custom.display(ax, fsle_custom.grid("theta"), **kw)
 ax.grid()
-cb = plt.colorbar(m, cax=fig.add_axes([0.94, 0.05, 0.01, 0.9]))
+_ = plt.colorbar(m, cax=fig.add_axes([0.94, 0.05, 0.01, 0.9]))

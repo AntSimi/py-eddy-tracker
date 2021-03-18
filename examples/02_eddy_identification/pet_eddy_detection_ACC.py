@@ -94,7 +94,7 @@ a_, c_ = g_raw.eddy_identification("adt", **kw_ident)
 # -------
 kw_adt = dict(vmin=-1.5, vmax=1.5, cmap=plt.get_cmap("RdBu_r", 30))
 fig, axs = quad_axes("General properties field")
-m = g_raw.display(axs[0], "adt", **kw_adt)
+g_raw.display(axs[0], "adt", **kw_adt)
 axs[0].set_title("Total ADT (m)")
 m = g.display(axs[1], "adt_low", **kw_adt)
 axs[1].set_title("ADT (m) large scale, cutoff at 700 km")
