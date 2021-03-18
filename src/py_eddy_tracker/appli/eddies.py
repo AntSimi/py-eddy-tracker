@@ -445,6 +445,79 @@ def get_group(
     return group1, group2
 
 
+def run_compare(ref, others, invalid=1, low=20, high=80, intern=False, **kwargs):
+    groups_ref, groups_other = dict(), dict()
+    for i, (k, other) in enumerate(others.items()):
+        print(f"[{i}] {k} -> {len(other)} obs")
+        gr1, gr2 = get_group(
+            ref,
+            other,
+            *ref.match(other, intern=intern, **kwargs),
+            invalid=invalid,
+            low=low,
+            high=high,
+        )
+        groups_ref[k] = gr1
+        groups_other[k] = gr2
+    return groups_ref, groups_other
+
+
+def display_compare(
+    ref, others, invalid=1, low=20, high=80, area=False, intern=False, **kwargs
+):
+    gr_ref, gr_others = run_compare(
+        ref, others, invalid=invalid, low=low, high=high, intern=intern, **kwargs
+    )
+
+    def display(value, ref=None):
+        outs = list()
+        for v in value:
+            if ref:
+                if area:
+                    outs.append(f"{v / ref * 100:.1f}% ({v:.1f}Mkm²)")
+                else:
+                    outs.append(f"{v/ref * 100:.1f}% ({v})")
+            else:
+                outs.append(v)
+        if area:
+            return "".join([f"{v:^16}" for v in outs])
+        else:
+            return "".join([f"{v:^15}" for v in outs])
+
+    def get_values(v, dataset):
+        if area:
+            area_ = dataset["speed_area" if intern else "effective_area"]
+            return [area_[v_].sum() / 1e12 for v_ in v.values()]
+        else:
+            return [
+                v_.sum() if v_.dtype == "bool" else v_.shape[0] for v_ in v.values()
+            ]
+
+    labels = dict(
+        high=f"{high:0.0f} <= high",
+        low=f"{invalid:0.0f} <= low < {low:0.0f}",
+    )
+
+    keys = [labels.get(key, key) for key in list(gr_ref.values())[0].keys()]
+    print("     ", display(keys))
+    if area:
+        ref_ = ref["speed_area" if intern else "effective_area"].sum() / 1e12
+    else:
+        ref_ = len(ref)
+    for i, v in enumerate(gr_ref.values()):
+        print(f"[{i:2}] ", display(get_values(v, ref), ref=ref_))
+
+    print("     Point of view of study dataset")
+    print("     ", display(keys))
+    for i, (k, v) in enumerate(gr_others.items()):
+        other = others[k]
+        if area:
+            ref_ = other["speed_area" if intern else "effective_area"].sum() / 1e12
+        else:
+            ref_ = len(other)
+        print(f"[{i:2}] ", display(get_values(v, other), ref=ref_))
+
+
 def quick_compare():
     parser = EddyParser(
         "Tool to have a quick comparison between several identification"
@@ -478,23 +551,17 @@ def quick_compare():
 
     ref = EddiesObservations.load_file(args.ref, **kw)
     print(f"[ref] {args.ref} -> {len(ref)} obs")
-    groups_ref, groups_other = dict(), dict()
     others = {other: EddiesObservations.load_file(other, **kw) for other in args.others}
-    for i, other_ in enumerate(args.others):
-        other = others[other_]
-        print(f"[{i}] {other_} -> {len(other)} obs")
-        gr1, gr2 = get_group(
-            ref,
-            other,
-            *ref.match(other, intern=args.intern, minimal_area=args.minimal_area),
-            invalid=args.invalid,
-            low=args.low,
-            high=args.high,
-        )
-        groups_ref[other_] = gr1
-        groups_other[other_] = gr2
 
+    kwargs = dict(
+        invalid=args.invalid,
+        low=args.low,
+        high=args.high,
+        intern=args.intern,
+        minimal_area=args.minimal_area,
+    )
     if args.path_out is not None:
+        groups_ref, groups_other = run_compare(ref, others, **kwargs)
         if not exists(args.path_out):
             mkdir(args.path_out)
         for i, other_ in enumerate(args.others):
@@ -508,51 +575,4 @@ def quick_compare():
                 basename_ = f"ref_{k}.nc"
                 ref.index(v).write_file(filename=f"{dirname_}/{basename_}")
         return
-
-    def display(value, ref=None):
-        outs = list()
-        for v in value:
-            if ref:
-                if args.area:
-                    outs.append(f"{v / ref * 100:.1f}% ({v:.1f}Mkm²)")
-                else:
-                    outs.append(f"{v/ref * 100:.1f}% ({v})")
-            else:
-                outs.append(v)
-        if args.area:
-            return "".join([f"{v:^16}" for v in outs])
-        else:
-            return "".join([f"{v:^15}" for v in outs])
-
-    def get_values(v, dataset):
-        if args.area:
-            area = dataset["speed_area" if args.intern else "effective_area"]
-            return [area[v_].sum() / 1e12 for v_ in v.values()]
-        else:
-            return [
-                v_.sum() if v_.dtype == "bool" else v_.shape[0] for v_ in v.values()
-            ]
-
-    labels = dict(
-        high=f"{args.high:0.0f} <= high",
-        low=f"{args.invalid:0.0f} <= low < {args.low:0.0f}",
-    )
-
-    keys = [labels.get(key, key) for key in gr1.keys()]
-    print("     ", display(keys))
-    if args.area:
-        ref_ = ref["speed_area" if args.intern else "effective_area"].sum() / 1e12
-    else:
-        ref_ = len(ref)
-    for i, v in enumerate(groups_ref.values()):
-        print(f"[{i:2}] ", display(get_values(v, ref), ref=ref_))
-
-    print("     Point of view of study dataset")
-    print("     ", display(keys))
-    for i, (k, v) in enumerate(groups_other.items()):
-        other = others[k]
-        if args.area:
-            ref_ = other["speed_area" if args.intern else "effective_area"].sum() / 1e12
-        else:
-            ref_ = len(other)
-        print(f"[{i:2}] ", display(get_values(v, other), ref=ref_))
+    display_compare(ref, others, **kwargs, area=args.area)
