@@ -243,9 +243,12 @@ class NetworkObservations(GroupEddiesObservations):
     def correct_close_events(self, nb_days_max=20):
         """
         transform event where
-            segment A split to B, then A merge into B
+        segment A split to B, then A merge into B
+
         to
-            segment A split to B, then B merge to A
+
+        segment A split to B, then B merge to A
+
         these events are filtered with `nb_days_max`, which the event have to take place in less than `nb_days_max`
 
         :param float nb_days_max: maximum time to search for splitting-merging event
@@ -334,7 +337,7 @@ class NetworkObservations(GroupEddiesObservations):
         if backward=True, search all observation
         where water from obs `i_observation` could come from
 
-        :param int, iterable(int) i_observation:
+        :param int,iterable(int) i_observation:
             indices of observation. Can be
             int, or iterable of int.
         :param bool forward, backward:
