@@ -252,13 +252,17 @@ class NetworkObservations(GroupEddiesObservations):
         """
 
         _time = self.time
-        segment = self.segment.copy()
+        # segment used to correct and track changes
+        segment = self.segment_track_array.copy()
+        # final segment used to copy into self.segment
+        segment_copy = self.segment
+
         segments_connexion = dict()
 
         previous_obs, next_obs = self.previous_obs, self.next_obs
 
         # record for every segments, the slice, indice of next obs & indice of previous obs
-        for i, seg, _ in self.iter_on(self.segment):
+        for i, seg, _ in self.iter_on(segment):
             if i.start == i.stop:
                 continue
 
@@ -270,6 +274,10 @@ class NetworkObservations(GroupEddiesObservations):
 
             # the segment ID has to be corrected, because we may have changed it since
             seg_corrected = segment[seg_slice.stop - 1]
+
+            # we keep the real segment number
+            seg_corrected_copy = segment_copy[seg_slice.stop - 1]
+
             n_seg = segment[i_seg_n]
 
             # if segment has splitting
@@ -282,13 +290,15 @@ class NetworkObservations(GroupEddiesObservations):
                     _time[i_seg_n] - _time[i2_seg_p] < nb_days_max
                 ):
                     my_slice = slice(i_seg_n, seg2_slice.stop)
+                    # correct the factice segment
                     segment[my_slice] = seg_corrected
+                    # correct the good segment
+                    segment_copy[my_slice] = seg_corrected_copy
                     previous_obs[i_seg_n] = seg_slice.stop - 1
 
                     segments_connexion[seg_corrected][0] = my_slice
 
-        self.segment[:] = segment
-        self.next_obs[:] = next_obs
+        self.segment[:] = segment_copy
         self.previous_obs[:] = previous_obs
 
         self.sort()
@@ -1116,7 +1126,7 @@ class NetworkObservations(GroupEddiesObservations):
             logger.warning("Empty dataset will be created")
         else:
             logger.info(
-                f"{nb_obs} observations will be extract ({nb_obs * 100. / self.shape[0]}%)"
+                f"{nb_obs} observations will be extract ({nb_obs / self.shape[0]:.3%})"
             )
             for field in self.obs.dtype.descr:
                 if field in ("next_obs", "previous_obs"):
