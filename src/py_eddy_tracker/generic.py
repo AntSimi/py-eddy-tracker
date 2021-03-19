@@ -258,6 +258,8 @@ def interp2d_bilinear(x_g, y_g, z_g, m_g, x, y):
         x_ = (x[i] - x_ref) / x_step
         y_ = (y[i] - y_ref) / y_step
         i0 = int(floor(x_))
+        # To keep original value if wrapping apply to compute xd
+        i0_ = i0
         j0 = int(floor(y_))
         # corner are the same need only a new xd and yd
         if i0 != i0_old or j0 != j0_old:
@@ -286,7 +288,7 @@ def interp2d_bilinear(x_g, y_g, z_g, m_g, x, y):
         if masked:
             z[i] = nan
         else:
-            xd = x_ - i0
+            xd = x_ - i0_
             yd = y_ - j0
             z[i] = (z00 * (1 - xd) + (z10 * xd)) * (1 - yd) + (
                 z01 * (1 - xd) + z11 * xd
