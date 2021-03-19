@@ -323,6 +323,102 @@ class NetworkObservations(GroupEddiesObservations):
         self.only_one_network()
         return self.segment_relative_order(self.segment[i_obs])
 
+    def find_link(self, i_observations, forward=True, backward=False):
+        """
+        find all observations where obs `i_observation` could be
+        in future or past.
+
+        if forward=True, search all observation  where water
+        from obs "i_observation" could go
+
+        if backward=True, search all observation
+        where water from obs `i_observation` could come from
+
+        :param int, iterable(int) i_observation:
+            indices of observation. Can be
+            int, or iterable of int.
+        :param bool forward, backward:
+            if forward, search observations after obs.
+            else mode==backward search before obs
+
+        """
+
+        i_obs = (
+            [i_observations]
+            if not hasattr(i_observations, "__iter__")
+            else i_observations
+        )
+
+        segment = self.segment_track_array
+        previous_obs, next_obs = self.previous_obs, self.next_obs
+
+        segments_connexion = dict()
+
+        for i_slice, seg, _ in self.iter_on(segment):
+            if i_slice.start == i_slice.stop:
+                continue
+
+            i_p, i_n = previous_obs[i_slice.start], next_obs[i_slice.stop - 1]
+            p_seg, n_seg = segment[i_p], segment[i_n]
+
+            # dumping slice into dict
+            if seg not in segments_connexion:
+                segments_connexion[seg] = [i_slice, [], []]
+            else:
+                segments_connexion[seg][0] = i_slice
+
+            if i_p != -1:
+
+                if p_seg not in segments_connexion:
+                    segments_connexion[p_seg] = [None, [], []]
+
+                # backward
+                segments_connexion[seg][2].append((i_slice.start, i_p, p_seg))
+                # forward
+                segments_connexion[p_seg][1].append((i_p, i_slice.start, seg))
+
+            if i_n != -1:
+                if n_seg not in segments_connexion:
+                    segments_connexion[n_seg] = [None, [], []]
+
+                # forward
+                segments_connexion[seg][1].append((i_slice.stop - 1, i_n, n_seg))
+                # backward
+                segments_connexion[n_seg][2].append((i_n, i_slice.stop - 1, seg))
+
+        mask = zeros(segment.size, dtype=bool)
+
+        def func_forward(seg, indice):
+            seg_slice, _forward, _ = segments_connexion[seg]
+
+            mask[indice : seg_slice.stop] = True
+            for i_begin, i_end, seg2 in _forward:
+                if i_begin < indice:
+                    continue
+
+                if not mask[i_end]:
+                    func_forward(seg2, i_end)
+
+        def func_backward(seg, indice):
+            seg_slice, _, _backward = segments_connexion[seg]
+
+            mask[seg_slice.start : indice + 1] = True
+            for i_begin, i_end, seg2 in _backward:
+                if i_begin > indice:
+                    continue
+
+                if not mask[i_end]:
+                    func_backward(seg2, i_end)
+
+        for indice in i_obs:
+            if forward:
+                func_forward(segment[indice], indice)
+
+            if backward:
+                func_backward(segment[indice], indice)
+
+        return self.extract_with_mask(mask)
+
     def connexions(self, multi_network=False):
         """
         create dictionnary for each segments, gives the segments which interact with
