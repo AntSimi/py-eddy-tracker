@@ -136,6 +136,51 @@ ax = fig.add_axes([0.04, 0.04, 0.90, 0.40])
 ax.set_title(f"Clean network ({n_clean.infos()})")
 _ = n_clean.display_timeline(ax)
 
+
+# %%
+# change splittint-merging events
+# ------------------
+# change event where seg A split to B, then A merge into B, to A split to B then B merge into A
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12), dpi=120)
+
+ax1.set_title(f"Clean network ({n_clean.infos()})")
+n_clean.display_timeline(ax1)
+
+clean_modified = n_clean.copy()
+clean_modified.correct_close_events(100)
+ax2.set_title(f"resplitted network ({clean_modified.infos()})")
+_ = clean_modified.display_timeline(ax2)
+
+
+# %%
+# keep only observations where water could propagate from an observation
+# ----------------------------------------------------------------------
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12), dpi=120)
+i_observation = 600
+only_linked = n_clean.find_link(i_observation)
+
+for ax, dataset in zip([ax1, ax2], [n_clean, only_linked]):
+    dataset.display_timeline(
+        ax, field="segment", marker="+", lw=2, markersize=5, colors_mode="y"
+    )
+    ax.scatter(
+        n_clean.time[i_observation],
+        n_clean.segment[i_observation],
+        marker="s",
+        s=50,
+        color="black",
+        zorder=200,
+        label="observation start",
+        alpha=0.6,
+    )
+    ax.legend()
+
+ax1.set_title(f"full example ({n_clean.infos()})")
+ax2.set_title(f"only linked observations ({only_linked.infos()})")
+ax2.set_xlim(ax1.get_xlim())
+ax2.set_ylim(ax1.get_ylim())
+
 # %%
 # For further figure we will use clean path
 n = n_clean
