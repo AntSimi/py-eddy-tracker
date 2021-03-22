@@ -74,7 +74,16 @@ def subset_network():
         help="Nb of day which must be cover by network, first minimum number of day and last maximum number of day,"
         "if value is negative, this bound won't be used",
     )
+    parser.add_argument(
+        "--remove_dead_end",
+        nargs=2,
+        type=int,
+        help="Remove short dead end, first is for minimal obs number and second for minimal segment time to keep",
+    )
     args = parser.parse_args()
     n = NetworkObservations.load_file(args.input)
-    n = n.longer_than(*args.length)
+    if args.length is not None:
+        n = n.longer_than(*args.length)
+    if args.remove_dead_end is not None:
+        n = n.remove_dead_end(*args.remove_dead_end)
     n.write_file(filename=args.out)
