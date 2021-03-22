@@ -1693,6 +1693,26 @@ class EddiesObservations(object):
         for key, item in self.global_attr.items():
             h_nc.setncattr(key, item)
 
+    def mask_from_polygons(self, polygons):
+        """
+        Return mask for all observation in one of polygons list
+
+        :param list((array,array)) polygons: list of x/y array which be used to identify observations
+        """
+        x, y = polygons[0]
+        m = insidepoly(
+            self.longitude, self.latitude, x.reshape((1, -1)), y.reshape((1, -1))
+        )
+        for x, y in polygons[1:]:
+            m_ = ~m
+            m[m_] = insidepoly(
+                self.longitude[m_],
+                self.latitude[m_],
+                x.reshape((1, -1)),
+                y.reshape((1, -1)),
+            )
+        return m
+
     def extract_with_area(self, area, **kwargs):
         """
         Extract geographically with a bounding box.
