@@ -1923,10 +1923,10 @@ class RegularGridDataset(GridDataset):
         :param str,array v_name: V field to advect obs
         :param int time_step: Number of second for each advection
         """
-        u = (self.grid(u_name) if isinstance(u_name, str) else u_name).copy() * factor
-        v = (self.grid(v_name) if isinstance(v_name, str) else v_name).copy() * factor
+        u = (self.grid(u_name) if isinstance(u_name, str) else u_name).copy()
+        v = (self.grid(v_name) if isinstance(v_name, str) else v_name).copy()
         # N seconds / 1 degrees in m
-        coef = time_step * 180 / pi / self.EARTH_RADIUS
+        coef = time_step * 180 / pi / self.EARTH_RADIUS * factor
         u *= coef / cos(radians(self.y_c))
         v *= coef
         if backward:
