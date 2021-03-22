@@ -1135,6 +1135,9 @@ class NetworkObservations(GroupEddiesObservations):
         self.only_one_network()
         return self.tag_segment().shape[0] == 1
 
+    def remove_trash(self):
+        return self.extract_with_mask(self.track != 0)
+
     def plot(self, ax, ref=None, color_cycle=None, **kwargs):
         """
         This function will draw path of each trajectory
@@ -1152,7 +1155,7 @@ class NetworkObservations(GroupEddiesObservations):
         if "label" in kwargs:
             kwargs["label"] = self.format_label(kwargs["label"])
         j = 0
-        for i, _, _ in self.iter_on("segment"):
+        for i, _, _ in self.iter_on(self.segment_track_array):
             nb = i.stop - i.start
             if nb == 0:
                 continue
