@@ -542,6 +542,33 @@ class NetworkObservations(GroupEddiesObservations):
             m[other.network_slice(i)] = True
         return other.extract_with_mask(m)
 
+    def normalize_longitude(self):
+        """Normalize all longitude
+
+        Normalize longitude field and in the same range :
+        - longitude_max
+        - contour_lon_e (how to do if in raw)
+        - contour_lon_s (how to do if in raw)
+        """
+        i_start, i_stop, _ = self.index_network
+        lon0 = (self.lon[i_start] - 180).repeat(i_stop - i_start)
+        logger.debug("Normalize longitude")
+        self.lon[:] = (self.lon - lon0) % 360 + lon0
+        if "lon_max" in self.obs.dtype.names:
+            logger.debug("Normalize longitude_max")
+            self.lon_max[:] = (self.lon_max - self.lon + 180) % 360 + self.lon - 180
+        if not self.raw_data:
+            if "contour_lon_e" in self.obs.dtype.names:
+                logger.debug("Normalize effective contour longitude")
+                self.contour_lon_e[:] = (
+                    (self.contour_lon_e.T - self.lon + 180) % 360 + self.lon - 180
+                ).T
+            if "contour_lon_s" in self.obs.dtype.names:
+                logger.debug("Normalize speed contour longitude")
+                self.contour_lon_s[:] = (
+                    (self.contour_lon_s.T - self.lon + 180) % 360 + self.lon - 180
+                ).T
+
     def numbering_segment(self, start=0):
         """
         New numbering of segment
