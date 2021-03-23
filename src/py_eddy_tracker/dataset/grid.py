@@ -2005,7 +2005,7 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
-    nb_x_ = x_g.size - 2
+    nb_x_ = x_g.size
     nb_x = nb_x_ if is_circular else 0
     # cache
     i_cache, j_cache = -1000000, -1000000
@@ -2108,7 +2108,7 @@ def advect(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
-    nb_x_ = x_g.size - 2
+    nb_x_ = x_g.size
     nb_x = nb_x_ if is_circular else 0
     # Indices which should be never exist
     i0_old, j0_old = -100000, -100000
@@ -2472,7 +2472,7 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, hal
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
-    nb_x_ = x_g.size - 2
+    nb_x_ = x_g.size
     nb_x = nb_x_ if is_circular else 0
     # Indices which should be never exist
     i0_old, j0_old = -100000, -100000
@@ -2598,7 +2598,7 @@ def advect_t_rk4(
     x_ref, y_ref = x_g[0], y_g[0]
     x_step, y_step = x_g[1] - x_ref, y_g[1] - y_ref
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
-    nb_x_ = x_g.size - 2
+    nb_x_ = x_g.size
     nb_x = nb_x_ if is_circular else 0
     # cache
     i_cache, j_cache = -1000000, -1000000
