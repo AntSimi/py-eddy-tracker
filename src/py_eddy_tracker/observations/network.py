@@ -645,7 +645,7 @@ class NetworkObservations(GroupEddiesObservations):
         j = 0
         line_kw = dict(
             ls="-",
-            marker=".",
+            marker="+",
             markersize=6,
             zorder=1,
             lw=3,

@@ -173,6 +173,7 @@ class Amplitude(object):
                 self.mle,
                 -1,
             )
+            # After we use grid.data because index are in contour and we check before than no pixel are hide
             nb = len(lmi_i)
             if nb == 0:
                 logger.warning(
