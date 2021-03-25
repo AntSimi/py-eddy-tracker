@@ -602,7 +602,7 @@ class GridDataset(object):
         **kwargs,
     ):
         """
-        Compute eddy identification on the pecified grid
+        Compute eddy identification on the specified grid
 
         :param str grid_height: Grid name of Sea Surface Height
         :param str uname: Grid name of u speed component

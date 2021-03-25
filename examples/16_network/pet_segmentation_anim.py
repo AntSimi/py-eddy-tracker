@@ -48,7 +48,7 @@ def get_obs(dataset):
 
 
 # %%
-# Overlaod of class to pick up
+# Hack to pick up each step of segmentation
 TRACKS = list()
 INDICES = list()
 

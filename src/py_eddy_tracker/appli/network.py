@@ -37,7 +37,7 @@ def build_network():
 
 
 def divide_network():
-    parser = EddyParser("Separate path for a same group")
+    parser = EddyParser("Separate path for a same group(network)")
     parser.add_argument("input", help="input network file")
     parser.add_argument("out", help="output file")
     parser.contour_intern_arg()

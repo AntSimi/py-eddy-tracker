@@ -178,8 +178,8 @@ mappable = lavd_backward_static.display(ax, "lavd", **kw_lavd)
 _ = update_axes(ax, mappable)
 
 # %%
-# Contourdetection
-# ----------------
+# Contour detection
+# -----------------
 # To extract contour from LAVD grid, we will used method design for SSH, with some hacks and adapted options.
 # It will produce false amplitude and speed.
 kw_ident = dict(
