@@ -22,7 +22,7 @@ def id_parser():
         "--period",
         nargs=2,
         type=int,
-        help="Start day and end day, if it s negative value we will add to day min and add to day max, if 0 it s not use",
+        help="Start day and end day, if it's negative value we will add to day min and add to day max, if 0 it s not use",
     )
     group.add_argument(
         "-l",

@@ -70,6 +70,11 @@ def build_index(groups):
     :param array groups: array which contain group to be separated
     :return: (first_index of each group, last_index of each group, value to shift group)
     :rtype: (array, array, int)
+
+    Examples
+    --------
+    >>> build_index(array((1, 1, 3, 4, 4)))
+    (array([0, 2, 2, 3]), array([2, 2, 3, 5]), 1)
     """
     i0, i1 = groups.min(), groups.max()
     amplitude = i1 - i0 + 1
@@ -78,7 +83,7 @@ def build_index(groups):
     for i, group in enumerate(groups[:-1]):
         # Get next value to compare
         next_group = groups[i + 1]
-        # if different we need to set index
+        # if different we need to set index for all group between the 2 values
         if group != next_group:
             first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
     last_index = zeros(amplitude, dtype=numba_types.int_)

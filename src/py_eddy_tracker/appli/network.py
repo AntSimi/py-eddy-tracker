@@ -62,11 +62,6 @@ def subset_network():
     parser.add_argument("input", help="input network file")
     parser.add_argument("out", help="output file")
     parser.add_argument(
-        "--inverse_selection",
-        action="store_true",
-        help="Extract the inverse of selection",
-    )
-    parser.add_argument(
         "-l",
         "--length",
         nargs=2,
@@ -80,10 +75,25 @@ def subset_network():
         type=int,
         help="Remove short dead end, first is for minimal obs number and second for minimal segment time to keep",
     )
+    parser.add_argument(
+        "--remove_trash",
+        action="store_true",
+        help="Remove trash (network id == 0)",
+    )
+    parser.add_argument(
+        "-p",
+        "--period",
+        nargs=2,
+        type=int,
+        help="Start day and end day, if it's negative value we will add to day min and add to day max,"
+        "if 0 it s not use",
+    )
     args = parser.parse_args()
-    n = NetworkObservations.load_file(args.input)
+    n = NetworkObservations.load_file(args.input, raw_data=True)
     if args.length is not None:
         n = n.longer_than(*args.length)
     if args.remove_dead_end is not None:
         n = n.remove_dead_end(*args.remove_dead_end)
+    if args.period is not None:
+        n = n.extract_with_period(args.period)
     n.write_file(filename=args.out)

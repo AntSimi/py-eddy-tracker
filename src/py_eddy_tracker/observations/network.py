@@ -10,6 +10,7 @@ from numpy import (
     arange,
     array,
     bincount,
+    bool_,
     concatenate,
     empty,
     in1d,
@@ -1235,6 +1236,30 @@ class NetworkObservations(GroupEddiesObservations):
         for i, b0, b1 in self.iter_on(values):
             if not keep[b0]:
                 mask[i] = False
+        return self.extract_with_mask(mask)
+
+    def extract_with_period(self, period):
+        """
+        Extract within a time period
+
+        :param (int,int) period: two dates to define the period, must be specify from 1/1/1950
+        :return: Return all eddy tracks which are in bounds
+        :rtype: NetworkObservations
+
+        .. minigallery:: py_eddy_tracker.NetworkObservations.extract_with_period
+        """
+        dataset_period = self.period
+        p_min, p_max = period
+        if p_min > 0:
+            mask = self.time >= p_min
+        elif p_min < 0:
+            mask = self.time >= (dataset_period[0] - p_min)
+        else:
+            mask = ones(self.time.shape, dtype=bool_)
+        if p_max > 0:
+            mask *= self.time <= p_max
+        elif p_max < 0:
+            mask *= self.time <= (dataset_period[1] + p_max)
         return self.extract_with_mask(mask)
 
     def extract_with_mask(self, mask):
