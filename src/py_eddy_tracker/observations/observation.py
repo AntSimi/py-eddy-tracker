@@ -65,9 +65,10 @@ from ..poly import (
     convexs,
     create_vertice,
     get_pixel_in_regular,
+    insidepoly,
+    poly_indexs,
     reduce_size,
     vertice_overlap,
-    winding_number_poly,
 )
 
 logger = logging.getLogger("pet")
@@ -2062,6 +2063,7 @@ class EddiesObservations(object):
         :rtype: array[bool]
         """
         xname, yname = self.intern(intern)
+        # FIXME: wrapping
         return insidepoly(x, y, self[xname], self[yname])
 
     def grid_count(self, bins, intern=False, center=False, filter=slice(None)):
@@ -2328,62 +2330,6 @@ def grid_count_pixel_in(
         )
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
         grid_count_(grid, i, j)
-
-
-@njit(cache=True)
-def poly_indexs(x_p, y_p, x_c, y_c):
-    """
-    index of contour for each postion inside a contour, -1 in case of no contour
-
-    :param array x_p: longitude to test
-    :param array y_p: latitude to test
-    :param array x_c: longitude of contours
-    :param array y_c: latitude of contours
-    """
-    nb_p = x_p.shape[0]
-    nb_c = x_c.shape[0]
-    indexs = -ones(nb_p, dtype=numba_types.int32)
-    for i in range(nb_c):
-        x_, y_ = reduce_size(x_c[i], y_c[i])
-        x_c_min, y_c_min = x_.min(), y_.min()
-        x_c_max, y_c_max = x_.max(), y_.max()
-        v = create_vertice(x_, y_)
-        for j in range(nb_p):
-            if indexs[j] != -1:
-                continue
-            x, y = x_p[j], y_p[j]
-            if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
-                if winding_number_poly(x, y, v) != 0:
-                    indexs[j] = i
-    return indexs
-
-
-@njit(cache=True)
-def insidepoly(x_p, y_p, x_c, y_c):
-    """
-    True for each postion inside a contour
-
-    :param array x_p: longitude to test
-    :param array y_p: latitude to test
-    :param array x_c: longitude of contours
-    :param array y_c: latitude of contours
-    """
-    nb_p = x_p.shape[0]
-    nb_c = x_c.shape[0]
-    flag = zeros(nb_p, dtype=numba_types.bool_)
-    for i in range(nb_c):
-        x_, y_ = reduce_size(x_c[i], y_c[i])
-        x_c_min, y_c_min = x_.min(), y_.min()
-        x_c_max, y_c_max = x_.max(), y_.max()
-        v = create_vertice(x_, y_)
-        for j in range(nb_p):
-            if flag[j]:
-                continue
-            x, y = x_p[j], y_p[j]
-            if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
-                if winding_number_poly(x, y, v) != 0:
-                    flag[j] = True
-    return flag
 
 
 @njit(cache=True)

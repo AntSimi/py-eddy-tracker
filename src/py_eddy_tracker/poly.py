@@ -7,9 +7,11 @@ import heapq
 
 from numba import njit, prange
 from numba import types as numba_types
-from numpy import arctan, array, concatenate, empty, nan, ones, pi, where
+from numpy import arctan, array, concatenate, empty, nan, ones, pi, where, zeros
 from numpy.linalg import lstsq
 from Polygon import Polygon
+
+from .generic import build_index
 
 
 @njit(cache=True)
@@ -788,3 +790,110 @@ def reduce_size(x, y):
             # In case of virtual obs all value could be fill with same value, to avoid empty array
             i = max(3, i)
             return x[:i], y[:i]
+
+
+@njit(cache=True)
+def group_obs(x, y, step, nb_x):
+    """Get index k_box for each box, and indexes to sort"""
+    nb = x.size
+    i = empty(nb, dtype=numba_types.uint32)
+    for k in range(nb):
+        i[k] = box_index(x[k], y[k], step, nb_x)
+    return i, i.argsort()
+
+
+@njit(cache=True)
+def box_index(x, y, step, nb_x):
+    """Return k_box index for each value"""
+    return numba_types.uint32((x % 360) // step + nb_x * ((y + 90) // step))
+
+
+@njit(cache=True)
+def box_indexes(x, y, step):
+    """Return i_box,j_box index for each value"""
+    return numba_types.uint32((x % 360) // step), numba_types.uint32((y + 90) // step)
+
+
+@njit(cache=True)
+def poly_indexs(x_p, y_p, x_c, y_c):
+    """
+    Index of contour for each postion inside a contour, -1 in case of no contour
+
+    :param array x_p: longitude to test (must be define, no nan)
+    :param array y_p: latitude to test (must be define, no nan)
+    :param array x_c: longitude of contours
+    :param array y_c: latitude of contours
+    """
+    i, i_order = group_obs(x_p, y_p, 1, 360)
+    nb_p = x_p.shape[0]
+    nb_c = x_c.shape[0]
+    indexs = -ones(nb_p, dtype=numba_types.int32)
+    # Adress table to get particle bloc
+    start_index, end_index, i_first = build_index(i[i_order])
+    nb_bloc = end_index.size
+    for i_contour in range(nb_c):
+        # Build vertice and box included contour
+        x_, y_ = reduce_size(x_c[i_contour], y_c[i_contour])
+        x_c_min, y_c_min = x_.min(), y_.min()
+        x_c_max, y_c_max = x_.max(), y_.max()
+        v = create_vertice(x_, y_)
+        i0, j0 = box_indexes(x_c_min, y_c_min, 1)
+        i1, j1 = box_indexes(x_c_max, y_c_max, 1)
+        # i0 could be greater than i1, (x_c is always continious) so you could have a contour over bound
+        if i0 > i1:
+            i1 += 360
+        for i_x in range(i0, i1 + 1):
+            # we force i_x in 0 360 range
+            i_x %= 360
+            for i_y in range(j0, j1 + 1):
+                # Get box indices
+                i_box = i_x + 360 * i_y - i_first
+                # Indice must be in table range
+                if i_box < 0 or i_box >= nb_bloc:
+                    continue
+                for i_p_ordered in range(start_index[i_box], end_index[i_box]):
+                    i_p = i_order[i_p_ordered]
+                    if indexs[i_p] != -1:
+                        continue
+                    y = y_p[i_p]
+                    if y > y_c_max:
+                        continue
+                    if y < y_c_min:
+                        continue
+                    x = (x_p[i_p] - x_c_min + 180) % 360 + x_c_min - 180
+                    if x > x_c_max:
+                        continue
+                    if x < x_c_min:
+                        continue
+                    if winding_number_poly(x, y, v) != 0:
+                        indexs[i_p] = i_contour
+    return indexs
+
+
+@njit(cache=True)
+def insidepoly(x_p, y_p, x_c, y_c):
+    """
+    True for each postion inside a contour
+
+    :param array x_p: longitude to test
+    :param array y_p: latitude to test
+    :param array x_c: longitude of contours
+    :param array y_c: latitude of contours
+    """
+    # TODO must be optimize like poly_index
+    nb_p = x_p.shape[0]
+    nb_c = x_c.shape[0]
+    flag = zeros(nb_p, dtype=numba_types.bool_)
+    for i in range(nb_c):
+        x_, y_ = reduce_size(x_c[i], y_c[i])
+        x_c_min, y_c_min = x_.min(), y_.min()
+        x_c_max, y_c_max = x_.max(), y_.max()
+        v = create_vertice(x_, y_)
+        for j in range(nb_p):
+            if flag[j]:
+                continue
+            x, y = x_p[j], y_p[j]
+            if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
+                if winding_number_poly(x, y, v) != 0:
+                    flag[j] = True
+    return flag
