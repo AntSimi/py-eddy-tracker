@@ -799,7 +799,7 @@ def group_obs(x, y, step, nb_x):
     i = empty(nb, dtype=numba_types.uint32)
     for k in range(nb):
         i[k] = box_index(x[k], y[k], step, nb_x)
-    return i, i.argsort()
+    return i, i.argsort(kind="mergesort")
 
 
 @njit(cache=True)
@@ -824,7 +824,9 @@ def poly_indexs(x_p, y_p, x_c, y_c):
     :param array x_c: longitude of contours
     :param array y_c: latitude of contours
     """
-    i, i_order = group_obs(x_p, y_p, 1, 360)
+    nb_x = 360
+    step = 1.0
+    i, i_order = group_obs(x_p, y_p, step, nb_x)
     nb_p = x_p.shape[0]
     nb_c = x_c.shape[0]
     indexs = -ones(nb_p, dtype=numba_types.int32)
@@ -837,17 +839,17 @@ def poly_indexs(x_p, y_p, x_c, y_c):
         x_c_min, y_c_min = x_.min(), y_.min()
         x_c_max, y_c_max = x_.max(), y_.max()
         v = create_vertice(x_, y_)
-        i0, j0 = box_indexes(x_c_min, y_c_min, 1)
-        i1, j1 = box_indexes(x_c_max, y_c_max, 1)
+        i0, j0 = box_indexes(x_c_min, y_c_min, step)
+        i1, j1 = box_indexes(x_c_max, y_c_max, step)
         # i0 could be greater than i1, (x_c is always continious) so you could have a contour over bound
         if i0 > i1:
-            i1 += 360
+            i1 += nb_x
         for i_x in range(i0, i1 + 1):
             # we force i_x in 0 360 range
-            i_x %= 360
+            i_x %= nb_x
             for i_y in range(j0, j1 + 1):
                 # Get box indices
-                i_box = i_x + 360 * i_y - i_first
+                i_box = i_x + nb_x * i_y - i_first
                 # Indice must be in table range
                 if i_box < 0 or i_box >= nb_bloc:
                     continue
@@ -860,6 +862,7 @@ def poly_indexs(x_p, y_p, x_c, y_c):
                         continue
                     if y < y_c_min:
                         continue
+                    # Normalize longitude at +-180° around x_c_min
                     x = (x_p[i_p] - x_c_min + 180) % 360 + x_c_min - 180
                     if x > x_c_max:
                         continue

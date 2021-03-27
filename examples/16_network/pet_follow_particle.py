@@ -17,6 +17,7 @@ from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.data import get_path
 from py_eddy_tracker.dataset.grid import GridCollection
 from py_eddy_tracker.observations.network import NetworkObservations
+from py_eddy_tracker.poly import group_obs
 
 start_logger().setLevel("ERROR")
 
@@ -203,8 +204,12 @@ def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
 # ^^^^^^^^^^^^^^^^^^
 step = 1 / 60.0
 
-x, y = meshgrid(arange(20, 36, step), arange(30, 46, step))
+x, y = meshgrid(arange(24, 36, step), arange(31, 36, step))
 x0, y0 = x.reshape(-1), y.reshape(-1)
+# Pre-order to speed up
+_, i = group_obs(x0, y0, 1, 360)
+x0, y0 = x0[i], y0[i]
+
 t_start, t_end = n.period
 dt = 14
 
