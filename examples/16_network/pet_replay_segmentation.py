@@ -12,7 +12,7 @@ from matplotlib.ticker import FuncFormatter
 from numpy import where
 
 import py_eddy_tracker.gui
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
@@ -91,7 +91,7 @@ def get_obs(dataset):
 
 # %%
 # Get original network, we will isolate only relative at order *2*
-n = NetworkObservations.load_file(get_path("network_med.nc")).network(651)
+n = NetworkObservations.load_file(get_demo_path("network_med.nc")).network(651)
 n_ = n.relative(get_obs(n), order=2)
 
 # %%

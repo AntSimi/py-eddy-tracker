@@ -39,7 +39,9 @@ class VideoAnimation(FuncAnimation):
 # %%
 # Load experimental atlas, and we select one eddy
 a = TrackEddiesObservations.load_file(
-    py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Anticyclonic.zarr")
+    py_eddy_tracker_sample.get_demo_path(
+        "eddies_med_adt_allsat_dt2018/Anticyclonic.zarr"
+    )
 )
 eddy = a.extract_ids([9672])
 

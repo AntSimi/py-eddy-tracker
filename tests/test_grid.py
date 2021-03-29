@@ -2,10 +2,10 @@ from matplotlib.path import Path
 from numpy import array, isnan, ma
 from pytest import approx
 
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 
-G = RegularGridDataset(get_path("mask_1_60.nc"), "lon", "lat")
+G = RegularGridDataset(get_demo_path("mask_1_60.nc"), "lon", "lat")
 X = 0.025
 contour = Path(
     (

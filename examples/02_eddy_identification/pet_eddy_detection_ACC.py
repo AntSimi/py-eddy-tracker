@@ -60,7 +60,7 @@ def set_fancy_labels(fig, ticklabelsize=14, labelsize=14, labelweight="semibold"
 margin = 30
 
 kw_data = dict(
-    filename=data.get_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
+    filename=data.get_demo_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
     x_name="longitude",
     y_name="latitude",
     # Manual area subset

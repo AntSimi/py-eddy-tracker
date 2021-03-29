@@ -11,7 +11,7 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 # %%
 # Load experimental atlas, we filter position to have nice display
 c = TrackEddiesObservations.load_file(
-    py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
+    py_eddy_tracker_sample.get_demo_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 c.position_filter(median_half_window=1, loess_half_window=5)
 

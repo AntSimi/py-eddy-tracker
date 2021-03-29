@@ -25,7 +25,7 @@ from numpy import arange, isnan, ma, meshgrid, zeros
 
 import py_eddy_tracker.gui
 from py_eddy_tracker import start_logger
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection, RegularGridDataset
 
 start_logger().setLevel("ERROR")
@@ -73,7 +73,7 @@ kw_lavd = dict(vmin=0, vmax=2e-5, cmap="viridis")
 
 # Load data cube of 3 month
 c = GridCollection.from_netcdf_cube(
-    get_path("dt_med_allsat_phy_l4_2005T2.nc"),
+    get_demo_path("dt_med_allsat_phy_l4_2005T2.nc"),
     "longitude",
     "latitude",
     "time",

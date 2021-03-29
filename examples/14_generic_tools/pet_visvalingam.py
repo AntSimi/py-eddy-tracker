@@ -51,7 +51,7 @@ def update_line(num):
 
 # %%
 # Load detection files
-a = EddiesObservations.load_file(data.get_path("Anticyclonic_20190223.nc"))
+a = EddiesObservations.load_file(data.get_demo_path("Anticyclonic_20190223.nc"))
 a = a.extract_with_mask((abs(a.lat) < 66) * (abs(a.radius_e) > 80e3))
 
 nb_pt = 10

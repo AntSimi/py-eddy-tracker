@@ -17,8 +17,10 @@ from py_eddy_tracker.dataset.grid import RegularGridDataset
 
 date = datetime(2016, 7, 7)
 
-filename_alt = data.get_path(f"dt_blacksea_allsat_phy_l4_{date:%Y%m%d}_20200801.nc")
-filename_sst = data.get_path(
+filename_alt = data.get_demo_path(
+    f"dt_blacksea_allsat_phy_l4_{date:%Y%m%d}_20200801.nc"
+)
+filename_sst = data.get_demo_path(
     f"{date:%Y%m%d}000000-GOS-L4_GHRSST-SSTfnd-OISST_HR_REP-BLK-v02.0-fv01.0.nc"
 )
 var_name_sst = "analysed_sst"
@@ -30,7 +32,7 @@ extent = [27, 42, 40.5, 47]
 # ------------
 sst = RegularGridDataset(filename=filename_sst, x_name="lon", y_name="lat")
 alti = RegularGridDataset(
-    data.get_path(filename_alt), x_name="longitude", y_name="latitude"
+    data.get_demo_path(filename_alt), x_name="longitude", y_name="latitude"
 )
 # We can use `Grid` tools to interpolate ADT on the sst grid
 sst.regrid(alti, "sla")

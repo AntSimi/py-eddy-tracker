@@ -12,7 +12,7 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 # %%
 # Load an experimental cyclonic atlas, we keep only eddies which are follow more than 180 days
 c = TrackEddiesObservations.load_file(
-    py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
+    py_eddy_tracker_sample.get_demo_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 c = c.extract_with_length((180, -1))
 

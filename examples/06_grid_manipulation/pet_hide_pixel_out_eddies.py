@@ -15,12 +15,12 @@ from py_eddy_tracker.poly import create_vertice
 
 # %%
 # Load an eddy file which contains contours
-a = EddiesObservations.load_file(data.get_path("Anticyclonic_20190223.nc"))
+a = EddiesObservations.load_file(data.get_demo_path("Anticyclonic_20190223.nc"))
 
 # %%
 # Load a grid where we want found pixels in eddies or out
 g = RegularGridDataset(
-    data.get_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
+    data.get_demo_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
     "longitude",
     "latitude",
 )

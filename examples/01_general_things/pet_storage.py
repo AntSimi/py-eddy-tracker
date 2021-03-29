@@ -17,7 +17,7 @@ There are 3 class of files:
 
 import py_eddy_tracker_sample
 
-from py_eddy_tracker.data import get_path, get_remote_sample
+from py_eddy_tracker.data import get_demo_path, get_remote_demo_sample
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.observation import EddiesObservations, Table
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
@@ -33,7 +33,7 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
 # %%
 # Eddies files (zarr or netcdf) could be loaded with ```load_file``` method:
-eddies_collections = EddiesObservations.load_file(get_path("Cyclonic_20160515.nc"))
+eddies_collections = EddiesObservations.load_file(get_demo_path("Cyclonic_20160515.nc"))
 eddies_collections.field_table()
 # offset and scale_factor are used only when data is stored in zarr or netCDF4
 
@@ -69,7 +69,7 @@ eddies_collections.obs.dtype
 # - **observation_number** : Eddy temporal index in a trajectory, days starting at the eddy first detection
 # - **cost_association** : result of the cost function to associate the eddy with the next observation
 eddies_tracks = TrackEddiesObservations.load_file(
-    py_eddy_tracker_sample.get_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
+    py_eddy_tracker_sample.get_demo_path("eddies_med_adt_allsat_dt2018/Cyclonic.zarr")
 )
 # In this example some fields are removed (effective_contour_longitude,...) in order to save time for doc building
 eddies_tracks.field_table()
@@ -87,7 +87,7 @@ eddies_tracks.field_table()
 # - previous_cost : Result of the cost function (1 is a good association, 0 is bad) with previous observation
 # - next_cost : Result of the cost function (1 is a good association, 0 is bad) with next observation
 eddies_network = NetworkObservations.load_file(
-    get_remote_sample(
+    get_remote_demo_sample(
         "eddies_med_adt_allsat_dt2018_err70_filt500_order1/Anticyclonic_network.nc"
     )
 )

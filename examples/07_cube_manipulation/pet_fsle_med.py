@@ -17,7 +17,7 @@ from numba import njit
 from numpy import arange, arctan2, empty, isnan, log2, ma, meshgrid, ones, pi, zeros
 
 from py_eddy_tracker import start_logger
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection, RegularGridDataset
 
 start_logger().setLevel("ERROR")
@@ -27,7 +27,7 @@ start_logger().setLevel("ERROR")
 # ADT in med
 # ----------
 c = GridCollection.from_netcdf_cube(
-    get_path("dt_med_allsat_phy_l4_2005T2.nc"),
+    get_demo_path("dt_med_allsat_phy_l4_2005T2.nc"),
     "longitude",
     "latitude",
     "time",

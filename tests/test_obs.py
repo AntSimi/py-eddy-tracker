@@ -1,11 +1,11 @@
 import zarr
 
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.observations.observation import EddiesObservations
 
 a_filename, c_filename = (
-    get_path("Anticyclonic_20190223.nc"),
-    get_path("Cyclonic_20190223.nc"),
+    get_demo_path("Anticyclonic_20190223.nc"),
+    get_demo_path("Cyclonic_20190223.nc"),
 )
 a = EddiesObservations.load_file(a_filename)
 a_raw = EddiesObservations.load_file(a_filename, raw_data=True)

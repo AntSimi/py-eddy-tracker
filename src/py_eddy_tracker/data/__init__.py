@@ -16,11 +16,11 @@ from os import path
 import requests
 
 
-def get_path(name):
+def get_demo_path(name):
     return path.join(path.dirname(__file__), name)
 
 
-def get_remote_sample(path):
+def get_remote_demo_sample(path):
     if path.startswith("/") or path.startswith("."):
         content = open(path, "rb").read()
         if path.endswith(".nc"):

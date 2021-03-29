@@ -13,7 +13,7 @@ from py_eddy_tracker.poly import poly_area
 
 # %%
 # Load detection files
-a = EddiesObservations.load_file(data.get_path("Anticyclonic_20190223.nc"))
+a = EddiesObservations.load_file(data.get_demo_path("Anticyclonic_20190223.nc"))
 areas = list()
 # For each contour area will be compute in local reference
 for i in a:

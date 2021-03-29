@@ -11,7 +11,7 @@ from matplotlib.colors import ListedColormap
 from numpy import ones, where
 
 import py_eddy_tracker.gui
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
@@ -69,7 +69,7 @@ class MyTrack(TrackEddiesObservations):
 # Load data where observations are put in same network but no segmentation
 
 # Get a known network for the demonstration
-n = NetworkObservations.load_file(get_path("network_med.nc")).network(651)
+n = NetworkObservations.load_file(get_demo_path("network_med.nc")).network(651)
 # We keep only some segment
 n = n.relative(get_obs(n), order=2)
 print(len(n))

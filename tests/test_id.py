@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 
 g = RegularGridDataset(
-    get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
+    get_demo_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
 )
 
 

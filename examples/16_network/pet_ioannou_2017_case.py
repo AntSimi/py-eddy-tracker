@@ -18,7 +18,7 @@ from numpy import arange, where
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.observations.network import NetworkObservations
 
 
@@ -71,7 +71,9 @@ def update_axes(ax, mappable=None):
 
 # %%
 # We know the network ID, we will get directly
-ioannou_case = NetworkObservations.load_file(get_path("network_med.nc")).network(651)
+ioannou_case = NetworkObservations.load_file(get_demo_path("network_med.nc")).network(
+    651
+)
 print(ioannou_case.infos())
 
 # %%

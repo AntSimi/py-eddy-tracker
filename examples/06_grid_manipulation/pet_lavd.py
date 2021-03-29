@@ -25,7 +25,7 @@ from matplotlib.animation import FuncAnimation
 from numpy import arange, meshgrid, zeros
 
 import py_eddy_tracker.gui
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker.observations.observation import EddiesObservations
 
@@ -82,7 +82,7 @@ class VideoAnimation(FuncAnimation):
 # .. math::
 #     \omega = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}
 g = RegularGridDataset(
-    get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
+    get_demo_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
 )
 g.add_uv("adt")
 u_y = g.compute_stencil(g.grid("u"), vertical=True)
@@ -171,8 +171,10 @@ lavd = RegularGridDataset.with_array(
 # Period used for LAVD integration (8 days) is too short for a real use, but choose for example efficiency.
 fig, ax, _ = start_ax()
 mappable = lavd.display(ax, "lavd", **kw_vorticity)
-EddiesObservations.load_file(get_path("Anticyclonic_20160515.nc")).display(
+EddiesObservations.load_file(get_demo_path("Anticyclonic_20160515.nc")).display(
     ax, color="k"
 )
-EddiesObservations.load_file(get_path("Cyclonic_20160515.nc")).display(ax, color="k")
+EddiesObservations.load_file(get_demo_path("Cyclonic_20160515.nc")).display(
+    ax, color="k"
+)
 _ = update_axes(ax, mappable)

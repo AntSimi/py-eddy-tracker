@@ -11,8 +11,8 @@ from py_eddy_tracker.observations.observation import EddiesObservations
 
 # %%
 # Load detection files
-a = EddiesObservations.load_file(data.get_path("Anticyclonic_20190223.nc"))
-c = EddiesObservations.load_file(data.get_path("Cyclonic_20190223.nc"))
+a = EddiesObservations.load_file(data.get_demo_path("Anticyclonic_20190223.nc"))
+c = EddiesObservations.load_file(data.get_demo_path("Cyclonic_20190223.nc"))
 
 # %%
 # Fill effective contour with amplitude

@@ -13,7 +13,7 @@ from py_eddy_tracker.observations.network import NetworkObservations
 # Load data
 # ---------
 # Load data where observations are put in same network but no segmentation
-n = NetworkObservations.load_file(data.get_path("network_med.nc")).network(651)
+n = NetworkObservations.load_file(data.get_demo_path("network_med.nc")).network(651)
 i = where(
     (n.lat > 33)
     * (n.lat < 34)

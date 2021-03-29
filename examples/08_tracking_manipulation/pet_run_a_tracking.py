@@ -7,16 +7,16 @@ This example didn't replace EddyTracking, we remove check that application do an
 
 # %%
 
-from py_eddy_tracker.data import get_remote_sample
+from py_eddy_tracker.data import get_remote_demo_sample
 from py_eddy_tracker.featured_tracking.area_tracker import AreaTracker
 from py_eddy_tracker.gui import GUI
 from py_eddy_tracker.tracking import Correspondances
 
 # %%
 # Get remote data, we will keep only 180 first days,
-# `get_remote_sample` function is only to get demo dataset, in your own case give a list of identification filename
+# `get_remote_demo_sample` function is only to get demo dataset, in your own case give a list of identification filename
 # and don't mix cyclonic and anticyclonic files.
-file_objects = get_remote_sample(
+file_objects = get_remote_demo_sample(
     "eddies_med_adt_allsat_dt2018/Anticyclonic_2010_2011_2012"
 )[:180]
 

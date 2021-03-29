@@ -6,11 +6,11 @@ from matplotlib import pyplot as plt
 from numpy import ma
 
 import py_eddy_tracker.gui
-from py_eddy_tracker.data import get_remote_sample
+from py_eddy_tracker.data import get_remote_demo_sample
 from py_eddy_tracker.observations.network import NetworkObservations
 
 n = NetworkObservations.load_file(
-    get_remote_sample(
+    get_remote_demo_sample(
         "eddies_med_adt_allsat_dt2018_err70_filt500_order1/Anticyclonic_network.nc"
     )
 )

@@ -37,7 +37,7 @@ def update_axes(ax, mappable=None):
 # Load Input grid, ADT is used to detect eddies
 margin = 30
 g = RegularGridDataset(
-    data.get_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
+    data.get_demo_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
     "longitude",
     "latitude",
     # Manual area subset

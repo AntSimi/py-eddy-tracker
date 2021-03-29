@@ -11,22 +11,22 @@ from matplotlib.animation import FuncAnimation
 from numpy import arange, isnan, meshgrid, ones
 
 import py_eddy_tracker.gui
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import RegularGridDataset
 from py_eddy_tracker.observations.observation import EddiesObservations
 
 # %%
 # Load Input grid ADT
 g = RegularGridDataset(
-    get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
+    get_demo_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
 )
 # Compute u/v from height
 g.add_uv("adt")
 
 # %%
 # Load detection files
-a = EddiesObservations.load_file(get_path("Anticyclonic_20160515.nc"))
-c = EddiesObservations.load_file(get_path("Cyclonic_20160515.nc"))
+a = EddiesObservations.load_file(get_demo_path("Anticyclonic_20160515.nc"))
+c = EddiesObservations.load_file(get_demo_path("Cyclonic_20160515.nc"))
 
 
 # %%

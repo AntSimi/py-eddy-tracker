@@ -93,7 +93,7 @@ t1 = (datetime(2005, 6, 1) - datetime(1950, 1, 1)).days
 
 # %%
 # Get data from period and area
-e = EddiesObservations.load_file(data.get_path("network_med.nc"))
+e = EddiesObservations.load_file(data.get_demo_path("network_med.nc"))
 e = e.extract_with_mask((e.time >= t0) * (e.time < t1)).extract_with_area(
     dict(llcrnrlon=25, urcrnrlon=35, llcrnrlat=31, urcrnrlat=37.5)
 )

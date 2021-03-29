@@ -40,13 +40,13 @@ def update_axes(axes, mappable=None):
 
 # %%
 # Load detection files
-a = EddiesObservations.load_file(data.get_path("Anticyclonic_20190223.nc"))
-c = EddiesObservations.load_file(data.get_path("Cyclonic_20190223.nc"))
+a = EddiesObservations.load_file(data.get_demo_path("Anticyclonic_20190223.nc"))
+c = EddiesObservations.load_file(data.get_demo_path("Cyclonic_20190223.nc"))
 
 # %%
 # Load Input grid, ADT will be used to detect eddies
 g = RegularGridDataset(
-    data.get_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
+    data.get_demo_path("nrt_global_allsat_phy_l4_20190223_20190226.nc"),
     "longitude",
     "latitude",
 )

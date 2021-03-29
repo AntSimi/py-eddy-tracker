@@ -30,11 +30,13 @@ def update_axes(ax, mappable=None):
 
 # %%
 # Load detection files and data to interp
-a = EddiesObservations.load_file(data.get_path("Anticyclonic_20160515.nc"))
-c = EddiesObservations.load_file(data.get_path("Cyclonic_20160515.nc"))
+a = EddiesObservations.load_file(data.get_demo_path("Anticyclonic_20160515.nc"))
+c = EddiesObservations.load_file(data.get_demo_path("Cyclonic_20160515.nc"))
 
 aviso_map = RegularGridDataset(
-    data.get_path("dt_med_allsat_phy_l4_20160515_20190101.nc"), "longitude", "latitude"
+    data.get_demo_path("dt_med_allsat_phy_l4_20160515_20190101.nc"),
+    "longitude",
+    "latitude",
 )
 aviso_map.add_uv("adt")
 

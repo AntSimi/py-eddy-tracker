@@ -14,7 +14,7 @@ from numpy import arange, meshgrid, ones, unique, where, zeros
 
 from py_eddy_tracker import start_logger
 from py_eddy_tracker.appli.gui import Anim
-from py_eddy_tracker.data import get_path
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.poly import group_obs
@@ -42,12 +42,12 @@ class VideoAnimation(FuncAnimation):
 
 
 # %%
-n = NetworkObservations.load_file(get_path("network_med.nc")).network(651)
+n = NetworkObservations.load_file(get_demo_path("network_med.nc")).network(651)
 n = n.extract_with_mask((n.time >= 20180) * (n.time <= 20269))
 n = n.remove_dead_end(nobs=0, ndays=10)
 n.numbering_segment()
 c = GridCollection.from_netcdf_cube(
-    get_path("dt_med_allsat_phy_l4_2005T2.nc"),
+    get_demo_path("dt_med_allsat_phy_l4_2005T2.nc"),
     "longitude",
     "latitude",
     "time",
