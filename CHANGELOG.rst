@@ -8,7 +8,15 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
 [Unreleased]
 ------------
+Changed
+^^^^^^^
+Fixed
+^^^^^
+Added
+^^^^^
 
+[3.4.0] - 2021-03-29
+--------------------
 Changed
 ^^^^^^^
 - `TrackEddiesObservations.filled_by_interpolation` method stop to normalize longitude, to continue to have same
