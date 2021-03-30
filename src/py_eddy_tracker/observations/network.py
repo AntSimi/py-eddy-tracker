@@ -575,7 +575,7 @@ class NetworkObservations(GroupEddiesObservations):
         New numbering of segment
         """
         for i, _, _ in self.iter_on("track"):
-            new_numbering(self.segment[i])
+            new_numbering(self.segment[i], start)
 
     def numbering_network(self, start=1):
         """
