@@ -311,7 +311,7 @@ class NetworkObservations(GroupEddiesObservations):
         """
         sort observations
 
-        :param tuple order: order or sorting. Passed to `np.argsort`
+        :param tuple order: order or sorting. Passed to :func:`numpy.argsort`
         """
 
         index_order = self.obs.argsort(order=order)
@@ -485,39 +485,78 @@ class NetworkObservations(GroupEddiesObservations):
             d[i0:i1] = v
         return d
 
-    def relative(self, i_obs, order=2, direct=True, only_past=False, only_future=False):
-        """
-        Extract the segments at a certain order from one observation.
-
-        :param list obs: indice of observation for relative computation
-        :param int order: order of relatives wanted. 0 means only observations in obs, 1 means direct relatives, ...
-
-        :return: all segments relatives
-        :rtype: EddiesObservations
-        """
-
-        d = self.segment_relative_order(self.segment[i_obs])
-        m = (d <= order) * (d != -1)
-        return self.extract_with_mask(m)
-
-    def relatives(self, obs, order=2, direct=True, only_past=False, only_future=False):
+    def relatives(self, obs, order=2):
         """
         Extract the segments at a certain order from multiple observations.
 
-        :param list obs: indices of observation for relatives computation
+        :param iterable,int obs: indices of observation for relatives computation. Can be one observation (int) or collection of observations (iterable(int))
         :param int order: order of relatives wanted. 0 means only observations in obs, 1 means direct relatives, ...
 
         :return: all segments relatives
         :rtype: EddiesObservations
         """
+        segment = self.segment_track_array
+        previous_obs, next_obs = self.previous_obs, self.next_obs
 
-        mask = zeros(self.segment.shape, dtype=bool)
+        segments_connexion = dict()
 
-        for i_obs in obs:
-            d = self.segment_relative_order(self.segment[i_obs])
-            mask += (d <= order) * (d != -1)
+        for i_slice, seg, _ in self.iter_on(segment):
+            if i_slice.start == i_slice.stop:
+                continue
 
-        return self.extract_with_mask(mask)
+            i_p, i_n = previous_obs[i_slice.start], next_obs[i_slice.stop - 1]
+            p_seg, n_seg = segment[i_p], segment[i_n]
+
+            # dumping slice into dict
+            if seg not in segments_connexion:
+                segments_connexion[seg] = [i_slice, []]
+            else:
+                segments_connexion[seg][0] = i_slice
+
+
+            if i_p != -1:
+
+                if p_seg not in segments_connexion:
+                    segments_connexion[p_seg] = [None, []]
+
+                # backward
+                segments_connexion[seg][1].append(p_seg)
+                segments_connexion[p_seg][1].append(seg)
+
+            if i_n != -1:
+                if n_seg not in segments_connexion:
+                    segments_connexion[n_seg] = [None, []]
+
+                # forward
+                segments_connexion[seg][1].append(n_seg)
+                segments_connexion[n_seg][1].append(seg)
+
+
+        i_obs = (
+            [obs]
+            if not hasattr(obs, "__iter__")
+            else obs
+        )
+        import numpy as np
+
+        distance = zeros(segment.size, dtype=np.uint16) - 1
+
+        def loop(seg, dist=1):
+            i_slice, links = segments_connexion[seg]
+            d = distance[i_slice.start]
+
+            if dist < d and dist <= order:
+                distance[i_slice] = dist
+                for _seg in links:
+                    loop(_seg, dist + 1)
+
+        for indice in i_obs:
+            loop(segment[indice], 0)
+
+        return self.extract_with_mask(distance <= order)
+
+    # keep old names, for backward compatibility
+    relative = relatives
 
     def close_network(self, other, nb_obs_min=10, **kwargs):
         """
