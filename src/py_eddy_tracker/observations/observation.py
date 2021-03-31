@@ -553,6 +553,8 @@ class EddiesObservations(object):
         :param str,array xname:
         :param array bins: bounds of each bin ,
         :return: index or mask, bound low, bound up
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.iter_on
         """
         x = self[xname] if isinstance(xname, str) else xname
         d = x[1:] - x[:-1]
@@ -593,6 +595,8 @@ class EddiesObservations(object):
     def align_on(self, other, var_name="time", **kwargs):
         """
         Align the time indexes of two datasets.
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.align_on
         """
         iter_self = self.iter_on(var_name, **kwargs)
         iter_other = other.iter_on(var_name, **kwargs)

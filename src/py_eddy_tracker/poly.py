@@ -536,7 +536,6 @@ def fit_ellips(x, y):
     https://en.wikipedia.org/wiki/Ellipse
 
     """
-    # x,y = x[1:],y[1:]
     nb = x.shape[0]
     datas = ones((nb, 5), dtype=x.dtype)
     datas[:, 0] = x ** 2
