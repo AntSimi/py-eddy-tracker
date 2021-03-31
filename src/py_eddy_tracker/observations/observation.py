@@ -2050,7 +2050,10 @@ class EddiesObservations(object):
         :rtype: array[int32]
         """
         xname, yname = self.intern(intern)
-        return poly_indexs(x, y, self[xname], self[yname])
+        m = ~ (isnan(x) + isnan(y))
+        i = -ones(x.shape, dtype='i4')
+        i[m] = poly_indexs(x[m], y[m], self[xname], self[yname])
+        return i
 
     def inside(self, x, y, intern=False):
         """
