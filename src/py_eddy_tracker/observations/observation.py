@@ -2220,6 +2220,8 @@ class EddiesObservations(object):
         :param str method: 'center', 'mean', 'max', 'min', 'nearest'
         :param str dtype: if None we use var dtype
         :param bool intern: Use extern or intern contour
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.interp_grid
         """
         if method in ("center", "nearest"):
             return grid_object.interp(varname, self.longitude, self.latitude, method)

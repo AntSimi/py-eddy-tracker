@@ -52,8 +52,8 @@ nb_max_a = a.nb_obs_by_track.max()
 nb_max_c = c.nb_obs_by_track.max()
 
 # %%
-# Compute normalize lifetime
-# --------------------------
+# Compute normalised lifetime
+# ---------------------------
 
 # Radius
 AC_radius = a.eddy_norm_lifetime("speed_radius", nb=nb_max_a, factor=1e-3)
