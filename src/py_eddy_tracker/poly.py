@@ -815,7 +815,7 @@ def box_indexes(x, y, step):
 
 
 @njit(cache=True)
-def poly_indexs_(x_p, y_p, x_c, y_c):
+def poly_indexs(x_p, y_p, x_c, y_c):
     """
     Index of contour for each postion inside a contour, -1 in case of no contour
 
@@ -874,7 +874,7 @@ def poly_indexs_(x_p, y_p, x_c, y_c):
 
 
 @njit(cache=True)
-def poly_indexs(x_p, y_p, x_c, y_c):
+def poly_indexs_old(x_p, y_p, x_c, y_c):
     """
     index of contour for each postion inside a contour, -1 in case of no contour
 
