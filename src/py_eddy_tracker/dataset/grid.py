@@ -609,17 +609,17 @@ class GridDataset(object):
         :param str vname: Grid name of v speed component
         :param datetime.datetime date: Date which will be stored in object to date data
         :param float,int step: Height between two layers in m
-        :param float,int shape_error: Maximal error allowed for outter contour in %
+        :param float,int shape_error: Maximal error allowed for outermost contour in %
         :param int sampling: Number of points to store contours and speed profile
         :param str sampling_method: Method to resample 'uniform' or 'visvalingam'
         :param (int,int),None pixel_limit:
-            Min and max number of pixels inside the inner and the outer contour to be considered as an eddy
+            Min and max number of pixels inside the inner and the outermost contour to be considered as an eddy
         :param float,None precision: Truncate values at the defined precision in m
         :param str force_height_unit: Unit used for height unit
         :param str force_speed_unit: Unit used for speed unit
         :param dict kwargs: Argument given to amplitude
 
-        :return: Return a list of 2 elements: Anticyclone and Cyclone
+        :return: Return a list of 2 elements: Anticyclones and Cyclones
         :rtype: py_eddy_tracker.observations.observation.EddiesObservations
 
         .. minigallery:: py_eddy_tracker.GridDataset.eddy_identification
@@ -729,7 +729,8 @@ class GridDataset(object):
                 for contour in contour_paths:
                     if contour.used:
                         continue
-                    # FIXME : center could be not in contour and fit on raw sampling
+                    # FIXME : center could be outside the contour due to the fit
+                    # FIXME : warning : the fit is made on raw sampling
                     _, _, _, aerr = contour.fit_circle()
 
                     # Filter for shape
@@ -752,6 +753,7 @@ class GridDataset(object):
                     ):
                         continue
 
+                    # Test the number of pixels within the outermost contour
                     # FIXME : Maybe limit max must be replace with a maximum of surface
                     if (
                         contour.nb_pixel < pixel_limit[0]
@@ -759,6 +761,9 @@ class GridDataset(object):
                     ):
                         contour.reject = 3
                         continue
+
+                    # Here the considered contour passed shape_error test, masked_pixels test,
+                    # values strictly above (AEs) or below (CEs) the contour, number_pixels test)
 
                     # Compute amplitude
                     reset_centroid, amp = self.get_amplitude(

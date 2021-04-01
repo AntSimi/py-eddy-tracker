@@ -188,3 +188,47 @@ ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, "shape_error_e", vmin=14, vmax=70, **kw)
 cb = update_axes(ax, m["scatter"])
 cb.set_label("Effective shape error")
+
+# %%
+# Rotation angle
+# --------------
+from py_eddy_tracker.generic import coordinates_to_local, local_to_coordinates
+from py_eddy_tracker.poly import fit_ellips
+theta_ = list()
+a_ = list()
+b_ = list()
+for obs in close_to_i3:
+    x, y = obs['contour_lon_s'], obs['contour_lat_s']
+    x0_, y0_ = x.mean(), y.mean()
+    x_, y_ = coordinates_to_local(x, y, x0_, y0_)
+    x0, y0, a, b, theta = fit_ellips(x_, y_)
+    theta_.append(theta)
+    a_.append(a)
+    b_.append(b)
+a_=array(a_)
+b_=array(b_)
+
+# %%
+# Theta
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, theta_, vmin=-pi/2, vmax=pi/2, cmap='hsv')
+cb = update_axes(ax, m["scatter"])
+
+# %%
+# A
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, a_ * 1e-3, vmin=0, vmax=80, cmap='Spectral_r')
+cb = update_axes(ax, m["scatter"])
+
+# %%
+# B
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, b_ * 1e-3, vmin=0, vmax=80, cmap='Spectral_r')
+cb = update_axes(ax, m["scatter"])
+
+# %%
+# A/B
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, a_/b_, vmin=1, vmax=2, cmap='Spectral_r')
+cb = update_axes(ax, m["scatter"])
+
