@@ -16,6 +16,7 @@ from numpy import (
     in1d,
     ones,
     uint32,
+    uint16,
     unique,
     where,
     zeros,
@@ -513,7 +514,6 @@ class NetworkObservations(GroupEddiesObservations):
             else:
                 segments_connexion[seg][0] = i_slice
 
-
             if i_p != -1:
 
                 if p_seg not in segments_connexion:
@@ -531,15 +531,9 @@ class NetworkObservations(GroupEddiesObservations):
                 segments_connexion[seg][1].append(n_seg)
                 segments_connexion[n_seg][1].append(seg)
 
+        i_obs = [obs] if not hasattr(obs, "__iter__") else obs
 
-        i_obs = (
-            [obs]
-            if not hasattr(obs, "__iter__")
-            else obs
-        )
-        import numpy as np
-
-        distance = zeros(segment.size, dtype=np.uint16) - 1
+        distance = zeros(segment.size, dtype=uint16) - 1
 
         def loop(seg, dist=1):
             i_slice, links = segments_connexion[seg]

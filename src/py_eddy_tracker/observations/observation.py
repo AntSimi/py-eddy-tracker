@@ -2054,8 +2054,8 @@ class EddiesObservations(object):
         :rtype: array[int32]
         """
         xname, yname = self.intern(intern)
-        m = ~ (isnan(x) + isnan(y))
-        i = -ones(x.shape, dtype='i4')
+        m = ~(isnan(x) + isnan(y))
+        i = -ones(x.shape, dtype="i4")
         i[m] = poly_indexs(x[m], y[m], self[xname], self[yname])
         return i
 
