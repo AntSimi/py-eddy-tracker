@@ -15,8 +15,8 @@ from numpy import (
     empty,
     in1d,
     ones,
-    uint32,
     uint16,
+    uint32,
     unique,
     where,
     zeros,
@@ -490,7 +490,9 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Extract the segments at a certain order from multiple observations.
 
-        :param iterable,int obs: indices of observation for relatives computation. Can be one observation (int) or collection of observations (iterable(int))
+        :param iterable,int obs:
+            indices of observation for relatives computation. Can be one observation (int)
+            or collection of observations (iterable(int))
         :param int order: order of relatives wanted. 0 means only observations in obs, 1 means direct relatives, ...
 
         :return: all segments relatives
@@ -532,7 +534,6 @@ class NetworkObservations(GroupEddiesObservations):
                 segments_connexion[n_seg][1].append(seg)
 
         i_obs = [obs] if not hasattr(obs, "__iter__") else obs
-
         distance = zeros(segment.size, dtype=uint16) - 1
 
         def loop(seg, dist=1):
