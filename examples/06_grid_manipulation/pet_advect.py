@@ -10,9 +10,9 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from numpy import arange, isnan, meshgrid, ones
 
-import py_eddy_tracker.gui
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import RegularGridDataset
+from py_eddy_tracker.gui import GUI_AXES
 from py_eddy_tracker.observations.observation import EddiesObservations
 
 # %%
@@ -32,7 +32,7 @@ c = EddiesObservations.load_file(get_demo_path("Cyclonic_20160515.nc"))
 # %%
 # Quiver from u/v with eddies
 fig = plt.figure(figsize=(10, 5))
-ax = fig.add_axes([0, 0, 1, 1], projection="full_axes")
+ax = fig.add_axes([0, 0, 1, 1], projection=GUI_AXES)
 ax.set_xlim(19, 30), ax.set_ylim(31, 36.5), ax.grid()
 x, y = meshgrid(g.x_c, g.y_c)
 a.filled(ax, facecolors="r", alpha=0.1), c.filled(ax, facecolors="b", alpha=0.1)
@@ -82,7 +82,7 @@ frame_t = kw_p["nb_step"] * kw_p["time_step"] / 86400.0
 def anim_ax(**kw):
     t = 0
     fig = plt.figure(figsize=(10, 5), dpi=55)
-    axes = fig.add_axes([0, 0, 1, 1], projection="full_axes")
+    axes = fig.add_axes([0, 0, 1, 1], projection=GUI_AXES)
     axes.set_xlim(19, 30), axes.set_ylim(31, 36.5), axes.grid()
     a.filled(axes, facecolors="r", alpha=0.1), c.filled(axes, facecolors="b", alpha=0.1)
     line = axes.plot([], [], "k", **kw)[0]

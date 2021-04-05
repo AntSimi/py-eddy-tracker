@@ -24,16 +24,16 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from numpy import arange, meshgrid, zeros
 
-import py_eddy_tracker.gui
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import RegularGridDataset
+from py_eddy_tracker.gui import GUI_AXES
 from py_eddy_tracker.observations.observation import EddiesObservations
 
 
 # %%
 def start_ax(title="", dpi=90):
     fig = plt.figure(figsize=(16, 9), dpi=dpi)
-    ax = fig.add_axes([0, 0, 1, 1], projection="full_axes")
+    ax = fig.add_axes([0, 0, 1, 1], projection=GUI_AXES)
     ax.set_xlim(0, 32), ax.set_ylim(28, 46)
     ax.set_title(title)
     return fig, ax, ax.text(3, 32, "", fontsize=20)

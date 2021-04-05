@@ -23,10 +23,10 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from numpy import arange, isnan, ma, meshgrid, zeros
 
-import py_eddy_tracker.gui
 from py_eddy_tracker import start_logger
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection, RegularGridDataset
+from py_eddy_tracker.gui import GUI_AXES
 
 start_logger().setLevel("ERROR")
 
@@ -47,7 +47,7 @@ class LAVDGrid(RegularGridDataset):
 # %%
 def start_ax(title="", dpi=90):
     fig = plt.figure(figsize=(12, 5), dpi=dpi)
-    ax = fig.add_axes([0.05, 0.08, 0.9, 0.9], projection="full_axes")
+    ax = fig.add_axes([0.05, 0.08, 0.9, 0.9], projection=GUI_AXES)
     ax.set_xlim(-6, 36), ax.set_ylim(31, 45)
     ax.set_title(title)
     return fig, ax, ax.text(3, 32, "", fontsize=20)

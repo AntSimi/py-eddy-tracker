@@ -10,8 +10,8 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.colors import ListedColormap
 from numpy import ones, where
 
-import py_eddy_tracker.gui
 from py_eddy_tracker.data import get_demo_path
+from py_eddy_tracker.gui import GUI_AXES
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
@@ -104,7 +104,7 @@ def update(i_frame):
 
 
 fig = plt.figure(figsize=(16, 9), dpi=60)
-ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection=GUI_AXES)
 ax.set_title(f"{len(e)} observations to segment")
 ax.set_xlim(19, 29), ax.set_ylim(31, 35.5), ax.grid()
 vmax = TRACKS[-1].max()
@@ -121,6 +121,6 @@ ani = VideoAnimation(fig, update, frames=range(1, len(TRACKS), 4), interval=125)
 # Final Result
 # ------------
 fig = plt.figure(figsize=(16, 9))
-ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection=GUI_AXES)
 ax.set_xlim(19, 29), ax.set_ylim(31, 35.5), ax.grid()
 _ = ax.scatter(e.lon, e.lat, c=TRACKS[-1], cmap=cmap, vmin=0, vmax=vmax, s=20)

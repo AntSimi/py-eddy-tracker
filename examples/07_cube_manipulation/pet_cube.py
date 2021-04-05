@@ -12,10 +12,10 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from numpy import arange, isnan, meshgrid, ones
 
-import py_eddy_tracker.gui
 from py_eddy_tracker import start_logger
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection
+from py_eddy_tracker.gui import GUI_AXES
 
 start_logger().setLevel("ERROR")
 
@@ -70,7 +70,7 @@ x, y = x0.copy(), y0.copy()
 # Function
 def anim_ax(**kw):
     fig = plt.figure(figsize=(10, 5), dpi=55)
-    axes = fig.add_axes([0, 0, 1, 1], projection="full_axes")
+    axes = fig.add_axes([0, 0, 1, 1], projection=GUI_AXES)
     axes.set_xlim(19, 30), axes.set_ylim(31, 36.5), axes.grid()
     line = axes.plot([], [], "k", **kw)[0]
     return fig, axes.text(21, 32.1, ""), line
