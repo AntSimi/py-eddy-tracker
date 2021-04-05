@@ -1,4 +1,4 @@
-from numpy import array, pi
+from numpy import array, pi, roll
 from pytest import approx
 
 from py_eddy_tracker.poly import (
@@ -40,6 +40,14 @@ def test_convex_hull():
 def test_visvalingam():
     x = array([1, 2, 3, 4, 5, 6.75, 6, 1])
     y = array([-0.5, -1.5, -1, -1.75, -1, -1, -0.5, -0.5])
+    x_target = [1, 2, 3, 4, 6, 1]
+    y_target = [-0.5, -1.5, -1, -1.75, -0.5, -0.5]
     x_, y_ = visvalingam(x, y, 6)
-    assert ([1, 2, 3, 4, 6, 1] == x_).all()
-    assert ([-0.5, -1.5, -1, -1.75, -0.5, -0.5] == y_).all()
+    assert (x_target == x_).all()
+    assert (y_target == y_).all()
+    x_, y_ = visvalingam(x[:-1], y[:-1], 6)
+    assert (x_target == x_).all()
+    assert (y_target == y_).all()
+    x_, y_ = visvalingam(roll(x, 2), roll(y, 2), 6)
+    assert (x_target[:-1] == x_[1:]).all()
+    assert (y_target[:-1] == y_[1:]).all()
