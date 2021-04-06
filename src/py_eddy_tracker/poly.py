@@ -522,9 +522,9 @@ def fit_circle(x, y):
 
 
 @njit(cache=True)
-def fit_ellips(x, y):
+def fit_ellipse(x, y):
     r"""
-    From a polygon, function will fit an ellips.
+    From a polygon, function will fit an ellipse.
 
     Must be call with local coordinates (in m, to get a radius in m).
 

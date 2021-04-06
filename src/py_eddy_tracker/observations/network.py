@@ -513,7 +513,6 @@ class NetworkObservations(GroupEddiesObservations):
             else:
                 segments_connexion[seg][0] = i_slice
 
-
             if i_p != -1:
 
                 if p_seg not in segments_connexion:
@@ -531,12 +530,7 @@ class NetworkObservations(GroupEddiesObservations):
                 segments_connexion[seg][1].append(n_seg)
                 segments_connexion[n_seg][1].append(seg)
 
-
-        i_obs = (
-            [obs]
-            if not hasattr(obs, "__iter__")
-            else obs
-        )
+        i_obs = [obs] if not hasattr(obs, "__iter__") else obs
         import numpy as np
 
         distance = zeros(segment.size, dtype=np.uint16) - 1

@@ -21,13 +21,13 @@ class CheltonTracker(Model):
         return distance
 
     def mask_function(self, other, distance):
-        """We mask link with ellips and ratio"""
-        # Compute Parameter of ellips
+        """We mask link with ellipse and ratio"""
+        # Compute Parameter of ellipse
         minor, major = 1.05, 1.5
-        y = self.basic_formula_ellips_major_axis(
+        y = self.basic_formula_ellipse_major_axis(
             self.lat, degrees=True, c0=minor, cmin=minor, cmax=major, lat1=23, lat2=5
         )
-        # mask from ellips
+        # mask from ellipse
         mask = self.shifted_ellipsoid_degrees_mask(
             other, minor=minor, major=y  # Minor can be bigger than major??
         )
