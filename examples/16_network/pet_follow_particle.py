@@ -33,7 +33,7 @@ class VideoAnimation(FuncAnimation):
 
     def save(self, *args, **kwargs):
         if args[0].endswith("gif"):
-            # In this case gif is use to create thumbnail which are not use but consume same time than video
+            # In this case gif is used to create thumbnail which are not used but consumes same time than video
             # So we create an empty file, to save time
             with open(args[0], "w") as _:
                 pass
@@ -147,7 +147,7 @@ def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
     e = eddies.extract_with_mask(m_start)
     # to be able to get global index
     translate_start = where(m_start)[0]
-    # Identify particle in eddies(only in core)
+    # Identify particle in eddies (only in core)
     i_start = e.contains(x, y, intern=True)
     m = i_start != -1
     x, y, i_start = x[m], y[m], i_start[m]
@@ -158,9 +158,9 @@ def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
     e_end = eddies.extract_with_mask(m_end)
     # to be able to get global index
     translate_end = where(m_end)[0]
-    # Id eddies for each alive particle(in core and extern)
+    # Id eddies for each alive particle (in core and extern)
     i_end = e_end.contains(x, y)
-    # compute matrix and filled target array
+    # compute matrix and fill target array
     get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
 
 
@@ -169,7 +169,7 @@ def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
     nb_start, nb_end = translate_start.size, translate_end.size
     # Matrix which will store count for every couple
     count = zeros((nb_start, nb_end), dtype=nb_types.int32)
-    # Number of particle in each origin observation
+    # Number of particles in each origin observation
     ref = zeros(nb_start, dtype=nb_types.int32)
     # For each particle
     for i in range(i_start.size):
@@ -181,7 +181,7 @@ def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
     for i in range(nb_start):
         for j in range(nb_end):
             pct_ = count[i, j]
-            # If there are particle from i to j
+            # If there are particles from i to j
             if pct_ != 0:
                 # Get percent
                 pct_ = pct_ / ref[i] * 100.0

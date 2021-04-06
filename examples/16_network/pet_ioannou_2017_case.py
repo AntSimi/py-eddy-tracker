@@ -14,15 +14,19 @@ from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
-from numpy import arange, where
+from numpy import arange, where, array, pi
 
 import py_eddy_tracker.gui
 from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.observations.network import NetworkObservations
 
+from py_eddy_tracker.generic import coordinates_to_local, local_to_coordinates
+from py_eddy_tracker.poly import fit_ellipse
 
 # %%
+
+
 class VideoAnimation(FuncAnimation):
     def _repr_html_(self, *args, **kwargs):
         """To get video in html and have a player"""
@@ -188,3 +192,47 @@ ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, "shape_error_e", vmin=14, vmax=70, **kw)
 cb = update_axes(ax, m["scatter"])
 cb.set_label("Effective shape error")
+
+# %%
+# Rotation angle
+# --------------
+# For each obs, fit an ellipse to the contour, with theta the angle from the x-axis,
+# a the semi ax in x direction and b the semi ax in y dimension
+
+theta_ = list()
+a_ = list()
+b_ = list()
+for obs in close_to_i3:
+    x, y = obs["contour_lon_s"], obs["contour_lat_s"]
+    x0_, y0_ = x.mean(), y.mean()
+    x_, y_ = coordinates_to_local(x, y, x0_, y0_)
+    x0, y0, a, b, theta = fit_ellipse(x_, y_)
+    theta_.append(theta)
+    a_.append(a)
+    b_.append(b)
+a_ = array(a_)
+b_ = array(b_)
+
+# %%
+# Theta
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, theta_, vmin=-pi / 2, vmax=pi / 2, cmap="hsv")
+cb = update_axes(ax, m["scatter"])
+
+# %%
+# a
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, a_ * 1e-3, vmin=0, vmax=80, cmap="Spectral_r")
+cb = update_axes(ax, m["scatter"])
+
+# %%
+# b
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, b_ * 1e-3, vmin=0, vmax=80, cmap="Spectral_r")
+cb = update_axes(ax, m["scatter"])
+
+# %%
+# a/b
+ax = timeline_axes()
+m = close_to_i3.scatter_timeline(ax, a_ / b_, vmin=1, vmax=2, cmap="Spectral_r")
+cb = update_axes(ax, m["scatter"])

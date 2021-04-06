@@ -87,7 +87,7 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
     # Focal
     f_right = lon0
     f_left = f_right - (c - minor)
-    # Ellips center
+    # Ellipse center
     x_c = (f_left + f_right) * 0.5
 
     nb_0, nb_1 = lat0.shape[0], lat1.shape[0]
@@ -1248,7 +1248,7 @@ class EddiesObservations(object):
         )
 
     def fixed_ellipsoid_mask(
-        self, other, minor=50, major=100, only_east=False, shifted_ellips=False
+        self, other, minor=50, major=100, only_east=False, shifted_ellipse=False
     ):
         dist = self.distance(other).T
         accepted = dist < minor
@@ -1272,13 +1272,13 @@ class EddiesObservations(object):
             )
 
             lon_self = self.lon[index_self]
-            if shifted_ellips:
-                x_center_ellips = lon_self - (major - minor) / 2
+            if shifted_ellipse:
+                x_center_ellipse = lon_self - (major - minor) / 2
             else:
-                x_center_ellips = lon_self
+                x_center_ellipse = lon_self
 
-            lon_left_f = x_center_ellips - f_degree
-            lon_right_f = x_center_ellips + f_degree
+            lon_left_f = x_center_ellipse - f_degree
+            lon_right_f = x_center_ellipse + f_degree
 
             dist_left_f = distance(
                 lon_left_f,
@@ -1302,7 +1302,7 @@ class EddiesObservations(object):
         return accepted.T
 
     @staticmethod
-    def basic_formula_ellips_major_axis(
+    def basic_formula_ellipse_major_axis(
         lats, cmin=1.5, cmax=10.0, c0=1.5, lat1=13.5, lat2=5.0, degrees=False
     ):
         """Give major axis in km with a given latitude"""
@@ -2054,8 +2054,8 @@ class EddiesObservations(object):
         :rtype: array[int32]
         """
         xname, yname = self.intern(intern)
-        m = ~ (isnan(x) + isnan(y))
-        i = -ones(x.shape, dtype='i4')
+        m = ~(isnan(x) + isnan(y))
+        i = -ones(x.shape, dtype="i4")
         i[m] = poly_indexs(x[m], y[m], self[xname], self[yname])
         return i
 
