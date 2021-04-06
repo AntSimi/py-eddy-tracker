@@ -153,7 +153,7 @@ def _circle_from_equal_area(vertice):
     # last coordinates == first
     lon0, lat0 = lons[1:].mean(), lats[1:].mean()
     c_x, c_y = coordinates_to_local(lons, lats, lon0, lat0)
-    # Some time, edge is only a dot of few coordinates
+    # Sometimes, edge is only a dot of few coordinates
     d_lon = lons.max() - lons.min()
     d_lat = lats.max() - lats.min()
     if d_lon < 1e-7 and d_lat < 1e-7:
@@ -239,7 +239,7 @@ BasePath.nb_pixel = nb_pixel
 
 class GridDataset(object):
     """
-    Class to have basic tool on NetCDF Grid
+    Class for basic tools on NetCDF Grid
     """
 
     __slots__ = (
@@ -274,7 +274,7 @@ class GridDataset(object):
         :param str x_name: Name of longitude coordinates
         :param str y_name: Name of latitude coordinates
         :param bool,None centered: Allow to know how coordinates could be used with pixel
-        :param dict indexs: A dictionary which set indexs to use for non-coordinate dimensions
+        :param dict indexs: A dictionary that sets indexes to use for non-coordinate dimensions
         :param bool unset: Set to True to create an empty grid object without file
         """
         self.dimensions = None
@@ -294,7 +294,7 @@ class GridDataset(object):
         self.indexs = dict() if indexs is None else indexs
         if centered is None:
             logger.warning(
-                "We assume pixel position of grid is center for %s", filename
+                "We assume pixel position of grid is centered for %s", filename
             )
         if not unset:
             self.load_general_features()
@@ -314,7 +314,7 @@ class GridDataset(object):
             return self.centered
 
     def load_general_features(self):
-        """Load attrs to  be stored in object"""
+        """Load attrs to be stored in object"""
         logger.debug(
             "Load general feature from %(filename)s", dict(filename=self.filename)
         )
@@ -395,9 +395,9 @@ class GridDataset(object):
     @staticmethod
     def c_to_bounds(c):
         """
-        Centred coordinates to bounds coordinates
+        Centered coordinates to bounds coordinates
 
-        :param array c: centred coordinates to translate
+        :param array c: centered coordinates to translate
         :return: bounds coordinates
         """
         bounds = concatenate((c, (2 * c[-1] - c[-2],)))
@@ -558,7 +558,7 @@ class GridDataset(object):
         return data
 
     def high_filter(self, grid_name, w_cut, **kwargs):
-        """Return the grid high-pass filtered, by substracting to the grid the low-pass filter (default: order=1)
+        """Return the high-pass filtered grid, by substracting to the initial grid the low-pass filtered grid (default: order=1)
 
         :param grid_name: the name of the grid
         :param int, w_cut: the half-power wavelength cutoff (km)
@@ -567,7 +567,7 @@ class GridDataset(object):
         self.vars[grid_name] -= result
 
     def low_filter(self, grid_name, w_cut, **kwargs):
-        """Return the grid low-pass filtered (default: order=1)
+        """Return the low-pass filtered grid (default: order=1)
 
         :param grid_name: the name of the grid
         :param int, w_cut: the half-power wavelength cutoff (km)
@@ -607,11 +607,11 @@ class GridDataset(object):
         :param str grid_height: Grid name of Sea Surface Height
         :param str uname: Grid name of u speed component
         :param str vname: Grid name of v speed component
-        :param datetime.datetime date: Date which will be stored in object to date data
+        :param datetime.datetime date: Date to be stored in object to date data
         :param float,int step: Height between two layers in m
         :param float,int shape_error: Maximal error allowed for outermost contour in %
         :param int sampling: Number of points to store contours and speed profile
-        :param str sampling_method: Method to resample 'uniform' or 'visvalingam'
+        :param str sampling_method: Method to resample, 'uniform' or 'visvalingam'
         :param (int,int),None pixel_limit:
             Min and max number of pixels inside the inner and the outermost contour to be considered as an eddy
         :param float,None precision: Truncate values at the defined precision in m
@@ -625,8 +625,8 @@ class GridDataset(object):
         .. minigallery:: py_eddy_tracker.GridDataset.eddy_identification
         """
         if not isinstance(date, datetime):
-            raise Exception("Date argument be a datetime object")
-        # The inf limit must be in pixel and  sup limit in surface
+            raise Exception("Date argument must be a datetime object")
+        # The inf limit must be in pixel and sup limit in surface
         if pixel_limit is None:
             pixel_limit = (4, 1000)
 
@@ -651,10 +651,10 @@ class GridDataset(object):
 
         # Get ssh grid
         data = self.grid(grid_height).astype("f8")
-        # In case of a reduce mask
+        # In case of a reduced mask
         if len(data.mask.shape) == 0 and not data.mask:
             data.mask = zeros(data.shape, dtype="bool")
-        # we remove noisy information
+        # we remove noisy data
         if precision is not None:
             data = (data / precision).round() * precision
         # Compute levels for ssh
@@ -754,7 +754,7 @@ class GridDataset(object):
                         continue
 
                     # Test the number of pixels within the outermost contour
-                    # FIXME : Maybe limit max must be replace with a maximum of surface
+                    # FIXME : Maybe limit max must be replaced with a maximum of surface
                     if (
                         contour.nb_pixel < pixel_limit[0]
                         or contour.nb_pixel > pixel_limit[1]
@@ -794,7 +794,7 @@ class GridDataset(object):
                             centlon_e = x[centi, centj]
                             centlat_e = y[centi, centj]
 
-                    # centlat_e and centlon_e must be index of maximum, we will loose some inner contour if it's not
+                    # centlat_e and centlon_e must be indexes of maximum, we will loose some inner contour if it's not
                     (
                         max_average_speed,
                         speed_contour,
@@ -812,7 +812,7 @@ class GridDataset(object):
                         pixel_min=pixel_limit[0],
                     )
 
-                    # FIXME : Instantiate new EddyObservation object (high cost need to be reviewed)
+                    # FIXME : Instantiate new EddyObservation object (high cost, need to be reviewed)
                     obs = EddiesObservations(
                         size=1,
                         track_extra_variables=track_extra_variables,
@@ -928,7 +928,7 @@ class GridDataset(object):
         pixel_min=3,
     ):
         """
-        Calculate geostrophic speed around successive contours
+        Compute geostrophic speed around successive contours
         Returns the average
         """
         # Init max speed to search maximum
@@ -1040,7 +1040,7 @@ class UnRegularGridDataset(GridDataset):
 
     @property
     def bounds(self):
-        """Give bound"""
+        """Give bounds"""
         return self.x_c.min(), self.x_c.max(), self.y_c.min(), self.y_c.max()
 
     def bbox_indice(self, vertices):
@@ -1072,7 +1072,7 @@ class UnRegularGridDataset(GridDataset):
         pass
 
     def init_pos_interpolator(self):
-        logger.debug("Create a KdTree could be long ...")
+        logger.debug("Create a KdTree, could be long ...")
         self.index_interp = cKDTree(
             create_vertice(self.x_c.reshape(-1), self.y_c.reshape(-1))
         )
@@ -1202,10 +1202,10 @@ class RegularGridDataset(GridDataset):
 
     def get_pixels_in(self, contour):
         """
-        Get indices of pixels in contour.
+        Get indexes of pixels in contour.
 
-        :param vertice,Path contour: Contour which enclosed some pixels
-        :return: Indices of grid in contour
+        :param vertice,Path contour: Contour that encloses some pixels
+        :return: Indexes of grid in contour
         :rtype: array[int],array[int]
         """
         if isinstance(contour, BasePath):
@@ -1238,7 +1238,7 @@ class RegularGridDataset(GridDataset):
         return self._y_step
 
     def compute_pixel_path(self, x0, y0, x1, y1):
-        """Give a series of indexes which describe the path between to position"""
+        """Give a series of indexes describing the path between two positions"""
         return compute_pixel_path(
             x0,
             y0,
@@ -1275,7 +1275,7 @@ class RegularGridDataset(GridDataset):
         min_wave_length = max(step_x_km, step_y_km) * 2
         if wave_length < min_wave_length:
             logger.error(
-                "Wave_length too short for resolution, must be > %d km",
+                "Wavelength too short for resolution, must be > %d km",
                 ceil(min_wave_length),
             )
             raise Exception()
@@ -1315,7 +1315,7 @@ class RegularGridDataset(GridDataset):
 
     def kernel_lanczos(self, lat, wave_length, order=1):
         """Not really operational
-        wave_length in km
+        wavelength in km
         order must be int
         """
         order = self.check_order(order)
@@ -1327,7 +1327,7 @@ class RegularGridDataset(GridDataset):
         return self.finalize_kernel(kernel, order, half_x_pt, half_y_pt)
 
     def kernel_bessel(self, lat, wave_length, order=1):
-        """wave_length in km
+        """wavelength in km
         order must be int
         """
         order = self.check_order(order)
@@ -1481,13 +1481,13 @@ class RegularGridDataset(GridDataset):
         :param str grid_name: grid to filter, data will replace original one
         :param float wave_length: in km
         :param int order: order to use, if > 1 negative values of the cardinal sinus are present in kernel
-        :param float lat_max: absolute latitude above no filtering apply
+        :param float lat_max: absolute latitude, no filtering above
         :param dict kwargs: look at :py:meth:`RegularGridDataset.convolve_filter_with_dynamic_kernel`
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.bessel_high_filter
         """
         logger.debug(
-            "Run filtering with wave of %(wave_length)s km and order of %(order)s ...",
+            "Run filtering with wavelength of %(wave_length)s km and order of %(order)s ...",
             dict(wave_length=wave_length, order=order),
         )
         data_out = self.convolve_filter_with_dynamic_kernel(
@@ -1813,7 +1813,7 @@ class RegularGridDataset(GridDataset):
         )
 
     def speed_coef_mean(self, contour):
-        """Some nan can be computed over contour if we are near border,
+        """Some nan can be computed over contour if we are near borders,
         something to explore
         """
         return mean_on_regular_contour(
@@ -1831,10 +1831,10 @@ class RegularGridDataset(GridDataset):
 
     def display(self, ax, name, factor=1, ref=None, **kwargs):
         """
-        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
+        :param matplotlib.axes.Axes ax: matplotlib axes used to draw
         :param str,array name: variable to display, could be an array
         :param float factor: multiply grid by
-        :param float,None ref: if define use like west bound
+        :param float,None ref: if defined, all coordinates are wrapped with ref as western boundary
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolormesh`
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.display
@@ -1853,10 +1853,10 @@ class RegularGridDataset(GridDataset):
 
     def contour(self, ax, name, factor=1, ref=None, **kwargs):
         """
-        :param matplotlib.axes.Axes ax: matplotlib axes use to draw
+        :param matplotlib.axes.Axes ax: matplotlib axes used to draw
         :param str,array name: variable to display, could be an array
         :param float factor: multiply grid by
-        :param float,None ref: if define use like west bound
+        :param float,None ref: if defined, all coordinates are wrapped with ref as western boundary
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.contour`
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.contour
@@ -1944,13 +1944,13 @@ class RegularGridDataset(GridDataset):
         """
         At each call it will update position in place with u & v field
 
-        It's a dummy advection which use only one layer of current
+        It's a dummy advection using only one layer of current
 
         :param array x: Longitude of obs to move
         :param array y: Latitude of obs to move
         :param str,array u_name: U field to advect obs
         :param str,array v_name: V field to advect obs
-        :param int nb_step: Number of iteration before to release data
+        :param int nb_step: Number of iterations before releasing data
 
         .. minigallery:: py_eddy_tracker.GridDataset.advect
         """
@@ -1967,13 +1967,13 @@ class RegularGridDataset(GridDataset):
         """
         Produce filament with concatenation of advection
 
-        It's a dummy advection which use only one layer of current
+        It's a dummy advection using only one layer of current
 
         :param array x: Longitude of obs to move
         :param array y: Latitude of obs to move
         :param str,array u_name: U field to advect obs
         :param str,array v_name: V field to advect obs
-        :param int nb_step: Number of iteration before to release data
+        :param int nb_step: Number of iteration before releasing data
         :param int filament_size: Number of point by filament
         :return: x,y for a line
 
@@ -2019,7 +2019,7 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     v00, v01, v10, v11 = 0.0, 0.0, 0.0, 0.0
     # On each particle
     for i in prange(x.size):
-        # If particle are not valid => continue
+        # If particle is not valid => continue
         if m[i]:
             continue
         x_, y_ = x[i], y[i]
@@ -2037,7 +2037,7 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
                     masked, u00, u01, u10, u11, v00, v01, v10, v11 = get_uv_quad(
                         ii_, jj_, u_g, v_g, m_g, nb_x
                     )
-            # The 3 following could be in cache operation but this one must be test in any case
+            # The 3 following could be in cache operation but this one must be tested in any case
             if masked:
                 x_, y_ = nan, nan
                 m[i] = True
@@ -2061,7 +2061,7 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
                     m[i] = True
                     break
             u2, v2 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
-            # k3, slope at middle with update guess position
+            # k3, slope at middle with updated guess position
             x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
             ii_, jj_, xd, yd = get_grid_indices(
                 x_ref, y_ref, x_step, y_step, x2, y2, nb_x
@@ -2079,7 +2079,7 @@ def advect_rk4(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
                     m[i] = True
                     break
             u3, v3 = interp_uv(xd, yd, u00, u01, u10, u11, v00, v01, v10, v11)
-            # k4, slope at end with update guess position
+            # k4, slope at end with updated guess position
             x3, y3 = x_ + u3, y_ + v3
             ii_, jj_, xd, yd = get_grid_indices(
                 x_ref, y_ref, x_step, y_step, x3, y3, nb_x
@@ -2115,14 +2115,14 @@ def advect(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
     nb_x_ = x_g.size
     nb_x = nb_x_ if is_circular else 0
-    # Indices which should be never exist
+    # Indexes which should be never exist
     i0_old, j0_old = -100000, -100000
     masked = False
     u00, u01, u10, u11 = 0.0, 0.0, 0.0, 0.0
     v00, v01, v10, v11 = 0.0, 0.0, 0.0, 0.0
     # On each particule
     for i in prange(x.size):
-        # If particule are not valid => continue
+        # If particule is not valid => continue
         if m[i]:
             continue
         # Iterate on whole steps
@@ -2130,9 +2130,9 @@ def advect(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
             i0, j0, xd, yd = get_grid_indices(
                 x_ref, y_ref, x_step, y_step, x[i], y[i], nb_x
             )
-            # corner are the same need only a new xd and yd
+            # corners are the same, need only a new xd and yd
             if i0 != i0_old or j0 != j0_old:
-                # Need to be store only on change
+                # Need to be stored only on change
                 i0_old, j0_old = i0, j0
                 if not is_circular and (i0 < 0 or i0 > nb_x_):
                     masked = True
@@ -2152,7 +2152,7 @@ def advect(x_g, y_g, u_g, v_g, m_g, x, y, m, nb_step):
 
 @njit(cache=True, fastmath=True)
 def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
-    """Give a serie of indexes describing the path between two position"""
+    """Give a serie of indexes describing the path between two positions"""
     # index
     nx = x0.shape[0]
     i_x0 = empty(nx, dtype=numba_types.int_)
@@ -2171,23 +2171,23 @@ def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
     i_x1 = i_x0 + d_x
     # Delta index of y
     d_y = i_y1 - i_y0
-    # max and abs sum doesn't work on array?
+    # max and abs sum do not work on array?
     d_max = empty(nx, dtype=numba_types.int32)
     nb_value = 0
     for i in range(nx):
         d_max[i] = max(abs(d_x[i]), abs(d_y[i]))
-        # Compute number of pixel which we go trought
+        # Compute number of pixel we go trought
         nb_value += d_max[i] + 1
 
-    # Create an empty array to store value of pixel across the travel
+    # Create an empty array to store value of pixel across the path
     i_g = empty(nb_value, dtype=numba_types.int32)
     j_g = empty(nb_value, dtype=numba_types.int32)
 
     # Index to determine the position in the global array
     ii = 0
-    # Iteration on each travel
+    # Iteration on each path
     for i, delta in enumerate(d_max):
-        # If the travel don't cross multiple pixel
+        # If the path doesn't cross multiple pixels
         if delta == 0:
             i_g[ii : ii + delta + 1] = i_x0[i]
             j_g[ii : ii + delta + 1] = i_y0[i]
@@ -2201,7 +2201,7 @@ def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
             sup = -1 if d_x[i] < 0 else 1
             i_g[ii : ii + delta + 1] = arange(i_x0[i], i_x1[i] + sup, sup)
             j_g[ii : ii + delta + 1] = i_y0[i]
-        # In case of multiple direction
+        # In case of multiple directions
         else:
             a = (i_x1[i] - i_x0[i]) / float(i_y1[i] - i_y0[i])
             if abs(d_x[i]) >= abs(d_y[i]):
@@ -2479,7 +2479,7 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, hal
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
     nb_x_ = x_g.size
     nb_x = nb_x_ if is_circular else 0
-    # Indices which should be never exist
+    # Indexes that should never exist
     i0_old, j0_old = -100000, -100000
     m0, m1 = False, False
     u000, u001, u010, u011 = 0.0, 0.0, 0.0, 0.0
@@ -2488,7 +2488,7 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, hal
     v100, v101, v110, v111 = 0.0, 0.0, 0.0, 0.0
     # On each particle
     for i in prange(x.size):
-        # If particle are not valid => continue
+        # If particle is not valid => continue
         if m[i]:
             continue
         # Iterate on whole steps
@@ -2497,7 +2497,7 @@ def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, hal
                 x_ref, y_ref, x_step, y_step, x[i], y[i], nb_x
             )
             if i0 != i0_old or j0 != j0_old:
-                # Need to be store only on change
+                # Need to be stored only on change
                 i0_old, j0_old = i0, j0
                 if not is_circular and (i0 < 0 or i0 > nb_x_):
                     m0, m1 = True, True
@@ -2528,8 +2528,8 @@ def get_uv_quad(i0, j0, u, v, m, nb_x=0):
     """
     Return u/v for (i0, j0), (i1, j0), (i0, j1), (i1, j1)
 
-    :param int i0: indices of longitude
-    :param int j0: indices of latitude
+    :param int i0: indexes of longitude
+    :param int j0: indexes of latitude
     :param array[float] u: current along x axis
     :param array[float] v: current along y axis
     :param array[bool] m: flag to know if position is valid
@@ -2552,7 +2552,7 @@ def get_uv_quad(i0, j0, u, v, m, nb_x=0):
 @njit(cache=True, fastmath=True)
 def get_grid_indices(x0, y0, x_step, y_step, x, y, nb_x=0):
     """
-    Return grid indices and weight
+    Return grid indexes and weight
 
     :param float x0: first longitude
     :param float y0: first latitude
@@ -2562,7 +2562,7 @@ def get_grid_indices(x0, y0, x_step, y_step, x, y, nb_x=0):
     :param float y: latitude to interpolate
     :param int nb_x: If different of 0 we check if wrapping is needed
 
-    :return: indices and weight
+    :return: indexes and weight
     :rtype: int,int,float,float
     """
     i, j = (x - x0) / x_step, (y - y0) / y_step
@@ -2614,7 +2614,7 @@ def advect_t_rk4(
     v100, v101, v110, v111 = 0.0, 0.0, 0.0, 0.0
     # On each particle
     for i in prange(x.size):
-        # If particle are not valid => continue
+        # If particle is not valid => continue
         if m[i]:
             continue
         x_, y_ = x[i], y[i]
@@ -2635,7 +2635,7 @@ def advect_t_rk4(
                     (m1, u100, u101, u110, u111, v100, v101, v110, v111) = get_uv_quad(
                         ii_, jj_, u_g1, v_g1, m_g1, nb_x
                     )
-            # The 3 following could be in cache operation but this one must be test in any case
+            # The 3 following could be in cache operation but this one must be tested in any case
             if m0 or m1:
                 x_, y_ = nan, nan
                 m[i] = True
@@ -2667,7 +2667,7 @@ def advect_t_rk4(
             u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             w_ = w - half_w
             u2, v2 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
-            # k3, slope at middle with update guess position
+            # k3, slope at middle with updated guess position
             x2, y2 = x_ + u2 * 0.5, y_ + v2 * 0.5
             ii_, jj_, xd, yd = get_grid_indices(
                 x_ref, y_ref, x_step, y_step, x2, y2, nb_x
@@ -2690,7 +2690,7 @@ def advect_t_rk4(
             u0_, v0_ = interp_uv(xd, yd, u000, u001, u010, u011, v000, v001, v010, v011)
             u1_, v1_ = interp_uv(xd, yd, u100, u101, u110, u111, v100, v101, v110, v111)
             u3, v3 = u0_ * w_ + u1_ * (1 - w_), v0_ * w_ + v1_ * (1 - w_)
-            # k4, slope at end with update guess position
+            # k4, slope at end with updated guess position
             x3, y3 = x_ + u3, y_ + v3
             ii_, jj_, xd, yd = get_grid_indices(
                 x_ref, y_ref, x_step, y_step, x3, y3, nb_x
@@ -2737,7 +2737,7 @@ def compute_stencil(x, y, h, m, earth_radius, vertical=False, stencil_halfwidth=
     :param array x: longitude coordinates
     :param array y: latitude coordinates
     :param array h: 2D array to derivate
-    :param array m: mask associate to h to know where are invalid data
+    :param array m: mask associated to h to know where are invalid data
     :param float earth_radius: Earth radius in m
     :param bool vertical: if True stencil will be vertical (along y)
     :param int stencil_halfwidth: from 1 to 4 to specify maximal kernel usable
@@ -2831,7 +2831,7 @@ def compute_stencil(x, y, h, m, earth_radius, vertical=False, stencil_halfwidth=
                 grad[i, j] = (h3 - h_3 + 9 * (h_2 - h2) + 45 * (h1 - h_1)) / 60 * d_
                 m_out[i, j] = False
                 continue
-            # If all value of buffer are available
+            # If all values of buffer are available
             grad[i, j] = (
                 (3 * (h_4 - h4) + 32 * (h3 - h_3) + 168 * (h_2 - h2) + 672 * (h1 - h_1))
                 / 840

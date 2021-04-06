@@ -13,13 +13,13 @@ logger = logging.getLogger("pet")
 def get_missing_indices(
     array_time, array_track, dt=1, flag_untrack=True, indice_untrack=0
 ):
-    """return indices where it misses values
+    """Return indexes where values are missing
 
     :param np.array(int) array_time : array of strictly increasing int representing time
-    :param np.array(int) array_track: N° track where observation belong
-    :param int,float dt: theorical timedelta between 2 observation
+    :param np.array(int) array_track: N° track where observations belong
+    :param int,float dt: theorical timedelta between 2 observations
     :param bool flag_untrack: if True, ignore observations where n°track equal `indice_untrack`
-    :param int indice_untrack: n° representing where observations are untrack
+    :param int indice_untrack: n° representing where observations are untracked
 
 
     ex : array_time = np.array([67, 68, 70, 71, 74, 75])
@@ -72,11 +72,11 @@ class GroupEddiesObservations(EddiesObservations, ABC):
 
     @abstractmethod
     def get_missing_indices(self, dt):
-        "find indices where observations is missing"
+        "Find indexes where observations are missing"
         pass
 
     def filled_by_interpolation(self, mask):
-        """Filled selected values by interpolation
+        """Fill selected values by interpolation
 
         :param array(bool) mask: True if must be filled by interpolation
 
@@ -102,20 +102,20 @@ class GroupEddiesObservations(EddiesObservations, ABC):
             )
 
     def insert_virtual(self):
-        """insert virtual observation on segments where observations were not found"""
+        """insert virtual observations on segments where observations are missing"""
 
         dt_theorical = median(self.time[1:] - self.time[:-1])
         indices = self.get_missing_indices(dt_theorical)
 
         logger.info("%d virtual observation will be added", indices.size)
 
-        # new observation size
+        # new observations size
         size_obs_corrected = self.time.size + indices.size
 
-        # correction of indices for new size
+        # correction of indexes for new size
         indices_corrected = indices + arange(indices.size)
 
-        # creating mask with indices
+        # creating mask with indexes
         mask = zeros(size_obs_corrected, dtype=bool)
         mask[indices_corrected] = 1
 
@@ -128,12 +128,12 @@ class GroupEddiesObservations(EddiesObservations, ABC):
 
     def keep_tracks_by_date(self, date, nb_days):
         """
-        Find tracks which exist at date `date` and lasted at least `nb_days` after.
+        Find tracks that exist at date `date` and lasted at least `nb_days` after.
 
         :param int,float date: date where the tracks must exist
-        :param int,float nb_days: number of time where the tracks must exist. Can be negative
+        :param int,float nb_days: number of times the tracks must exist. Can be negative
 
-        If nb_days is negative, it search a tracks which exist at the date,
+        If nb_days is negative, it searches a track that exists at the date,
         but existed at least `nb_days` before the date
         """
 
