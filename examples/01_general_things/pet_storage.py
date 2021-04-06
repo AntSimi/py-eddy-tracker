@@ -32,7 +32,7 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 # array field like contour/profile are 2D column.
 
 # %%
-# Eddies files (zarr or netcdf) could be loaded with ```load_file``` method:
+# Eddies files (zarr or netcdf) can be loaded with ```load_file``` method:
 eddies_collections = EddiesObservations.load_file(get_demo_path("Cyclonic_20160515.nc"))
 eddies_collections.field_table()
 # offset and scale_factor are used only when data is stored in zarr or netCDF4
