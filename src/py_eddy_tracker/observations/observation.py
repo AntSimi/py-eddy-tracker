@@ -594,7 +594,7 @@ class EddiesObservations(object):
 
     def align_on(self, other, var_name="time", **kwargs):
         """
-        Align the time indexes of two datasets.
+        Align the time indices of two datasets.
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.align_on
         """
@@ -1135,7 +1135,7 @@ class EddiesObservations(object):
         :param bool intern: if True, speed contour is used (default = effective contour)
         :param float cmin: 0 < cmin < 1, return only couples with score >= cmin
         :param dict kwargs: look at :py:meth:`vertice_overlap`
-        :return: return the indexes of the eddies in self coupled with eddies in
+        :return: return the indices of the eddies in self coupled with eddies in
             other and their associated score
         :rtype: (array(int), array(int), array(float))
 
@@ -1166,7 +1166,7 @@ class EddiesObservations(object):
         :param array,int index: local index to re ref
         :param slice,array ref:
             reference could be a slice in this case we juste add start to index
-            or could be indexes and in this case we need to translate
+            or could be indices and in this case we need to translate
         """
         if isinstance(ref, slice):
             return index + ref.start

@@ -135,7 +135,7 @@ class NetworkObservations(GroupEddiesObservations):
             return nw.relatives([i_obs, i_stopped], order=order)
 
     def get_missing_indices(self, dt):
-        """Find indexes where observations are missing.
+        """Find indices where observations are missing.
 
         As network have all untracked observation in tracknumber `self.NOGROUP`,
             we don't compute them
@@ -215,7 +215,7 @@ class NetworkObservations(GroupEddiesObservations):
     @classmethod
     def from_split_network(cls, group_dataset, indexs, **kwargs):
         """
-        Build a NetworkObservations object with Group dataset and indexes
+        Build a NetworkObservations object with Group dataset and indices
 
         :param TrackEddiesObservations group_dataset: Group dataset
         :param indexs: result from split_network
@@ -346,7 +346,7 @@ class NetworkObservations(GroupEddiesObservations):
         where water from obs `i_observation` could come from
 
         :param int,iterable(int) i_observation:
-            indexes of observation. Can be
+            indices of observation. Can be
             int, or iterable of int.
         :param bool forward, backward:
             if forward, search observations after obs.
@@ -496,7 +496,7 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Extract the segments at a certain order from multiple observations.
 
-        :param iterable,int obs: indexes of observation for relatives computation.
+        :param iterable,int obs: indices of observation for relatives computation.
             Can be one observation (int) or collection of observations (iterable(int))
         :param int order: order of relatives wanted.
             0 means only observations in obs, 1 means direct relatives (1 interaction event), ...
