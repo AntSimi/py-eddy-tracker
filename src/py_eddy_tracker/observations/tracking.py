@@ -77,7 +77,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
             yield self.index(slice(i0, i0 + nb))
 
     def get_missing_indices(self, dt):
-        """Find indexes where observations are missing.
+        """Find indices where observations are missing.
 
         :param int,float dt: theorical delta time between 2 observations
         """
@@ -618,7 +618,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         # Initialisation
         # To store the id of the segments, the backward and forward cost associations
         ids["track"], ids["previous_cost"], ids["next_cost"] = 0, 0, 0
-        # To store the indexes of the backward and forward observations associated
+        # To store the indices of the backward and forward observations associated
         ids["previous_obs"], ids["next_obs"] = -1, -1
         # At the end, ids["previous_obs"] == -1 means the start of a non-split segment
         # and ids["next_obs"] == -1 means the end of a non-merged segment

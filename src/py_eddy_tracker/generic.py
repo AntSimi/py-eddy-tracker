@@ -50,7 +50,7 @@ def count_consecutive(mask):
 @njit(cache=True)
 def reverse_index(index, nb):
     """
-    Compute a list of indexes, which are not in index.
+    Compute a list of indices, which are not in index.
 
     :param array index: index of group which will be set to False
     :param array nb: Count for each group

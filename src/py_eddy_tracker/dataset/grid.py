@@ -1275,7 +1275,7 @@ class RegularGridDataset(GridDataset):
         min_wave_length = max(step_x_km, step_y_km) * 2
         if wave_length < min_wave_length:
             logger.error(
-                "Wave_length too short for resolution, must be > %d km",
+                "wave_length too short for resolution, must be > %d km",
                 ceil(min_wave_length),
             )
             raise Exception()
