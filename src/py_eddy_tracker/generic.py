@@ -57,7 +57,6 @@ def reverse_index(index, nb):
     :return: mask of value selected
     :rtype: array
     """
-
     m = ones(nb, dtype=numba_types.bool_)
     for i in index:
         m[i] = False
@@ -71,7 +70,6 @@ def build_index(groups):
     :param array groups: array that contains groups to be separated
     :return: (first_index of each group, last_index of each group, value to shift groups)
     :rtype: (array, array, int)
-
     Examples
     --------
     >>> build_index(array((1, 1, 3, 4, 4)))
