@@ -745,7 +745,7 @@ class EddiesObservations(object):
         :param bool raw_data: If true load data without scale_factor and add_offset
         :param None,list(str) remove_vars: List of variable name that will be not loaded
         :param None,list(str) include_vars: If defined only this variable will be loaded
-        :param None,dict indexs: Indexs to laod only a slice of data
+        :param None,dict indexs: Indexes to load only a slice of data
         :param int buffer_size: Size of buffer used to load zarr data
         :param class_kwargs: argument to set up observations class
         :return: Obsevations selected
@@ -885,7 +885,7 @@ class EddiesObservations(object):
         :param bool raw_data: If true load data without apply scale_factor and add_offset
         :param None,list(str) remove_vars: List of variable name which will be not loaded
         :param None,list(str) include_vars: If defined only this variable will be loaded
-        :param None,dict indexs: Indexs to laod only a slice of data
+        :param None,dict indexs: Indexes to load only a slice of data
         :param class_kwargs: argument to set up observations class
         :return: Obsevations selected
         :return type: class
@@ -1054,7 +1054,7 @@ class EddiesObservations(object):
         self, previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model
     ):
         """
-        Filled virtual obs (C).
+        Fill virtual obs (C).
 
         :param previous_obs: previous obs from current (A)
         :param current_obs: previous obs from virtual (B)
@@ -1166,7 +1166,7 @@ class EddiesObservations(object):
         :param array,int index: local index to re ref
         :param slice,array ref:
             reference could be a slice in this case we juste add start to index
-            or could be indexs and in this case we need to translate
+            or could be indexes and in this case we need to translate
         """
         if isinstance(ref, slice):
             return index + ref.start
@@ -1341,7 +1341,7 @@ class EddiesObservations(object):
         eddies_merge = 1 < other_links
         test = eddies_separation.any() or eddies_merge.any()
         if test:
-            # We extract matrix that contains concflict
+            # We extract matrix that contains conflict
             obs_linking_to_self = mask[eddies_separation].any(axis=0)
             obs_linking_to_other = mask[:, eddies_merge].any(axis=1)
             i_self_keep = where(obs_linking_to_other + eddies_separation)[0]
@@ -1370,7 +1370,7 @@ class EddiesObservations(object):
                 security_increment += 1
                 i_min_value = cost_reduce.argmin()
                 i, j = floor(i_min_value / shape[1]).astype(int), i_min_value % shape[1]
-                # Set to False all link
+                # Set to False all links
                 mask[i_self_keep[i]] = False
                 mask[:, i_other_keep[j]] = False
                 cost_reduce.mask[i] = True

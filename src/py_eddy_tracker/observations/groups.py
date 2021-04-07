@@ -23,7 +23,7 @@ def get_missing_indices(
 
 
     ex : array_time = np.array([67, 68, 70, 71, 74, 75])
-         array_track= np.array([ 1,  1,  1,  1,  1,  1])
+        array_track= np.array([ 1,  1,  1,  1,  1,  1])
         return : np.array([2, 4, 4])
     """
 

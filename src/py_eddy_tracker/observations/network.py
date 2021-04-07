@@ -260,7 +260,7 @@ class NetworkObservations(GroupEddiesObservations):
         # FIXME : we want to change
         # segment A splits from segment B, then x days after segment B merges with A
         # to
-        # segment A splits from segment B the x days after segement A merges with B (B will be longer)
+        # segment A splits from segment B then x days after segement A merges with B (B will be longer)
         # comments are in the wrong way but the example works as wanted
 
         _time = self.time
@@ -321,7 +321,6 @@ class NetworkObservations(GroupEddiesObservations):
 
         :param tuple order: order or sorting. Given to :func:`numpy.argsort`
         """
-
         index_order = self.obs.argsort(order=order)
         for field in self.elements:
             self[field][:] = self[field][index_order]
@@ -497,8 +496,10 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Extract the segments at a certain order from multiple observations.
 
-        :param iterable,int obs: indexes of observation for relatives computation. Can be one observation (int) or collection of observations (iterable(int))
-        :param int order: order of relatives wanted. 0 means only observations in obs, 1 means direct relatives (1 interaction event), ...
+        :param iterable,int obs: indexes of observation for relatives computation.
+            Can be one observation (int) or collection of observations (iterable(int))
+        :param int order: order of relatives wanted.
+            0 means only observations in obs, 1 means direct relatives (1 interaction event), ...
 
         :return: all segments' relatives
         :rtype: EddiesObservations
@@ -1206,8 +1207,8 @@ class NetworkObservations(GroupEddiesObservations):
 
     def remove_trash(self):
         """
-        Remove the lonely eddies (only 1 obs in segment, associated segment number is 0)"""
-
+        Remove the lonely eddies (only 1 obs in segment, associated segment number is 0)
+        """
         return self.extract_with_mask(self.track != 0)
 
     def plot(self, ax, ref=None, color_cycle=None, **kwargs):

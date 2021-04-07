@@ -57,6 +57,7 @@ def reverse_index(index, nb):
     :return: mask of value selected
     :rtype: array
     """
+
     m = ones(nb, dtype=numba_types.bool_)
     for i in index:
         m[i] = False
@@ -76,6 +77,7 @@ def build_index(groups):
     >>> build_index(array((1, 1, 3, 4, 4)))
     (array([0, 2, 2, 3]), array([2, 2, 3, 5]), 1)
     """
+
     i0, i1 = groups.min(), groups.max()
     amplitude = i1 - i0 + 1
     # Index of first observation for each group

@@ -28,7 +28,7 @@ except ImportError:
 
 class GUIAxes(PlatCarreAxes):
     """
-    Axes which will use full space available
+    Axes that uses full space available
     """
 
     name = "full_axes"

@@ -1275,7 +1275,7 @@ class RegularGridDataset(GridDataset):
         min_wave_length = max(step_x_km, step_y_km) * 2
         if wave_length < min_wave_length:
             logger.error(
-                "Wavelength too short for resolution, must be > %d km",
+                "Wave_length too short for resolution, must be > %d km",
                 ceil(min_wave_length),
             )
             raise Exception()
@@ -1315,7 +1315,7 @@ class RegularGridDataset(GridDataset):
 
     def kernel_lanczos(self, lat, wave_length, order=1):
         """Not really operational
-        wavelength in km
+        wave_length in km
         order must be int
         """
         order = self.check_order(order)
@@ -1327,7 +1327,7 @@ class RegularGridDataset(GridDataset):
         return self.finalize_kernel(kernel, order, half_x_pt, half_y_pt)
 
     def kernel_bessel(self, lat, wave_length, order=1):
-        """wavelength in km
+        """wave_length in km
         order must be int
         """
         order = self.check_order(order)
