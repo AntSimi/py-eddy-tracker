@@ -224,7 +224,7 @@ class EddiesObservations(object):
         return array_equal(self.obs, other.obs)
 
     def get_color(self, i):
-        """Return colors like a cyclic list"""
+        """Return colors as a cyclic list"""
         return self.COLORS[i % self.NB_COLORS]
 
     @property
@@ -260,7 +260,7 @@ class EddiesObservations(object):
         :param str,array varname: variable to use to compute stat
         :param str,array x: variable to use to know in which bins
         :param array bins:
-        :param bool percent: normalize by sum of all bins
+        :param bool percent: normalized by sum of all bins
         :param bool mean: compute mean by bins
         :param bool nb: only count by bins
         :return: value by bins
@@ -279,7 +279,7 @@ class EddiesObservations(object):
 
     @staticmethod
     def box_display(value):
-        """Return value evenly spaced with few numbers"""
+        """Return values evenly spaced with few numbers"""
         return "".join([f"{v_:10.2f}" for v_ in value])
 
     def field_table(self):
@@ -437,7 +437,7 @@ class EddiesObservations(object):
 
     def circle_contour(self, only_virtual=False, factor=1):
         """
-        Set contours as a circles from radius and center data.
+        Set contours as circles from radius and center data.
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.circle_contour
         """
@@ -572,7 +572,7 @@ class EddiesObservations(object):
             i = numba_digitize(x, bins) - 1
             # Order by bins
             i_sort = i.argsort()
-            # If in reduce mode we will translate i_sort in full array index
+            # If in reduced mode we will translate i_sort in full array index
             i_sort_ = translate[i_sort] if test else i_sort
             # Bound for each bins in sorting view
             i0, i1, _ = build_index(i[i_sort])
@@ -613,7 +613,7 @@ class EddiesObservations(object):
             yield indexs_self, indexs_other, b0_self, b1_self
 
     def insert_observations(self, other, index):
-        """Insert other obs in self at the index."""
+        """Insert other obs in self at the given index."""
         if not self.coherence(other):
             raise Exception("Observations with no coherence")
         insert_size = len(other.obs)
@@ -742,10 +742,10 @@ class EddiesObservations(object):
         """Load data from zarr.
 
         :param str,store filename: path or store to load data
-        :param bool raw_data: If true load data without apply scale_factor and add_offset
-        :param None,list(str) remove_vars: List of variable name which will be not loaded
+        :param bool raw_data: If true load data without scale_factor and add_offset
+        :param None,list(str) remove_vars: List of variable name that will be not loaded
         :param None,list(str) include_vars: If defined only this variable will be loaded
-        :param None,dict indexs: Indexs to laad only a slice of data
+        :param None,dict indexs: Indexes to load only a slice of data
         :param int buffer_size: Size of buffer used to load zarr data
         :param class_kwargs: argument to set up observations class
         :return: Obsevations selected
@@ -764,7 +764,7 @@ class EddiesObservations(object):
         nb_obs = getattr(h_zarr, var_list[0]).shape[0]
         dims = list(cls.zarr_dimension(filename))
         if len(dims) == 2 and nb_obs in dims:
-            # FIXME must be investigate, in zarr no dimensions name (or could be add in attr)
+            # FIXME must be investigated, in zarr no dimensions name (or could be add in attr)
             array_dim = dims[1] if nb_obs == dims[0] else dims[0]
         if indexs is not None and "obs" in indexs:
             sl = indexs["obs"]
@@ -885,7 +885,7 @@ class EddiesObservations(object):
         :param bool raw_data: If true load data without apply scale_factor and add_offset
         :param None,list(str) remove_vars: List of variable name which will be not loaded
         :param None,list(str) include_vars: If defined only this variable will be loaded
-        :param None,dict indexs: Indexs to laad only a slice of data
+        :param None,dict indexs: Indexes to load only a slice of data
         :param class_kwargs: argument to set up observations class
         :return: Obsevations selected
         :return type: class
@@ -1054,7 +1054,7 @@ class EddiesObservations(object):
         self, previous_obs, current_obs, obs_to_extend, dead_track, nb_next, model
     ):
         """
-        Filled virtual obs (C).
+        Fill virtual obs (C).
 
         :param previous_obs: previous obs from current (A)
         :param current_obs: previous obs from virtual (B)
@@ -1166,7 +1166,7 @@ class EddiesObservations(object):
         :param array,int index: local index to re ref
         :param slice,array ref:
             reference could be a slice in this case we juste add start to index
-            or could be indexs and in this case we need to translate
+            or could be indexes and in this case we need to translate
         """
         if isinstance(ref, slice):
             return index + ref.start
@@ -1330,18 +1330,18 @@ class EddiesObservations(object):
     def solve_simultaneous(cost):
         """Write something (TODO)"""
         mask = ~cost.mask
-        # Count number of link by self obs and other obs
+        # Count number of links by self obs and other obs
         self_links, other_links = sum_row_column(mask)
         max_links = max(self_links.max(), other_links.max())
         if max_links > 5:
             logger.warning("One observation have %d links", max_links)
 
-        # If some obs have multiple link, we keep only one link by eddy
+        # If some obs have multiple links, we keep only one link by eddy
         eddies_separation = 1 < self_links
         eddies_merge = 1 < other_links
         test = eddies_separation.any() or eddies_merge.any()
         if test:
-            # We extract matrix which contains concflict
+            # We extract matrix that contains conflict
             obs_linking_to_self = mask[eddies_separation].any(axis=0)
             obs_linking_to_other = mask[:, eddies_merge].any(axis=1)
             i_self_keep = where(obs_linking_to_other + eddies_separation)[0]
@@ -1364,13 +1364,13 @@ class EddiesObservations(object):
             security_increment = 0
             while False in cost_reduce.mask:
                 if security_increment > max_iteration:
-                    # Maybe check if the size decrease if not rise an exception
+                    # Maybe check if the size decreases if not rise an exception
                     # x_i, y_i = where(-cost_reduce.mask)
                     raise Exception("To many iteration: %d" % security_increment)
                 security_increment += 1
                 i_min_value = cost_reduce.argmin()
                 i, j = floor(i_min_value / shape[1]).astype(int), i_min_value % shape[1]
-                # Set to False all link
+                # Set to False all links
                 mask[i_self_keep[i]] = False
                 mask[:, i_other_keep[j]] = False
                 cost_reduce.mask[i] = True
@@ -1384,19 +1384,19 @@ class EddiesObservations(object):
     @staticmethod
     def solve_first(cost, multiple_link=False):
         mask = ~cost.mask
-        # Count number of link by self obs and other obs
+        # Count number of links by self obs and other obs
         self_links = mask.sum(axis=1)
         other_links = mask.sum(axis=0)
         max_links = max(self_links.max(), other_links.max())
         if max_links > 5:
             logger.warning("One observation have %d links", max_links)
 
-        # If some obs have multiple link, we keep only one link by eddy
+        # If some obs have multiple links, we keep only one link by eddy
         eddies_separation = 1 < self_links
         eddies_merge = 1 < other_links
         test = eddies_separation.any() or eddies_merge.any()
         if test:
-            # We extract matrix which contains concflict
+            # We extract matrix that contains conflict
             obs_linking_to_self = mask[eddies_separation].any(axis=0)
             obs_linking_to_other = mask[:, eddies_merge].any(axis=1)
             i_self_keep = where(obs_linking_to_other + eddies_separation)[0]
@@ -1700,7 +1700,7 @@ class EddiesObservations(object):
 
     def mask_from_polygons(self, polygons):
         """
-        Return mask for all observation in one of polygons list
+        Return mask for all observations in one of polygons list
 
         :param list((array,array)) polygons: list of x/y array which be used to identify observations
         """
@@ -1724,7 +1724,7 @@ class EddiesObservations(object):
 
         :param dict area: 4 coordinates in a dictionary to specify bounding box (lower left corner and upper right corner)
         :param dict kwargs: look at :py:meth:`extract_with_mask`
-        :return: Return all eddy tracks which are in bounds
+        :return: Return all eddy trajetories in bounds
         :rtype: EddiesObservations
 
         .. code-block:: python
@@ -1745,7 +1745,7 @@ class EddiesObservations(object):
         """
         Time sub sampling
 
-        :param int,float t0: reference time which will be keep
+        :param int,float t0: reference time that will be keep
         :param int,float time_step: keep every observation spaced by time_step
         """
         mask = (self.time - t0) % time_step == 0
@@ -1779,7 +1779,7 @@ class EddiesObservations(object):
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
         :param str,array,None name:
             variable used to fill the contour, if None all elements have the same color
-        :param float,None ref: if define use like west bound
+        :param float,None ref: if defined, all coordinates are wrapped with ref as western boundary
         :param float factor: multiply value by
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
         :return: scatter mappable
@@ -1811,7 +1811,7 @@ class EddiesObservations(object):
         """
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
         :param str,array,None varname: variable used to fill the contours, or an array of same size than obs
-        :param float,None ref: if define use like west bound?
+        :param float,None ref: if defined, all coordinates are wrapped with ref as western boundary
         :param bool intern: if True draw speed contours instead of effective contours
         :param str cmap: matplotlib colormap name
         :param int,None lut: Number of colors in the colormap
@@ -2271,7 +2271,7 @@ class EddiesObservations(object):
 
     @property
     def nb_days(self):
-        """Return period days cover by dataset
+        """Return period in days covered by the dataset
 
         :return: Number of days
         :rtype: int
@@ -2282,7 +2282,7 @@ class EddiesObservations(object):
 @njit(cache=True)
 def grid_count_(grid, i, j):
     """
-    Add one to each index
+    Add 1 to each index
     """
     for i_, j_ in zip(i, j):
         grid[i_, j_] += 1
@@ -2305,7 +2305,7 @@ def grid_count_pixel_in(
     y_c,
 ):
     """
-    Count how many time a pixel is used.
+    Count how many times a pixel is used.
 
     :param array grid:
     :param array x: x for all contour
