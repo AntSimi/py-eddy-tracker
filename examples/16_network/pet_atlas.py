@@ -5,8 +5,8 @@ Network Analysis
 from matplotlib import pyplot as plt
 from numpy import ma
 
-import py_eddy_tracker.gui
 from py_eddy_tracker.data import get_remote_demo_sample
+from py_eddy_tracker.gui import GUI_AXES
 from py_eddy_tracker.observations.network import NetworkObservations
 
 n = NetworkObservations.load_file(
@@ -26,7 +26,7 @@ kw_ratio = dict(cmap=plt.get_cmap("YlGnBu_r", 10))
 # Functions
 def start_axes(title):
     fig = plt.figure(figsize=(13, 5))
-    ax = fig.add_axes([0.03, 0.03, 0.90, 0.94], projection="full_axes")
+    ax = fig.add_axes([0.03, 0.03, 0.90, 0.94], projection=GUI_AXES)
     ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)
     ax.set_aspect("equal")
     ax.set_title(title, weight="bold")

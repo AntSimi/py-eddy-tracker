@@ -716,50 +716,85 @@ def tri_area2(x, y, i0, i1, i2):
 def visvalingam(x, y, fixed_size=18):
     """Polygon simplification with visvalingam algorithm
 
+    X, Y are considered like a polygon, the next point after the last one is the first one
     :param array x:
     :param array y:
     :param int fixed_size: array size of out
-    :return: New (x, y) array
+    :return:
+        New (x, y) array, last position will be equal to first one, if array size is 6,
+        there is only 5 point.
     :rtype: array,array
+
+    .. plot::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from py_eddy_tracker.poly import visvalingam
+
+        x = np.array([1, 2, 3, 4, 5, 6.75, 6, 1])
+        y = np.array([-0.5, -1.5, -1, -1.75, -1, -1, -0.5, -0.5])
+        ax = plt.subplot(111)
+        ax.set_aspect("equal")
+        ax.grid(True), ax.set_ylim(-2, -.2)
+        ax.plot(x, y, "r",  lw=5)
+        ax.plot(*visvalingam(x,y,6), "b", lw=2)
+        plt.show()
     """
+    # TODO :  in case of original size lesser than fixed size, jump at the end
     nb = x.shape[0]
-    i0, i1 = nb - 3, nb - 2
+    nb_ori = nb
+    # Get indice of first triangle
+    i0, i1 = nb - 2, nb - 1
+    # Init heap with first area and tiangle
     h = [(tri_area2(x, y, i0, i1, 0), (i0, i1, 0))]
+    # Roll index for next one
     i0 = i1
     i1 = 0
-    i_previous = empty(nb - 1, dtype=numba_types.int32)
-    i_next = empty(nb - 1, dtype=numba_types.int32)
+    # Index of previous valid point
+    i_previous = empty(nb, dtype=numba_types.int64)
+    # Index of next valid point
+    i_next = empty(nb, dtype=numba_types.int64)
+    # Mask of removed
+    removed = zeros(nb, dtype=numba_types.bool_)
     i_previous[0] = -1
     i_next[0] = -1
-    for i in range(1, nb - 1):
+    for i in range(1, nb):
         i_previous[i] = -1
         i_next[i] = -1
+        # We add triangle area for all triangle
         heapq.heappush(h, (tri_area2(x, y, i0, i1, i), (i0, i1, i)))
         i0 = i1
         i1 = i
     # we continue until we are equal to nb_pt
-    while len(h) >= fixed_size:
+    while nb >= fixed_size:
         # We pop lower area
         _, (i0, i1, i2) = heapq.heappop(h)
         # We check if triangle is valid(i0 or i2 not removed)
-        i_p, i_n = i_previous[i0], i_next[i2]
-        if i_p == -1 and i_n == -1:
-            # We store reference of delete point
-            i_previous[i1] = i0
-            i_next[i1] = i2
+        if removed[i0] or removed[i2]:
+            # In this cas nothing to do
             continue
-        elif i_p == -1:
-            i2 = i_n
-        elif i_n == -1:
-            i0 = i_p
-        else:
-            # in this case we replace two point
-            i0, i2 = i_p, i_n
-        heapq.heappush(h, (tri_area2(x, y, i0, i1, i2), (i0, i1, i2)))
+        # Flag obs like removed
+        removed[i1] = True
+        # We count point still valid
+        nb -= 1
+        # Modify index for the next and previous, we jump over i1
+        i_previous[i2] = i0
+        i_next[i0] = i2
+        # We insert 2 triangles which are modified by the deleted point
+        # Previous triangle
+        i_1 = i_previous[i0]
+        if i_1 == -1:
+            i_1 = (i0 - 1) % nb_ori
+        heapq.heappush(h, (tri_area2(x, y, i_1, i0, i2), (i_1, i0, i2)))
+        # Previous triangle
+        i3 = i_next[i2]
+        if i3 == -1:
+            i3 = (i2 + 1) % nb_ori
+        heapq.heappush(h, (tri_area2(x, y, i0, i2, i3), (i0, i2, i3)))
     x_new, y_new = empty(fixed_size, dtype=x.dtype), empty(fixed_size, dtype=y.dtype)
     j = 0
-    for i, i_n in enumerate(i_next):
-        if i_n == -1:
+    for i, flag in enumerate(removed):
+        if not flag:
             x_new[j] = x[i]
             y_new[j] = y[i]
             j += 1
@@ -869,34 +904,6 @@ def poly_indexs(x_p, y_p, x_c, y_c):
                         continue
                     if winding_number_poly(x, y, v) != 0:
                         indexs[i_p] = i_contour
-    return indexs
-
-
-@njit(cache=True)
-def poly_indexs_old(x_p, y_p, x_c, y_c):
-    """
-    index of contour for each postion inside a contour, -1 in case of no contour
-
-    :param array x_p: longitude to test
-    :param array y_p: latitude to test
-    :param array x_c: longitude of contours
-    :param array y_c: latitude of contours
-    """
-    nb_p = x_p.shape[0]
-    nb_c = x_c.shape[0]
-    indexs = -ones(nb_p, dtype=numba_types.int32)
-    for i in range(nb_c):
-        x_, y_ = reduce_size(x_c[i], y_c[i])
-        x_c_min, y_c_min = x_.min(), y_.min()
-        x_c_max, y_c_max = x_.max(), y_.max()
-        v = create_vertice(x_, y_)
-        for j in range(nb_p):
-            if indexs[j] != -1:
-                continue
-            x, y = x_p[j], y_p[j]
-            if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
-                if winding_number_poly(x, y, v) != 0:
-                    indexs[j] = i
     return indexs
 
 

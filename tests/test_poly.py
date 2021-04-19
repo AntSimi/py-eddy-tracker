@@ -1,7 +1,13 @@
-from numpy import array, pi
+from numpy import array, pi, roll
 from pytest import approx
 
-from py_eddy_tracker.poly import convex, fit_circle, get_convex_hull, poly_area_vertice
+from py_eddy_tracker.poly import (
+    convex,
+    fit_circle,
+    get_convex_hull,
+    poly_area_vertice,
+    visvalingam,
+)
 
 # Vertices for next test
 V = array(((2, 2, 3, 3, 2), (-10, -9, -9, -10, -10)))
@@ -29,3 +35,19 @@ def test_convex():
 
 def test_convex_hull():
     assert convex(*get_convex_hull(*V_concave)) is True
+
+
+def test_visvalingam():
+    x = array([1, 2, 3, 4, 5, 6.75, 6, 1])
+    y = array([-0.5, -1.5, -1, -1.75, -1, -1, -0.5, -0.5])
+    x_target = [1, 2, 3, 4, 6, 1]
+    y_target = [-0.5, -1.5, -1, -1.75, -0.5, -0.5]
+    x_, y_ = visvalingam(x, y, 6)
+    assert (x_target == x_).all()
+    assert (y_target == y_).all()
+    x_, y_ = visvalingam(x[:-1], y[:-1], 6)
+    assert (x_target == x_).all()
+    assert (y_target == y_).all()
+    x_, y_ = visvalingam(roll(x, 2), roll(y, 2), 6)
+    assert (x_target[:-1] == x_[1:]).all()
+    assert (y_target[:-1] == y_[1:]).all()

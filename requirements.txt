@@ -9,5 +9,3 @@ pyyaml
 requests
 scipy
 zarr
-# for binder
-pyeddytrackersample

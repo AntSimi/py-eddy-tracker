@@ -5,8 +5,8 @@ Network basic manipulation
 from matplotlib import pyplot as plt
 from numpy import where
 
-import py_eddy_tracker.gui
 from py_eddy_tracker import data
+from py_eddy_tracker.gui import GUI_AXES
 from py_eddy_tracker.observations.network import NetworkObservations
 
 # %%
@@ -266,7 +266,7 @@ n.numbering_segment()
 # %%
 # Only a map can be tricky to understand, with a timeline it's easier!
 fig = plt.figure(figsize=(15, 8))
-ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.94, 0.88], projection=GUI_AXES)
 n.plot(ax, color_cycle=n.COLORS)
 ax.set_xlim(17.5, 27.5), ax.set_ylim(31, 36), ax.grid()
 ax = fig.add_axes([0.08, 0.7, 0.7, 0.3])
@@ -278,7 +278,7 @@ _ = n.display_timeline(ax)
 # -----------------
 # Display the position of the eddies after a merging
 fig = plt.figure(figsize=(15, 8))
-ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection=GUI_AXES)
 n.plot(ax, color_cycle=n.COLORS)
 m1, m0, m0_stop = n.merging_event(triplet=True)
 m1.display(ax, color="violet", lw=2, label="Eddies after merging")
@@ -296,7 +296,7 @@ m1
 # ------------------
 # Display the position of the eddies before a splitting
 fig = plt.figure(figsize=(15, 8))
-ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection=GUI_AXES)
 n.plot(ax, color_cycle=n.COLORS)
 s0, s1, s1_start = n.spliting_event(triplet=True)
 s0.display(ax, color="violet", lw=2, label="Eddies before splitting")
@@ -314,7 +314,7 @@ s1
 # ---------------
 # Display the starting position of non-splitted eddies
 fig = plt.figure(figsize=(15, 8))
-ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection=GUI_AXES)
 birth = n.birth_event()
 birth.display(ax)
 ax.set_xlim(17.5, 27.5), ax.set_ylim(31, 36), ax.grid()
@@ -325,7 +325,7 @@ birth
 # ---------------
 # Display the last position of non-merged eddies
 fig = plt.figure(figsize=(15, 8))
-ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection="full_axes")
+ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection=GUI_AXES)
 death = n.death_event()
 death.display(ax)
 ax.set_xlim(17.5, 27.5), ax.set_ylim(31, 36), ax.grid()

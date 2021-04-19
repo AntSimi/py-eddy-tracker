@@ -26,12 +26,15 @@ except ImportError:
             self.set_aspect("equal")
 
 
+GUI_AXES = "full_axes"
+
+
 class GUIAxes(PlatCarreAxes):
     """
     Axes that uses full space available
     """
 
-    name = "full_axes"
+    name = GUI_AXES
 
     def end_pan(self, *args, **kwargs):
         (x0, x1), (y0, y1) = self.get_xlim(), self.get_ylim()
@@ -125,7 +128,7 @@ class GUI:
     def setup(self):
         self.figure = plt.figure()
         # map
-        self.map = self.figure.add_axes((0, 0.25, 1, 0.75), projection="full_axes")
+        self.map = self.figure.add_axes((0, 0.25, 1, 0.75), projection=GUI_AXES)
         self.map.grid()
         self.map.tick_params("both", pad=-22)
         # self.map.tick_params("y", pad=-22)
