@@ -31,7 +31,7 @@ logger = logging.getLogger("pet")
 class Amplitude(object):
     """
     Class to calculate *amplitude* and counts of *local maxima/minima*
-    within a closed region of a sea level anomaly field.
+    within a closed region of a sea surface height field.
     """
 
     EPSILON = 1e-8
@@ -66,8 +66,8 @@ class Amplitude(object):
         :param array data:
         :param float interval:
         :param int mle: maximum number of local maxima in contour
-        :param int nb_step_min: number of interval to consider like an eddy
-        :param int nb_step_to_be_mle: number of interval to be consider like another maxima
+        :param int nb_step_min: number of intervals to consider an eddy
+        :param int nb_step_to_be_mle: number of intervals to be considered as an another maxima
         """
 
         # Height of the contour
@@ -102,8 +102,9 @@ class Amplitude(object):
         self.nb_pixel = i_x.shape[0]
 
         # Only pixel in contour
+        # FIXME : change sla by ssh as the grid can be adt?
         self.sla = data[contour.pixels_index]
-        # Amplitude which will be provide
+        # Amplitude which will be provided
         self.amplitude = 0
         # Maximum local extrema accepted
         self.mle = mle
@@ -115,9 +116,10 @@ class Amplitude(object):
     def all_pixels_below_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
-        are below a given SSH threshold for cyclonic eddies.
+        are below (above) a given SSH threshold for cyclonic (anticyclonic)
+        eddies.
         """
-        # In some case pixel value must be very near of contour bounds
+        # In some cases pixel value may be very close to the contour bounds
         if self.sla.mask.any() or ((self.sla.data - self.h_0) > self.EPSILON).any():
             return False
         else:
@@ -293,10 +295,10 @@ class Contours(object):
 
     Attributes:
       contour:
-        A matplotlib contour object of high-pass filtered SLA
+        A matplotlib contour object of high-pass filtered SSH
 
       eddy:
-        A tracklist object holding the SLA data
+        A tracklist object holding the SSH data
 
       grd:
         A grid object
@@ -406,7 +408,7 @@ class Contours(object):
         fig = Figure()
         ax = fig.add_subplot(111)
         if wrap_x:
-            logger.debug("wrapping activate to compute contour")
+            logger.debug("wrapping activated to compute contour")
             x = concatenate((x, x[:1] + 360))
             z = ma.concatenate((z, z[:1]))
         logger.debug("X shape : %s", x.shape)
@@ -602,8 +604,8 @@ class Contours(object):
             Must be 'shape_error', 'x', 'y' or 'radius'.
             If define display_criterion is not use.
             bins argument must be define
-        :param array bins: bins use to colorize contour
-        :param str cmap: Name of cmap to use for field display
+        :param array bins: bins used to colorize contour
+        :param str cmap: Name of cmap for field display
         :param dict kwargs: look at :py:meth:`matplotlib.collections.LineCollection`
 
         .. minigallery:: py_eddy_tracker.Contours.display
@@ -688,7 +690,7 @@ class Contours(object):
             ax.autoscale_view()
 
     def label_contour_unused_which_contain_eddies(self, eddies):
-        """Select contour which contain several eddies"""
+        """Select contour containing several eddies"""
         if eddies.sign_type == 1:
             # anticyclonic
             sl = slice(None, -1)

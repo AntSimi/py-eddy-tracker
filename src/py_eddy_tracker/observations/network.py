@@ -78,10 +78,10 @@ class Buffer(metaclass=Singleton):
 
 @njit(cache=True)
 def fix_next_previous_obs(next_obs, previous_obs, flag_virtual):
-    """when an observation is virtual, we have to fix the previous and next obs
+    """When an observation is virtual, we have to fix the previous and next obs
 
-    :param np.array(int)  next_obs    : indice of next observation from network
-    :param np.array(int   previous_obs: indice of previous observation from network
+    :param np.array(int)  next_obs    : index of next observation from network
+    :param np.array(int   previous_obs: index of previous observation from network
     :param np.array(bool) flag_virtual: if observation is virtual or not
     """
 
@@ -89,8 +89,8 @@ def fix_next_previous_obs(next_obs, previous_obs, flag_virtual):
         if not flag_virtual[i_o]:
             continue
 
-        # if there is many virtual side by side, there is some values writted multiple times.
-        #   but it should not be slow
+        # if there are several consecutive virtuals, some values are written multiple times.
+        # but it should not be slow
         next_obs[i_o - 1] = i_o
         next_obs[i_o] = i_o + 1
         previous_obs[i_o] = i_o - 1
@@ -109,15 +109,17 @@ class NetworkObservations(GroupEddiesObservations):
 
     def find_segments_relative(self, obs, stopped=None, order=1):
         """
-        find all relative segments within an event from an order.
+        Find all relative segments linked with merging/splitting events at a specific order.
 
-        :param int obs: indice of event after the event
-        :param int stopped: indice of event before the event
+        :param int obs: index of event after the event
+        :param int stopped: index of event before the event
         :param int order: order of relatives accepted
 
-        :return: all segments relatives
+        :return: all relative segments
         :rtype: EddiesObservations
         """
+
+        # FIXME : double "event" in the description, please clarify (event = chosen obs?)
 
         # extraction of network where the event is
         network_id = self.tracks[obs]
@@ -134,9 +136,9 @@ class NetworkObservations(GroupEddiesObservations):
             return nw.relatives([i_obs, i_stopped], order=order)
 
     def get_missing_indices(self, dt):
-        """find indices where observations is missing.
+        """Find indices where observations are missing.
 
-        As network have all untrack observation in tracknumber `self.NOGROUP`,
+        As network have all untracked observation in tracknumber `self.NOGROUP`,
             we don't compute them
 
         :param int,float dt: theorical delta time between 2 observations
@@ -196,8 +198,8 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Select network on time duration
 
-        :param int nb_day_min: Minimal number of day covered by one network, if negative -> not used
-        :param int nb_day_max: Maximal number of day covered by one network, if negative -> not used
+        :param int nb_day_min: Minimal number of days covered by one network, if negative -> not used
+        :param int nb_day_max: Maximal number of days covered by one network, if negative -> not used
         """
         if nb_day_max < 0:
             nb_day_max = 1000000000000
@@ -214,7 +216,7 @@ class NetworkObservations(GroupEddiesObservations):
     @classmethod
     def from_split_network(cls, group_dataset, indexs, **kwargs):
         """
-        Build a NetworkObservations object with Group dataset and indexes
+        Build a NetworkObservations object with Group dataset and indices
 
         :param TrackEddiesObservations group_dataset: Group dataset
         :param indexs: result from split_network
@@ -228,7 +230,7 @@ class NetworkObservations(GroupEddiesObservations):
                 continue
             network[field][:] = group_dataset[field][index_order]
         network.segment[:] = indexs["track"][index_order]
-        # n & p must be re-index
+        # n & p must be re-indexed
         n, p = indexs["next_obs"][index_order], indexs["previous_obs"][index_order]
         # we add 2 for -1 index return index -1
         translate = -ones(index_order.max() + 2, dtype="i4")
@@ -244,7 +246,7 @@ class NetworkObservations(GroupEddiesObservations):
 
     def correct_close_events(self, nb_days_max=20):
         """
-        transform event where
+        Transform event where
         segment A split to B, then A merge into B
 
         to
@@ -256,6 +258,12 @@ class NetworkObservations(GroupEddiesObservations):
         :param float nb_days_max: maximum time to search for splitting-merging event
         """
 
+        # FIXME : we want to change
+        # segment A splits from segment B, then x days after segment B merges with A
+        # to
+        # segment A splits from segment B then x days after segement A merges with B (B will be longer)
+        # comments are in the wrong way but the example works as wanted
+
         _time = self.time
         # segment used to correct and track changes
         segment = self.segment_track_array.copy()
@@ -266,7 +274,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         previous_obs, next_obs = self.previous_obs, self.next_obs
 
-        # record for every segments, the slice, indice of next obs & indice of previous obs
+        # record for every segment the slice, index of next obs & index of previous obs
         for i, seg, _ in self.iter_on(segment):
             if i.start == i.stop:
                 continue
@@ -285,12 +293,12 @@ class NetworkObservations(GroupEddiesObservations):
 
             n_seg = segment[i_seg_n]
 
-            # if segment has splitting
+            # if segment is split
             if i_seg_n != -1:
                 seg2_slice, i2_seg_p, i2_seg_n = segments_connexion[n_seg]
                 p2_seg = segment[i2_seg_p]
 
-                # if it merge on the first in a certain time
+                # if it merges on the first in a certain time
                 if (p2_seg == seg_corrected) and (
                     _time[i_seg_n] - _time[i2_seg_p] < nb_days_max
                 ):
@@ -310,11 +318,10 @@ class NetworkObservations(GroupEddiesObservations):
 
     def sort(self, order=("track", "segment", "time")):
         """
-        sort observations
+        Sort observations
 
-        :param tuple order: order or sorting. Passed to :func:`numpy.argsort`
+        :param tuple order: order or sorting. Given to :func:`numpy.argsort`
         """
-
         index_order = self.obs.argsort(order=order)
         for field in self.elements:
             self[field][:] = self[field][index_order]
@@ -330,13 +337,13 @@ class NetworkObservations(GroupEddiesObservations):
 
     def find_link(self, i_observations, forward=True, backward=False):
         """
-        find all observations where obs `i_observation` could be
+        Find all observations where obs `i_observation` could be
         in future or past.
 
-        if forward=True, search all observation  where water
+        If forward=True, search all observations where water
         from obs "i_observation" could go
 
-        if backward=True, search all observation
+        If backward=True, search all observation
         where water from obs `i_observation` could come from
 
         :param int,iterable(int) i_observation:
@@ -426,7 +433,7 @@ class NetworkObservations(GroupEddiesObservations):
 
     def connexions(self, multi_network=False):
         """
-        create dictionnary for each segments, gives the segments which interact with
+        Create dictionnary for each segment, gives the segments in interaction with
         """
         if multi_network:
             segment = self.segment_track_array
@@ -445,7 +452,7 @@ class NetworkObservations(GroupEddiesObservations):
             if i.start == i.stop:
                 continue
             i_p, i_n = previous_obs[i.start], next_obs[i.stop - 1]
-            # segment of interaction
+            # segment in interaction
             p_seg, n_seg = segment[i_p], segment[i_n]
             # Where segment are called
             if i_p != -1:
@@ -494,8 +501,7 @@ class NetworkObservations(GroupEddiesObservations):
             indices of observation for relatives computation. Can be one observation (int)
             or collection of observations (iterable(int))
         :param int order: order of relatives wanted. 0 means only observations in obs, 1 means direct relatives, ...
-
-        :return: all segments relatives
+        :return: all segments' relatives
         :rtype: EddiesObservations
         """
         segment = self.segment_track_array
@@ -560,7 +566,7 @@ class NetworkObservations(GroupEddiesObservations):
         :param self other: Atlas to compare
         :param int nb_obs_min: Minimal number of overlap for one trajectory
         :param dict kwargs: keyword arguments for match function
-        :return: return other atlas reduce to common track with self
+        :return: return other atlas reduced to common tracks with self
 
         .. warning::
             It could be a costly operation for huge dataset
@@ -663,7 +669,7 @@ class NetworkObservations(GroupEddiesObservations):
         **kwargs,
     ):
         """
-        Plot a timeline of a network.
+        Plot the timeline of a network.
         Must be called on only one network.
 
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
@@ -724,7 +730,7 @@ class NetworkObservations(GroupEddiesObservations):
         return mappables
 
     def event_timeline(self, ax, field=None, method=None, factor=1, colors_mode="roll"):
-        """mark events in plot"""
+        """Mark events in plot"""
         j = 0
         events = dict(spliting=[], merging=[])
 
@@ -838,11 +844,11 @@ class NetworkObservations(GroupEddiesObservations):
 
     def map_network(self, method, y, same=True, return_dict=False, **kw):
         """
-        transform data `y` with method `method` for each track.
+        Transform data `y` with method `method` for each track.
 
-        :param Callable method: method to apply on each  tracks
+        :param Callable method: method to apply on each track
         :param np.array y: data where to apply method
-        :param bool same: if True, return array same size from y. else, return list with track edited
+        :param bool same: if True, return an array with the same size than y. Else, return a list with the edited tracks
         :param bool return_dict: if None, mean values are used
         :param float kw: to multiply field
         :return: array or dict of result from method for each network
@@ -850,7 +856,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         if same and return_dict:
             raise NotImplementedError(
-                "both condition 'same' and 'return_dict' should no be true"
+                "both conditions 'same' and 'return_dict' should no be true"
             )
 
         if same:
@@ -894,7 +900,7 @@ class NetworkObservations(GroupEddiesObservations):
         **kwargs,
     ):
         """
-        Must be call on only one network
+        Must be called on only one network
         """
         self.only_one_network()
         y = (self.segment if yfield is None else self.parse_varname(yfield)) * yfactor
@@ -914,7 +920,7 @@ class NetworkObservations(GroupEddiesObservations):
         return mappables
 
     def event_map(self, ax, **kwargs):
-        """Add the merging and splitting events """
+        """Add the merging and splitting events to a map"""
         j = 0
         mappables = dict()
         symbol_kw = dict(
@@ -958,12 +964,12 @@ class NetworkObservations(GroupEddiesObservations):
         **kwargs,
     ):
         """
-        This function will scatter the path of each network, with the merging and splitting events
+        This function scatters the path of each network, with the merging and splitting events
 
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
         :param str,array,None name:
-            variable used to fill the contour, if None all elements have the same color
-        :param float,None ref: if define use like west bound
+            variable used to fill the contours, if None all elements have the same color
+        :param float,None ref: if defined, ref is used as western boundary
         :param float factor: multiply value by
         :param list edgecolor_cycle: list of colors
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.scatter`
@@ -1121,7 +1127,7 @@ class NetworkObservations(GroupEddiesObservations):
 
     def dissociate_network(self):
         """
-        Dissociate network with no known interaction (spliting/merging)
+        Dissociate networks with no known interaction (spliting/merging)
         """
 
         tags = self.tag_segment(multi_network=True)
@@ -1135,7 +1141,7 @@ class NetworkObservations(GroupEddiesObservations):
         self.obs.sort(order=("track", "segment", "time"), kind="mergesort")
         self._index_network = None
 
-        # n & p must be re-index
+        # n & p must be re-indexed
         n, p = self.next_obs, self.previous_obs
         # we add 2 for -1 index return index -1
         nb_obs = len(self)
@@ -1158,17 +1164,17 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Will set same temporary ID for each connected segment.
 
-        :param int seg: current ID of seg
-        :param ing tag: temporary ID to set for seg and its connexion
-        :param array[int] groups: array where tag will be stored
-        :param dict connexions: gives for one ID of seg all seg connected
+        :param int seg: current ID of segment
+        :param ing tag: temporary ID to set for segment and its connexion
+        :param array[int] groups: array where tag is stored
+        :param dict connexions: gives for one ID of segment all connected segments
         """
-        # If seg are already used we stop recursivity
+        # If segments are already used we stop recursivity
         if groups[seg] != 0:
             return
-        # We set tag for this seg
+        # We set tag for this segment
         groups[seg] = tag
-        # Get all connexions of this seg
+        # Get all connexions of this segment
         segs = connexions.get(seg, None)
         if segs is not None:
             for seg in segs:
@@ -1198,14 +1204,17 @@ class NetworkObservations(GroupEddiesObservations):
         return self.tag_segment().shape[0] == 1
 
     def remove_trash(self):
+        """
+        Remove the lonely eddies (only 1 obs in segment, associated segment number is 0)
+        """
         return self.extract_with_mask(self.track != 0)
 
     def plot(self, ax, ref=None, color_cycle=None, **kwargs):
         """
-        This function will draw path of each trajectory
+        This function draws the path of each trajectory
 
         :param matplotlib.axes.Axes ax: ax to draw
-        :param float,int ref: if defined, all coordinates will be wrapped with ref like west boundary
+        :param float,int ref: if defined, all coordinates are wrapped with ref as western boundary
         :param dict kwargs: keyword arguments for Axes.plot
         :return: a list of matplotlib mappables
         """
@@ -1232,15 +1241,15 @@ class NetworkObservations(GroupEddiesObservations):
 
     def remove_dead_end(self, nobs=3, ndays=0, recursive=0, mask=None):
         """
-        Remove short segment which didn't connect several segment
+        Remove short segments that don't connect several segments
 
-        :param int nobs: Minimal number of observation to keep segment
-        :param int ndays: Minimal number of days to keep segment
-        :param int recursive: Run  method N times more
-        :param int mask: if one or more observation of segment are select by mask, the segment is keep
+        :param int nobs: Minimal number of observation to keep a segment
+        :param int ndays: Minimal number of days to keep a segment
+        :param int recursive: Run method N times more
+        :param int mask: if one or more observation of the segment are selected by mask, the segment is kept
 
         .. warning::
-            It will remove short segment which splits than merges with same segment
+            It will remove short segment that splits from then merges with the same segment
         """
         segments_keep = list()
         connexions = self.connexions(multi_network=True)
@@ -1276,8 +1285,8 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Extract within a time period
 
-        :param (int,int) period: two dates to define the period, must be specify from 1/1/1950
-        :return: Return all eddy tracks which are in bounds
+        :param (int,int) period: two dates to define the period, must be specified from 1/1/1950
+        :return: Return all eddy trajectories in period
         :rtype: NetworkObservations
 
         .. minigallery:: py_eddy_tracker.NetworkObservations.extract_with_period
@@ -1314,7 +1323,7 @@ class NetworkObservations(GroupEddiesObservations):
             logger.warning("Empty dataset will be created")
         else:
             logger.info(
-                f"{nb_obs} observations will be extract ({nb_obs / self.shape[0]:.3%})"
+                f"{nb_obs} observations will be extracted ({nb_obs / self.shape[0]:.3%})"
             )
             for field in self.obs.dtype.descr:
                 if field in ("next_obs", "previous_obs"):
@@ -1404,7 +1413,7 @@ class Network:
         Create a translator with all duos
 
         :param int nb: size of translator
-        :param set((int, int)) duos: set of all group which must be join
+        :param set((int, int)) duos: set of all groups that must be joined
 
         Examples
         --------
@@ -1425,7 +1434,7 @@ class Network:
         for i, filename in enumerate(self.filenames):
             if display_iteration:
                 print(f"{filename} compared to {self.window} next", end="\r")
-            # Load observations with function to buffered observations
+            # Load observations with function to buffer observations
             xi, yi = self.buffer.load_contour(filename)
             # Append number of observations by filename
             nb_obs.append(xi.shape[0])
@@ -1450,7 +1459,7 @@ class Network:
         model = TrackEddiesObservations.load_file(self.filenames[-1], raw_data=raw_data)
         eddies = TrackEddiesObservations.new_like(model, nb_obs)
         eddies.sign_type = model.sign_type
-        # Get new index to re-order observation by group
+        # Get new index to re-order observations by groups
         new_i = get_next_index(group)
         display_iteration = logger.getEffectiveLevel() == logging.INFO
         elements = eddies.elements
@@ -1478,7 +1487,7 @@ class Network:
 
 @njit(cache=True)
 def get_next_index(gr):
-    """Return for each obs index the new position to join all group"""
+    """Return for each obs index the new position to join all groups"""
     nb_obs_gr = bincount(gr)
     i_gr = nb_obs_gr.cumsum() - nb_obs_gr
     new_index = empty(gr.shape, dtype=uint32)

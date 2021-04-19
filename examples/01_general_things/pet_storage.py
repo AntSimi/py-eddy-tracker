@@ -16,8 +16,10 @@ There are 3 class of files:
 """
 
 import py_eddy_tracker_sample
+from matplotlib import pyplot as plt
+from numpy import arange, outer
 
-from py_eddy_tracker.data import get_demo_path, get_remote_demo_sample
+from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.observation import EddiesObservations, Table
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
@@ -32,7 +34,7 @@ from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 # array field like contour/profile are 2D column.
 
 # %%
-# Eddies files (zarr or netcdf) could be loaded with ```load_file``` method:
+# Eddies files (zarr or netcdf) can be loaded with ```load_file``` method:
 eddies_collections = EddiesObservations.load_file(get_demo_path("Cyclonic_20160515.nc"))
 eddies_collections.field_table()
 # offset and scale_factor are used only when data is stored in zarr or netCDF4
@@ -57,6 +59,53 @@ eddies_collections.obs.dtype
 # Contour storage
 # ---------------
 # All contours are stored on the same number of points, and are resampled if needed with an algorithm to be stored as objects
+
+# %%
+# Speed profile storage
+# ---------------------
+# Speed profile is an interpolation of speed mean along each contour.
+# For each contour included in eddy, we compute mean of speed along the contour,
+# and after we interpolate speed mean array on a fixed size array.
+#
+# Several field are available to understand "uavg_profile" :
+#  0. - num_contours : Number of contour in eddies, must be equal to amplitude divide by isoline step
+#  1. - height_inner_contour : height of inner contour used
+#  2. - height_max_speed_contour : height of max speed contour used
+#  3. - height_external_contour : height of outter contour used
+#
+# Last value of "uavg_profile" is for inner contour and first value for outter contour.
+
+# Observations selection of "uavg_profile" with high number of contour(Eddy with high amplitude)
+e = eddies_collections.extract_with_mask(eddies_collections.num_contours > 15)
+
+# %%
+
+# Raw display of profiles with more than 15 contours
+ax = plt.subplot(111)
+_ = ax.plot(e.uavg_profile.T, lw=0.5)
+
+# %%
+
+# Profile from inner to outter
+ax = plt.subplot(111)
+ax.plot(e.uavg_profile[:, ::-1].T, lw=0.5)
+_ = ax.set_xlabel("From inner to outter contour"), ax.set_ylabel("Speed (m/s)")
+
+# %%
+
+# If we normalize indice of contour to set speed contour to 1 and inner contour to 0
+ax = plt.subplot(111)
+h_in = e.height_inner_contour
+h_s = e.height_max_speed_contour
+h_e = e.height_external_contour
+r = (h_e - h_in) / (h_s - h_in)
+nb_pt = e.uavg_profile.shape[1]
+# Create an x array for each profile
+x = outer(arange(nb_pt) / nb_pt, r)
+
+ax.plot(x, e.uavg_profile[:, ::-1].T, lw=0.5)
+_ = ax.set_xlabel("From inner to outter contour"), ax.set_ylabel("Speed (m/s)")
+
 
 # %%
 # Trajectories
@@ -86,11 +135,7 @@ eddies_tracks.field_table()
 # - next_obs : Index of the next observation in the full dataset, if -1 there are no next observation (the segment ends)
 # - previous_cost : Result of the cost function (1 is a good association, 0 is bad) with previous observation
 # - next_cost : Result of the cost function (1 is a good association, 0 is bad) with next observation
-eddies_network = NetworkObservations.load_file(
-    get_remote_demo_sample(
-        "eddies_med_adt_allsat_dt2018_err70_filt500_order1/Anticyclonic_network.nc"
-    )
-)
+eddies_network = NetworkObservations.load_file(get_demo_path("network_med.nc"))
 eddies_network.field_table()
 
 # %%

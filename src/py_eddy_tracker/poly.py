@@ -474,13 +474,13 @@ def polygon_overlap(p0, p1, minimal_area=False):
     return cost
 
 
-# FIXME: only one function are needed
+# FIXME: only one function is needed
 @njit(cache=True)
 def fit_circle(x, y):
     """
     From a polygon, function will fit a circle.
 
-    Must be call with local coordinates (in m, to get a radius in m).
+    Must be called with local coordinates (in m, to get a radius in m).
 
     :param array x: x of polygon
     :param array y: y of polygon
@@ -510,11 +510,11 @@ def fit_circle(x, y):
     radius **= 0.5
     x0 *= scale
     y0 *= scale
-    # radius of fitted circle
+    # radius of fit circle
     radius *= scale
-    # center X-position of fitted circle
+    # center X-position of fit circle
     x0 += x_mean
-    # center Y-position of fitted circle
+    # center Y-position of fit circle
     y0 += y_mean
 
     err = shape_error(x, y, x0, y0, radius)
@@ -522,9 +522,9 @@ def fit_circle(x, y):
 
 
 @njit(cache=True)
-def fit_ellips(x, y):
+def fit_ellipse(x, y):
     r"""
-    From a polygon, function will fit an ellips.
+    From a polygon, function will fit an ellipse.
 
     Must be call with local coordinates (in m, to get a radius in m).
 

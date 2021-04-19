@@ -30,7 +30,7 @@ from numpy import (
 @njit(cache=True)
 def count_consecutive(mask):
     """
-    Count consecutive event every False flag count restart
+    Count consecutive events every False flag count restart
 
     :param array[bool] mask: event to count
     :return: count when consecutive event
@@ -50,7 +50,7 @@ def count_consecutive(mask):
 @njit(cache=True)
 def reverse_index(index, nb):
     """
-    Compute a list of index, which are not in index.
+    Compute a list of indices, which are not in index.
 
     :param array index: index of group which will be set to False
     :param array nb: Count for each group
@@ -65,17 +65,17 @@ def reverse_index(index, nb):
 
 @njit(cache=True)
 def build_index(groups):
-    """We expected that variable is monotonous, and return index for each step change.
+    """We expect that variable is monotonous, and return index for each step change.
 
-    :param array groups: array which contain group to be separated
-    :return: (first_index of each group, last_index of each group, value to shift group)
+    :param array groups: array that contains groups to be separated
+    :return: (first_index of each group, last_index of each group, value to shift groups)
     :rtype: (array, array, int)
-
     Examples
     --------
     >>> build_index(array((1, 1, 3, 4, 4)))
     (array([0, 2, 2, 3]), array([2, 2, 3, 5]), 1)
     """
+
     i0, i1 = groups.min(), groups.max()
     amplitude = i1 - i0 + 1
     # Index of first observation for each group
@@ -83,7 +83,7 @@ def build_index(groups):
     for i, group in enumerate(groups[:-1]):
         # Get next value to compare
         next_group = groups[i + 1]
-        # if different we need to set index for all group between the 2 values
+        # if different we need to set index for all groups between the 2 values
         if group != next_group:
             first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
     last_index = zeros(amplitude, dtype=numba_types.int_)
@@ -95,21 +95,21 @@ def build_index(groups):
 
 @njit(cache=True)
 def hist_numba(x, bins):
-    """Call numba histogram  to speed up."""
+    """Call numba histogram to speed up."""
     return histogram(x, bins)
 
 
 @njit(cache=True, fastmath=True, parallel=False)
 def distance_grid(lon0, lat0, lon1, lat1):
     """
-    Get distance for every couple of point.
+    Get distance for every couple of points.
 
     :param array lon0:
     :param array lat0:
     :param array lon1:
     :param array lat1:
 
-    :return: nan value for far away point, and km for other
+    :return: nan value for far away points, and km for other
     :rtype: array
     """
     nb_0 = lon0.shape[0]
@@ -164,7 +164,7 @@ def cumsum_by_track(field, track):
     Cumsum by track.
 
     :param array field: data to sum
-    :pram array(int) track: id of track to separate data
+    :pram array(int) track: id of trajectories to separate data
     :return: cumsum with a reset at each start of track
     :rtype: array
     """
@@ -192,7 +192,7 @@ def interp2d_geo(x_g, y_g, z_g, m_g, x, y, nearest=False):
     :param array m_g: Boolean grid, True if value is masked
     :param array x: coordinate where interpolate z
     :param array y: coordinate where interpolate z
-    :param bool nearest: if true we will take nearest pixel
+    :param bool nearest: if True we will take nearest pixel
     :return: z interpolated
     :rtype: array
     """
@@ -256,17 +256,17 @@ def interp2d_bilinear(x_g, y_g, z_g, m_g, x, y):
     nb_x = x_g.shape[0]
     nb_y = y_g.shape[0]
     is_circular = abs(x_g[-1] % 360 - (x_g[0] - x_step) % 360) < 1e-5
-    # Indices which should be never exist
+    # Indexes that should never exist
     i0_old, j0_old, masked = -100000000, -10000000, False
     z = empty(x.shape, dtype=z_g.dtype)
     for i in prange(x.size):
         x_ = (x[i] - x_ref) / x_step
         y_ = (y[i] - y_ref) / y_step
         i0 = int(floor(x_))
-        # To keep original value if wrapping apply to compute xd
+        # To keep original values if wrapping applied to compute xd
         i0_ = i0
         j0 = int(floor(y_))
-        # corner are the same need only a new xd and yd
+        # corners are the same need only a new xd and yd
         if i0 != i0_old or j0 != j0_old:
             i1 = i0 + 1
             j1 = j0 + 1
@@ -288,7 +288,7 @@ def interp2d_bilinear(x_g, y_g, z_g, m_g, x, y):
                         z_g[i1, j1],
                     )
                     masked = False
-            # Need to be store only on change
+            # Need to be stored only on change
             i0_old, j0_old = i0, j0
         if masked:
             z[i] = nan
@@ -359,17 +359,17 @@ def flatten_line_matrix(l_matrix):
 @njit(cache=True)
 def simplify(x, y, precision=0.1):
     """
-    Will remove all middle/end point which are closer than precision.
+    Will remove all middle/end points closer than precision.
 
     :param array x:
     :param array y:
-    :param float precision: if two points have distance inferior to precision with remove next point
+    :param float precision: if two points have distance inferior to precision we remove next point
     :return: (x,y)
     :rtype: (array,array)
     """
     precision2 = precision ** 2
     nb = x.shape[0]
-    # will be True for value keep
+    # will be True for kept values
     mask = ones(nb, dtype=bool_)
     for j in range(0, nb):
         x_previous, y_previous = x[j], y[j]
@@ -423,7 +423,7 @@ def split_line(x, y, i):
     :param y: array
     :param i: array of int at each i change, we cut x, y
 
-    :return: x and y separate by nan at each i jump
+    :return: x and y separated by nan at each i jump
     """
     nb_jump = len(where(i[1:] - i[:-1] != 0)[0])
     nb_value = x.shape[0]
@@ -445,11 +445,11 @@ def split_line(x, y, i):
 @njit(cache=True)
 def wrap_longitude(x, y, ref, cut=False):
     """
-    Will wrap contiguous longitude with reference as west bound.
+    Will wrap contiguous longitude with reference as western boundary.
 
     :param array x:
     :param array y:
-    :param float ref: longitude of reference, all the new value will be between ref and ref + 360
+    :param float ref: longitude of reference, all the new values will be between ref and ref + 360
     :param bool cut: if True line will be cut at the bounds
     :return: lon,lat
     :rtype: (array,array)
@@ -557,7 +557,7 @@ def local_to_coordinates(x, y, lon0, lat0):
 @njit(cache=True, fastmath=True)
 def nearest_grd_indice(x, y, x0, y0, xstep, ystep):
     """
-    Get nearest grid indice from a position.
+    Get nearest grid index from a position.
 
     :param x: longitude
     :param y: latitude
@@ -575,7 +575,7 @@ def nearest_grd_indice(x, y, x0, y0, xstep, ystep):
 @njit(cache=True)
 def bbox_indice_regular(vertices, x0, y0, xstep, ystep, N, circular, x_size):
     """
-    Get bbox indice of a contour in a regular grid.
+    Get bbox index of a contour in a regular grid.
 
     :param vertices: vertice of contour
     :param float x0: first grid longitude

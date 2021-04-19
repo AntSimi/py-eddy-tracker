@@ -77,7 +77,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
             yield self.index(slice(i0, i0 + nb))
 
     def get_missing_indices(self, dt):
-        """find indices where observations is missing.
+        """Find indices where observations are missing.
 
         :param int,float dt: theorical delta time between 2 observations
         """
@@ -90,7 +90,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         )
 
     def fix_next_previous_obs(self):
-        """function used after 'insert_virtual', to correct next_obs and
+        """Function used after 'insert_virtual', to correct next_obs and
         previous obs.
         """
 
@@ -99,7 +99,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
     @property
     def nb_tracks(self):
         """
-        Will count and send number of track
+        Count and return number of track
         """
         if self.__nb_track is None:
             if len(self) == 0:
@@ -150,7 +150,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
 
     def distance_to_next(self):
         """
-        :return: array of distance in m, 0 when next obs if from another track
+        :return: array of distance in m, 0 when next obs is from another track
         :rtype: array
         """
         d = distance(
@@ -166,7 +166,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         return d_
 
     def normalize_longitude(self):
-        """Normalize all longitude
+        """Normalize all longitudes
 
         Normalize longitude field and in the same range :
         - longitude_max
@@ -217,7 +217,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         return list(set(elements))
 
     def set_global_attr_netcdf(self, h_nc):
-        """Set global attr"""
+        """Set global attributes"""
         h_nc.title = "Cyclonic" if self.sign_type == -1 else "Anticyclonic"
         h_nc.Metadata_Conventions = "Unidata Dataset Discovery v1.0"
         h_nc.comment = "Surface product; mesoscale eddies"
@@ -239,9 +239,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
         """
         Extract within a time period
 
-        :param (int,int) period: two dates to define the period, must be specify from 1/1/1950
+        :param (int,int) period: two dates to define the period, must be specified from 1/1/1950
         :param dict kwargs: look at :py:meth:`extract_with_mask`
-        :return: Return all eddy tracks which are in bounds
+        :return: Return all eddy tracks in period
         :rtype: TrackEddiesObservations
 
         .. minigallery:: py_eddy_tracker.TrackEddiesObservations.extract_with_period
@@ -264,9 +264,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
         """
         Return azimuth for each track.
 
-        Azimuth is computed with first and last observation
+        Azimuth is computed with first and last observations
 
-        :param bool equatorward: If True,  Poleward are positive and equatorward negative
+        :param bool equatorward: If True, Poleward is positive and Equatorward negative
         :rtype: array
         """
         i0, nb = self.index_from_track, self.nb_obs_by_track
@@ -427,7 +427,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
             track_mask = self.nb_obs_by_track >= b0
         else:
             logger.warning("No valid value for bounds")
-            raise Exception("One bounds must be positiv")
+            raise Exception("One bound must be positive")
         return self.extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
 
     def empty_dataset(self):
@@ -474,7 +474,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         :param bool full_path: extract the full trajectory if only one part is selected
         :param bool remove_incomplete: delete trajectory if not fully selected
         :param bool compress_id: resample trajectory number to use a smaller range
-        :param bool reject_virtual: if only virtual are selected, the trajectory is removed
+        :param bool reject_virtual: if only virtuals are selected, the trajectory is removed
         :return: same object with the selected observations
         :rtype: self.__class__
         """
@@ -525,10 +525,10 @@ class TrackEddiesObservations(GroupEddiesObservations):
 
     def display_shape(self, ax, ref=None, intern=False, **kwargs):
         """
-        This function will draw the shape of each trajectory
+        This function draws the shape of each trajectory
 
         :param matplotlib.axes.Axes ax: ax to draw
-        :param float,int ref: if defined all coordinates will be wrapped with ref like west boundary
+        :param float,int ref: if defined, all coordinates are wrapped with ref as western boundary
         :param bool intern: If True use speed contour instead of effective contour
         :param dict kwargs: keyword arguments for Axes.plot
         :return: matplotlib mappable
@@ -557,7 +557,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         :param self other: Atlas to compare
         :param int nb_obs_min: Minimal number of overlap for one trajectory
         :param dict kwargs: keyword arguments for match function
-        :return: return other atlas reduce to common track with self
+        :return: return other atlas reduced to common trajectories with self
 
         .. warning::
             It could be a costly operation for huge dataset
@@ -585,7 +585,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         This function will draw path of each trajectory
 
         :param matplotlib.axes.Axes ax: ax to draw
-        :param float,int ref: if defined, all coordinates will be wrapped with ref like west boundary
+        :param float,int ref: if defined, all coordinates are wrapped with ref as western boundary
         :param dict kwargs: keyword arguments for Axes.plot
         :return: matplotlib mappable
         """
@@ -618,7 +618,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         # Initialisation
         # To store the id of the segments, the backward and forward cost associations
         ids["track"], ids["previous_cost"], ids["next_cost"] = 0, 0, 0
-        # To store the indexes of the backward and forward observations associated
+        # To store the indices of the backward and forward observations associated
         ids["previous_obs"], ids["next_obs"] = -1, -1
         # At the end, ids["previous_obs"] == -1 means the start of a non-split segment
         # and ids["next_obs"] == -1 means the end of a non-merged segment
@@ -791,10 +791,10 @@ def track_loess_filter(half_window, x, y, track):
     """
     Apply a loess filter on y field
 
-    :param int,float window: parameter of smoother
+    :param int,float half_window: parameter of smoother
     :param array_like x: must be growing for each track but could be irregular
     :param array_like y: field to smooth
-    :param array_like track: field which allow to separate path
+    :param array_like track: field that allows to separate path
 
     :return: Array smoothed
     :rtype: array_like

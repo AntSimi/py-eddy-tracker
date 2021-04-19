@@ -37,7 +37,7 @@ def build_network():
 
 
 def divide_network():
-    parser = EddyParser("Separate path for a same group(network)")
+    parser = EddyParser("Separate path for a same group (network)")
     parser.add_argument("input", help="input network file")
     parser.add_argument("out", help="output file")
     parser.contour_intern_arg()
@@ -66,7 +66,7 @@ def subset_network():
         "--length",
         nargs=2,
         type=int,
-        help="Nb of day which must be cover by network, first minimum number of day and last maximum number of day,"
+        help="Nb of days that must be covered by the network, first minimum number of day and last maximum number of day,"
         "if value is negative, this bound won't be used",
     )
     parser.add_argument(
@@ -85,8 +85,8 @@ def subset_network():
         "--period",
         nargs=2,
         type=int,
-        help="Start day and end day, if it's negative value we will add to day min and add to day max,"
-        "if 0 it s not use",
+        help="Start day and end day, if it's a negative value we will add to day min and add to day max,"
+        "if 0 it is not used",
     )
     args = parser.parse_args()
     n = NetworkObservations.load_file(args.input, raw_data=True)
