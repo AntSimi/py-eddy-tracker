@@ -21,7 +21,7 @@ from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.gui import GUI_AXES
 from py_eddy_tracker.observations.network import NetworkObservations
 
-from py_eddy_tracker.generic import coordinates_to_local, local_to_coordinates
+from py_eddy_tracker.generic import coordinates_to_local
 from py_eddy_tracker.poly import fit_ellipse
 
 # %%
@@ -217,22 +217,22 @@ b_ = array(b_)
 # Theta
 ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, theta_, vmin=-pi / 2, vmax=pi / 2, cmap="hsv")
-cb = update_axes(ax, m["scatter"])
+_ = update_axes(ax, m["scatter"])
 
 # %%
 # a
 ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, a_ * 1e-3, vmin=0, vmax=80, cmap="Spectral_r")
-cb = update_axes(ax, m["scatter"])
+_ = update_axes(ax, m["scatter"])
 
 # %%
 # b
 ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, b_ * 1e-3, vmin=0, vmax=80, cmap="Spectral_r")
-cb = update_axes(ax, m["scatter"])
+_ = update_axes(ax, m["scatter"])
 
 # %%
 # a/b
 ax = timeline_axes()
 m = close_to_i3.scatter_timeline(ax, a_ / b_, vmin=1, vmax=2, cmap="Spectral_r")
-cb = update_axes(ax, m["scatter"])
+_ = update_axes(ax, m["scatter"])
