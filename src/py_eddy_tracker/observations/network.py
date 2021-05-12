@@ -6,6 +6,7 @@ import logging
 from glob import glob
 
 from numba import njit
+from numba import types as nb_types
 from numpy import (
     arange,
     array,
@@ -20,13 +21,16 @@ from numpy import (
     unique,
     where,
     zeros,
+    meshgrid,
 )
+import zarr
 
 from ..generic import build_index, wrap_longitude
-from ..poly import bbox_intersection, vertice_overlap
+from ..poly import bbox_intersection, vertice_overlap, group_obs
 from .groups import GroupEddiesObservations, get_missing_indices
 from .observation import EddiesObservations
 from .tracking import TrackEddiesObservations, track_loess_filter, track_median_filter
+from ..dataset.grid import GridCollection
 
 logger = logging.getLogger("pet")
 
@@ -97,6 +101,109 @@ def fix_next_previous_obs(next_obs, previous_obs, flag_virtual):
         previous_obs[i_o + 1] = i_o
 
 
+def advect(x, y, c, t0, delta_t):
+    """
+    Advect particle from t0 to t0 + delta_t, with data cube.
+
+    :param np.array(float) x: longitude of particles
+    :param np.array(float) y: latitude  of particles
+    :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
+    :param int t0: julian day of advection start
+    :param int delta_t: number of days to advect
+    """
+
+    kw = dict(nb_step=6, time_step=86400 / 6)
+    if delta_t < 0:
+        kw["backward"] = True
+        delta_t = -delta_t
+    p = c.advect(x, y, "u", "v", t_init=t0, **kw)
+    for _ in range(delta_t):
+        t, x, y = p.__next__()
+    return t, x, y
+
+
+def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
+    """Select particles within eddies, advect them, return target observation and associated percentages
+
+    :param np.array(float) x: longitude of particles
+    :param np.array(float) y: latitude  of particles
+    :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
+    :param NetworkObservations eddies: NetworkObservations considered
+    :param int t_start: julian day of the advection
+    :param np.array(int) i_target: corresponding obs where particles are advected
+    :param np.array(int) pct: corresponding percentage of avected particles
+    :params dict kwargs: dict of params given to `advect`
+    """
+
+    # Obs from initial time
+    m_start = eddies.time == t_start
+
+    e = eddies.extract_with_mask(m_start)
+    # to be able to get global index
+    translate_start = where(m_start)[0]
+    # Identify particle in eddies (only in core)
+    i_start = e.contains(x, y, intern=True)
+    m = i_start != -1
+
+    x, y, i_start = x[m], y[m], i_start[m]
+    # Advect
+    t_end, x, y = advect(x, y, c, t_start, **kwargs)
+    # eddies at last date
+    m_end = eddies.time == t_end / 86400
+    e_end = eddies.extract_with_mask(m_end)
+    # to be able to get global index
+    translate_end = where(m_end)[0]
+    # Id eddies for each alive particle (in core and extern)
+    i_end = e_end.contains(x, y)
+    # compute matrix and fill target array
+    get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
+
+
+@njit(cache=True)
+def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
+    """Compute target observation and associated percentages
+
+    :param np.array(int) i_start: indices of associated contours at starting advection day
+    :param np.array(int) i_end: indices of associated contours after advection
+    :param np.array(int) translate_start: corresponding global indices at starting advection day
+    :param np.array(int) translate_end: corresponding global indices after advection
+    :param np.array(int) i_target: corresponding obs where particles are advected
+    :param np.array(int) pct: corresponding percentage of avected particles
+    """
+
+    nb_start, nb_end = translate_start.size, translate_end.size
+    # Matrix which will store count for every couple
+    count = zeros((nb_start, nb_end), dtype=nb_types.int32)
+    # Number of particles in each origin observation
+    ref = zeros(nb_start, dtype=nb_types.int32)
+    # For each particle
+    for i in range(i_start.size):
+        i_end_ = i_end[i]
+        i_start_ = i_start[i]
+        if i_end_ != -1:
+            count[i_start_, i_end_] += 1
+        ref[i_start_] += 1
+    for i in range(nb_start):
+        for j in range(nb_end):
+            pct_ = count[i, j]
+            # If there are particles from i to j
+            if pct_ != 0:
+                # Get percent
+                pct_ = pct_ / ref[i] * 100.0
+                # Get indices in full dataset
+                i_, j_ = translate_start[i], translate_end[j]
+                pct_0 = pct[i_, 0]
+                if pct_ > pct_0:
+                    pct[i_, 1] = pct_0
+                    pct[i_, 0] = pct_
+                    i_target[i_, 1] = i_target[i_, 0]
+                    i_target[i_, 0] = j_
+                elif pct_ > pct[i_, 1]:
+                    pct[i_, 1] = pct_
+                    i_target[i_, 1] = j_
+    return i_target, pct
+
+
 class NetworkObservations(GroupEddiesObservations):
 
     __slots__ = ("_index_network",)
@@ -109,17 +216,16 @@ class NetworkObservations(GroupEddiesObservations):
 
     def find_segments_relative(self, obs, stopped=None, order=1):
         """
-        Find all relative segments linked with merging/splitting events at a specific order.
+        Find all relative segments from obs linked with merging/splitting events at a specific order.
 
-        :param int obs: index of event after the event
-        :param int stopped: index of event before the event
+        :param int obs: index of observation after the event
+        :param int stopped: index of observation before the event
         :param int order: order of relatives accepted
 
         :return: all relative segments
         :rtype: EddiesObservations
         """
 
-        # FIXME : double "event" in the description, please clarify (event = chosen obs?)
 
         # extraction of network where the event is
         network_id = self.tracks[obs]
@@ -247,22 +353,16 @@ class NetworkObservations(GroupEddiesObservations):
     def correct_close_events(self, nb_days_max=20):
         """
         Transform event where
-        segment A split to B, then A merge into B
+        segment A splits from segment B, then x days after segment B merges with A
 
         to
 
-        segment A split to B, then B merge to A
+        segment A splits from segment B then x days after segment A merges with B (B will be longer)
 
-        these events are filtered with `nb_days_max`, which the event have to take place in less than `nb_days_max`
+        These events have to last less than `nb_days_max` to be changed.
 
         :param float nb_days_max: maximum time to search for splitting-merging event
         """
-
-        # FIXME : we want to change
-        # segment A splits from segment B, then x days after segment B merges with A
-        # to
-        # segment A splits from segment B then x days after segement A merges with B (B will be longer)
-        # comments are in the wrong way but the example works as wanted
 
         _time = self.time
         # segment used to correct and track changes
@@ -1339,6 +1439,189 @@ class NetworkObservations(GroupEddiesObservations):
             new.next_obs[:] = translate[n]
             new.previous_obs[:] = translate[p]
         return new
+
+    def analysis_coherence(
+        self,
+        date_function,
+        uv_params,
+        advection_mode="both",
+        dt_advect=14,
+        step_mesh=1.0 / 50,
+        output_name=None,
+        dissociate_network=False,
+        correct_close_events=0,
+        remove_dead_end=0,
+    ):
+
+        """Global function to analyse segments coherence, with network preprocessing"""
+
+        if dissociate_network:
+            self.dissociate_network()
+
+        if correct_close_events > 0:
+            self.correct_close_events(nb_days_max=correct_close_events)
+
+        if remove_dead_end > 0:
+            network_clean = self.remove_dead_end(nobs=0, ndays=remove_dead_end)
+        else:
+            network_clean = self
+
+        res = network_clean.segment_coherence(
+            date_function=date_function,
+            uv_params=uv_params,
+            advection_mode=advection_mode,
+            output_name=output_name,
+            dt_advect=dt_advect,
+            step_mesh=step_mesh,
+        )
+
+        return network_clean, res
+
+    def segment_coherence(
+        self,
+        date_function,
+        uv_params,
+        advection_mode="both",
+        dt_advect=14,
+        step_mesh=1.0 / 50,
+        output_name=None,
+    ):
+
+        """
+        Percentage of particules and their targets after forward or/and backward advection from a specific eddy.
+
+        :param callable date_function: python function, takes as param `int` (julian day) and return
+            data filename associated to the date
+            ex:
+                def date2file(julian_day):
+                    date = datetime.timedelta(days=julian_day) + datetime.datetime(1950, 1, 1)
+
+                    return f"/tmp/dt_global_allsat_phy_l4_{date.strftime('%Y%m%d')}.nc"
+
+        :param dict uv_params: dict of parameters used by
+            :py:meth:`~py_eddy_tracker.dataset.grid.GridCollection.from_netcdf_list`
+        :param str advection_mode: "backward", "forward" or "both"
+        :param int dt_advect: days for advection
+        :param float step_mesh: step for particule mesh in degrees
+        :param str output_name: if not None, name of file saved in zarr. Else, data will not be saved
+        """
+
+        if advection_mode in ["both", "forward"]:
+            itf_final = -ones((self.obs.size, 2), dtype="i4")
+            ptf_final = zeros((self.obs.size, 2), dtype="i1")
+
+        if advection_mode in ["both", "backward"]:
+            itb_final = -ones((self.obs.size, 2), dtype="i4")
+            ptb_final = zeros((self.obs.size, 2), dtype="i1")
+
+        for slice_track, b0, _ in self.iter_on(self.track):
+            if b0 == 0:
+                continue
+
+            sub_networks = self.network(b0)
+
+            # find extremum to create a mesh of particles
+            lon = sub_networks.contour_lon_s
+            lonMin = lon.min() - 0.1
+            lonMax = lon.max() + 0.1
+
+            lat = sub_networks.contour_lat_s
+            latMin = lat.min() - 0.1
+            latMax = lat.max() + 0.1
+
+            x0, y0 = meshgrid(
+                arange(lonMin, lonMax, step_mesh), arange(latMin, latMax, step_mesh)
+            )
+            x0, y0 = x0.reshape(-1), y0.reshape(-1)
+            _, i = group_obs(x0, y0, 1, 360)
+            x0, y0 = x0[i], y0[i]
+
+            t_start, t_end = sub_networks.period
+            shape = (sub_networks.obs.size, 2)
+
+            if advection_mode in ["both", "forward"]:
+
+                # first dates to load.
+                dates = arange(t_start - 1, t_start + dt_advect + 2)
+                # files associated with dates
+                first_files = [date_function(x) for x in dates]
+
+                c = GridCollection.from_netcdf_list(first_files, dates, **uv_params)
+
+                i_target_f = -ones(shape, dtype="i4")
+                pct_target_f = zeros(shape, dtype="i1")
+
+                for _t in range(t_start, t_end - dt_advect + 1):
+                    t_shift = _t + dt_advect + 2
+
+                    # add next date to GridCollection and delete last date
+                    c.shift_files(t_shift, date_function(int(t_shift)), **uv_params)
+                    particle_candidate(
+                        x0,
+                        y0,
+                        c,
+                        sub_networks,
+                        _t,
+                        i_target_f,
+                        pct_target_f,
+                        delta_t=dt_advect,
+                    )
+
+                itf_final[slice_track] = i_target_f
+                ptf_final[slice_track] = pct_target_f
+
+            if advection_mode in ["both", "backward"]:
+
+                # first dates to load.
+                dates = arange(t_start - 1, t_start + dt_advect + 2)
+                # files associated with dates
+                first_files = [date_function(x) for x in dates]
+
+                c = GridCollection.from_netcdf_list(first_files, dates, **uv_params)
+
+                i_target_b = -ones(shape, dtype="i4")
+                pct_target_b = zeros(shape, dtype="i1")
+
+                for _t in range(t_start + dt_advect + 1, t_end + 1):
+                    t_shift = _t + 1
+
+                    # add next date to GridCollection and delete last date
+                    c.shift_files(t_shift, date_function(int(t_shift)), **uv_params)
+                    particle_candidate(
+                        x0,
+                        y0,
+                        c,
+                        self,
+                        _t,
+                        i_target_b,
+                        pct_target_b,
+                        delta_t=-dt_advect,
+                    )
+
+                itb_final[slice_track] = i_target_b
+                ptb_final[slice_track] = pct_target_b
+
+        if output_name is not None:
+            zg = zarr.open(output_name, "w")
+
+        # zarr compression parameters
+        params_seg = dict()
+        params_pct = dict()
+
+        res = []
+        if advection_mode in ["forward", "both"]:
+            res = res + [itf_final, ptf_final]
+            if output_name is not None:
+                zg.array("i_target_forward", itf_final, **params_seg)
+                zg.array("pct_target_forward", ptf_final, **params_pct)
+
+        if advection_mode in ["backward", "both"]:
+            res = res + [itb_final, ptb_final]
+            if output_name is not None:
+                zg.array("i_target_backward", itb_final, **params_seg)
+                zg.array("pct_target_backward", ptb_final, **params_pct)
+
+        return res
 
 
 class Network:

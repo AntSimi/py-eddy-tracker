@@ -2264,6 +2264,16 @@ class GridCollection:
             new.datasets.append((t, d))
         return new
 
+    def shift_files(self, t, filename, x_name, y_name, indexs, heigth):
+        """Add next file to the list and remove the oldest"""
+
+        self.datasets = self.datasets[1:]
+
+        d = RegularGridDataset(filename, x_name, y_name, indexs=indexs)
+        if heigth is not None:
+            d.add_uv(heigth)
+        self.datasets.append((t, d))
+
     def interp(self, grid_name, t, lons, lats, method="bilinear"):
         """
         Compute z over lons, lats

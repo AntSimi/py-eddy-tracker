@@ -2045,7 +2045,7 @@ class EddiesObservations(object):
 
     def contains(self, x, y, intern=False):
         """
-        Return index of contour which contain (x,y)
+        Return index of contour containing (x,y)
 
         :param array x: longitude
         :param array y: latitude
