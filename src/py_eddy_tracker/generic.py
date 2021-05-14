@@ -70,8 +70,9 @@ def build_index(groups):
     :param array groups: array that contains groups to be separated
     :return: (first_index of each group, last_index of each group, value to shift groups)
     :rtype: (array, array, int)
-    Examples
-    --------
+
+    :Example:
+
     >>> build_index(array((1, 1, 3, 4, 4)))
     (array([0, 2, 2, 3]), array([2, 2, 3, 5]), 1)
     """

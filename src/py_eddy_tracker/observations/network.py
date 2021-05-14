@@ -221,7 +221,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         :param TrackEddiesObservations group_dataset: Group dataset
         :param indexs: result from split_network
-        return NetworkObservations
+        :return: NetworkObservations
         """
         index_order = indexs.argsort(order=("group", "track", "time"))
         network = cls.new_like(group_dataset, len(group_dataset), **kwargs)
@@ -1598,8 +1598,8 @@ class Network:
         :param int nb: size of translator
         :param set((int, int)) duos: set of all groups that must be joined
 
-        Examples
-        --------
+        :Example:
+
         >>> NetworkObservations.group_translator(5, ((0, 1), (0, 2), (1, 3)))
         [3, 3, 3, 3, 5]
         """

@@ -717,6 +717,7 @@ def visvalingam(x, y, fixed_size=18):
     """Polygon simplification with visvalingam algorithm
 
     X, Y are considered like a polygon, the next point after the last one is the first one
+
     :param array x:
     :param array y:
     :param int fixed_size: array size of out
