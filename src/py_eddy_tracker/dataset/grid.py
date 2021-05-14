@@ -2264,7 +2264,7 @@ class GridCollection:
             new.datasets.append((t, d))
         return new
 
-    def shift_files(self, t, filename, x_name, y_name, indexs, heigth):
+    def shift_files(self, t, filename, x_name, y_name, indexs=None, heigth=None):
         """Add next file to the list and remove the oldest"""
 
         self.datasets = self.datasets[1:]
@@ -2553,8 +2553,8 @@ def get_uv_quad(i0, j0, u, v, m, nb_x=0):
         i1 %= nb_x
     i_max, j_max = m.shape
 
-    # if i1 >= i_max or j1 >= j_max:
-    #     return True, nan, nan, nan, nan, nan, nan, nan, nan
+    if i1 >= i_max or j1 >= j_max:
+        return True, nan, nan, nan, nan, nan, nan, nan, nan
 
     if m[i0, j0] or m[i0, j1] or m[i1, j0] or m[i1, j1]:
         return True, nan, nan, nan, nan, nan, nan, nan, nan

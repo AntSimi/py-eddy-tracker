@@ -17,6 +17,7 @@ from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection
 from py_eddy_tracker.observations.network import NetworkObservations
+from py_eddy_tracker.observations.groups import particle_candidate
 from py_eddy_tracker.poly import group_obs
 
 start_logger().setLevel("ERROR")
@@ -125,81 +126,6 @@ ani = VideoAnimation(a.fig, update, frames=arange(20200, 20269, step), interval=
 
 
 # %%
-# In which observations are the particle
-# --------------------------------------
-def advect(x, y, c, t0, delta_t):
-    """
-    Advect particle from t0 to t0 + delta_t, with data cube.
-    """
-    kw = dict(nb_step=6, time_step=86400 / 6)
-    if delta_t < 0:
-        kw["backward"] = True
-        delta_t = -delta_t
-    p = c.advect(x, y, "u", "v", t_init=t0, **kw)
-    for _ in range(delta_t):
-        t, x, y = p.__next__()
-    return t, x, y
-
-
-def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
-    # Obs from initial time
-    m_start = eddies.time == t_start
-    e = eddies.extract_with_mask(m_start)
-    # to be able to get global index
-    translate_start = where(m_start)[0]
-    # Identify particle in eddies (only in core)
-    i_start = e.contains(x, y, intern=True)
-    m = i_start != -1
-    x, y, i_start = x[m], y[m], i_start[m]
-    # Advect
-    t_end, x, y = advect(x, y, c, t_start, **kwargs)
-    # eddies at last date
-    m_end = eddies.time == t_end / 86400
-    e_end = eddies.extract_with_mask(m_end)
-    # to be able to get global index
-    translate_end = where(m_end)[0]
-    # Id eddies for each alive particle (in core and extern)
-    i_end = e_end.contains(x, y)
-    # compute matrix and fill target array
-    get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
-
-
-@njit(cache=True)
-def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
-    nb_start, nb_end = translate_start.size, translate_end.size
-    # Matrix which will store count for every couple
-    count = zeros((nb_start, nb_end), dtype=nb_types.int32)
-    # Number of particles in each origin observation
-    ref = zeros(nb_start, dtype=nb_types.int32)
-    # For each particle
-    for i in range(i_start.size):
-        i_end_ = i_end[i]
-        i_start_ = i_start[i]
-        if i_end_ != -1:
-            count[i_start_, i_end_] += 1
-        ref[i_start_] += 1
-    for i in range(nb_start):
-        for j in range(nb_end):
-            pct_ = count[i, j]
-            # If there are particles from i to j
-            if pct_ != 0:
-                # Get percent
-                pct_ = pct_ / ref[i] * 100.0
-                # Get indices in full dataset
-                i_, j_ = translate_start[i], translate_end[j]
-                pct_0 = pct[i_, 0]
-                if pct_ > pct_0:
-                    pct[i_, 1] = pct_0
-                    pct[i_, 0] = pct_
-                    i_target[i_, 1] = i_target[i_, 0]
-                    i_target[i_, 0] = j_
-                elif pct_ > pct[i_, 1]:
-                    pct[i_, 1] = pct_
-                    i_target[i_, 1] = j_
-    return i_target, pct
-
-
-# %%
 # Particle advection
 # ^^^^^^^^^^^^^^^^^^
 step = 1 / 60.0
@@ -217,12 +143,12 @@ shape = (n.obs.size, 2)
 # Forward run
 i_target_f, pct_target_f = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
 for t in range(t_start, t_end - dt):
-    particle_candidate(x0, y0, c, n, t, i_target_f, pct_target_f, delta_t=dt)
+    particle_candidate(x0, y0, c, n, t, i_target_f, pct_target_f, n_days=dt)
 
 # Backward run
 i_target_b, pct_target_b = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
 for t in range(t_start + dt, t_end):
-    particle_candidate(x0, y0, c, n, t, i_target_b, pct_target_b, delta_t=-dt)
+    particle_candidate(x0, y0, c, n, t, i_target_b, pct_target_b, n_days=-dt)
 
 # %%
 fig = plt.figure(figsize=(10, 10))

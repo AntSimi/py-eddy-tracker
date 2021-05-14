@@ -27,7 +27,7 @@ import zarr
 
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap, group_obs
-from .groups import GroupEddiesObservations, get_missing_indices
+from .groups import GroupEddiesObservations, get_missing_indices, particle_candidate
 from .observation import EddiesObservations
 from .tracking import TrackEddiesObservations, track_loess_filter, track_median_filter
 from ..dataset.grid import GridCollection
@@ -101,109 +101,6 @@ def fix_next_previous_obs(next_obs, previous_obs, flag_virtual):
         previous_obs[i_o + 1] = i_o
 
 
-def advect(x, y, c, t0, delta_t):
-    """
-    Advect particle from t0 to t0 + delta_t, with data cube.
-
-    :param np.array(float) x: longitude of particles
-    :param np.array(float) y: latitude  of particles
-    :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
-    :param int t0: julian day of advection start
-    :param int delta_t: number of days to advect
-    """
-
-    kw = dict(nb_step=6, time_step=86400 / 6)
-    if delta_t < 0:
-        kw["backward"] = True
-        delta_t = -delta_t
-    p = c.advect(x, y, "u", "v", t_init=t0, **kw)
-    for _ in range(delta_t):
-        t, x, y = p.__next__()
-    return t, x, y
-
-
-def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
-    """Select particles within eddies, advect them, return target observation and associated percentages
-
-    :param np.array(float) x: longitude of particles
-    :param np.array(float) y: latitude  of particles
-    :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
-    :param NetworkObservations eddies: NetworkObservations considered
-    :param int t_start: julian day of the advection
-    :param np.array(int) i_target: corresponding obs where particles are advected
-    :param np.array(int) pct: corresponding percentage of avected particles
-    :params dict kwargs: dict of params given to `advect`
-    """
-
-    # Obs from initial time
-    m_start = eddies.time == t_start
-
-    e = eddies.extract_with_mask(m_start)
-    # to be able to get global index
-    translate_start = where(m_start)[0]
-    # Identify particle in eddies (only in core)
-    i_start = e.contains(x, y, intern=True)
-    m = i_start != -1
-
-    x, y, i_start = x[m], y[m], i_start[m]
-    # Advect
-    t_end, x, y = advect(x, y, c, t_start, **kwargs)
-    # eddies at last date
-    m_end = eddies.time == t_end / 86400
-    e_end = eddies.extract_with_mask(m_end)
-    # to be able to get global index
-    translate_end = where(m_end)[0]
-    # Id eddies for each alive particle (in core and extern)
-    i_end = e_end.contains(x, y)
-    # compute matrix and fill target array
-    get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
-
-
-@njit(cache=True)
-def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
-    """Compute target observation and associated percentages
-
-    :param np.array(int) i_start: indices of associated contours at starting advection day
-    :param np.array(int) i_end: indices of associated contours after advection
-    :param np.array(int) translate_start: corresponding global indices at starting advection day
-    :param np.array(int) translate_end: corresponding global indices after advection
-    :param np.array(int) i_target: corresponding obs where particles are advected
-    :param np.array(int) pct: corresponding percentage of avected particles
-    """
-
-    nb_start, nb_end = translate_start.size, translate_end.size
-    # Matrix which will store count for every couple
-    count = zeros((nb_start, nb_end), dtype=nb_types.int32)
-    # Number of particles in each origin observation
-    ref = zeros(nb_start, dtype=nb_types.int32)
-    # For each particle
-    for i in range(i_start.size):
-        i_end_ = i_end[i]
-        i_start_ = i_start[i]
-        if i_end_ != -1:
-            count[i_start_, i_end_] += 1
-        ref[i_start_] += 1
-    for i in range(nb_start):
-        for j in range(nb_end):
-            pct_ = count[i, j]
-            # If there are particles from i to j
-            if pct_ != 0:
-                # Get percent
-                pct_ = pct_ / ref[i] * 100.0
-                # Get indices in full dataset
-                i_, j_ = translate_start[i], translate_end[j]
-                pct_0 = pct[i_, 0]
-                if pct_ > pct_0:
-                    pct[i_, 1] = pct_0
-                    pct[i_, 0] = pct_
-                    i_target[i_, 1] = i_target[i_, 0]
-                    i_target[i_, 0] = j_
-                elif pct_ > pct[i_, 1]:
-                    pct[i_, 1] = pct_
-                    i_target[i_, 1] = j_
-    return i_target, pct
-
-
 class NetworkObservations(GroupEddiesObservations):
 
     __slots__ = ("_index_network",)
@@ -221,11 +118,9 @@ class NetworkObservations(GroupEddiesObservations):
         :param int obs: index of observation after the event
         :param int stopped: index of observation before the event
         :param int order: order of relatives accepted
-
         :return: all relative segments
         :rtype: EddiesObservations
         """
-
 
         # extraction of network where the event is
         network_id = self.tracks[obs]
@@ -1491,19 +1386,24 @@ class NetworkObservations(GroupEddiesObservations):
         Percentage of particules and their targets after forward or/and backward advection from a specific eddy.
 
         :param callable date_function: python function, takes as param `int` (julian day) and return
-            data filename associated to the date
-            ex:
-                def date2file(julian_day):
-                    date = datetime.timedelta(days=julian_day) + datetime.datetime(1950, 1, 1)
-
-                    return f"/tmp/dt_global_allsat_phy_l4_{date.strftime('%Y%m%d')}.nc"
-
+            data filename associated to the date (see note)
         :param dict uv_params: dict of parameters used by
             :py:meth:`~py_eddy_tracker.dataset.grid.GridCollection.from_netcdf_list`
         :param str advection_mode: "backward", "forward" or "both"
         :param int dt_advect: days for advection
         :param float step_mesh: step for particule mesh in degrees
         :param str output_name: if not None, name of file saved in zarr. Else, data will not be saved
+        :return: list of 2 or 4 array (depending if forward, backward or both) with segment matchs, and percents
+
+        .. note:: the param `date_function` should be something like :
+
+            .. code-block:: python
+
+                def date2file(julian_day):
+                    date = datetime.timedelta(days=julian_day) + datetime.datetime(1950, 1, 1)
+
+                    return f"/tmp/dt_global_allsat_phy_l4_{date.strftime('%Y%m%d')}.nc"
+
         """
 
         if advection_mode in ["both", "forward"]:
@@ -1591,7 +1491,7 @@ class NetworkObservations(GroupEddiesObservations):
                         x0,
                         y0,
                         c,
-                        self,
+                        sub_networks,
                         _t,
                         i_target_b,
                         pct_target_b,
