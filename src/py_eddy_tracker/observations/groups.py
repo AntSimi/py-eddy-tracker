@@ -1,8 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
 
-from numba import njit, types as nb_types
-from numpy import arange, int32, interp, median, zeros, where
+from numba import njit
+from numba import types as nb_types
+from numpy import arange, int32, interp, median, where, zeros
 
 from .observation import EddiesObservations
 
@@ -63,7 +64,6 @@ def get_missing_indices(
                 indices[j] = i + 1
                 j += 1
     return indices
-
 
 
 def advect(x, y, c, t0, n_days):

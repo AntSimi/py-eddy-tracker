@@ -2264,12 +2264,12 @@ class GridCollection:
             new.datasets.append((t, d))
         return new
 
-    def shift_files(self, t, filename, x_name, y_name, indexs=None, heigth=None):
+    def shift_files(self, t, filename, heigth=None, **rgd_kwargs):
         """Add next file to the list and remove the oldest"""
 
         self.datasets = self.datasets[1:]
 
-        d = RegularGridDataset(filename, x_name, y_name, indexs=indexs)
+        d = RegularGridDataset(filename, **rgd_kwargs)
         if heigth is not None:
             d.add_uv(heigth)
         self.datasets.append((t, d))

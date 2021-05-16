@@ -8,16 +8,14 @@ import re
 from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
-from numba import njit
-from numba import types as nb_types
-from numpy import arange, meshgrid, ones, unique, where, zeros
+from numpy import arange, meshgrid, ones, unique, zeros
 
 from py_eddy_tracker import start_logger
 from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection
-from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.observations.groups import particle_candidate
+from py_eddy_tracker.observations.network import NetworkObservations
 from py_eddy_tracker.poly import group_obs
 
 start_logger().setLevel("ERROR")

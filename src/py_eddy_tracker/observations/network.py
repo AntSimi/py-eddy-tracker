@@ -5,6 +5,7 @@ Class to create network of observations
 import logging
 from glob import glob
 
+import zarr
 from numba import njit
 from numba import types as nb_types
 from numpy import (
@@ -15,22 +16,21 @@ from numpy import (
     concatenate,
     empty,
     in1d,
+    meshgrid,
     ones,
     uint16,
     uint32,
     unique,
     where,
     zeros,
-    meshgrid,
 )
-import zarr
 
+from ..dataset.grid import GridCollection
 from ..generic import build_index, wrap_longitude
-from ..poly import bbox_intersection, vertice_overlap, group_obs
+from ..poly import bbox_intersection, group_obs, vertice_overlap
 from .groups import GroupEddiesObservations, get_missing_indices, particle_candidate
 from .observation import EddiesObservations
 from .tracking import TrackEddiesObservations, track_loess_filter, track_median_filter
-from ..dataset.grid import GridCollection
 
 logger = logging.getLogger("pet")
 
