@@ -14,14 +14,13 @@ from matplotlib import colors
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
-from numpy import arange, where, array, pi
+from numpy import arange, array, pi, where
 
 from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.data import get_demo_path
+from py_eddy_tracker.generic import coordinates_to_local
 from py_eddy_tracker.gui import GUI_AXES
 from py_eddy_tracker.observations.network import NetworkObservations
-
-from py_eddy_tracker.generic import coordinates_to_local
 from py_eddy_tracker.poly import fit_ellipse
 
 # %%
