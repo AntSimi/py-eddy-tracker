@@ -2056,7 +2056,8 @@ class EddiesObservations(object):
         xname, yname = self.intern(intern)
         m = ~(isnan(x) + isnan(y))
         i = -ones(x.shape, dtype="i4")
-        i[m] = poly_indexs(x[m], y[m], self[xname], self[yname])
+        if x.size != 0:
+            i[m] = poly_indexs(x[m], y[m], self[xname], self[yname])
         return i
 
     def inside(self, x, y, intern=False):
