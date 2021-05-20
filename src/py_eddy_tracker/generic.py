@@ -89,8 +89,7 @@ def build_index(groups):
             first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
     last_index = zeros(amplitude, dtype=numba_types.int_)
     last_index[:-1] = first_index[1:]
-    # + 2 because we iterate only until -2 and we want upper bound ( 1 + 1)
-    last_index[-1] = i + 2
+    last_index[-1] = len(groups)
     return first_index, last_index, i0
 
 
