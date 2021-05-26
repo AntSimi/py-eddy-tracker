@@ -2057,7 +2057,7 @@ class EddiesObservations(object):
         m = ~(isnan(x) + isnan(y))
         i = -ones(x.shape, dtype="i4")
 
-        if x.size != 0 and True in m:
+        if x.size != 0 and m.any():
             i[m] = poly_indexs(x[m], y[m], self[xname], self[yname])
         return i
 
