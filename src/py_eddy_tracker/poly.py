@@ -854,8 +854,8 @@ def poly_indexs(x_p, y_p, x_c, y_c):
     """
     Index of contour for each postion inside a contour, -1 in case of no contour
 
-    :param array x_p: longitude to test (must be define, no nan)
-    :param array y_p: latitude to test (must be define, no nan)
+    :param array x_p: longitude to test (must be defined, no nan)
+    :param array y_p: latitude to test (must be defined, no nan)
     :param array x_c: longitude of contours
     :param array y_c: latitude of contours
     """
