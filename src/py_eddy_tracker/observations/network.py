@@ -1464,7 +1464,7 @@ class NetworkObservations(GroupEddiesObservations):
                         _t,
                         i_target_f,
                         pct_target_f,
-                        delta_t=dt_advect,
+                        n_days=dt_advect,
                     )
 
                 itf_final[slice_track] = i_target_f
@@ -1495,7 +1495,7 @@ class NetworkObservations(GroupEddiesObservations):
                         _t,
                         i_target_b,
                         pct_target_b,
-                        delta_t=-dt_advect,
+                        n_days=-dt_advect,
                     )
 
                 itb_final[slice_track] = i_target_b
