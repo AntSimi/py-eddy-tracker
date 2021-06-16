@@ -26,7 +26,7 @@ Example of conf.yaml
 
     # Number of timestep for missing detection
     VIRTUAL_LENGTH_MAX: 3
-    # Minimal time to consider as a full track
+    # Minimal number of timesteps to consider as a long track
     TRACK_DURATION_MIN: 10
 
 To run:
@@ -69,7 +69,7 @@ With yaml you could also select another tracker:
 
     # Number of timesteps for missing detection
     VIRTUAL_LENGTH_MAX: 3
-    # Minimal time to consider as a full track
+    # Minimal number of timesteps to consider as a long track
     TRACK_DURATION_MIN: 10
 
     CLASS:

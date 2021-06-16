@@ -16,6 +16,7 @@ def id_parser():
     )
     parser.add_argument("filename_in")
     parser.add_argument("filename_out")
+    parser.add_argument("--unraw", action="store_true", help="Load unraw data")
     return parser
 
 
@@ -32,10 +33,10 @@ def get_variable_name(filename):
         return list(h.keys())
 
 
-def get_variable(filename, varname):
+def get_variable(filename, varname, raw=True):
     if is_nc(filename):
         dataset = EddiesObservations.load_from_netcdf(
-            filename, raw_data=True, include_vars=(varname,)
+            filename, raw_data=raw, include_vars=(varname,)
         )
     else:
         dataset = EddiesObservations.load_from_zarr(filename, include_vars=(varname,))
@@ -49,8 +50,8 @@ if __name__ == "__main__":
     if not is_nc(args.filename_out):
         h = zarr.open(args.filename_out, "w")
         for varname in variables:
-            get_variable(args.filename_in, varname).to_zarr(h)
+            get_variable(args.filename_in, varname, raw=not args.unraw).to_zarr(h)
     else:
         with Dataset(args.filename_out, "w") as h:
             for varname in variables:
-                get_variable(args.filename_in, varname).to_netcdf(h)
+                get_variable(args.filename_in, varname, raw=not args.unraw).to_netcdf(h)

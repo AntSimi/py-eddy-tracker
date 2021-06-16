@@ -173,6 +173,8 @@ class TrackEddiesObservations(GroupEddiesObservations):
         - contour_lon_e (how to do if in raw)
         - contour_lon_s (how to do if in raw)
         """
+        if self.lon.size == 0:
+            return
         lon0 = (self.lon[self.index_from_track] - 180).repeat(self.nb_obs_by_track)
         logger.debug("Normalize longitude")
         self.lon[:] = (self.lon - lon0) % 360 + lon0
@@ -228,12 +230,13 @@ class TrackEddiesObservations(GroupEddiesObservations):
         )
         h_nc.date_created = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
         t = h_nc.variables[VAR_DESCR_inv["j1"]]
-        delta = t.max - t.min + 1
-        h_nc.time_coverage_duration = "P%dD" % delta
-        d_start = datetime(1950, 1, 1) + timedelta(int(t.min))
-        d_end = datetime(1950, 1, 1) + timedelta(int(t.max))
-        h_nc.time_coverage_start = d_start.strftime("%Y-%m-%dT00:00:00Z")
-        h_nc.time_coverage_end = d_end.strftime("%Y-%m-%dT00:00:00Z")
+        if t.size:
+            delta = t.max - t.min + 1
+            h_nc.time_coverage_duration = "P%dD" % delta
+            d_start = datetime(1950, 1, 1) + timedelta(int(t.min))
+            d_end = datetime(1950, 1, 1) + timedelta(int(t.max))
+            h_nc.time_coverage_start = d_start.strftime("%Y-%m-%dT00:00:00Z")
+            h_nc.time_coverage_end = d_end.strftime("%Y-%m-%dT00:00:00Z")
 
     def extract_with_period(self, period, **kwargs):
         """

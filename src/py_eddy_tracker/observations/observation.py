@@ -1328,6 +1328,8 @@ class EddiesObservations(object):
     def solve_simultaneous(cost):
         """Write something (TODO)"""
         mask = ~cost.mask
+        if mask.size == 0:
+            return mask
         # Count number of links by self obs and other obs
         self_links, other_links = sum_row_column(mask)
         max_links = max(self_links.max(), other_links.max())

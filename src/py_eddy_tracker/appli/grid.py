@@ -5,7 +5,7 @@ All entry point to manipulate grid
 from argparse import Action
 from datetime import datetime
 
-from .. import EddyParser
+from .. import TIME_MODELS, EddyParser
 from ..dataset.grid import RegularGridDataset, UnRegularGridDataset
 
 
@@ -121,7 +121,16 @@ def eddy_id(args=None):
         cut_wavelength = [0, *cut_wavelength]
     inf_bnds, upper_bnds = cut_wavelength
 
-    date = datetime.strptime(args.datetime, "%Y%m%d")
+    model_found = False
+    for model in TIME_MODELS:
+        try:
+            date = datetime.strptime(args.datetime, model)
+            model_found = True
+            break
+        except ValueError:
+            pass
+    if not model_found:
+        raise Exception("No time model found")
     kwargs = dict(
         step=args.isoline_step,
         shape_error=args.fit_errmax,
@@ -150,7 +159,7 @@ def eddy_id(args=None):
         sampling_method=args.sampling_method,
         **kwargs,
     )
-    out_name = date.strftime("%(path)s/%(sign_type)s_%Y%m%d.nc")
+    out_name = date.strftime("%(path)s/%(sign_type)s_%Y%m%dT%H%M%S.nc")
     a.write_file(path=args.path_out, filename=out_name, zarr_flag=args.zarr)
     c.write_file(path=args.path_out, filename=out_name, zarr_flag=args.zarr)
 

@@ -106,12 +106,17 @@ class EddyParser(ArgumentParser):
         return opts
 
 
+TIME_MODELS = ["%Y%m%d", "%Y%m%d%H%M%S", "%Y%m%dT%H%M%S"]
+
+
 VAR_DESCR = dict(
     time=dict(
         attr_name="time",
         nc_name="time",
         old_nc_name=["j1"],
-        nc_type="int32",
+        nc_type="float64",
+        output_type="uint32",
+        scale_factor=1 / 86400.0,
         nc_dims=("obs",),
         nc_attr=dict(
             standard_name="time",

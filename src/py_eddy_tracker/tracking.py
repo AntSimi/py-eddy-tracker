@@ -161,10 +161,10 @@ class Correspondances(list):
 
         """
         date_start = datetime(1950, 1, 1) + timedelta(
-            int(self.class_method.load_file(self.datasets[0]).time[0])
+            self.class_method.load_file(self.datasets[0]).time[0]
         )
         date_stop = datetime(1950, 1, 1) + timedelta(
-            int(self.class_method.load_file(self.datasets[-1]).time[0])
+            self.class_method.load_file(self.datasets[-1]).time[0]
         )
         return date_start, date_stop
 
@@ -584,7 +584,10 @@ class Correspondances(list):
     def longer_than(self, size_min):
         """Remove from correspondance table all association for shorter eddies than size_min"""
         # Identify eddies longer than
-        i_keep_track = where(self.nb_obs_by_tracks >= size_min)[0]
+        mask = self.nb_obs_by_tracks >= size_min
+        if not mask.any():
+            return False
+        i_keep_track = where(mask)[0]
         # Reduce array
         self.nb_obs_by_tracks = self.nb_obs_by_tracks[i_keep_track]
         self.i_current_by_tracks = (

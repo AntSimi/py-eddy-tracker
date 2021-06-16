@@ -15,7 +15,7 @@ from netCDF4 import Dataset
 from numpy import bincount, bytes_, empty, in1d, unique
 from yaml import safe_load
 
-from .. import EddyParser
+from .. import TIME_MODELS, EddyParser
 from ..observations.observation import EddiesObservations, reverse_index
 from ..observations.tracking import TrackEddiesObservations
 from ..tracking import Correspondances
@@ -223,7 +223,7 @@ def browse_dataset_in(
     data_dir,
     files_model,
     date_regexp,
-    date_model,
+    date_model=None,
     start_date=None,
     end_date=None,
     sub_sampling_step=1,
@@ -238,11 +238,7 @@ def browse_dataset_in(
         filenames = bytes_(glob(full_path))
 
     dataset_list = empty(
-        len(filenames),
-        dtype=[
-            ("filename", "S500"),
-            ("date", "datetime64[D]"),
-        ],
+        len(filenames), dtype=[("filename", "S500"), ("date", "datetime64[s]")],
     )
     dataset_list["filename"] = filenames
 
@@ -268,10 +264,21 @@ def browse_dataset_in(
                 str_date = result.groups()[0]
 
         if str_date is not None:
-            item["date"] = datetime.strptime(str_date, date_model).date()
+            if date_model is None:
+                model_found = False
+                for model in TIME_MODELS:
+                    try:
+                        item["date"] = datetime.strptime(str_date, model)
+                        model_found = True
+                        break
+                    except ValueError:
+                        pass
+                if not model_found:
+                    raise Exception("No time model found")
+            else:
+                item["date"] = datetime.strptime(str_date, date_model)
 
     dataset_list.sort(order=["date", "filename"])
-
     steps = unique(dataset_list["date"][1:] - dataset_list["date"][:-1])
     if len(steps) > 1:
         raise Exception("Several days steps in grid dataset %s" % steps)
@@ -304,7 +311,7 @@ def track(
     correspondances_only=False,
     **kw_c,
 ):
-    kw = dict(date_regexp=".*_([0-9]*?).[nz].*", date_model="%Y%m%d")
+    kw = dict(date_regexp=".*_([0-9]*?).[nz].*")
     if isinstance(pattern, list):
         kw.update(dict(data_dir=None, files_model=None, files=pattern))
     else:
@@ -323,10 +330,9 @@ def track(
     c = Correspondances(datasets=datasets["filename"], **kw_c)
     c.track()
     logger.info("Track finish")
-    t0, t1 = c.period
     kw_save = dict(
-        date_start=t0,
-        date_stop=t1,
+        date_start=datasets["date"][0],
+        date_stop=datasets["date"][-1],
         date_prod=datetime.now(),
         path=output_dir,
         sign_type=c.current_obs.sign_legend,
@@ -351,10 +357,12 @@ def track(
 
     short_c = c._copy()
     short_c.shorter_than(size_max=nb_obs_min)
-    c.longer_than(size_min=nb_obs_min)
-
-    long_track = c.merge(raw_data=raw)
     short_track = short_c.merge(raw_data=raw)
+
+    if c.longer_than(size_min=nb_obs_min) is False:
+        long_track = short_track.empty_dataset()
+    else:
+        long_track = c.merge(raw_data=raw)
 
     # We flag obs
     if c.virtual:
