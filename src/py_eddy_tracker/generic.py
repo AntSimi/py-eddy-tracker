@@ -309,7 +309,7 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     :param array_like x_val: input x contour coordinates
     :param array_like y_val: input y contour coordinates
     :param int num_fac: factor to increase lengths of output coordinates
-    :param int,None fixed_size: if define, it will used to set sampling
+    :param int,None fixed_size: if defined, will be used to set sampling
     """
     nb = x_val.shape[0]
     # Get distances
