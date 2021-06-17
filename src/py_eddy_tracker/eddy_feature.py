@@ -65,7 +65,7 @@ class Amplitude(object):
         :param float contour_height:
         :param array data:
         :param float interval:
-        :param int mle: maximum number of local maxima in contour
+        :param int mle: maximum number of local extrema in contour
         :param int nb_step_min: number of intervals to consider an eddy
         :param int nb_step_to_be_mle: number of intervals to be considered as an another maxima
         """
