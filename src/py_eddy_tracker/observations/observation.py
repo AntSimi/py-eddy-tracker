@@ -723,6 +723,7 @@ class EddiesObservations(object):
             zarr_file = filename_.endswith(end)
         else:
             zarr_file = False
+        logger.info(f"loading file '{filename}'")
         if zarr_file:
             return cls.load_from_zarr(filename, **kwargs)
         else:

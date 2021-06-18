@@ -12,8 +12,11 @@ Changed
 ^^^^^^^
 Fixed
 ^^^^^
+- GridCollection get_next_time_step & get_previous_time_step needed more files to work in the dataset list.
+  The loop needed explicitly self.dataset[i+-1] even when i==0, therefore indice went out of range
 Added
 ^^^^^
+
 
 [3.4.0] - 2021-03-29
 --------------------

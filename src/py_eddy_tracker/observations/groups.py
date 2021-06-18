@@ -3,9 +3,10 @@ from abc import ABC, abstractmethod
 
 from numba import njit
 from numba import types as nb_types
-from numpy import arange, int32, interp, median, where, zeros
+from numpy import arange, int32, interp, median, where, zeros, meshgrid, concatenate
 
 from .observation import EddiesObservations
+from ..poly import group_obs
 
 logger = logging.getLogger("pet")
 
@@ -87,7 +88,53 @@ def advect(x, y, c, t0, n_days):
     return t, x, y
 
 
-def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
+def create_particles(eddies, step):
+    """create particles only inside speed contour. Avoir creating too large numpy arrays, only to me masked
+
+    :param eddies: network where eddies are
+    :type eddies: network
+    :param step: step for particles
+    :type step: float
+    :return: lon, lat and indices of particles in contour speed
+    :rtype: tuple(np.array)
+    """
+
+    lon = eddies.contour_lon_s
+    lat = eddies.contour_lat_s
+
+    # compute bounding boxes of each eddies
+    lonMins = lon.min(axis=1)
+    lonMins = lonMins - (lonMins % step)
+    lonMaxs = lon.max(axis=1)
+    lonMaxs = lonMaxs - (lonMaxs % step) + step * 2
+
+    latMins = lat.min(axis=1)
+    latMins = latMins - (latMins % step)
+    latMaxs = lat.max(axis=1)
+    latMaxs = latMaxs - (latMaxs % step) + step * 2
+
+    lon = []
+    lat = []
+    # for each eddies, create mesh with particles then concatenate
+    for lonMin, lonMax, latMin, latMax in zip(lonMins, lonMaxs, latMins, latMaxs):
+        x0, y0 = meshgrid(arange(lonMin, lonMax, step), arange(latMin, latMax, step))
+
+        x0, y0 = x0.reshape(-1), y0.reshape(-1)
+        lon.append(x0)
+        lat.append(y0)
+
+    x = concatenate(lon)
+    y = concatenate(lat)
+
+    _, i = group_obs(x, y, 1, 360)
+    x, y = x[i], y[i]
+
+    i_start = eddies.contains(x, y, intern=True)
+    m = i_start != -1
+    return x[m], y[m], i_start[m]
+
+
+def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     """Select particles within eddies, advect them, return target observation and associated percentages
 
     :param np.array(float) x: longitude of particles
@@ -100,27 +147,28 @@ def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
     :params dict kwargs: dict of params given to `advect`
 
     """
-
     # Obs from initial time
     m_start = eddies.time == t_start
-
     e = eddies.extract_with_mask(m_start)
+
     # to be able to get global index
     translate_start = where(m_start)[0]
-    # Identify particle in eddies (only in core)
-    i_start = e.contains(x, y, intern=True)
-    m = i_start != -1
 
-    x, y, i_start = x[m], y[m], i_start[m]
-    # Advect
+    x, y, i_start = create_particles(e, step_mesh)
+
+    # Advection
     t_end, x, y = advect(x, y, c, t_start, **kwargs)
+
     # eddies at last date
     m_end = eddies.time == t_end / 86400
     e_end = eddies.extract_with_mask(m_end)
+
     # to be able to get global index
     translate_end = where(m_end)[0]
+
     # Id eddies for each alive particle (in core and extern)
     i_end = e_end.contains(x, y)
+
     # compute matrix and fill target array
     get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
 

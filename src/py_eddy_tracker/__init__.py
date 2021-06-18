@@ -32,9 +32,7 @@ del get_versions
 
 
 def start_logger():
-    FORMAT_LOG = (
-        "%(levelname)-8s %(asctime)s %(module)s.%(funcName)s :\n\t\t\t\t\t%(message)s"
-    )
+    FORMAT_LOG = "%(levelname)-8s %(asctime)s %(module)s.%(funcName)s :\n\t%(message)s"
     logger = logging.getLogger("pet")
     if len(logger.handlers) == 0:
         # set up logging to CONSOLE
