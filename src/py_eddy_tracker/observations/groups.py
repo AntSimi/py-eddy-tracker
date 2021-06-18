@@ -100,7 +100,6 @@ def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
     :params dict kwargs: dict of params given to `advect`
 
     """
-
     # Obs from initial time
     m_start = eddies.time == t_start
 

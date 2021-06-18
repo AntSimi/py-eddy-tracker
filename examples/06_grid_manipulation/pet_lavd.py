@@ -142,8 +142,9 @@ def update(i_frame):
 
 kw_video = dict(frames=arange(nb_time), interval=1000.0 / step_by_day / 2, blit=True)
 fig, ax, txt = start_ax(dpi=60)
-x_g_, y_g_ = arange(0 - step / 2, 36 + step / 2, step), arange(
-    28 - step / 2, 46 + step / 2, step
+x_g_, y_g_ = (
+    arange(0 - step / 2, 36 + step / 2, step),
+    arange(28 - step / 2, 46 + step / 2, step),
 )
 # pcolorfast will be faster than pcolormesh, we could use pcolorfast due to x and y are regular
 pcolormesh = ax.pcolorfast(x_g_, y_g_, lavd, **kw_vorticity)
@@ -158,11 +159,7 @@ _ = VideoAnimation(ax.figure, update, **kw_video)
 # Format LAVD data
 lavd = RegularGridDataset.with_array(
     coordinates=("lon", "lat"),
-    datas=dict(
-        lavd=lavd.T,
-        lon=x_g,
-        lat=y_g,
-    ),
+    datas=dict(lavd=lavd.T, lon=x_g, lat=y_g,),
     centered=True,
 )
 
