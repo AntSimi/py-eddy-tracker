@@ -137,8 +137,6 @@ def create_particles(eddies, step):
 def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     """Select particles within eddies, advect them, return target observation and associated percentages
 
-    :param np.array(float) x: longitude of particles
-    :param np.array(float) y: latitude  of particles
     :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
     :param GroupEddiesObservations eddies: GroupEddiesObservations considered
     :param int t_start: julian day of the advection
