@@ -617,7 +617,10 @@ class GridDataset(object):
         :param float,None precision: Truncate values at the defined precision in m
         :param str force_height_unit: Unit used for height unit
         :param str force_speed_unit: Unit used for speed unit
-        :param dict kwargs: Argument given to amplitude
+        :param dict kwargs: Arguments given to amplitude (mle, nb_step_min, nb_step_to_be_mle).
+            Look at :py:meth:`py_eddy_tracker.eddy_feature.Amplitude`
+            The amplitude threshold is given by `step*nb_step_min`
+
 
         :return: Return a list of 2 elements: Anticyclones and Cyclones
         :rtype: py_eddy_tracker.observations.observation.EddiesObservations

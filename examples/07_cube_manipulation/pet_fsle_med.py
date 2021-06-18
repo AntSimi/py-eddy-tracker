@@ -14,7 +14,7 @@ Example use a method similar to `AVISO flse`_
 
 from matplotlib import pyplot as plt
 from numba import njit
-from numpy import arange, arctan2, empty, isnan, log2, ma, meshgrid, ones, pi, zeros
+from numpy import arange, arctan2, empty, isnan, log, ma, meshgrid, ones, pi, zeros
 
 from py_eddy_tracker import start_logger
 from py_eddy_tracker.data import get_demo_path
@@ -71,7 +71,7 @@ def check_p(x, y, flse, theta, m_set, m, dt, dist_init=0.02, dist_max=0.6):
             s2 = ((dxn + dye) ** 2 + (dxe - dyn) ** 2) * (
                 (dxn - dye) ** 2 + (dxe + dyn) ** 2
             )
-            flse[i] = 1 / (2 * dt) * log2(1 / (2 * dist_init ** 2) * (s1 + s2 ** 0.5))
+            flse[i] = 1 / (2 * dt) * log(1 / (2 * dist_init ** 2) * (s1 + s2 ** 0.5))
             theta[i] = arctan2(at1, at2 + s2) * 180 / pi
             # To know where value are set
             m_set[i] = False
@@ -180,7 +180,7 @@ ax = fig.add_axes([0.03, 0.03, 0.90, 0.94])
 ax.set_xlim(-6, 36.5), ax.set_ylim(30, 46)
 ax.set_aspect("equal")
 ax.set_title("Finite size lyapunov exponent", weight="bold")
-kw = dict(cmap="viridis_r", vmin=-15, vmax=0)
+kw = dict(cmap="viridis_r", vmin=-20, vmax=0)
 m = fsle_custom.display(ax, 1 / fsle_custom.grid("fsle"), **kw)
 ax.grid()
 _ = plt.colorbar(m, cax=fig.add_axes([0.94, 0.05, 0.01, 0.9]))

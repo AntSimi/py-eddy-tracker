@@ -89,8 +89,7 @@ def build_index(groups):
             first_index[group - i0 + 1 : next_group - i0 + 1] = i + 1
     last_index = zeros(amplitude, dtype=numba_types.int_)
     last_index[:-1] = first_index[1:]
-    # + 2 because we iterate only until -2 and we want upper bound ( 1 + 1)
-    last_index[-1] = i + 2
+    last_index[-1] = len(groups)
     return first_index, last_index, i0
 
 
@@ -310,7 +309,7 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     :param array_like x_val: input x contour coordinates
     :param array_like y_val: input y contour coordinates
     :param int num_fac: factor to increase lengths of output coordinates
-    :param int,None fixed_size: if define, it will used to set sampling
+    :param int,None fixed_size: if defined, will be used to set sampling
     """
     nb = x_val.shape[0]
     # Get distances
