@@ -4,8 +4,9 @@ PATHS:
   # Path for saving of outputs
   SAVE_DIR: '/home/emason/toto/'
 
-# Minimum number of observations to store eddy
+# Minimal number of timesteps to consider as a long track
 TRACK_DURATION_MIN: 4
+# Number of timesteps for missing detection
 VIRTUAL_LENGTH_MAX: 0
 
 CLASS:

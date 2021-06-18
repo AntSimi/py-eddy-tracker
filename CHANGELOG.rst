@@ -13,6 +13,7 @@ Changed
 - Now time will be allow second precision in storage on uint32 from 01/01/1950 to 01/01/2086
   new identification will be produce with this type, old file could be still loaded.
   If you use old identification to track use `--unraw` option to unpack old time and store in new format.
+- Now amplitude is stored with .1 mm of precision, same advice than time.
 
 Fixed
 ^^^^^
