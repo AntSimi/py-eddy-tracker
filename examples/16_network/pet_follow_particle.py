@@ -133,12 +133,12 @@ dt = 14
 shape = (n.obs.size, 2)
 # Forward run
 i_target_f, pct_target_f = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
-for t in range(t_start, t_end - dt):
+for t in arange(t_start, t_end - dt):
     particle_candidate(c, n, step, t, i_target_f, pct_target_f, n_days=dt)
 
 # Backward run
 i_target_b, pct_target_b = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
-for t in range(t_start + dt, t_end):
+for t in arange(t_start + dt, t_end):
     particle_candidate(c, n, step, t, i_target_b, pct_target_b, n_days=-dt)
 
 # %%
