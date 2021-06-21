@@ -1472,9 +1472,10 @@ class NetworkObservations(GroupEddiesObservations):
             particle_candidate(
                 c, self, step_mesh, _t, itb_final, ptb_final, n_days=-n_days
             )
-            logger.info(
-                f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%}) : {time.time()-_timestamp:5.2f}s"
-            )
+            logger.info((
+                f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
+                f" : {time.time()-_timestamp:5.2f}s"
+            ))
 
         return itb_final, ptb_final
 
@@ -1535,9 +1536,10 @@ class NetworkObservations(GroupEddiesObservations):
             particle_candidate(
                 c, self, step_mesh, _t, itf_final, ptf_final, n_days=n_days
             )
-            logger.info(
-                f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%}) : {time.time()-_timestamp:5.2f}s"
-            )
+            logger.info((
+                f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
+                f" : {time.time()-_timestamp:5.2f}s"
+            ))
         return itf_final, ptf_final
 
 

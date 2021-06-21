@@ -89,7 +89,7 @@ def advect(x, y, c, t0, n_days):
 
 
 def create_particles(eddies, step):
-    """create particles only inside speed contour. Avoir creating too large numpy arrays, only to me masked
+    """create particles only inside speed contour. Avoid creating too large numpy arrays, only to me masked
 
     :param eddies: network where eddies are
     :type eddies: network
