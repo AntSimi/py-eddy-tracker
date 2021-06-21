@@ -367,8 +367,7 @@ def track(
 
     logger.info("Longer track saved have %d obs", c.nb_obs_by_tracks.max())
     logger.info(
-        "The mean length is %d observations for long track",
-        c.nb_obs_by_tracks.mean(),
+        "The mean length is %d observations for long track", c.nb_obs_by_tracks.mean(),
     )
 
     long_track.write_file(**kw_write)
@@ -378,14 +377,7 @@ def track(
 
 
 def get_group(
-    dataset1,
-    dataset2,
-    index1,
-    index2,
-    score,
-    invalid=2,
-    low=10,
-    high=60,
+    dataset1, dataset2, index1, index2, score, invalid=2, low=10, high=60,
 ):
     group1, group2 = dict(), dict()
     m_valid = (score * 100) >= invalid
@@ -494,8 +486,7 @@ def display_compare(
             ]
 
     labels = dict(
-        high=f"{high:0.0f} <= high",
-        low=f"{invalid:0.0f} <= low < {low:0.0f}",
+        high=f"{high:0.0f} <= high", low=f"{invalid:0.0f} <= low < {low:0.0f}",
     )
 
     keys = [labels.get(key, key) for key in list(gr_ref.values())[0].keys()]

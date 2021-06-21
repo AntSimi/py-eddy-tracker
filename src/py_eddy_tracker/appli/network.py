@@ -76,9 +76,7 @@ def subset_network():
         help="Remove short dead end, first is for minimal obs number and second for minimal segment time to keep",
     )
     parser.add_argument(
-        "--remove_trash",
-        action="store_true",
-        help="Remove trash (network id == 0)",
+        "--remove_trash", action="store_true", help="Remove trash (network id == 0)",
     )
     parser.add_argument(
         "-p",

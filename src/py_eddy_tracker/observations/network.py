@@ -679,13 +679,7 @@ class NetworkObservations(GroupEddiesObservations):
         """
         self.only_one_network()
         j = 0
-        line_kw = dict(
-            ls="-",
-            marker="+",
-            markersize=6,
-            zorder=1,
-            lw=3,
-        )
+        line_kw = dict(ls="-", marker="+", markersize=6, zorder=1, lw=3,)
         line_kw.update(kwargs)
         mappables = dict(lines=list())
 
@@ -918,10 +912,7 @@ class NetworkObservations(GroupEddiesObservations):
         """Add the merging and splitting events to a map"""
         j = 0
         mappables = dict()
-        symbol_kw = dict(
-            markersize=10,
-            color="k",
-        )
+        symbol_kw = dict(markersize=10, color="k",)
         symbol_kw.update(kwargs)
         symbol_kw_split = symbol_kw.copy()
         symbol_kw_split["markersize"] += 4
@@ -950,13 +941,7 @@ class NetworkObservations(GroupEddiesObservations):
         return mappables
 
     def scatter(
-        self,
-        ax,
-        name="time",
-        factor=1,
-        ref=None,
-        edgecolor_cycle=None,
-        **kwargs,
+        self, ax, name="time", factor=1, ref=None, edgecolor_cycle=None, **kwargs,
     ):
         """
         This function scatters the path of each network, with the merging and splitting events
@@ -1400,7 +1385,9 @@ class NetworkObservations(GroupEddiesObservations):
             .. code-block:: python
 
                 def date2file(julian_day):
-                    date = datetime.timedelta(days=julian_day) + datetime.datetime(1950, 1, 1)
+                    date = datetime.timedelta(days=julian_day) + datetime.datetime(
+                        1950, 1, 1
+                    )
 
                     return f"/tmp/dt_global_allsat_phy_l4_{date.strftime('%Y%m%d')}.nc"
 
