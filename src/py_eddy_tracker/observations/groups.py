@@ -3,9 +3,8 @@ from abc import ABC, abstractmethod
 
 from numba import njit
 from numba import types as nb_types
-from numpy import arange, array, int32, interp, median, where, zeros
+from numpy import arange, int32, interp, median, where, zeros
 
-from ..poly import create_vertice, reduce_size, winding_number_poly
 from .observation import EddiesObservations
 
 logger = logging.getLogger("pet")
@@ -88,41 +87,6 @@ def advect(x, y, c, t0, n_days):
     return t, x, y
 
 
-@njit(cache=True)
-def _create_meshed_particles(lons, lats, step):
-    x_out, y_out, i_out = list(), list(), list()
-    for i, (lon, lat) in enumerate(zip(lons, lats)):
-        lon_min, lon_max = lon.min(), lon.max()
-        lat_min, lat_max = lat.min(), lat.max()
-        lon_min -= lon_min % step
-        lon_max -= lon_max % step - step * 2
-        lat_min -= lat_min % step
-        lat_max -= lat_max % step - step * 2
-
-        for x in arange(lon_min, lon_max, step):
-            for y in arange(lat_min, lat_max, step):
-                if winding_number_poly(x, y, create_vertice(*reduce_size(lon, lat))):
-                    x_out.append(x), y_out.append(y), i_out.append(i)
-    return array(x_out), array(y_out), array(i_out)
-
-
-def create_particles(eddies, step):
-    """create particles only inside speed contour. Avoid creating too large numpy arrays, only to me masked
-
-    :param eddies: network where eddies are
-    :type eddies: network
-    :param step: step for particles
-    :type step: float
-    :return: lon, lat and indices of particles in contour speed
-    :rtype: tuple(np.array)
-    """
-
-    lon = eddies.contour_lon_s
-    lat = eddies.contour_lat_s
-
-    return _create_meshed_particles(lon, lat, step)
-
-
 def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     """Select particles within eddies, advect them, return target observation and associated percentages
 
@@ -141,7 +105,7 @@ def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     # to be able to get global index
     translate_start = where(m_start)[0]
 
-    x, y, i_start = create_particles(e, step_mesh)
+    x, y, i_start = e.create_particles(step_mesh)
 
     # Advection
     t_end, x, y = advect(x, y, c, t_start, **kwargs)
