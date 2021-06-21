@@ -16,7 +16,6 @@ from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection
 from py_eddy_tracker.observations.groups import particle_candidate
 from py_eddy_tracker.observations.network import NetworkObservations
-from py_eddy_tracker.poly import group_obs
 
 start_logger().setLevel("ERROR")
 
