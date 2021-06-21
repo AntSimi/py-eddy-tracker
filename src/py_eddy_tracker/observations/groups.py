@@ -3,10 +3,10 @@ from abc import ABC, abstractmethod
 
 from numba import njit
 from numba import types as nb_types
-from numpy import arange, int32, interp, median, where, zeros, meshgrid, concatenate
+from numpy import arange, array, int32, interp, median, where, zeros
 
+from ..poly import create_vertice, reduce_size, winding_number_poly
 from .observation import EddiesObservations
-from ..poly import group_obs
 
 logger = logging.getLogger("pet")
 
@@ -88,6 +88,24 @@ def advect(x, y, c, t0, n_days):
     return t, x, y
 
 
+@njit(cache=True)
+def _create_meshed_particles(lons, lats, step):
+    x_out, y_out, i_out = list(), list(), list()
+    for i, (lon, lat) in enumerate(zip(lons, lats)):
+        lon_min, lon_max = lon.min(), lon.max()
+        lat_min, lat_max = lat.min(), lat.max()
+        lon_min -= lon_min % step
+        lon_max -= lon_max % step - step * 2
+        lat_min -= lat_min % step
+        lat_max -= lat_max % step - step * 2
+
+        for x in arange(lon_min, lon_max, step):
+            for y in arange(lat_min, lat_max, step):
+                if winding_number_poly(x, y, create_vertice(*reduce_size(lon, lat))):
+                    x_out.append(x), y_out.append(y), i_out.append(i)
+    return array(x_out), array(y_out), array(i_out)
+
+
 def create_particles(eddies, step):
     """create particles only inside speed contour. Avoid creating too large numpy arrays, only to me masked
 
@@ -102,36 +120,7 @@ def create_particles(eddies, step):
     lon = eddies.contour_lon_s
     lat = eddies.contour_lat_s
 
-    # compute bounding boxes of each eddies
-    lonMins = lon.min(axis=1)
-    lonMins = lonMins - (lonMins % step)
-    lonMaxs = lon.max(axis=1)
-    lonMaxs = lonMaxs - (lonMaxs % step) + step * 2
-
-    latMins = lat.min(axis=1)
-    latMins = latMins - (latMins % step)
-    latMaxs = lat.max(axis=1)
-    latMaxs = latMaxs - (latMaxs % step) + step * 2
-
-    lon = []
-    lat = []
-    # for each eddies, create mesh with particles then concatenate
-    for lonMin, lonMax, latMin, latMax in zip(lonMins, lonMaxs, latMins, latMaxs):
-        x0, y0 = meshgrid(arange(lonMin, lonMax, step), arange(latMin, latMax, step))
-
-        x0, y0 = x0.reshape(-1), y0.reshape(-1)
-        lon.append(x0)
-        lat.append(y0)
-
-    x = concatenate(lon)
-    y = concatenate(lat)
-
-    _, i = group_obs(x, y, 1, 360)
-    x, y = x[i], y[i]
-
-    i_start = eddies.contains(x, y, intern=True)
-    m = i_start != -1
-    return x[m], y[m], i_start[m]
+    return _create_meshed_particles(lon, lat, step)
 
 
 def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
