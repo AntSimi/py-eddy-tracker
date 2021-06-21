@@ -27,7 +27,7 @@ start_logger().setLevel("ERROR")
 # ADT in med
 # ----------
 # :py:meth:`~py_eddy_tracker.dataset.grid.GridCollection.from_netcdf_cube` method is
-# made for data stores in time cube, you could use also 
+# made for data stores in time cube, you could use also
 # :py:meth:`~py_eddy_tracker.dataset.grid.GridCollection.from_netcdf_list` method to
 # load data-cube from multiple file.
 c = GridCollection.from_netcdf_cube(

@@ -407,20 +407,14 @@ VAR_DESCR = dict(
         nc_name="previous_cost",
         nc_type="float32",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Previous cost for previous observation",
-            comment="",
-        ),
+        nc_attr=dict(long_name="Previous cost for previous observation", comment="",),
     ),
     next_cost=dict(
         attr_name=None,
         nc_name="next_cost",
         nc_type="float32",
         nc_dims=("obs",),
-        nc_attr=dict(
-            long_name="Next cost for next observation",
-            comment="",
-        ),
+        nc_attr=dict(long_name="Next cost for next observation", comment="",),
     ),
     n=dict(
         attr_name=None,
@@ -631,8 +625,7 @@ VAR_DESCR = dict(
         nc_type="f4",
         nc_dims=("obs",),
         nc_attr=dict(
-            long_name="Log base 10 background chlorophyll",
-            units="Log(Chl/[mg/m^3])",
+            long_name="Log base 10 background chlorophyll", units="Log(Chl/[mg/m^3])",
         ),
     ),
     year=dict(
