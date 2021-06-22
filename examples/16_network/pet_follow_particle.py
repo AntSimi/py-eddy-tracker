@@ -16,7 +16,6 @@ from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.dataset.grid import GridCollection
 from py_eddy_tracker.observations.groups import particle_candidate
 from py_eddy_tracker.observations.network import NetworkObservations
-from py_eddy_tracker.poly import group_obs
 
 start_logger().setLevel("ERROR")
 
@@ -128,12 +127,6 @@ ani = VideoAnimation(a.fig, update, frames=arange(20200, 20269, step), interval=
 # ^^^^^^^^^^^^^^^^^^
 step = 1 / 60.0
 
-x, y = meshgrid(arange(24, 36, step), arange(31, 36, step))
-x0, y0 = x.reshape(-1), y.reshape(-1)
-# Pre-order to speed up
-_, i = group_obs(x0, y0, 1, 360)
-x0, y0 = x0[i], y0[i]
-
 t_start, t_end = n.period
 dt = 14
 
@@ -141,12 +134,12 @@ shape = (n.obs.size, 2)
 # Forward run
 i_target_f, pct_target_f = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
 for t in range(t_start, t_end - dt):
-    particle_candidate(x0, y0, c, n, t, i_target_f, pct_target_f, n_days=dt)
+    particle_candidate(c, n, step, t, i_target_f, pct_target_f, n_days=dt)
 
 # Backward run
 i_target_b, pct_target_b = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
 for t in range(t_start + dt, t_end):
-    particle_candidate(x0, y0, c, n, t, i_target_b, pct_target_b, n_days=-dt)
+    particle_candidate(c, n, step, t, i_target_b, pct_target_b, n_days=-dt)
 
 # %%
 fig = plt.figure(figsize=(10, 10))

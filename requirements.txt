@@ -1,6 +1,6 @@
 matplotlib
 netCDF4
-numba
+numba>=0.53
 numpy
 opencv-python
 pint

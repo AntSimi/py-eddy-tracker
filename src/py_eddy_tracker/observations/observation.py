@@ -69,6 +69,7 @@ from ..poly import (
     poly_indexs,
     reduce_size,
     vertice_overlap,
+    winding_number_poly
 )
 
 logger = logging.getLogger("pet")
@@ -719,6 +720,7 @@ class EddiesObservations(object):
             zarr_file = filename_.endswith(end)
         else:
             zarr_file = False
+        logger.info(f"loading file '{filename}'")
         if zarr_file:
             return cls.load_from_zarr(filename, **kwargs)
         else:
@@ -2273,6 +2275,19 @@ class EddiesObservations(object):
         """
         return self.period[1] - self.period[0] + 1
 
+    def create_particles(self, step, intern=True):
+        """create particles only inside speed contour. Avoid creating too large numpy arrays, only to me masked
+
+        :param step: step for particles
+        :type step: float
+        :param bool intern: If true use speed contour instead of effective contour
+        :return: lon, lat and indices of particles
+        :rtype: tuple(np.array)
+        """
+
+        xname, yname = self.intern(intern)
+        return _create_meshed_particles(self[xname], self[yname], step)
+
 
 @njit(cache=True)
 def grid_count_(grid, i, j):
@@ -2427,6 +2442,24 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
             for i_, j_ in zip(i, j):
                 v_max = max(v_max, grid[i_, j_])
             result[elt] = v_max
+
+
+@njit(cache=True)
+def _create_meshed_particles(lons, lats, step):
+    x_out, y_out, i_out = list(), list(), list()
+    for i, (lon, lat) in enumerate(zip(lons, lats)):
+        lon_min, lon_max = lon.min(), lon.max()
+        lat_min, lat_max = lat.min(), lat.max()
+        lon_min -= lon_min % step
+        lon_max -= lon_max % step - step * 2
+        lat_min -= lat_min % step
+        lat_max -= lat_max % step - step * 2
+
+        for x in arange(lon_min, lon_max, step):
+            for y in arange(lat_min, lat_max, step):
+                if winding_number_poly(x, y, create_vertice(*reduce_size(lon, lat))):
+                    x_out.append(x), y_out.append(y), i_out.append(i)
+    return array(x_out), array(y_out), array(i_out)
 
 
 class VirtualEddiesObservations(EddiesObservations):

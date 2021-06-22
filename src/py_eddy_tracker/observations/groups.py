@@ -87,11 +87,9 @@ def advect(x, y, c, t0, n_days):
     return t, x, y
 
 
-def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
+def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     """Select particles within eddies, advect them, return target observation and associated percentages
 
-    :param np.array(float) x: longitude of particles
-    :param np.array(float) y: latitude  of particles
     :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
     :param GroupEddiesObservations eddies: GroupEddiesObservations considered
     :param int t_start: julian day of the advection
@@ -102,24 +100,26 @@ def particle_candidate(x, y, c, eddies, t_start, i_target, pct, **kwargs):
     """
     # Obs from initial time
     m_start = eddies.time == t_start
-
     e = eddies.extract_with_mask(m_start)
+
     # to be able to get global index
     translate_start = where(m_start)[0]
-    # Identify particle in eddies (only in core)
-    i_start = e.contains(x, y, intern=True)
-    m = i_start != -1
 
-    x, y, i_start = x[m], y[m], i_start[m]
-    # Advect
+    x, y, i_start = e.create_particles(step_mesh)
+
+    # Advection
     t_end, x, y = advect(x, y, c, t_start, **kwargs)
+
     # eddies at last date
     m_end = eddies.time == t_end / 86400
     e_end = eddies.extract_with_mask(m_end)
+
     # to be able to get global index
     translate_end = where(m_end)[0]
+
     # Id eddies for each alive particle (in core and extern)
     i_end = e_end.contains(x, y)
+
     # compute matrix and fill target array
     get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
 
