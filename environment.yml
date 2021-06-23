@@ -1,0 +1,11 @@
+name: binder-pyeddytracker
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - ffmpeg
+  - pip:
+    - -r file:requirements.txt
+    - pyeddytrackersample
+    - .
