@@ -10,18 +10,25 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 ------------
 Changed
 ^^^^^^^
-- Now time will be allow second precision in storage on uint32 from 01/01/1950 to 01/01/2086
-  new identification will be produce with this type, old file could be still loaded.
-  If you use old identification to track use `--unraw` option to unpack old time and store in new format.
-- Now amplitude is stored with .1 mm of precision, same advice than time.
+
+- Now time allows second precision (instead of daily precision) in storage on uint32 from 01/01/1950 to 01/01/2086
+  New identifications are produced with this type, old files could still be loaded.
+  If you use old identifications for tracking use the `--unraw` option to unpack old times and store data with the new format.
+- Now amplitude is stored with .1 mm of precision (instead of 1 mm), same advice as for time.
+
+Fixed
+^^^^^
+
+Added
+^^^^^
+
+[3.5.0] - 2021-06-22
+--------------------
 
 Fixed
 ^^^^^
 - GridCollection get_next_time_step & get_previous_time_step needed more files to work in the dataset list.
   The loop needed explicitly self.dataset[i+-1] even when i==0, therefore indice went out of range
-Added
-^^^^^
-
 
 [3.4.0] - 2021-03-29
 --------------------

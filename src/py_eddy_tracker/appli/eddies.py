@@ -281,7 +281,7 @@ def browse_dataset_in(
     dataset_list.sort(order=["date", "filename"])
     steps = unique(dataset_list["date"][1:] - dataset_list["date"][:-1])
     if len(steps) > 1:
-        raise Exception("Several days steps in grid dataset %s" % steps)
+        raise Exception("Several timesteps in grid dataset %s" % steps)
 
     if sub_sampling_step != 1:
         logger.info("Grid subsampling %d", sub_sampling_step)
