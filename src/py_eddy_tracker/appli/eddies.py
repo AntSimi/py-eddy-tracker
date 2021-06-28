@@ -15,7 +15,7 @@ from netCDF4 import Dataset
 from numpy import bincount, bytes_, empty, in1d, unique
 from yaml import safe_load
 
-from .. import TIME_MODELS, EddyParser
+from .. import EddyParser, identify_time
 from ..observations.observation import EddiesObservations, reverse_index
 from ..observations.tracking import TrackEddiesObservations
 from ..tracking import Correspondances
@@ -163,7 +163,12 @@ def eddies_tracking():
     parser.add_argument(
         "--zarr", action="store_true", help="Output will be wrote in zarr"
     )
-    parser.add_argument("--unraw", action="store_true", help="Load unraw data")
+    parser.add_argument(
+        "--unraw",
+        action="store_true",
+        help="Load unraw data, use only for netcdf."
+        "If unraw is active, netcdf is loaded without apply scalefactor and add_offset.",
+    )
     parser.add_argument(
         "--blank_period",
         type=int,
@@ -265,16 +270,7 @@ def browse_dataset_in(
 
         if str_date is not None:
             if date_model is None:
-                model_found = False
-                for model in TIME_MODELS:
-                    try:
-                        item["date"] = datetime.strptime(str_date, model)
-                        model_found = True
-                        break
-                    except ValueError:
-                        pass
-                if not model_found:
-                    raise Exception("No time model found")
+                item["date"] = identify_time(str_date)
             else:
                 item["date"] = datetime.strptime(str_date, date_model)
 

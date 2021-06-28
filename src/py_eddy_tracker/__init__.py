@@ -22,6 +22,7 @@ Email: evanmason@gmail.com
 
 import logging
 from argparse import ArgumentParser
+from datetime import datetime
 
 import zarr
 
@@ -107,6 +108,15 @@ class EddyParser(ArgumentParser):
 
 
 TIME_MODELS = ["%Y%m%d", "%Y%m%d%H%M%S", "%Y%m%dT%H%M%S"]
+
+
+def identify_time(str_date):
+    for model in TIME_MODELS:
+        try:
+            return datetime.strptime(str_date, model)
+        except ValueError:
+            pass
+    raise Exception("No time model found")
 
 
 VAR_DESCR = dict(

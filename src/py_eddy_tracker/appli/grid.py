@@ -3,9 +3,8 @@
 All entry point to manipulate grid
 """
 from argparse import Action
-from datetime import datetime
 
-from .. import TIME_MODELS, EddyParser
+from .. import EddyParser, identify_time
 from ..dataset.grid import RegularGridDataset, UnRegularGridDataset
 
 
@@ -121,16 +120,7 @@ def eddy_id(args=None):
         cut_wavelength = [0, *cut_wavelength]
     inf_bnds, upper_bnds = cut_wavelength
 
-    model_found = False
-    for model in TIME_MODELS:
-        try:
-            date = datetime.strptime(args.datetime, model)
-            model_found = True
-            break
-        except ValueError:
-            pass
-    if not model_found:
-        raise Exception("No time model found")
+    date = identify_time(args.datetime)
     kwargs = dict(
         step=args.isoline_step,
         shape_error=args.fit_errmax,

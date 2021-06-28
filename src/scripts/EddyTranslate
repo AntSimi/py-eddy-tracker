@@ -16,7 +16,8 @@ def id_parser():
     )
     parser.add_argument("filename_in")
     parser.add_argument("filename_out")
-    parser.add_argument("--unraw", action="store_true", help="Load unraw data")
+    parser.add_argument("--unraw", action="store_true", help="Load unraw data, use only for netcdf."
+    "If unraw is active, netcdf is loaded without apply scalefactor and add_offset.")
     return parser
 
 
