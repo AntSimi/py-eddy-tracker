@@ -133,12 +133,12 @@ dt = 14
 shape = (n.obs.size, 2)
 # Forward run
 i_target_f, pct_target_f = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
-for t in range(t_start, t_end - dt):
+for t in arange(t_start, t_end - dt):
     particle_candidate(c, n, step, t, i_target_f, pct_target_f, n_days=dt)
 
 # Backward run
 i_target_b, pct_target_b = -ones(shape, dtype="i4"), zeros(shape, dtype="i1")
-for t in range(t_start + dt, t_end):
+for t in arange(t_start + dt, t_end):
     particle_candidate(c, n, step, t, i_target_b, pct_target_b, n_days=-dt)
 
 # %%
@@ -149,6 +149,11 @@ ax_1st_f = fig.add_axes([0.52, 0.52, 0.45, 0.45])
 ax_2nd_f = fig.add_axes([0.52, 0.05, 0.45, 0.45])
 ax_1st_b.set_title("Backward advection for each time step")
 ax_1st_f.set_title("Forward advection for each time step")
+ax_1st_b.set_ylabel("Color -> First target\nLatitude")
+ax_2nd_b.set_ylabel("Color -> Secondary target\nLatitude")
+ax_2nd_b.set_xlabel("Julian days"), ax_2nd_f.set_xlabel("Julian days")
+ax_1st_f.set_yticks([]), ax_2nd_f.set_yticks([])
+ax_1st_f.set_xticks([]), ax_1st_b.set_xticks([])
 
 
 def color_alpha(target, pct, vmin=5, vmax=80):

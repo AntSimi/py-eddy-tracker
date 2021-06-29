@@ -5,9 +5,9 @@ Tracking
 Requirements
 ************
 
-Before to run tracking, you will need to run identification on every time step of the period (period of your study).
+Before tracking, you will need to run identification on every time step of the period (period of your study).
 
-**Advice** : Before to run tracking, displaying some identification file allows to learn a lot
+**Advice** : Before tracking, displaying some identification files. You will learn a lot
 
 Default method
 **************
@@ -24,9 +24,9 @@ Example of conf.yaml
       FILES_PATTERN: MY_IDENTIFICATION_PATH/Anticyclonic*.nc
       SAVE_DIR: MY_OUTPUT_PATH
 
-    # Number of timestep for missing detection
+    # Number of consecutive timesteps with missing detection allowed
     VIRTUAL_LENGTH_MAX: 3
-    # Minimal time to consider as a full track
+    # Minimal number of timesteps to considered as a long trajectory
     TRACK_DURATION_MIN: 10
 
 To run:
@@ -63,13 +63,13 @@ With yaml you could also select another tracker:
 .. code-block:: yaml
 
     PATHS:
-      # Files produces with EddyIdentification
+      # Files produced with EddyIdentification
       FILES_PATTERN: MY/IDENTIFICATION_PATH/Anticyclonic*.nc
       SAVE_DIR: MY_OUTPUT_PATH
 
-    # Number of timesteps for missing detection
+    # Number of consecutive timesteps with missing detection allowed
     VIRTUAL_LENGTH_MAX: 3
-    # Minimal time to consider as a full track
+    # Minimal number of timesteps to considered as a long trajectory
     TRACK_DURATION_MIN: 10
 
     CLASS:

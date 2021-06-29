@@ -16,6 +16,7 @@ from numpy import (
     degrees,
     empty,
     histogram,
+    int_,
     median,
     nan,
     ones,
@@ -173,6 +174,8 @@ class TrackEddiesObservations(GroupEddiesObservations):
         - contour_lon_e (how to do if in raw)
         - contour_lon_s (how to do if in raw)
         """
+        if self.lon.size == 0:
+            return
         lon0 = (self.lon[self.index_from_track] - 180).repeat(self.nb_obs_by_track)
         logger.debug("Normalize longitude")
         self.lon[:] = (self.lon - lon0) % 360 + lon0
@@ -228,12 +231,13 @@ class TrackEddiesObservations(GroupEddiesObservations):
         )
         h_nc.date_created = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
         t = h_nc.variables[VAR_DESCR_inv["j1"]]
-        delta = t.max - t.min + 1
-        h_nc.time_coverage_duration = "P%dD" % delta
-        d_start = datetime(1950, 1, 1) + timedelta(int(t.min))
-        d_end = datetime(1950, 1, 1) + timedelta(int(t.max))
-        h_nc.time_coverage_start = d_start.strftime("%Y-%m-%dT00:00:00Z")
-        h_nc.time_coverage_end = d_end.strftime("%Y-%m-%dT00:00:00Z")
+        if t.size:
+            delta = t.max - t.min + 1
+            h_nc.time_coverage_duration = "P%dD" % delta
+            d_start = datetime(1950, 1, 1) + timedelta(int(t.min))
+            d_end = datetime(1950, 1, 1) + timedelta(int(t.max))
+            h_nc.time_coverage_start = d_start.strftime("%Y-%m-%dT00:00:00Z")
+            h_nc.time_coverage_end = d_end.strftime("%Y-%m-%dT00:00:00Z")
 
     def extract_with_period(self, period, **kwargs):
         """
@@ -598,6 +602,12 @@ class TrackEddiesObservations(GroupEddiesObservations):
 
     def split_network(self, intern=True, **kwargs):
         """Return each group (network) divided in segments"""
+        # Find timestep of dataset
+        # FIXME : how to know exact time sampling
+        t = unique(self.time)
+        dts = t[1:] - t[:-1]
+        timestep = median(dts)
+
         track_s, track_e, track_ref = build_index(self.tracks)
         ids = empty(
             len(self),
@@ -611,7 +621,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
                 ("next_obs", "i4"),
             ],
         )
-        ids["group"], ids["time"] = self.tracks, self.time
+        ids["group"], ids["time"] = self.tracks, int_(self.time / timestep)
         # Initialisation
         # To store the id of the segments, the backward and forward cost associations
         ids["track"], ids["previous_cost"], ids["next_cost"] = 0, 0, 0
@@ -638,6 +648,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
             local_ids["next_obs"][m] += i_s
         if display_iteration:
             print()
+        ids["time"] *= timestep
         return ids
 
     def set_tracks(self, x, y, ids, window, **kwargs):
@@ -649,8 +660,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         :param ndarray ids: several fields like time, group, ...
         :param int windows: number of days where observations could missed
         """
-
-        time_index = build_index(ids["time"])
+        time_index = build_index((ids["time"]).astype("i4"))
         nb = x.shape[0]
         used = zeros(nb, dtype="bool")
         track_id = 1
@@ -695,8 +705,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs
     ):
         """Backward association of observations to the segments"""
-
-        time_cur = ids["time"][i_current]
+        time_cur = int_(ids["time"][i_current])
         t0, t1 = time_cur - 1 - time_ref, max(time_cur - window - time_ref, 0)
         for t_step in range(t0, t1 - 1, -1):
             i0, i1 = time_s[t_step], time_e[t_step]
@@ -726,7 +735,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
     def get_next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
         """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1
-        time_cur = ids["time"][i_current]
+        time_cur = int_(ids["time"][i_current])
         t0, t1 = time_cur + 1 - time_ref, min(time_cur + window - time_ref, time_max)
         if t0 > time_max:
             return -1

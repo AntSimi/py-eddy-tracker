@@ -1,12 +1,13 @@
 PATHS:
-  # Files produces with EddyIdentification
+  # Files produced with EddyIdentification
   FILES_PATTERN: /home/emason/toto/Anticyclonic_*.nc
-  # Path for saving of outputs
+  # Path to save outputs
   SAVE_DIR: '/home/emason/toto/'
 
-# Minimum number of observations to store eddy
-TRACK_DURATION_MIN: 4
+# Number of consecutive timesteps with missing detection allowed
 VIRTUAL_LENGTH_MAX: 0
+# Minimal number of timesteps to considered as a long trajectory
+TRACK_DURATION_MIN: 4
 
 CLASS:
    MODULE: py_eddy_tracker.featured_tracking.area_tracker

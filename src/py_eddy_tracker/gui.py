@@ -291,8 +291,8 @@ class GUI:
         i_first = d.index_from_track[tr]
         track = d.obs[i_first : i_first + nb]
         nb -= 1
-        t0 = timedelta(days=int(track[0]["time"])) + datetime(1950, 1, 1)
-        t1 = timedelta(days=int(track[-1]["time"])) + datetime(1950, 1, 1)
+        t0 = timedelta(days=track[0]["time"]) + datetime(1950, 1, 1)
+        t1 = timedelta(days=track[-1]["time"]) + datetime(1950, 1, 1)
         txt = f"--{name}--\n"
         txt += f"    {t0} -> {t1}\n"
         txt += f"    Tracks : {tr}  {now['n']}/{nb} ({now['n'] / nb * 100:.2f} %)\n"

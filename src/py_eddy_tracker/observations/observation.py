@@ -69,7 +69,7 @@ from ..poly import (
     poly_indexs,
     reduce_size,
     vertice_overlap,
-    winding_number_poly
+    winding_number_poly,
 )
 
 logger = logging.getLogger("pet")
@@ -1326,8 +1326,15 @@ class EddiesObservations(object):
 
     @staticmethod
     def solve_simultaneous(cost):
-        """Write something (TODO)"""
+        """Deduce link from cost matrix.
+
+        :param array(float) cost: Cost for each available link
+        :return: return a boolean mask array, True for each valid couple
+        :rtype: array(bool)
+        """
         mask = ~cost.mask
+        if mask.size == 0:
+            return mask
         # Count number of links by self obs and other obs
         self_links, other_links = sum_row_column(mask)
         max_links = max(self_links.max(), other_links.max())

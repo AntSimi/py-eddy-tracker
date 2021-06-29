@@ -186,7 +186,8 @@ class GroupEddiesObservations(EddiesObservations, ABC):
 
         .. minigallery:: py_eddy_tracker.TrackEddiesObservations.filled_by_interpolation
         """
-
+        if self.track.size == 0:
+            return
         nb_filled = mask.sum()
         logger.info("%d obs will be filled (unobserved)", nb_filled)
 
@@ -194,7 +195,6 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         index = arange(nb_obs)
 
         for field in self.obs.dtype.descr:
-            # print(f"field : {field}")
             var = field[0]
             if (
                 var in ["n", "virtual", "track", "cost_association"]
