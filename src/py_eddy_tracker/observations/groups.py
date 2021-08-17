@@ -68,7 +68,7 @@ def get_missing_indices(
 
 def advect(x, y, c, t0, n_days):
     """
-    Advect particle from t0 to t0 + n_days, with data cube.
+    Advect particles from t0 to t0 + n_days, with data cube.
 
     :param np.array(float) x: longitude of particles
     :param np.array(float) y: latitude  of particles
@@ -87,7 +87,17 @@ def advect(x, y, c, t0, n_days):
     return t, x, y
 
 
-def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
+def particle_candidate(
+    c,
+    eddies,
+    step_mesh,
+    t_start,
+    i_target,
+    pct,
+    contour_start="speed",
+    contour_end="effective",
+    **kwargs
+):
     """Select particles within eddies, advect them, return target observation and associated percentages
 
     :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
@@ -95,6 +105,8 @@ def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     :param int t_start: julian day of the advection
     :param np.array(int) i_target: corresponding obs where particles are advected
     :param np.array(int) pct: corresponding percentage of avected particles
+    :param str contour_start: contour where particles are injected
+    :param str contour_end: contour where particles are counted after advection
     :params dict kwargs: dict of params given to `advect`
 
     """
@@ -105,7 +117,14 @@ def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     # to be able to get global index
     translate_start = where(m_start)[0]
 
-    x, y, i_start = e.create_particles(step_mesh)
+    # Create particles in specified contour
+    if contour_start == "speed":
+        x, y, i_start = e.create_particles(step_mesh, intern=True)
+    elif contour_start == "effective":
+        x, y, i_start = e.create_particles(step_mesh, intern=False)
+    else:
+        x, y, i_start = e.create_particles(step_mesh, intern=True)
+        print("The contour_start was not correct, speed contour is used")
 
     # Advection
     t_end, x, y = advect(x, y, c, t_start, **kwargs)
@@ -117,8 +136,14 @@ def particle_candidate(c, eddies, step_mesh, t_start, i_target, pct, **kwargs):
     # to be able to get global index
     translate_end = where(m_end)[0]
 
-    # Id eddies for each alive particle (in core and extern)
-    i_end = e_end.contains(x, y)
+    # Id eddies for each alive particle in specified contour
+    if contour_end == "speed":
+        i_end = e_end.contains(x, y, intern=True)
+    elif contour_end == "effective":
+        i_end = e_end.contains(x, y, intern=False)
+    else:
+        i_end = e_end.contains(x, y, intern=True)
+        print("The contour_end was not correct, speed contour is used")
 
     # compute matrix and fill target array
     get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
@@ -206,7 +231,7 @@ class GroupEddiesObservations(EddiesObservations, ABC):
             )
 
     def insert_virtual(self):
-        """insert virtual observations on segments where observations are missing"""
+        """Insert virtual observations on segments where observations are missing"""
 
         dt_theorical = median(self.time[1:] - self.time[:-1])
         indices = self.get_missing_indices(dt_theorical)

@@ -578,7 +578,10 @@ class TrackEddiesObservations(GroupEddiesObservations):
     def format_label(self, label):
         t0, t1 = self.period
         return label.format(
-            t0=t0, t1=t1, nb_obs=len(self), nb_tracks=(self.nb_obs_by_track != 0).sum(),
+            t0=t0,
+            t1=t1,
+            nb_obs=len(self),
+            nb_tracks=(self.nb_obs_by_track != 0).sum(),
         )
 
     def plot(self, ax, ref=None, **kwargs):
@@ -702,7 +705,16 @@ class TrackEddiesObservations(GroupEddiesObservations):
 
     @staticmethod
     def get_previous_obs(
-        i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs
+        i_current,
+        ids,
+        x,
+        y,
+        time_s,
+        time_e,
+        time_ref,
+        window,
+        min_overlap=0.01,
+        **kwargs,
     ):
         """Backward association of observations to the segments"""
         time_cur = int_(ids["time"][i_current])
@@ -720,7 +732,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
             c = zeros(len(xj))
             c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
             # We remove low overlap
-            c[c < 0.01] = 0
+            c[c < min_overlap] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]
@@ -732,7 +744,18 @@ class TrackEddiesObservations(GroupEddiesObservations):
             break
 
     @staticmethod
-    def get_next_obs(i_current, ids, x, y, time_s, time_e, time_ref, window, **kwargs):
+    def get_next_obs(
+        i_current,
+        ids,
+        x,
+        y,
+        time_s,
+        time_e,
+        time_ref,
+        window,
+        min_overlap=0.01,
+        **kwargs,
+    ):
         """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1
         time_cur = int_(ids["time"][i_current])
@@ -752,7 +775,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
             c = zeros(len(xj))
             c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
             # We remove low overlap
-            c[c < 0.01] = 0
+            c[c < min_overlap] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]

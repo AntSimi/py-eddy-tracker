@@ -159,7 +159,11 @@ _ = VideoAnimation(ax.figure, update, **kw_video)
 # Format LAVD data
 lavd = RegularGridDataset.with_array(
     coordinates=("lon", "lat"),
-    datas=dict(lavd=lavd.T, lon=x_g, lat=y_g,),
+    datas=dict(
+        lavd=lavd.T,
+        lon=x_g,
+        lat=y_g,
+    ),
     centered=True,
 )
 

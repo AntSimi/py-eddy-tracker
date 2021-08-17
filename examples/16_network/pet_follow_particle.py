@@ -125,9 +125,11 @@ ani = VideoAnimation(a.fig, update, frames=arange(20200, 20269, step), interval=
 # %%
 # Particle advection
 # ^^^^^^^^^^^^^^^^^^
+# Advection from speed contour to speed contour (default)
+
 step = 1 / 60.0
 
-t_start, t_end = n.period
+t_start, t_end = int(n.period[0]), int(n.period[1])
 dt = 14
 
 shape = (n.obs.size, 2)

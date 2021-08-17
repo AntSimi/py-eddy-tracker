@@ -292,13 +292,13 @@ ax.set_xlim(17.5, 27.5), ax.set_ylim(31, 36), ax.grid()
 m1
 
 # %%
-# Get spliting event
-# ------------------
+# Get splitting event
+# -------------------
 # Display the position of the eddies before a splitting
 fig = plt.figure(figsize=(15, 8))
 ax = fig.add_axes([0.04, 0.06, 0.90, 0.88], projection=GUI_AXES)
 n.plot(ax, color_cycle=n.COLORS)
-s0, s1, s1_start = n.spliting_event(triplet=True)
+s0, s1, s1_start = n.splitting_event(triplet=True)
 s0.display(ax, color="violet", lw=2, label="Eddies before splitting")
 s1.display(ax, color="blueviolet", lw=2, label="Eddies after splitting")
 s1_start.display(ax, color="black", lw=2, label="Eddies starting by splitting")
