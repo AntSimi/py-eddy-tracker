@@ -23,6 +23,9 @@ from numpy import (
     zeros,
 )
 
+import netCDF4
+import zarr
+
 from ..dataset.grid import GridCollection
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
@@ -147,7 +150,7 @@ class NetworkObservations(GroupEddiesObservations):
         )
 
     def fix_next_previous_obs(self):
-        """function used after 'insert_virtual', to correct next_obs and
+        """Function used after 'insert_virtual', to correct next_obs and
         previous obs.
         """
 
@@ -577,7 +580,7 @@ class NetworkObservations(GroupEddiesObservations):
         return other.extract_with_mask(m)
 
     def normalize_longitude(self):
-        """Normalize all longitude
+        """Normalize all longitudes
 
         Normalize longitude field and in the same range :
         - longitude_max
@@ -677,7 +680,13 @@ class NetworkObservations(GroupEddiesObservations):
         """
         self.only_one_network()
         j = 0
-        line_kw = dict(ls="-", marker="+", markersize=6, zorder=1, lw=3,)
+        line_kw = dict(
+            ls="-",
+            marker="+",
+            markersize=6,
+            zorder=1,
+            lw=3,
+        )
         line_kw.update(kwargs)
         mappables = dict(lines=list())
 
@@ -719,7 +728,7 @@ class NetworkObservations(GroupEddiesObservations):
     def event_timeline(self, ax, field=None, method=None, factor=1, colors_mode="roll"):
         """Mark events in plot"""
         j = 0
-        events = dict(spliting=[], merging=[])
+        events = dict(splitting=[], merging=[])
 
         # TODO : fill mappables dict
         y_seg = dict()
@@ -784,15 +793,15 @@ class NetworkObservations(GroupEddiesObservations):
                     )
                 )
                 ax.plot((x[0], _time[i_p]), (y0, y1), **event_kw)[0]
-                events["spliting"].append((x[0], y0))
+                events["splitting"].append((x[0], y0))
 
             j += 1
 
         kwargs = dict(color="k", zorder=-1, linestyle=" ")
-        if len(events["spliting"]) > 0:
-            X, Y = list(zip(*events["spliting"]))
+        if len(events["splitting"]) > 0:
+            X, Y = list(zip(*events["splitting"]))
             ref = ax.plot(
-                X, Y, marker="*", markersize=12, label="spliting events", **kwargs
+                X, Y, marker="*", markersize=12, label="splitting events", **kwargs
             )[0]
             mappables.setdefault("events", []).append(ref)
 
@@ -910,7 +919,10 @@ class NetworkObservations(GroupEddiesObservations):
         """Add the merging and splitting events to a map"""
         j = 0
         mappables = dict()
-        symbol_kw = dict(markersize=10, color="k",)
+        symbol_kw = dict(
+            markersize=10,
+            color="k",
+        )
         symbol_kw.update(kwargs)
         symbol_kw_split = symbol_kw.copy()
         symbol_kw_split["markersize"] += 4
@@ -939,7 +951,13 @@ class NetworkObservations(GroupEddiesObservations):
         return mappables
 
     def scatter(
-        self, ax, name="time", factor=1, ref=None, edgecolor_cycle=None, **kwargs,
+        self,
+        ax,
+        name="time",
+        factor=1,
+        ref=None,
+        edgecolor_cycle=None,
+        **kwargs,
     ):
         """
         This function scatters the path of each network, with the merging and splitting events
@@ -1001,6 +1019,8 @@ class NetworkObservations(GroupEddiesObservations):
         return build_unique_array(self.segment, self.track)
 
     def birth_event(self):
+        """Extract birth events.
+        Advice : individual eddies (self.track == 0) should be removed before -> apply remove_trash."""
         # FIXME how to manage group 0
         indices = list()
         previous_obs = self.previous_obs
@@ -1014,6 +1034,8 @@ class NetworkObservations(GroupEddiesObservations):
         return self.extract_event(list(set(indices)))
 
     def death_event(self):
+        """Extract death events.
+        Advice : individual eddies (self.track == 0) should be removed before -> apply remove_trash."""
         # FIXME how to manage group 0
         indices = list()
         next_obs = self.next_obs
@@ -1064,7 +1086,7 @@ class NetworkObservations(GroupEddiesObservations):
             else:
                 return self.extract_event(idx_m1)
 
-    def spliting_event(self, triplet=False, only_index=False):
+    def splitting_event(self, triplet=False, only_index=False):
         """Return observation before a splitting event.
 
         If `triplet=True` return the eddy before a splitting event, the eddy after the splitting event,
@@ -1105,7 +1127,7 @@ class NetworkObservations(GroupEddiesObservations):
 
     def dissociate_network(self):
         """
-        Dissociate networks with no known interaction (spliting/merging)
+        Dissociate networks with no known interaction (splitting/merging)
         """
 
         tags = self.tag_segment(multi_network=True)
@@ -1183,7 +1205,7 @@ class NetworkObservations(GroupEddiesObservations):
 
     def remove_trash(self):
         """
-        Remove the lonely eddies (only 1 obs in segment, associated segment number is 0)
+        Remove the lonely eddies (only 1 obs in segment, associated network number is 0)
         """
         return self.extract_with_mask(self.track != 0)
 
@@ -1372,7 +1394,7 @@ class NetworkObservations(GroupEddiesObservations):
         date_function,
         uv_params,
         advection_mode="both",
-        dt_advect=14,
+        n_days=14,
         step_mesh=1.0 / 50,
         output_name=None,
         dissociate_network=False,
@@ -1380,7 +1402,26 @@ class NetworkObservations(GroupEddiesObservations):
         remove_dead_end=0,
     ):
 
-        """Global function to analyse segments coherence, with network preprocessing"""
+        """Global function to analyse segments coherence, with network preprocessing.
+        :param callable date_function: python function, takes as param `int` (julian day) and return
+            data filename associated to the date
+        :param dict uv_params: dict of parameters used by
+            :py:meth:`~py_eddy_tracker.dataset.grid.GridCollection.from_netcdf_list`
+        :param int n_days: nuber of days for advection
+        :param float step_mesh: step for particule mesh in degrees
+        :param str output_name: path/name for the output (without extension) to store the clean
+            network in .nc and the coherence results in .zarr. Works only for advection_mode = "both"
+        :param bool dissociate_network: If True apply
+            :py:meth:`~py_eddy_tracker.observation.network.NetworkObservations.dissociate_network`
+        :param int correct_close_events: Number of days in
+            :py:meth:`~py_eddy_tracker.observation.network.NetworkObservations.correct_close_events`
+        :param int remove_dead_end: Number of days in
+            :py:meth:`~py_eddy_tracker.observation.network.NetworkObservations.remove_dead_end`
+        :return target_forward, target_bakward: 2D numpy.array with the eddy observation the
+            particles ended in after advection
+        :return target_forward, target_bakward: percentage of ending particles within the
+            eddy observation with regards to the starting number
+        """
 
         if dissociate_network:
             self.dissociate_network()
@@ -1393,19 +1434,53 @@ class NetworkObservations(GroupEddiesObservations):
         else:
             network_clean = self
 
-        res = network_clean.segment_coherence(
-            date_function=date_function,
-            uv_params=uv_params,
-            advection_mode=advection_mode,
-            output_name=output_name,
-            dt_advect=dt_advect,
-            step_mesh=step_mesh,
-        )
+        network_clean.numbering_segment()
+
+        res = []
+        if (advection_mode == "both") | (advection_mode == "forward"):
+            target_forward, pct_forward = network_clean.segment_coherence_forward(
+                date_function=date_function,
+                uv_params=uv_params,
+                n_days=n_days,
+                step_mesh=step_mesh,
+            )
+            res = res + [target_forward, pct_forward]
+
+        if (advection_mode == "both") | (advection_mode == "backward"):
+            target_backward, pct_backward = network_clean.segment_coherence_backward(
+                date_function=date_function,
+                uv_params=uv_params,
+                n_days=n_days,
+                step_mesh=step_mesh,
+            )
+            res = res + [target_backward, pct_backward]
+
+        if (output_name is not None) & (advection_mode == "both"):
+            # TODO : put some path verification?
+            # Save the clean network in netcdf
+            with netCDF4.Dataset(output_name + ".nc", "w") as fh:
+                network_clean.to_netcdf(fh)
+            # Save the results of particles advection in zarr
+            # zarr compression parameters
+            # TODO : check size? compression?
+            params_seg = dict()
+            params_pct = dict()
+            zg = zarr.open(output_name + ".zarr", mode="w")
+            zg.array("target_forward", target_forward, **params_seg)
+            zg.array("pct_forward", pct_forward, **params_pct)
+            zg.array("target_backward", target_backward, **params_seg)
+            zg.array("pct_backward", pct_backward, **params_pct)
 
         return network_clean, res
 
     def segment_coherence_backward(
-        self, date_function, uv_params, n_days=14, step_mesh=1.0 / 50, output_name=None,
+        self,
+        date_function,
+        uv_params,
+        n_days=14,
+        step_mesh=1.0 / 50,
+        contour_start="speed",
+        contour_end="speed",
     ):
 
         """
@@ -1434,7 +1509,7 @@ class NetworkObservations(GroupEddiesObservations):
         itb_final = -ones((self.obs.size, 2), dtype="i4")
         ptb_final = zeros((self.obs.size, 2), dtype="i1")
 
-        t_start, t_end = self.period
+        t_start, t_end = int(self.period[0]), int(self.period[1])
 
         dates = arange(t_start, t_start + n_days + 1)
         first_files = [date_function(x) for x in dates]
@@ -1455,17 +1530,33 @@ class NetworkObservations(GroupEddiesObservations):
                 # add next date to GridCollection and delete last date
                 c.shift_files(t_shift, date_function(int(t_shift)), **uv_params)
             particle_candidate(
-                c, self, step_mesh, _t, itb_final, ptb_final, n_days=-n_days
+                c,
+                self,
+                step_mesh,
+                _t,
+                itb_final,
+                ptb_final,
+                n_days=-n_days,
+                contour_start=contour_start,
+                contour_end=contour_end,
             )
-            logger.info((
-                f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
-                f" : {time.time()-_timestamp:5.2f}s"
-            ))
+            logger.info(
+                (
+                    f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
+                    f" : {time.time()-_timestamp:5.2f}s"
+                )
+            )
 
         return itb_final, ptb_final
 
     def segment_coherence_forward(
-        self, date_function, uv_params, n_days=14, step_mesh=1.0 / 50,
+        self,
+        date_function,
+        uv_params,
+        n_days=14,
+        step_mesh=1.0 / 50,
+        contour_start="speed",
+        contour_end="speed",
     ):
 
         """
@@ -1494,7 +1585,7 @@ class NetworkObservations(GroupEddiesObservations):
         itf_final = -ones((self.obs.size, 2), dtype="i4")
         ptf_final = zeros((self.obs.size, 2), dtype="i1")
 
-        t_start, t_end = self.period
+        t_start, t_end = int(self.period[0]), int(self.period[1])
         # if begin is not None and begin > t_start:
         #     t_start = begin
         # if end is not None and end < t_end:
@@ -1519,12 +1610,22 @@ class NetworkObservations(GroupEddiesObservations):
                 # add next date to GridCollection and delete last date
                 c.shift_files(t_shift, date_function(int(t_shift)), **uv_params)
             particle_candidate(
-                c, self, step_mesh, _t, itf_final, ptf_final, n_days=n_days
+                c,
+                self,
+                step_mesh,
+                _t,
+                itf_final,
+                ptf_final,
+                n_days=n_days,
+                contour_start=contour_start,
+                contour_end=contour_end,
             )
-            logger.info((
-                f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
-                f" : {time.time()-_timestamp:5.2f}s"
-            ))
+            logger.info(
+                (
+                    f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
+                    f" : {time.time()-_timestamp:5.2f}s"
+                )
+            )
         return itf_final, ptf_final
 
 

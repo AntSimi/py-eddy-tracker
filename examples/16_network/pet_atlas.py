@@ -153,33 +153,33 @@ m = g_10_merging.display(ax, **kw_ratio, vmin=0, vmax=5, name=g_)
 update_axes(ax, m).set_label("Pixel used in % all atlas")
 
 # %%
-# All Spliting
-# ------------
-# Display the occurence of spliting events
+# All splitting
+# -------------
+# Display the occurence of splitting events
 ax = start_axes("")
-g_all_spliting = n.spliting_event().grid_count(bins)
-m = g_all_spliting.display(ax, **kw_time, vmin=0, vmax=1)
+g_all_splitting = n.splitting_event().grid_count(bins)
+m = g_all_splitting.display(ax, **kw_time, vmin=0, vmax=1)
 update_axes(ax, m).set_label("Pixel used in % of time")
 
 # %%
-# Ratio spliting events / eddy presence
+# Ratio splitting events / eddy presence
 ax = start_axes("")
-g_ = g_all_spliting.vars["count"] * 100.0 / g_all.vars["count"]
-m = g_all_spliting.display(ax, **kw_ratio, vmin=0, vmax=5, name=g_)
+g_ = g_all_splitting.vars["count"] * 100.0 / g_all.vars["count"]
+m = g_all_splitting.display(ax, **kw_ratio, vmin=0, vmax=5, name=g_)
 update_axes(ax, m).set_label("Pixel used in % all atlas")
 
 # %%
-# Spliting in networks longer than 10 days
-# ----------------------------------------
+# splitting in networks longer than 10 days
+# -----------------------------------------
 ax = start_axes("")
-g_10_spliting = n10.spliting_event().grid_count(bins)
-m = g_10_spliting.display(ax, **kw_time, vmin=0, vmax=1)
+g_10_splitting = n10.splitting_event().grid_count(bins)
+m = g_10_splitting.display(ax, **kw_time, vmin=0, vmax=1)
 update_axes(ax, m).set_label("Pixel used in % of time")
 # %%
 ax = start_axes("")
 g_ = ma.array(
-    g_10_spliting.vars["count"] * 100.0 / g_10.vars["count"],
+    g_10_splitting.vars["count"] * 100.0 / g_10.vars["count"],
     mask=g_10.vars["count"] < 365,
 )
-m = g_10_spliting.display(ax, **kw_ratio, vmin=0, vmax=5, name=g_)
+m = g_10_splitting.display(ax, **kw_ratio, vmin=0, vmax=5, name=g_)
 update_axes(ax, m).set_label("Pixel used in % all atlas")

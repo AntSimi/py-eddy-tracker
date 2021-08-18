@@ -702,7 +702,11 @@ class EddiesObservations(object):
         .. code-block:: python
 
             kwargs_latlon_300 = dict(
-                include_vars=["longitude", "latitude",], indexs=dict(obs=slice(0, 300)),
+                include_vars=[
+                    "longitude",
+                    "latitude",
+                ],
+                indexs=dict(obs=slice(0, 300)),
             )
             small_dataset = TrackEddiesObservations.load_file(
                 filename, **kwargs_latlon_300
@@ -1973,7 +1977,11 @@ class EddiesObservations(object):
 
     def format_label(self, label):
         t0, t1 = self.period
-        return label.format(t0=t0, t1=t1, nb_obs=len(self),)
+        return label.format(
+            t0=t0,
+            t1=t1,
+            nb_obs=len(self),
+        )
 
     def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
         """Plot the speed and effective (dashed) contour of the eddies
@@ -2283,7 +2291,7 @@ class EddiesObservations(object):
         return self.period[1] - self.period[0] + 1
 
     def create_particles(self, step, intern=True):
-        """create particles only inside speed contour. Avoid creating too large numpy arrays, only to me masked
+        """Create particles inside contour (Default : speed contour). Avoid creating too large numpy arrays, only to be masked
 
         :param step: step for particles
         :type step: float
@@ -2345,7 +2353,14 @@ def grid_count_pixel_in(
         x_, y_ = reduce_size(x_, y_)
         v = create_vertice(x_, y_)
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
-            v, x_bounds, y_bounds, xstep, ystep, N, is_circular, x_size,
+            v,
+            x_bounds,
+            y_bounds,
+            xstep,
+            ystep,
+            N,
+            is_circular,
+            x_size,
         )
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
         grid_count_(grid, i, j)

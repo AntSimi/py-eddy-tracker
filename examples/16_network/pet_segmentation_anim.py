@@ -96,7 +96,8 @@ def update(i_frame):
 
     indices_frames = INDICES[i_frame]
     mappable_CONTOUR.set_data(
-        e.contour_lon_e[indices_frames], e.contour_lat_e[indices_frames],
+        e.contour_lon_e[indices_frames],
+        e.contour_lat_e[indices_frames],
     )
     mappable_CONTOUR.set_color(cmap.colors[tr[indices_frames] % len(cmap.colors)])
     return (mappable_tracks,)

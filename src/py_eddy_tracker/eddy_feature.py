@@ -61,13 +61,13 @@ class Amplitude(object):
         """
         Create amplitude object
 
-        :param Contours contour:
-        :param float contour_height:
-        :param array data:
-        :param float interval:
+        :param Contours contour: usefull class defined below
+        :param float contour_height: field value of the contour
+        :param array data: grid
+        :param float interval: step between two contours
         :param int mle: maximum number of local extrema in contour
-        :param int nb_step_min: number of intervals to consider an eddy
-        :param int nb_step_to_be_mle: number of intervals to be considered as an another maxima
+        :param int nb_step_min: minimum number of intervals to consider the contour as an eddy
+        :param int nb_step_to_be_mle: number of intervals to be considered as another extrema
         """
 
         # Height of the contour
@@ -116,8 +116,7 @@ class Amplitude(object):
     def all_pixels_below_h0(self, level):
         """
         Check CSS11 criterion 1: The SSH values of all of the pixels
-        are below (above) a given SSH threshold for cyclonic (anticyclonic)
-        eddies.
+        are below a given SSH threshold for cyclonic eddies.
         """
         # In some cases pixel value may be very close to the contour bounds
         if self.sla.mask.any() or ((self.sla.data - self.h_0) > self.EPSILON).any():
@@ -602,8 +601,8 @@ class Contours(object):
             4. - Amplitude criterion (yellow)
         :param str field:
             Must be 'shape_error', 'x', 'y' or 'radius'.
-            If define display_criterion is not use.
-            bins argument must be define
+            If defined display_criterion is not use.
+            bins argument must be defined
         :param array bins: bins used to colorize contour
         :param str cmap: Name of cmap for field display
         :param dict kwargs: look at :py:meth:`matplotlib.collections.LineCollection`

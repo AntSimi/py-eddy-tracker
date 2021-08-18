@@ -7,7 +7,15 @@ from py_eddy_tracker.dataset.grid import RegularGridDataset
 
 G = RegularGridDataset(get_demo_path("mask_1_60.nc"), "lon", "lat")
 X = 0.025
-contour = Path(((-X, 0), (X, 0), (X, X), (-X, X), (-X, 0),))
+contour = Path(
+    (
+        (-X, 0),
+        (X, 0),
+        (X, X),
+        (-X, X),
+        (-X, 0),
+    )
+)
 
 
 # contour

@@ -149,7 +149,13 @@ ax = timeline_axes()
 n_.median_filter(15, "time", "latitude")
 kw["s"] = (n_.radius_e * 1e-3) ** 2 / 30 ** 2 * 20
 m = n_.scatter_timeline(
-    ax, "shape_error_e", vmin=14, vmax=70, **kw, yfield="lon", method="all",
+    ax,
+    "shape_error_e",
+    vmin=14,
+    vmax=70,
+    **kw,
+    yfield="lon",
+    method="all",
 )
 ax.set_ylabel("Longitude")
 cb = update_axes(ax, m["scatter"])
