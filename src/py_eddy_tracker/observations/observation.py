@@ -687,10 +687,15 @@ class EddiesObservations(object):
             h = filename
         else:
             h = zarr.open(filename)
+
         dims = list()
         for varname in h:
-            dims.extend(list(getattr(h, varname).shape))
-        return set(dims)
+            shape = getattr(h, varname).shape
+            if len(shape) > len(dims):
+                dims = shape
+        return dims
+        #     dims.extend(list(getattr(h, varname).shape))
+        # return set(dims)
 
     @classmethod
     def load_file(cls, filename, **kwargs):
@@ -754,7 +759,6 @@ class EddiesObservations(object):
         :return type: class
         """
         # FIXME
-        array_dim = -1
         if isinstance(filename, zarr.storage.MutableMapping):
             h_zarr = filename
         else:
@@ -763,11 +767,10 @@ class EddiesObservations(object):
             h_zarr = zarr.open(filename)
         var_list = cls.build_var_list(list(h_zarr.keys()), remove_vars, include_vars)
 
-        nb_obs = getattr(h_zarr, var_list[0]).shape[0]
-        dims = list(cls.zarr_dimension(filename))
-        if len(dims) == 2 and nb_obs in dims:
-            # FIXME must be investigated, in zarr no dimensions name (or could be add in attr)
-            array_dim = dims[1] if nb_obs == dims[0] else dims[0]
+        # FIXME must be investigated, in zarr no dimensions name (or could be add in attr)
+        #   so we assume first dimension is number of observation, second is number of contours
+        nb_obs, track_array_variables = getattr(h_zarr, var_list[0]).shape
+
         if indexs is not None and "obs" in indexs:
             sl = indexs["obs"]
             sl = slice(sl.start, min(sl.stop, nb_obs))
@@ -781,28 +784,31 @@ class EddiesObservations(object):
         logger.debug("%d observations will be load", nb_obs)
         kwargs = dict()
 
-        if array_dim in dims:
-            kwargs["track_array_variables"] = array_dim
-            kwargs["array_variables"] = list()
-            for variable in var_list:
-                if array_dim in h_zarr[variable].shape:
-                    var_inv = VAR_DESCR_inv[variable]
-                    kwargs["array_variables"].append(var_inv)
-        array_variables = kwargs.get("array_variables", list())
-        kwargs["track_extra_variables"] = []
+        kwargs["track_array_variables"] = h_zarr.attrs.get("track_array_variables", track_array_variables)
+
+        array_variables = list()
+        for variable in var_list:
+            if len(h_zarr[variable].shape) > 1:
+                var_inv = VAR_DESCR_inv[variable]
+                array_variables.append(var_inv)
+        kwargs["array_variables"] = array_variables
+        track_extra_variables = []
+
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
             if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
-                kwargs["track_extra_variables"].append(var_inv)
+                track_extra_variables.append(var_inv)
+        kwargs["track_extra_variables"] = track_extra_variables
         kwargs["raw_data"] = raw_data
         kwargs["only_variables"] = (
             None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
         )
         kwargs.update(class_kwargs)
         eddies = cls(size=nb_obs, **kwargs)
-        for variable in var_list:
+
+        for i_var, variable in enumerate(var_list):
             var_inv = VAR_DESCR_inv[variable]
-            logger.debug("%s will be loaded", variable)
+            logger.debug("%s will be loaded (%d/%d)", variable, i_var, len(var_list))
             # find unit factor
             input_unit = h_zarr[variable].attrs.get("unit", None)
             if input_unit is None:
@@ -858,6 +864,7 @@ class EddiesObservations(object):
             i_start = 0
         if i_stop is None:
             i_stop = handler_zarr.shape[0]
+
         for i in range(i_start, i_stop, buffer_size):
             sl_in = slice(i, min(i + buffer_size, i_stop))
             data = handler_zarr[sl_in]
@@ -868,6 +875,7 @@ class EddiesObservations(object):
                     data -= add_offset
                 if scale_factor is not None:
                     data /= scale_factor
+
             sl_out = slice(i - i_start, i - i_start + buffer_size)
             handler_eddies[sl_out] = data
 

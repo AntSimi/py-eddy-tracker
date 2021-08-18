@@ -1495,7 +1495,8 @@ class NetworkObservations(GroupEddiesObservations):
 
         t_start, t_end = int(self.period[0]), int(self.period[1])
 
-        dates = arange(t_start, t_start + n_days + 1)
+        # dates = arange(t_start, t_start + n_days + 1)
+        dates = arange(t_start, min(t_start + n_days + 1, t_end + 1))
         first_files = [date_function(x) for x in dates]
 
         c = GridCollection.from_netcdf_list(first_files, dates, **uv_params)
@@ -1575,7 +1576,8 @@ class NetworkObservations(GroupEddiesObservations):
         # if end is not None and end < t_end:
         #     t_end = end
 
-        dates = arange(t_start, t_start + n_days + 1)
+        dates = arange(t_start, min(t_start + n_days + 1, t_end + 1))
+        # print("dates = ", dates)
         first_files = [date_function(x) for x in dates]
 
         c = GridCollection.from_netcdf_list(first_files, dates, **uv_params)
