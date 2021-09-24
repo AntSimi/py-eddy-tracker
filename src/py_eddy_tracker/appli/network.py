@@ -21,6 +21,16 @@ def build_network():
     parser.add_argument(
         "--window", "-w", type=int, help="Half time window to search eddy", default=1
     )
+
+    parser.add_argument(
+        "--min-overlap", "-p", type=float, help="minimum overlap area to associate observations", default=0.2
+    )
+    parser.add_argument(
+        "--minimal-area",
+            action="store_true",
+            help="If True, use intersection/little polygon, else intersection/union",
+    )
+
     parser.contour_intern_arg()
 
     parser.memory_arg()
@@ -32,7 +42,7 @@ def build_network():
         intern=args.intern,
         memory=args.memory,
     )
-    group = n.group_observations(minimal_area=True)
+    group = n.group_observations(min_overlap=args.min_overlap, minimal_area=args.minimal_area)
     n.build_dataset(group).write_file(filename=args.out)
 
 
@@ -44,6 +54,14 @@ def divide_network():
     parser.add_argument(
         "--window", "-w", type=int, help="Half time window to search eddy", default=1
     )
+    parser.add_argument(
+        "--min-overlap", "-p", type=float, help="minimum overlap area to associate observations", default=0.2
+    )
+    parser.add_argument(
+        "--minimal-area",
+            action="store_true",
+            help="If True, use intersection/little polygon, else intersection/union",
+    )
     args = parser.parse_args()
     contour_name = TrackEddiesObservations.intern(args.intern, public_label=True)
     e = TrackEddiesObservations.load_file(
@@ -52,7 +70,7 @@ def divide_network():
     )
     n = NetworkObservations.from_split_network(
         TrackEddiesObservations.load_file(args.input, raw_data=True),
-        e.split_network(intern=args.intern, window=args.window),
+        e.split_network(intern=args.intern, window=args.window, min_overlap=args.min_overlap, minimal_area=args.minimal_area),
     )
     n.write_file(filename=args.out)
 
