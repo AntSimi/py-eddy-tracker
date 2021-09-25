@@ -680,6 +680,7 @@ class GridDataset(object):
             )
             z_min, z_max = z_min_p, z_max_p
 
+        logger.debug("Levels from %f to %f", z_min, z_max)
         levels = arange(z_min - z_min % step, z_max - z_max % step + 2 * step, step)
 
         # Get x and y values
@@ -1404,7 +1405,8 @@ class RegularGridDataset(GridDataset):
             tmp_matrix = ma.zeros((2 * d_lon + data.shape[0], k_shape[1]))
             tmp_matrix.mask = ones(tmp_matrix.shape, dtype=bool)
             # Slice to apply on input data
-            sl_lat_data = slice(max(0, i - d_lat), min(i + d_lat, data.shape[1]))
+            # +1 for upper bound, to take in acount this column
+            sl_lat_data = slice(max(0, i - d_lat), min(i + d_lat + 1, data.shape[1]))
             # slice to apply on temporary matrix to store input data
             sl_lat_in = slice(
                 d_lat - (i - sl_lat_data.start), d_lat + (sl_lat_data.stop - i)
