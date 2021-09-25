@@ -1,4 +1,4 @@
-matplotlib
+matplotlib<3.5
 netCDF4
 numba>=0.53
 numpy<1.21
