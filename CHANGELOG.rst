@@ -19,6 +19,9 @@ Changed
 Fixed
 ^^^^^
 
+- Fix bug in convolution(filter), lowest rows was replace by zeros in convolution computation.
+  Important impact for tiny kernel
+
 Added
 ^^^^^
 
