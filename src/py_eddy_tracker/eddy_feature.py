@@ -646,7 +646,7 @@ class Contours(object):
                     paths.append(i.vertices)
             local_kwargs = kwargs.copy()
             if "color" not in kwargs:
-                local_kwargs["color"] = collection.get_color()
+                local_kwargs["color"] = collection.get_edgecolor()
                 local_kwargs.pop("label", None)
             elif j != 0:
                 local_kwargs.pop("label", None)
