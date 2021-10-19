@@ -25,6 +25,8 @@ Fixed
 Added
 ^^^^^
 
+- Allow to replace mask by isnan method to manage nan data instead of masked data
+
 [3.5.0] - 2021-06-22
 --------------------
 

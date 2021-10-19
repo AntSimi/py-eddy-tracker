@@ -258,6 +258,7 @@ class GridDataset(object):
         "global_attrs",
         "vars",
         "contours",
+        "nan_mask",
     )
 
     GRAVITY = 9.807
@@ -267,7 +268,14 @@ class GridDataset(object):
     N = 1
 
     def __init__(
-        self, filename, x_name, y_name, centered=None, indexs=None, unset=False
+        self,
+        filename,
+        x_name,
+        y_name,
+        centered=None,
+        indexs=None,
+        unset=False,
+        nan_masking=False,
     ):
         """
         :param str filename: Filename to load
@@ -276,6 +284,7 @@ class GridDataset(object):
         :param bool,None centered: Allow to know how coordinates could be used with pixel
         :param dict indexs: A dictionary that sets indexes to use for non-coordinate dimensions
         :param bool unset: Set to True to create an empty grid object without file
+        :param bool nan_masking: Set to True to replace data.mask with isnan method result
         """
         self.dimensions = None
         self.variables_description = None
@@ -286,6 +295,7 @@ class GridDataset(object):
         self.y_bounds = None
         self.x_dim = None
         self.y_dim = None
+        self.nan_mask = nan_masking
         self.centered = centered
         self.contours = None
         self.filename = filename
@@ -519,6 +529,10 @@ class GridDataset(object):
                     if i_x > i_y:
                         self.variables_description[varname]["infos"]["transpose"] = True
                         self.vars[varname] = self.vars[varname].T
+            if self.nan_mask:
+                self.vars[varname] = ma.array(
+                    self.vars[varname], mask=isnan(self.vars[varname]),
+                )
             if not hasattr(self.vars[varname], "mask"):
                 self.vars[varname] = ma.array(
                     self.vars[varname],
