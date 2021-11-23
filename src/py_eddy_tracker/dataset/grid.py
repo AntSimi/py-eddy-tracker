@@ -607,6 +607,7 @@ class GridDataset(object):
         date,
         step=0.005,
         shape_error=55,
+        presampling_multiplier=10,
         sampling=50,
         sampling_method="visvalingam",
         pixel_limit=None,
@@ -624,8 +625,10 @@ class GridDataset(object):
         :param datetime.datetime date: Date to be stored in object to date data
         :param float,int step: Height between two layers in m
         :param float,int shape_error: Maximal error allowed for outermost contour in %
+        :param int presampling_multiplier:
+            Evenly oversample the initial number of points in the contour by nb_pts x presampling_multiplier to fit circles
         :param int sampling: Number of points to store contours and speed profile
-        :param str sampling_method: Method to resample, 'uniform' or 'visvalingam'
+        :param str sampling_method: Method to resample the stored contours, 'uniform' or 'visvalingam'
         :param (int,int),None pixel_limit:
             Min and max number of pixels inside the inner and the outermost contour to be considered as an eddy
         :param float,None precision: Truncate values at the defined precision in m
@@ -849,42 +852,59 @@ class GridDataset(object):
                     obs.amplitude[:] = amp.amplitude
                     obs.speed_average[:] = max_average_speed
                     obs.num_point_e[:] = contour.lon.shape[0]
-                    xy_e = resample(contour.lon, contour.lat, **out_sampling)
-                    obs.contour_lon_e[:], obs.contour_lat_e[:] = xy_e
                     obs.num_point_s[:] = speed_contour.lon.shape[0]
-                    xy_s = resample(
-                        speed_contour.lon, speed_contour.lat, **out_sampling
-                    )
-                    obs.contour_lon_s[:], obs.contour_lat_s[:] = xy_s
 
-                    # FIXME : we use a contour without resampling
-                    # First, get position based on innermost contour
-                    centlon_i, centlat_i, _, _ = _fit_circle_path(
-                        create_vertice(inner_contour.lon, inner_contour.lat)
+                    # Evenly resample contours with nb_pts = nb_pts_original x presampling_multiplier
+                    xy_i = uniform_resample(
+                        inner_contour.lon,
+                        inner_contour.lat,
+                        num_fac=presampling_multiplier
+                        )
+                    xy_e = uniform_resample(
+                        contour.lon,
+                        contour.lat,
+                        num_fac=presampling_multiplier,
                     )
-                    # Second, get speed-based radius based on contour of max uavg
+                    xy_s = uniform_resample(
+                        speed_contour.lon,
+                        speed_contour.lat,
+                        num_fac=presampling_multiplier,
+                    )
+
+                    # First, get position of max SSH based on best fit circle with resampled innermost contour
+                    centlon_i, centlat_i, _, _ = _fit_circle_path(create_vertice(*xy_i))
+                    obs.lon_max[:] = centlon_i
+                    obs.lat_max[:] = centlat_i
+
+                    # Second, get speed-based radius, shape error, eddy center, area based on resampled contour of max uavg
                     centlon_s, centlat_s, eddy_radius_s, aerr_s = _fit_circle_path(
                         create_vertice(*xy_s)
                     )
-                    # Compute again to use resampled contour
-                    _, _, eddy_radius_e, aerr_e = _fit_circle_path(
-                        create_vertice(*xy_e)
-                    )
-
                     obs.radius_s[:] = eddy_radius_s
-                    obs.radius_e[:] = eddy_radius_e
-                    obs.shape_error_e[:] = aerr_e
                     obs.shape_error_s[:] = aerr_s
                     obs.speed_area[:] = poly_area(
                         *coordinates_to_local(*xy_s, lon0=centlon_s, lat0=centlat_s)
                     )
+                    obs.lon[:] = centlon_s
+                    obs.lat[:] = centlat_s
+
+                    # Third, compute effective radius, shape error, area from resampled effective contour
+                    _, _, eddy_radius_e, aerr_e = _fit_circle_path(
+                        create_vertice(*xy_e)
+                    )
+                    obs.radius_e[:] = eddy_radius_e
+                    obs.shape_error_e[:] = aerr_e
                     obs.effective_area[:] = poly_area(
                         *coordinates_to_local(*xy_e, lon0=centlon_s, lat0=centlat_s)
                     )
-                    obs.lon[:] = centlon_s
-                    obs.lat[:] = centlat_s
-                    obs.lon_max[:] = centlon_i
-                    obs.lat_max[:] = centlat_i
+
+                    # Finally, resample contours with output parameters
+                    xy_e_f = resample(*xy_e, **out_sampling)
+                    xy_s_f = resample(*xy_s, **out_sampling)
+
+                    obs.contour_lon_s[:], obs.contour_lat_s[:] = xy_s_f
+                    obs.contour_lon_e[:], obs.contour_lat_e[:] = xy_e_f
+
                     if aerr > 99.9 or aerr_s > 99.9:
                         logger.warning(
                             "Strange shape at this step! shape_error : %f, %f",
