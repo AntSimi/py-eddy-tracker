@@ -86,7 +86,7 @@ def poly_area_vertice(v):
 @njit(cache=True)
 def poly_area(x, y):
     """
-    Must be call with local coordinates (in m, to get an area in m²).
+    Must be called with local coordinates (in m, to get an area in m²).
 
     :param array x:
     :param array y:
