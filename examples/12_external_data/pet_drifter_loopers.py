@@ -12,7 +12,6 @@ import re
 
 import numpy as np
 import py_eddy_tracker_sample
-from IPython.display import HTML
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 
