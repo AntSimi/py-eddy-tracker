@@ -445,6 +445,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         if inplace:
             self.obs[yfield] = result
             return self
+        return result
 
     def median_filter(self, half_window, xfield, yfield, inplace=True):
         result = track_median_filter(
@@ -568,7 +569,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         """
         p0, p1 = self.period
         indexs = list()
-        for i_self, i_other, t0, t1 in self.align_on(other, bins=range(p0, p1 + 2)):
+        for i_self, i_other, t0, t1 in self.align_on(other, bins=arange(p0, p1 + 2)):
             i, j, s = self.match(other, i_self=i_self, i_other=i_other, **kwargs)
             indexs.append(other.re_reference_index(j, i_other))
         indexs = concatenate(indexs)
@@ -578,10 +579,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
     def format_label(self, label):
         t0, t1 = self.period
         return label.format(
-            t0=t0,
-            t1=t1,
-            nb_obs=len(self),
-            nb_tracks=(self.nb_obs_by_track != 0).sum(),
+            t0=t0, t1=t1, nb_obs=len(self), nb_tracks=(self.nb_obs_by_track != 0).sum(),
         )
 
     def plot(self, ax, ref=None, **kwargs):
