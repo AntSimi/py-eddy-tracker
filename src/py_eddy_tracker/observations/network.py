@@ -1327,7 +1327,7 @@ class NetworkObservations(GroupEddiesObservations):
         )
         new.sign_type = self.sign_type
         if nb_obs == 0:
-            logger.warning("Empty dataset will be created")
+            logger.info("Empty dataset will be created")
         else:
             logger.info(
                 f"{nb_obs} observations will be extracted ({nb_obs / self.shape[0]:.3%})"
@@ -1353,7 +1353,7 @@ class NetworkObservations(GroupEddiesObservations):
         new = self.__class__.new_like(self, nb_obs)
         new.sign_type = self.sign_type
         if nb_obs == 0:
-            logger.warning("Empty dataset will be created")
+            logger.info("Empty dataset will be created")
         else:
             logger.debug(
                 f"{nb_obs} observations will be extracted ({nb_obs / self.shape[0]:.3%})"

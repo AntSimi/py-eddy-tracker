@@ -1,11 +1,9 @@
 """
-[draft] Loopers vs eddies from altimetry
+Colocate looper with eddy from altimetry
 ========================================
 
-All loopers datas used in this example are a subset from the dataset describe in this article
+All loopers data used in this example are a subset from the dataset describe in this article
 [Lumpkin, R. : Global characteristics of coherent vortices from surface drifter trajectories](https://doi.org/10.1002/2015JC011435)
-
-
 """
 
 import re
@@ -71,65 +69,85 @@ loopers_med = TrackEddiesObservations.load_file(
 )
 
 # %%
-#
+# Global view
+# ===========
 ax = start_axes("All drifter available in med from Lumpkin dataset")
 loopers_med.plot(ax, lw=0.5, color="r", ref=-10)
 update_axes(ax)
 
 # %%
-# Only long period drifter
-long_drifter = loopers_med.extract_with_length((400, -1))
-ax = start_axes("Long period drifter")
-long_drifter.plot(ax, lw=0.5, color="r", ref=-10)
-update_axes(ax)
-print(np.unique(long_drifter.tracks))
-
-# %%
-drifter_1 = long_drifter.extract_ids((3588,))
-fig = plt.figure(figsize=(8, 4))
+# One segment of drifter
+# ======================
+#
+# Get a drifter segment (index used have no correspondance with original dataset).
+looper = loopers_med.extract_ids((3588,))
+fig = plt.figure(figsize=(16, 6))
 ax = fig.add_subplot(111, aspect="equal")
-ax.grid()
-drifter_1.plot(ax, lw=0.5)
-# %%
-drifter_1.close_tracks(
-    anticyclonic_eddies, method="close_center", delta=0.5, nb_obs_min=25
-).tracks
-
-# %%
-# Animation which show drifter with colocated eddies
-ed = anticyclonic_eddies.extract_ids((4738, 4836, 4910,))
-x, y, t = drifter_1.lon, drifter_1.lat, drifter_1.time
-
-
-def update(frame):
-    # We display last 5 days of loopers trajectory
-    m = (t < frame) * (t > (frame - 5))
-    a.func_animation(frame)
-    line.set_data(x[m], y[m])
-
-
-a = Anim(ed, intern=True, figsize=(8, 8), cmap="magma_r", nb_step=10, dpi=60)
-line = a.ax.plot([], [], "r", lw=4, zorder=100)[0]
-kwargs = dict(frames=np.arange(*a.period, 1), interval=100)
-a.fig.suptitle("")
-_ = VideoAnimation(a.fig, update, **kwargs)
-
-# %%
-fig = plt.figure(figsize=(12, 6))
-ax = fig.add_subplot(111)
-ax.plot(drifter_1.time, drifter_1.radius_s / 1e3, label="loopers")
-drifter_1.median_filter(7, "time", "radius_s", inplace=True)
-drifter_1.loess_filter(15, "time", "radius_s", inplace=True)
-ax.plot(
-    drifter_1.time,
-    drifter_1.radius_s / 1e3,
-    label="loopers (filtered half window 15 days)",
+looper.plot(ax, lw=0.5, label="Original position of drifter")
+looper_filtered = looper.copy()
+looper_filtered.position_filter(1, 13)
+s = looper_filtered.scatter(
+    ax,
+    "time",
+    cmap=plt.get_cmap("Spectral_r", 20),
+    label="Filtered position of drifter",
 )
-ax.plot(ed.time, ed.radius_s / 1e3, label="altimetry")
-ed.median_filter(7, "time", "radius_s", inplace=True)
-ed.loess_filter(15, "time", "radius_s", inplace=True)
-ax.plot(ed.time, ed.radius_s / 1e3, label="altimetry (filtered half window 15 days)")
-ax.set_ylabel("radius(km)"), ax.set_ylim(0, 100)
+plt.colorbar(s).set_label("time (days from 1/1/1950)")
 ax.legend()
 ax.grid()
-_ = ax.set_title("Radius from loopers and altimeter")
+
+# %%
+# Try to find a detected eddies with adt at same place. We used filtered track to simulate an eddy center
+match = looper_filtered.close_tracks(
+    anticyclonic_eddies, method="close_center", delta=0.1, nb_obs_min=50
+)
+fig = plt.figure(figsize=(16, 6))
+ax = fig.add_subplot(111, aspect="equal")
+looper.plot(ax, lw=0.5, label="Original position of drifter")
+looper_filtered.plot(ax, lw=1.5, label="Filtered position of drifter")
+match.plot(ax, lw=1.5, label="Matched eddy")
+ax.legend()
+ax.grid()
+
+# %%
+# Display radius of this 2 datasets.
+fig = plt.figure(figsize=(20, 8))
+ax = fig.add_subplot(111)
+ax.plot(looper.time, looper.radius_s / 1e3, label="loopers")
+looper_radius = looper.copy()
+looper_radius.median_filter(1, "time", "radius_s", inplace=True)
+looper_radius.loess_filter(13, "time", "radius_s", inplace=True)
+ax.plot(
+    looper_radius.time,
+    looper_radius.radius_s / 1e3,
+    label="loopers (filtered half window 13 days)",
+)
+ax.plot(match.time, match.radius_s / 1e3, label="altimetry")
+match_radius = match.copy()
+match_radius.median_filter(1, "time", "radius_s", inplace=True)
+match_radius.loess_filter(13, "time", "radius_s", inplace=True)
+ax.plot(
+    match_radius.time,
+    match_radius.radius_s / 1e3,
+    label="altimetry (filtered half window 13 days)",
+)
+ax.set_ylabel("radius(km)"), ax.set_ylim(0, 100)
+ax.legend()
+ax.set_title("Radius from loopers and altimeter")
+ax.grid()
+
+
+# %%
+# Animation which show drifter with colocated eddy
+def update(frame):
+    # We display last 5 days of loopers trajectory
+    m = (looper.time < frame) * (looper.time > (frame - 5))
+    anim.func_animation(frame)
+    line.set_data(looper.lon[m], looper.lat[m])
+
+
+anim = Anim(match, intern=True, figsize=(8, 8), cmap="magma_r", nb_step=10, dpi=75)
+# mappable to show drifter in red
+line = anim.ax.plot([], [], "r", lw=4, zorder=100)[0]
+anim.fig.suptitle("")
+_ = VideoAnimation(anim.fig, update, frames=np.arange(*anim.period, 1), interval=125)
