@@ -21,11 +21,13 @@ Fixed
 
 - Fix bug in convolution(filter), lowest rows was replace by zeros in convolution computation.
   Important impact for tiny kernel
+- Fix method of sampling before contour fitting
 
 Added
 ^^^^^
 
 - Allow to replace mask by isnan method to manage nan data instead of masked data
+- Add drifter colocation example
 
 [3.5.0] - 2021-06-22
 --------------------

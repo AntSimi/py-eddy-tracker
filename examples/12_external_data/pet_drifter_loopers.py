@@ -2,7 +2,7 @@
 Colocate looper with eddy from altimetry
 ========================================
 
-All loopers data used in this example are a subset from the dataset describe in this article
+All loopers data used in this example are a subset from the dataset described in this article
 [Lumpkin, R. : Global characteristics of coherent vortices from surface drifter trajectories](https://doi.org/10.1002/2015JC011435)
 """
 
@@ -29,7 +29,7 @@ class VideoAnimation(FuncAnimation):
 
     def save(self, *args, **kwargs):
         if args[0].endswith("gif"):
-            # In this case gif is use to create thumbnail which are not use but consume same time than video
+            # In this case gif is used to create thumbnail which is not used but consume same time than video
             # So we create an empty file, to save time
             with open(args[0], "w") as _:
                 pass
@@ -71,7 +71,7 @@ loopers_med = TrackEddiesObservations.load_file(
 # %%
 # Global view
 # ===========
-ax = start_axes("All drifter available in med from Lumpkin dataset")
+ax = start_axes("All drifters available in Med from Lumpkin dataset")
 loopers_med.plot(ax, lw=0.5, color="r", ref=-10)
 update_axes(ax)
 
@@ -79,7 +79,7 @@ update_axes(ax)
 # One segment of drifter
 # ======================
 #
-# Get a drifter segment (index used have no correspondance with original dataset).
+# Get a drifter segment (the indexes used have no correspondance with the original dataset).
 looper = loopers_med.extract_ids((3588,))
 fig = plt.figure(figsize=(16, 6))
 ax = fig.add_subplot(111, aspect="equal")
@@ -138,7 +138,7 @@ ax.grid()
 
 
 # %%
-# Animation which show drifter with colocated eddy
+# Animation of a drifter and its colocated eddy
 def update(frame):
     # We display last 5 days of loopers trajectory
     m = (looper.time < frame) * (looper.time > (frame - 5))

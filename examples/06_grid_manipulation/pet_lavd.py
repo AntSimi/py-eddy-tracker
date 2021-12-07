@@ -65,7 +65,7 @@ class VideoAnimation(FuncAnimation):
 
     def save(self, *args, **kwargs):
         if args[0].endswith("gif"):
-            # In this case gif is use to create thumbnail which are not use but consume same time than video
+            # In this case gif is used to create thumbnail which is not used but consume same time than video
             # So we create an empty file, to save time
             with open(args[0], "w") as _:
                 pass
@@ -159,11 +159,7 @@ _ = VideoAnimation(ax.figure, update, **kw_video)
 # Format LAVD data
 lavd = RegularGridDataset.with_array(
     coordinates=("lon", "lat"),
-    datas=dict(
-        lavd=lavd.T,
-        lon=x_g,
-        lat=y_g,
-    ),
+    datas=dict(lavd=lavd.T, lon=x_g, lat=y_g,),
     centered=True,
 )
 
