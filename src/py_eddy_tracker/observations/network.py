@@ -1301,7 +1301,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         return self.extract_with_mask(self.get_mask_with_period(period))
 
-    def extract_light_with_mask(self, mask):
+    def extract_light_with_mask(self, mask, track_extra_variables=[]):
         """extract data with mask, but only with variables used for coherence, aka self.array_variables
 
         :param mask: mask used to extract
@@ -1319,7 +1319,7 @@ class NetworkObservations(GroupEddiesObservations):
         variables = ["time"] + self.array_variables
         new = self.__class__(
             size=nb_obs,
-            track_extra_variables=[],
+            track_extra_variables=track_extra_variables,
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables,
             only_variables=variables,
@@ -1333,9 +1333,19 @@ class NetworkObservations(GroupEddiesObservations):
                 f"{nb_obs} observations will be extracted ({nb_obs / self.shape[0]:.3%})"
             )
 
-        for field in variables:
+        for field in variables + track_extra_variables:
             logger.debug("Copy of field %s ...", field)
             new.obs[field] = self.obs[field][mask]
+
+        if "previous_obs" in track_extra_variables and "next_obs" in track_extra_variables:
+            # n & p must be re-index
+            n, p = self.next_obs[mask], self.previous_obs[mask]
+            # we add 2 for -1 index return index -1
+            translate = -ones(len(self) + 1, dtype="i4")
+            translate[:-1][mask] = arange(nb_obs)
+            new.next_obs[:] = translate[n]
+            new.previous_obs[:] = translate[p]
+
         return new
 
     def extract_with_mask(self, mask):
