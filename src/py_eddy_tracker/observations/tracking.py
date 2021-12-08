@@ -578,10 +578,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
     def format_label(self, label):
         t0, t1 = self.period
         return label.format(
-            t0=t0,
-            t1=t1,
-            nb_obs=len(self),
-            nb_tracks=(self.nb_obs_by_track != 0).sum(),
+            t0=t0, t1=t1, nb_obs=len(self), nb_tracks=(self.nb_obs_by_track != 0).sum(),
         )
 
     def plot(self, ax, ref=None, **kwargs):
@@ -730,7 +727,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
             if len(ii) == 0:
                 continue
             c = zeros(len(xj))
-            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area)
+            c[ij] = vertice_overlap(
+                xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+            )
             # We remove low overlap
             c[c < min_overlap] = 0
             # We get index of maximal overlap
@@ -773,7 +772,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
             if len(ii) == 0:
                 continue
             c = zeros(len(xj))
-            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area)
+            c[ij] = vertice_overlap(
+                xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+            )
             # We remove low overlap
             c[c < min_overlap] = 0
             # We get index of maximal overlap

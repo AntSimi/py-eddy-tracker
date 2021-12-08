@@ -1337,7 +1337,10 @@ class NetworkObservations(GroupEddiesObservations):
             logger.debug("Copy of field %s ...", field)
             new.obs[field] = self.obs[field][mask]
 
-        if "previous_obs" in track_extra_variables and "next_obs" in track_extra_variables:
+        if (
+            "previous_obs" in track_extra_variables
+            and "next_obs" in track_extra_variables
+        ):
             # n & p must be re-index
             n, p = self.next_obs[mask], self.previous_obs[mask]
             # we add 2 for -1 index return index -1
@@ -1741,7 +1744,12 @@ class Network:
             for j in range(i + 1, min(self.window + i + 1, self.nb_input)):
                 xj, yj = self.buffer.load_contour(self.filenames[j])
                 ii, ij = bbox_intersection(xi, yi, xj, yj)
-                m = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area) > min_overlap
+                m = (
+                    vertice_overlap(
+                        xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+                    )
+                    > min_overlap
+                )
                 results.append((i, j, ii[m], ij[m]))
         if display_iteration:
             print()
