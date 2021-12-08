@@ -8,6 +8,7 @@ from io import BufferedReader, BytesIO
 from tarfile import ExFileObject
 from tokenize import TokenError
 
+import packaging
 import zarr
 from matplotlib.cm import get_cmap
 from matplotlib.collections import PolyCollection
@@ -73,6 +74,25 @@ from ..poly import (
 )
 
 logger = logging.getLogger("pet")
+
+# keep only major and minor version number
+_software_version_reduced = packaging.version.Version("{v.major}.{v.minor}".format(v=packaging.version.parse(__version__)))
+
+
+def _check_versions(version):
+    """Check if version of py_eddy_tracker used to create the file is compatible with software version
+
+    if not, warn user with both versions
+
+    :param version: string version of software used to create the file. If None, version was not provided
+    :type version: str, None
+    """
+
+    file_version = packaging.version.parse(version) if version is not None else None
+    if file_version is None or file_version < _software_version_reduced:
+        logger.warning("File was created with py-eddy-tracker version '%s' but software version is '%s'",
+            file_version, _software_version_reduced
+        )
 
 
 @njit(cache=True, fastmath=True)
@@ -765,6 +785,8 @@ class EddiesObservations(object):
             if not isinstance(filename, str):
                 filename = filename.astype(str)
             h_zarr = zarr.open(filename)
+
+        _check_versions(h_zarr.attrs.get("framework_version", None))
         var_list = cls.build_var_list(list(h_zarr.keys()), remove_vars, include_vars)
 
         nb_obs = getattr(h_zarr, var_list[0]).shape[0]
@@ -908,6 +930,8 @@ class EddiesObservations(object):
         else:
             args, kwargs = (filename,), dict()
         with Dataset(*args, **kwargs) as h_nc:
+            _check_versions(getattr(h_nc, "framework_version", None))
+
             var_list = cls.build_var_list(
                 list(h_nc.variables.keys()), remove_vars, include_vars
             )
