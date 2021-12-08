@@ -718,8 +718,6 @@ class EddiesObservations(object):
             if len(shape) > len(dims):
                 dims = shape
         return dims
-        #     dims.extend(list(getattr(h, varname).shape))
-        # return set(dims)
 
     @classmethod
     def load_file(cls, filename, **kwargs):
