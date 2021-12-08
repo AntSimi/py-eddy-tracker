@@ -767,9 +767,8 @@ class EddiesObservations(object):
             h_zarr = zarr.open(filename)
         var_list = cls.build_var_list(list(h_zarr.keys()), remove_vars, include_vars)
 
-        # FIXME must be investigated, in zarr no dimensions name (or could be add in attr)
-        #   so we assume first dimension is number of observation, second is number of contours
-        nb_obs, track_array_variables = getattr(h_zarr, var_list[0]).shape
+        nb_obs = getattr(h_zarr, var_list[0]).shape[0]
+        track_array_variables = h_zarr.attrs["track_array_variables"]
 
         if indexs is not None and "obs" in indexs:
             sl = indexs["obs"]
@@ -1040,6 +1039,7 @@ class EddiesObservations(object):
                 eddies.obs[variable] = handler.variables[variable][:]
             else:
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
+        eddies.sign_type = handler.rotation_type
         return eddies
 
     @classmethod
@@ -1058,6 +1058,7 @@ class EddiesObservations(object):
                 eddies.obs[variable] = handler.variables[variable][:]
             else:
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
+        eddies.sign_type = handler.rotation_type
         return eddies
 
     def propagate(
