@@ -15,12 +15,19 @@ Changed
   New identifications are produced with this type, old files could still be loaded.
   If you use old identifications for tracking use the `--unraw` option to unpack old times and store data with the new format.
 - Now amplitude is stored with .1 mm of precision (instead of 1 mm), same advice as for time.
+- expose more parameters to users for bash tools build_network & divide_network
+- add warning when loading a file created from a previous version of py-eddy-tracker.
+
+
 
 Fixed
 ^^^^^
 
 - Fix bug in convolution(filter), lowest rows was replace by zeros in convolution computation.
   Important impact for tiny kernel
+- Fix bug when loading dataset in zarr format, not all variables were correctly loaded
+- Fix bug when zarr dataset has same size for number of observations and contour size
+- Fix bug when tracking, previous_virtual_obs was not always loaded
 
 Added
 ^^^^^
