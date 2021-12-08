@@ -2,7 +2,9 @@
 Track animation with standard matplotlib
 ========================================
 
-Run in a terminal this script, which allow to watch eddy evolution
+Run in a terminal this script, which allow to watch eddy evolution.
+
+You could use also *EddyAnim* script to display/save animation.
 
 """
 import re
