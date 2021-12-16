@@ -8,6 +8,7 @@ from io import BufferedReader, BytesIO
 from tarfile import ExFileObject
 from tokenize import TokenError
 
+import packaging
 import zarr
 from matplotlib.cm import get_cmap
 from matplotlib.collections import PolyCollection
@@ -73,6 +74,29 @@ from ..poly import (
 )
 
 logger = logging.getLogger("pet")
+
+# keep only major and minor version number
+_software_version_reduced = packaging.version.Version(
+    "{v.major}.{v.minor}".format(v=packaging.version.parse(__version__))
+)
+
+
+def _check_versions(version):
+    """Check if version of py_eddy_tracker used to create the file is compatible with software version
+
+    if not, warn user with both versions
+
+    :param version: string version of software used to create the file. If None, version was not provided
+    :type version: str, None
+    """
+
+    file_version = packaging.version.parse(version) if version is not None else None
+    if file_version is None or file_version < _software_version_reduced:
+        logger.warning(
+            "File was created with py-eddy-tracker version '%s' but software version is '%s'",
+            file_version,
+            _software_version_reduced,
+        )
 
 
 @njit(cache=True, fastmath=True)
@@ -687,10 +711,13 @@ class EddiesObservations(object):
             h = filename
         else:
             h = zarr.open(filename)
+
         dims = list()
         for varname in h:
-            dims.extend(list(getattr(h, varname).shape))
-        return set(dims)
+            shape = getattr(h, varname).shape
+            if len(shape) > len(dims):
+                dims = shape
+        return dims
 
     @classmethod
     def load_file(cls, filename, **kwargs):
@@ -702,11 +729,7 @@ class EddiesObservations(object):
         .. code-block:: python
 
             kwargs_latlon_300 = dict(
-                include_vars=[
-                    "longitude",
-                    "latitude",
-                ],
-                indexs=dict(obs=slice(0, 300)),
+                include_vars=["longitude", "latitude",], indexs=dict(obs=slice(0, 300)),
             )
             small_dataset = TrackEddiesObservations.load_file(
                 filename, **kwargs_latlon_300
@@ -754,20 +777,19 @@ class EddiesObservations(object):
         :return type: class
         """
         # FIXME
-        array_dim = -1
         if isinstance(filename, zarr.storage.MutableMapping):
             h_zarr = filename
         else:
             if not isinstance(filename, str):
                 filename = filename.astype(str)
             h_zarr = zarr.open(filename)
+
+        _check_versions(h_zarr.attrs.get("framework_version", None))
         var_list = cls.build_var_list(list(h_zarr.keys()), remove_vars, include_vars)
 
         nb_obs = getattr(h_zarr, var_list[0]).shape[0]
-        dims = list(cls.zarr_dimension(filename))
-        if len(dims) == 2 and nb_obs in dims:
-            # FIXME must be investigated, in zarr no dimensions name (or could be add in attr)
-            array_dim = dims[1] if nb_obs == dims[0] else dims[0]
+        track_array_variables = h_zarr.attrs["track_array_variables"]
+
         if indexs is not None and "obs" in indexs:
             sl = indexs["obs"]
             sl = slice(sl.start, min(sl.stop, nb_obs))
@@ -781,28 +803,33 @@ class EddiesObservations(object):
         logger.debug("%d observations will be load", nb_obs)
         kwargs = dict()
 
-        if array_dim in dims:
-            kwargs["track_array_variables"] = array_dim
-            kwargs["array_variables"] = list()
-            for variable in var_list:
-                if array_dim in h_zarr[variable].shape:
-                    var_inv = VAR_DESCR_inv[variable]
-                    kwargs["array_variables"].append(var_inv)
-        array_variables = kwargs.get("array_variables", list())
-        kwargs["track_extra_variables"] = []
+        kwargs["track_array_variables"] = h_zarr.attrs.get(
+            "track_array_variables", track_array_variables
+        )
+
+        array_variables = list()
+        for variable in var_list:
+            if len(h_zarr[variable].shape) > 1:
+                var_inv = VAR_DESCR_inv[variable]
+                array_variables.append(var_inv)
+        kwargs["array_variables"] = array_variables
+        track_extra_variables = []
+
         for variable in var_list:
             var_inv = VAR_DESCR_inv[variable]
             if var_inv not in cls.ELEMENTS and var_inv not in array_variables:
-                kwargs["track_extra_variables"].append(var_inv)
+                track_extra_variables.append(var_inv)
+        kwargs["track_extra_variables"] = track_extra_variables
         kwargs["raw_data"] = raw_data
         kwargs["only_variables"] = (
             None if include_vars is None else [VAR_DESCR_inv[i] for i in include_vars]
         )
         kwargs.update(class_kwargs)
         eddies = cls(size=nb_obs, **kwargs)
-        for variable in var_list:
+
+        for i_var, variable in enumerate(var_list):
             var_inv = VAR_DESCR_inv[variable]
-            logger.debug("%s will be loaded", variable)
+            logger.debug("%s will be loaded (%d/%d)", variable, i_var, len(var_list))
             # find unit factor
             input_unit = h_zarr[variable].attrs.get("unit", None)
             if input_unit is None:
@@ -858,6 +885,7 @@ class EddiesObservations(object):
             i_start = 0
         if i_stop is None:
             i_stop = handler_zarr.shape[0]
+
         for i in range(i_start, i_stop, buffer_size):
             sl_in = slice(i, min(i + buffer_size, i_stop))
             data = handler_zarr[sl_in]
@@ -868,6 +896,7 @@ class EddiesObservations(object):
                     data -= add_offset
                 if scale_factor is not None:
                     data /= scale_factor
+
             sl_out = slice(i - i_start, i - i_start + buffer_size)
             handler_eddies[sl_out] = data
 
@@ -901,6 +930,8 @@ class EddiesObservations(object):
         else:
             args, kwargs = (filename,), dict()
         with Dataset(*args, **kwargs) as h_nc:
+            _check_versions(getattr(h_nc, "framework_version", None))
+
             var_list = cls.build_var_list(
                 list(h_nc.variables.keys()), remove_vars, include_vars
             )
@@ -1032,6 +1063,7 @@ class EddiesObservations(object):
                 eddies.obs[variable] = handler.variables[variable][:]
             else:
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
+        eddies.sign_type = handler.rotation_type
         return eddies
 
     @classmethod
@@ -1050,6 +1082,7 @@ class EddiesObservations(object):
                 eddies.obs[variable] = handler.variables[variable][:]
             else:
                 eddies.obs[VAR_DESCR_inv[variable]] = handler.variables[variable][:]
+        eddies.sign_type = handler.rotation_type
         return eddies
 
     def propagate(
@@ -1977,11 +2010,7 @@ class EddiesObservations(object):
 
     def format_label(self, label):
         t0, t1 = self.period
-        return label.format(
-            t0=t0,
-            t1=t1,
-            nb_obs=len(self),
-        )
+        return label.format(t0=t0, t1=t1, nb_obs=len(self),)
 
     def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
         """Plot the speed and effective (dashed) contour of the eddies
@@ -2352,14 +2381,7 @@ def grid_count_pixel_in(
         x_, y_ = reduce_size(x_, y_)
         v = create_vertice(x_, y_)
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
-            v,
-            x_bounds,
-            y_bounds,
-            xstep,
-            ystep,
-            N,
-            is_circular,
-            x_size,
+            v, x_bounds, y_bounds, xstep, ystep, N, is_circular, x_size,
         )
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
         grid_count_(grid, i, j)

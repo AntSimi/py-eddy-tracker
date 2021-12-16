@@ -657,12 +657,12 @@ class TrackEddiesObservations(GroupEddiesObservations):
 
     def set_tracks(self, x, y, ids, window, **kwargs):
         """
-        Will split one group (network) in segments
+        Split one group (network) in segments
 
         :param array x: coordinates of group
         :param array y: coordinates of group
         :param ndarray ids: several fields like time, group, ...
-        :param int windows: number of days where observations could missed
+        :param int window: number of days where observations could missed
         """
         time_index = build_index((ids["time"]).astype("i4"))
         nb = x.shape[0]
@@ -714,8 +714,8 @@ class TrackEddiesObservations(GroupEddiesObservations):
         time_e,
         time_ref,
         window,
-        min_overlap=0.01,
-        **kwargs,
+        min_overlap=0.2,
+        minimal_area=False,
     ):
         """Backward association of observations to the segments"""
         time_cur = int_(ids["time"][i_current])
@@ -731,7 +731,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
             if len(ii) == 0:
                 continue
             c = zeros(len(xj))
-            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
+            c[ij] = vertice_overlap(
+                xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+            )
             # We remove low overlap
             c[c < min_overlap] = 0
             # We get index of maximal overlap
@@ -754,8 +756,8 @@ class TrackEddiesObservations(GroupEddiesObservations):
         time_e,
         time_ref,
         window,
-        min_overlap=0.01,
-        **kwargs,
+        min_overlap=0.2,
+        minimal_area=False,
     ):
         """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1
@@ -774,7 +776,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
             if len(ii) == 0:
                 continue
             c = zeros(len(xj))
-            c[ij] = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs)
+            c[ij] = vertice_overlap(
+                xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+            )
             # We remove low overlap
             c[c < min_overlap] = 0
             # We get index of maximal overlap

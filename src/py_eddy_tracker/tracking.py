@@ -350,6 +350,9 @@ class Correspondances(list):
                     self.virtual_obs = VirtualEddiesObservations.from_netcdf(
                         general_handler.groups["LastVirtualObs"]
                     )
+                    self.previous_virtual_obs = VirtualEddiesObservations.from_netcdf(
+                        general_handler.groups["LastPreviousVirtualObs"]
+                    )
                     # Load and last previous virtual obs to be merge with current => will be previous2_obs
                     # TODO : Need to rethink this line ??
                     self.current_obs = self.current_obs.merge(

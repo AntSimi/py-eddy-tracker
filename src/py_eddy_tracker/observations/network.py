@@ -1301,7 +1301,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         return self.extract_with_mask(self.get_mask_with_period(period))
 
-    def extract_light_with_mask(self, mask):
+    def extract_light_with_mask(self, mask, track_extra_variables=[]):
         """extract data with mask, but only with variables used for coherence, aka self.array_variables
 
         :param mask: mask used to extract
@@ -1319,7 +1319,7 @@ class NetworkObservations(GroupEddiesObservations):
         variables = ["time"] + self.array_variables
         new = self.__class__(
             size=nb_obs,
-            track_extra_variables=[],
+            track_extra_variables=track_extra_variables,
             track_array_variables=self.track_array_variables,
             array_variables=self.array_variables,
             only_variables=variables,
@@ -1333,9 +1333,22 @@ class NetworkObservations(GroupEddiesObservations):
                 f"{nb_obs} observations will be extracted ({nb_obs / self.shape[0]:.3%})"
             )
 
-        for field in variables:
+        for field in variables + track_extra_variables:
             logger.debug("Copy of field %s ...", field)
             new.obs[field] = self.obs[field][mask]
+
+        if (
+            "previous_obs" in track_extra_variables
+            and "next_obs" in track_extra_variables
+        ):
+            # n & p must be re-index
+            n, p = self.next_obs[mask], self.previous_obs[mask]
+            # we add 2 for -1 index return index -1
+            translate = -ones(len(self) + 1, dtype="i4")
+            translate[:-1][mask] = arange(nb_obs)
+            new.next_obs[:] = translate[n]
+            new.previous_obs[:] = translate[p]
+
         return new
 
     def extract_with_mask(self, mask):
@@ -1495,7 +1508,8 @@ class NetworkObservations(GroupEddiesObservations):
 
         t_start, t_end = int(self.period[0]), int(self.period[1])
 
-        dates = arange(t_start, t_start + n_days + 1)
+        # dates = arange(t_start, t_start + n_days + 1)
+        dates = arange(t_start, min(t_start + n_days + 1, t_end + 1))
         first_files = [date_function(x) for x in dates]
 
         c = GridCollection.from_netcdf_list(first_files, dates, **uv_params)
@@ -1570,12 +1584,8 @@ class NetworkObservations(GroupEddiesObservations):
         ptf_final = zeros((self.obs.size, 2), dtype="i1")
 
         t_start, t_end = int(self.period[0]), int(self.period[1])
-        # if begin is not None and begin > t_start:
-        #     t_start = begin
-        # if end is not None and end < t_end:
-        #     t_end = end
 
-        dates = arange(t_start, t_start + n_days + 1)
+        dates = arange(t_start, min(t_start + n_days + 1, t_end + 1))
         first_files = [date_function(x) for x in dates]
 
         c = GridCollection.from_netcdf_list(first_files, dates, **uv_params)
@@ -1699,7 +1709,23 @@ class Network:
                 apply_replace(translate, gr_i, gr_j)
         return translate
 
-    def group_observations(self, **kwargs):
+    def group_observations(self, min_overlap=0.2, minimal_area=False):
+        """Store every interaction between identifications
+
+        Parameters
+        ----------
+        minimal_area : bool, optional
+            If True, function will compute intersection/little polygon, else intersection/union, by default False
+
+        min_overlap : float, optional
+            minimum overlap area to associate observations, by default 0.2
+
+        Returns
+        -------
+        TrackEddiesObservations
+            netcdf with interactions
+        """
+
         results, nb_obs = list(), list()
         # To display print only in INFO
         display_iteration = logger.getEffectiveLevel() == logging.INFO
@@ -1713,7 +1739,12 @@ class Network:
             for j in range(i + 1, min(self.window + i + 1, self.nb_input)):
                 xj, yj = self.buffer.load_contour(self.filenames[j])
                 ii, ij = bbox_intersection(xi, yi, xj, yj)
-                m = vertice_overlap(xi[ii], yi[ii], xj[ij], yj[ij], **kwargs) > 0.2
+                m = (
+                    vertice_overlap(
+                        xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+                    )
+                    > min_overlap
+                )
                 results.append((i, j, ii[m], ij[m]))
         if display_iteration:
             print()

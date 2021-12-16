@@ -858,12 +858,10 @@ class GridDataset(object):
                     xy_i = uniform_resample(
                         inner_contour.lon,
                         inner_contour.lat,
-                        num_fac=presampling_multiplier
-                        )
-                    xy_e = uniform_resample(
-                        contour.lon,
-                        contour.lat,
                         num_fac=presampling_multiplier,
+                    )
+                    xy_e = uniform_resample(
+                        contour.lon, contour.lat, num_fac=presampling_multiplier,
                     )
                     xy_s = uniform_resample(
                         speed_contour.lon,
