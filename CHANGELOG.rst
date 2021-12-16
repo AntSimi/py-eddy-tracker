@@ -25,6 +25,7 @@ Fixed
 
 - Fix bug in convolution(filter), lowest rows was replace by zeros in convolution computation.
   Important impact for tiny kernel
+- Fix method of sampling before contour fitting
 - Fix bug when loading dataset in zarr format, not all variables were correctly loaded
 - Fix bug when zarr dataset has same size for number of observations and contour size
 - Fix bug when tracking, previous_virtual_obs was not always loaded
@@ -33,6 +34,7 @@ Added
 ^^^^^
 
 - Allow to replace mask by isnan method to manage nan data instead of masked data
+- Add drifter colocation example
 
 [3.5.0] - 2021-06-22
 --------------------

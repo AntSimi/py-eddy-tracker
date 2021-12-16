@@ -445,6 +445,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         if inplace:
             self.obs[yfield] = result
             return self
+        return result
 
     def median_filter(self, half_window, xfield, yfield, inplace=True):
         result = track_median_filter(
@@ -501,7 +502,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         new = self.__class__.new_like(self, nb_obs)
         new.sign_type = self.sign_type
         if nb_obs == 0:
-            logger.warning("Empty dataset will be created")
+            logger.info("Empty dataset will be created")
         else:
             for field in self.obs.dtype.descr:
                 logger.debug("Copy of field %s ...", field)
@@ -567,8 +568,11 @@ class TrackEddiesObservations(GroupEddiesObservations):
             It could be a costly operation for huge dataset
         """
         p0, p1 = self.period
+        p0_other, p1_other = other.period
+        if p1_other < p0 or p1 < p0_other:
+            return other.__class__.new_like(other, 0)
         indexs = list()
-        for i_self, i_other, t0, t1 in self.align_on(other, bins=range(p0, p1 + 2)):
+        for i_self, i_other, t0, t1 in self.align_on(other, bins=arange(p0, p1 + 2)):
             i, j, s = self.match(other, i_self=i_self, i_other=i_other, **kwargs)
             indexs.append(other.re_reference_index(j, i_other))
         indexs = concatenate(indexs)

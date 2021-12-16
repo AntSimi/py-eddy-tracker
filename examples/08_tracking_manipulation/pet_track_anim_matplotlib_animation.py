@@ -2,7 +2,9 @@
 Track animation with standard matplotlib
 ========================================
 
-Run in a terminal this script, which allow to watch eddy evolution
+Run in a terminal this script, which allow to watch eddy evolution.
+
+You could use also *EddyAnim* script to display/save animation.
 
 """
 import re
@@ -28,7 +30,7 @@ class VideoAnimation(FuncAnimation):
 
     def save(self, *args, **kwargs):
         if args[0].endswith("gif"):
-            # In this case gif is use to create thumbnail which are not use but consume same time than video
+            # In this case gif is used to create thumbnail which is not used but consume same time than video
             # So we create an empty file, to save time
             with open(args[0], "w") as _:
                 pass

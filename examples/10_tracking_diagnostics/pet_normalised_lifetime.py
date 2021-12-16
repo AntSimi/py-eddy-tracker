@@ -65,14 +65,14 @@ CC_amplitude = c.eddy_norm_lifetime("amplitude", nb=nb_max_c, factor=1e2)
 # %%
 # Figure
 # ------
-fig, axs = plt.subplots(nrows=2, figsize=(8, 6))
+fig, (ax0, ax1) = plt.subplots(nrows=2, figsize=(8, 6))
 
-axs[0].set_title("Normalised Mean Radius")
-axs[0].plot(*AC_radius), axs[0].plot(*CC_radius)
-axs[0].set_ylabel("Radius (km)"), axs[0].grid()
-axs[0].set_xlim(0, 1), axs[0].set_ylim(0, None)
+ax0.set_title("Normalised Mean Radius")
+ax0.plot(*AC_radius), ax0.plot(*CC_radius)
+ax0.set_ylabel("Radius (km)"), ax0.grid()
+ax0.set_xlim(0, 1), ax0.set_ylim(0, None)
 
-axs[1].set_title("Normalised Mean Amplitude")
-axs[1].plot(*AC_amplitude, label="AC"), axs[1].plot(*CC_amplitude, label="CC")
-axs[1].set_ylabel("Amplitude (cm)"), axs[1].grid(), axs[1].legend()
-_ = axs[1].set_xlim(0, 1), axs[1].set_ylim(0, None)
+ax1.set_title("Normalised Mean Amplitude")
+ax1.plot(*AC_amplitude, label="AC"), ax1.plot(*CC_amplitude, label="CC")
+ax1.set_ylabel("Amplitude (cm)"), ax1.grid(), ax1.legend()
+_ = ax1.set_xlim(0, 1), ax1.set_ylim(0, None)

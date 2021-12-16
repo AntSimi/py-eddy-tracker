@@ -2,7 +2,9 @@
 Track animation
 ===============
 
-Run in a terminal this script, which allow to watch eddy evolution
+Run in a terminal this script, which allow to watch eddy evolution.
+
+You could use also *EddyAnim* script to display/save animation.
 
 """
 import py_eddy_tracker_sample

@@ -865,7 +865,7 @@ def poly_indexs(x_p, y_p, x_c, y_c):
     nb_p = x_p.shape[0]
     nb_c = x_c.shape[0]
     indexs = -ones(nb_p, dtype=numba_types.int32)
-    # Adress table to get particle bloc
+    # Adress table to get test bloc
     start_index, end_index, i_first = build_index(i[i_order])
     nb_bloc = end_index.size
     for i_contour in range(nb_c):
@@ -918,20 +918,4 @@ def insidepoly(x_p, y_p, x_c, y_c):
     :param array x_c: longitude of contours
     :param array y_c: latitude of contours
     """
-    # TODO must be optimize like poly_index
-    nb_p = x_p.shape[0]
-    nb_c = x_c.shape[0]
-    flag = zeros(nb_p, dtype=numba_types.bool_)
-    for i in range(nb_c):
-        x_, y_ = reduce_size(x_c[i], y_c[i])
-        x_c_min, y_c_min = x_.min(), y_.min()
-        x_c_max, y_c_max = x_.max(), y_.max()
-        v = create_vertice(x_, y_)
-        for j in range(nb_p):
-            if flag[j]:
-                continue
-            x, y = x_p[j], y_p[j]
-            if x > x_c_min and x < x_c_max and y > y_c_min and y < y_c_max:
-                if winding_number_poly(x, y, v) != 0:
-                    flag[j] = True
-    return flag
+    return poly_indexs(x_p, y_p, x_c, y_c) != -1

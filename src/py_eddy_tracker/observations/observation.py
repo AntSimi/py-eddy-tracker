@@ -2016,7 +2016,7 @@ class EddiesObservations(object):
         """Plot the speed and effective (dashed) contour of the eddies
 
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
-        :param float,None ref: western longitude reference used
+        :param float,None ref: if defined, all coordinates are wrapped with ref as western boundary
         :param bool extern_only: if True, draw only the effective contour
         :param bool intern_only: if True, draw only the speed contour
         :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.plot`
@@ -2111,7 +2111,6 @@ class EddiesObservations(object):
         :rtype: array[bool]
         """
         xname, yname = self.intern(intern)
-        # FIXME: wrapping
         return insidepoly(x, y, self[xname], self[yname])
 
     def grid_count(self, bins, intern=False, center=False, filter=slice(None)):
