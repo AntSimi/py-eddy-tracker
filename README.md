@@ -17,15 +17,17 @@ Method was described in :
 ### Use case ###
 
 Method is used in :
- 
+
 [Mason, E., A. Pascual, P. Gaube, S.Ruiz, J. Pelegrí, A. Delepoulle, 2017: Subregional characterization of mesoscale eddies across the Brazil-Malvinas Confluence](https://doi.org/10.1002/2016JC012611)
 
 ### How do I get set up? ###
 
 #### Short story ####
+
 ```bash
 pip install pyeddytracker
 ```
+
 #### Long story ####
 
 To avoid problems with installation, use of the virtualenv Python virtual environment is recommended.
@@ -36,12 +38,20 @@ Then use pip to install all dependencies (numpy, scipy, matplotlib, netCDF4, ...
 pip install numpy scipy netCDF4 matplotlib opencv-python pyyaml pint polygon3
 ```
 
-Then run the following to install the eddy tracker:
+Clone :
+
+```bash
+git clone https://github.com/AntSimi/py-eddy-tracker
+```
+
+Then run the following to install the eddy tracker :
 
 ```bash
 python setup.py install
 ```
+
 ### Tools gallery ###
+
 Several examples based on py eddy tracker module are [here](https://py-eddy-tracker.readthedocs.io/en/latest/python_module/index.html).
 
 [![](https://py-eddy-tracker.readthedocs.io/en/latest/_static/logo.png)](https://py-eddy-tracker.readthedocs.io/en/latest/python_module/index.html)

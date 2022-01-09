@@ -807,7 +807,7 @@ class GridDataset(object):
                         else:
                             centi = reset_centroid[0]
                         centj = reset_centroid[1]
-                        # To move in regular and unregular grid
+                        # FIXME : To move in regular and unregular grid
                         if len(x.shape) == 1:
                             centlon_e = x[centi]
                             centlat_e = y[centj]
