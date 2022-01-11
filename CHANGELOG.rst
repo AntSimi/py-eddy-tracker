@@ -7,7 +7,19 @@ The format is based on `Keep a Changelog <https://keepachangelog.com/en>`_
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
 [Unreleased]
-------------
+-------------
+Changed
+^^^^^^^
+
+Fixed
+^^^^^
+
+Added
+^^^^^
+
+
+[3.6.0] - 2022-01-12
+--------------------
 Changed
 ^^^^^^^
 
@@ -15,8 +27,8 @@ Changed
   New identifications are produced with this type, old files could still be loaded.
   If you use old identifications for tracking use the `--unraw` option to unpack old times and store data with the new format.
 - Now amplitude is stored with .1 mm of precision (instead of 1 mm), same advice as for time.
-- expose more parameters to users for bash tools build_network & divide_network
-- add warning when loading a file created from a previous version of py-eddy-tracker.
+- Expose more parameters to users for bash tools build_network & divide_network
+- Add warning when loading a file created from a previous version of py-eddy-tracker.
 
 
 
