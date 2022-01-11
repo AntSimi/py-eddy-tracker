@@ -411,7 +411,7 @@ def merge(x, y):
     return concatenate(x), concatenate(y)
 
 
-def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
+def vertice_overlap(x0, y0, x1, y1, minimal_area=False, p1_area=False):
     r"""
     Return percent of overlap for each item.
 
@@ -420,6 +420,7 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
     :param array x1: x for polygon list 1
     :param array y1: y for polygon list 1
     :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union
+    :param bool p1_area: If True, function will compute intersection/p1 polygon, else intersection/union
     :return: Result of cost function
     :rtype: array
 
@@ -430,6 +431,10 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
     If minimal area:
 
         .. math:: Score = \frac{Intersection(P_0,P_1)_{area}}{min(P_{0 area},P_{1 area})}
+
+    If P1 area:
+
+        .. math:: Score = \frac{Intersection(P_0,P_1)_{area}}{P_{1 area}}
     """
     nb = x0.shape[0]
     cost = empty(nb)
@@ -443,6 +448,9 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False):
         # we divide intersection with the little one result from 0 to 1
         if minimal_area:
             cost[i] = intersection / min(p0.area(), p1.area())
+        # we divide intersection with p1
+        elif p1_area:
+            cost[i] = intersection / p1.area()
         # we divide intersection with polygon merging result from 0 to 1
         else:
             cost[i] = intersection / (p0 + p1).area()

@@ -8,7 +8,7 @@ from io import BufferedReader, BytesIO
 from tarfile import ExFileObject
 from tokenize import TokenError
 
-import packaging
+import packaging.version
 import zarr
 from matplotlib.cm import get_cmap
 from matplotlib.collections import PolyCollection
