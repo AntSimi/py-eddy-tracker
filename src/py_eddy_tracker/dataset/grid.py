@@ -2517,6 +2517,28 @@ class GridCollection:
             logger.debug(f"i={i}, t={t}, dataset={dataset}")
             yield t, dataset
 
+    def path(self, x0, y0, *args, nb_time=2, **kwargs):
+        """
+        At each call it will update position in place with u & v field
+
+        :param array x0: Longitude of obs to move
+        :param array y0: Latitude of obs to move
+        :param int nb_time: Number of iteration for particle
+        :param dict kwargs: look at :py:meth:`GridCollection.advect`
+
+        :return: t,x,y
+
+        .. minigallery:: py_eddy_tracker.GridCollection.path
+        """
+        particles = self.advect(x0.copy(), y0.copy(), *args, **kwargs)
+        t = empty(nb_time + 1, dtype="f8")
+        x = empty((nb_time + 1, x0.size), dtype=x0.dtype)
+        y = empty(x.shape, dtype=y0.dtype)
+        t[0], x[0], y[0] = kwargs.get("t_init"), x0, y0
+        for i in range(nb_time):
+            t[i + 1], x[i + 1], y[i + 1] = particles.__next__()
+        return t, x, y
+
 
 @njit(cache=True)
 def advect_t(x_g, y_g, u_g0, v_g0, m_g0, u_g1, v_g1, m_g1, x, y, m, weigths, half_w=0):
