@@ -1193,6 +1193,10 @@ class RegularGridDataset(GridDataset):
             raise Exception(
                 "Coordinates in RegularGridDataset must be 1D array, or think to use UnRegularGridDataset"
             )
+        dx = self.x_bounds[1:] - self.x_bounds[:-1]
+        dy = self.y_bounds[1:] - self.y_bounds[:-1]
+        if (dx < 0).any() or (dy < 0).any():
+            raise Exception("Coordinates in RegularGridDataset must be strictly increasing")
         self._x_step = (self.x_c[1:] - self.x_c[:-1]).mean()
         self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
 

@@ -14,6 +14,8 @@ Changed
 Fixed
 ^^^^^
 
+- Check strictly increasing coordinates for RegularGridDataset.
+
 Added
 ^^^^^
 
