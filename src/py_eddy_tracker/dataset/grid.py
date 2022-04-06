@@ -1074,6 +1074,21 @@ class UnRegularGridDataset(GridDataset):
 
             self.init_pos_interpolator()
 
+    def display(self, ax, name, factor=1, **kwargs):
+        """
+        :param matplotlib.axes.Axes ax: matplotlib axes used to draw
+        :param str,array name: variable to display, could be an array
+        :param float factor: multiply grid by
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolormesh`
+
+        .. minigallery:: py_eddy_tracker.UnRegularGridDataset.display
+        """
+        if "cmap" not in kwargs:
+            kwargs["cmap"] = "coolwarm"
+        data = self.grid(name) if isinstance(name, str) else name
+        print(self.x_c.shape, self.y_c.shape, data.shape)
+        return ax.pcolor(self.x_c, self.y_c, data * factor, **kwargs)
+
     @property
     def bounds(self):
         """Give bounds"""

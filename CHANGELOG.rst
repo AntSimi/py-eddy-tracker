@@ -19,6 +19,8 @@ Fixed
 Added
 ^^^^^
 
+- Add display grid for unregular grid
+
 
 [3.6.0] - 2022-01-12
 --------------------
