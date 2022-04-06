@@ -1086,7 +1086,6 @@ class UnRegularGridDataset(GridDataset):
         if "cmap" not in kwargs:
             kwargs["cmap"] = "coolwarm"
         data = self.grid(name) if isinstance(name, str) else name
-        print(self.x_c.shape, self.y_c.shape, data.shape)
         return ax.pcolor(self.x_c, self.y_c, data * factor, **kwargs)
 
     @property
