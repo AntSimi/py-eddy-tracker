@@ -1079,7 +1079,7 @@ class UnRegularGridDataset(GridDataset):
         :param matplotlib.axes.Axes ax: matplotlib axes used to draw
         :param str,array name: variable to display, could be an array
         :param float factor: multiply grid by
-        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolormesh`
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolor`
 
         .. minigallery:: py_eddy_tracker.UnRegularGridDataset.display
         """
