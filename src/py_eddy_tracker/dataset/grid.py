@@ -403,6 +403,14 @@ class GridDataset(object):
         self.setup_coordinates()
 
     @staticmethod
+    def get_mask(a):
+        if len(a.mask.shape):
+            m = a.mask
+        else:
+            m = ones(a.shape, dtype='bool') if a.mask else zeros(a.shape, dtype='bool')
+        return m
+
+    @staticmethod
     def c_to_bounds(c):
         """
         Centered coordinates to bounds coordinates
@@ -1126,7 +1134,7 @@ class UnRegularGridDataset(GridDataset):
         bins = (x_array, y_array)
 
         x_flat, y_flat, z_flat = x.reshape((-1,)), y.reshape((-1,)), data.reshape((-1,))
-        m = ~z_flat.mask
+        m = ~self.get_mask(z_flat)
         x_flat, y_flat, z_flat = x_flat[m], y_flat[m], z_flat[m]
 
         nb_value, _, _ = histogram2d(x_flat, y_flat, bins=bins)
@@ -1935,14 +1943,6 @@ class RegularGridDataset(GridDataset):
         self.variables_description[new_name] = other.variables_description[grid_name]
         # self.variables_description[new_name]['infos'] = False
         # self.variables_description[new_name]['kwargs']['dimensions'] = ...
-
-    @staticmethod
-    def get_mask(a):
-        if len(a.mask.shape):
-            m = a.mask
-        else:
-            m = ones(a.shape) if a.mask else zeros(a.shape)
-        return m
 
     def interp(self, grid_name, lons, lats, method="bilinear"):
         """
