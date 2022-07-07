@@ -6,6 +6,6 @@ pyyaml
 requests
 scipy
 zarr
-numpy
 netCDF4<1.6
+numpy<1.23
 numba>=0.55.1
