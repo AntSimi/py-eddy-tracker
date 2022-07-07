@@ -1,6 +1,6 @@
 matplotlib
 opencv-python
-pint
+pint==0.18
 polygon3
 pyyaml
 requests
