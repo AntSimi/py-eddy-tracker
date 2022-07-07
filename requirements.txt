@@ -1,7 +1,4 @@
 matplotlib
-netCDF4<1.6
-numba>=0.55.1
-numpy
 opencv-python
 pint
 polygon3
@@ -9,3 +6,6 @@ pyyaml
 requests
 scipy
 zarr
+numpy
+netCDF4<1.6
+numba>=0.55.1
