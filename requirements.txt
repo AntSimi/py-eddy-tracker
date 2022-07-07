@@ -1,7 +1,7 @@
 matplotlib
 netCDF4<1.6
 numba>=0.55.1
-numpy
+numpy<1.23
 opencv-python
 pint
 polygon3
