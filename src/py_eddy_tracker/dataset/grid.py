@@ -407,7 +407,7 @@ class GridDataset(object):
         if len(a.mask.shape):
             m = a.mask
         else:
-            m = ones(a.shape, dtype='bool') if a.mask else zeros(a.shape, dtype='bool')
+            m = ones(a.shape, dtype="bool") if a.mask else zeros(a.shape, dtype="bool")
         return m
 
     @staticmethod

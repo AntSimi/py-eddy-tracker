@@ -3,6 +3,7 @@
 GUI class
 """
 
+import logging
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
@@ -10,6 +11,8 @@ import numpy as np
 from matplotlib.projections import register_projection
 
 from .generic import flatten_line_matrix, split_line
+
+logger = logging.getLogger("pet")
 
 try:
     from pylook.axes import PlatCarreAxes
@@ -91,7 +94,7 @@ class GUI:
         for dataset in self.datasets.values():
             t0_, t1_ = dataset.period
             t0, t1 = min(t0, t0_), max(t1, t1_)
-
+        logger.debug("period detected %f -> %f", t0, t1)
         self.settings = dict(period=(t0, t1), now=t1)
 
     @property
