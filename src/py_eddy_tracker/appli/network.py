@@ -34,7 +34,12 @@ def build_network():
         action="store_true",
         help="If True, use intersection/little polygon, else intersection/union",
     )
-
+    parser.add_argument(
+        "--unraw",
+        action="store_true",
+        help="Load unraw data, use only for netcdf."
+        "If unraw is active, netcdf is loaded without apply scalefactor and add_offset.",
+    )
     parser.contour_intern_arg()
 
     parser.memory_arg()
@@ -49,7 +54,7 @@ def build_network():
     group = n.group_observations(
         min_overlap=args.min_overlap, minimal_area=args.minimal_area
     )
-    n.build_dataset(group).write_file(filename=args.out)
+    n.build_dataset(group,raw_data=not args.unraw).write_file(filename=args.out)
 
 
 def divide_network():
