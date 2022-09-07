@@ -114,7 +114,9 @@ def subset_network():
         help="Remove short dead end, first is for minimal obs number and second for minimal segment time to keep",
     )
     parser.add_argument(
-        "--remove_trash", action="store_true", help="Remove trash (network id == 0)",
+        "--remove_trash",
+        action="store_true",
+        help="Remove trash (network id == 0)",
     )
     parser.add_argument(
         "-p",
@@ -124,8 +126,18 @@ def subset_network():
         help="Start day and end day, if it's a negative value we will add to day min and add to day max,"
         "if 0 it is not used",
     )
+    parser.add_argument(
+        "-i",
+        "--ids",
+        nargs='*',
+        type=int,
+        help="network ids to extract",
+    )
+
     args = parser.parse_args()
     n = NetworkObservations.load_file(args.input, raw_data=True)
+    if args.ids:
+        n = n.networks(args.ids)
     if args.length is not None:
         n = n.longer_than(*args.length)
     if args.remove_dead_end is not None:
