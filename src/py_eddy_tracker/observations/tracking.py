@@ -68,6 +68,10 @@ class TrackEddiesObservations(GroupEddiesObservations):
         self.__obs_by_track = None
         self.__nb_track = None
 
+    def track_slice(self, track):
+        i0 = self.index_from_track[track]
+        return slice(i0, i0 + self.nb_obs_by_track[track])
+
     def iter_track(self):
         """
         Yield track
@@ -582,7 +586,10 @@ class TrackEddiesObservations(GroupEddiesObservations):
     def format_label(self, label):
         t0, t1 = self.period
         return label.format(
-            t0=t0, t1=t1, nb_obs=len(self), nb_tracks=(self.nb_obs_by_track != 0).sum(),
+            t0=t0,
+            t1=t1,
+            nb_obs=len(self),
+            nb_tracks=(self.nb_obs_by_track != 0).sum(),
         )
 
     def plot(self, ax, ref=None, **kwargs):

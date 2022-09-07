@@ -161,6 +161,16 @@ class NetworkObservations(GroupEddiesObservations):
             self._index_network = build_index(self.track)
         return self._index_network
 
+    def network_size(self, id_networks):
+        """
+        Return size for specified network
+
+        :param list,array id_networks: ids to identify network
+        """
+        i = id_networks - self.index_network[2]
+        i_start, i_stop = self.index_network[0][i], self.index_network[1][i]
+        return i_stop - i_start
+    
     def network_slice(self, id_network):
         """
         Return slice for one network
@@ -679,7 +689,13 @@ class NetworkObservations(GroupEddiesObservations):
         """
         self.only_one_network()
         j = 0
-        line_kw = dict(ls="-", marker="+", markersize=6, zorder=1, lw=3,)
+        line_kw = dict(
+            ls="-",
+            marker="+",
+            markersize=6,
+            zorder=1,
+            lw=3,
+        )
         line_kw.update(kwargs)
         mappables = dict(lines=list())
 
@@ -912,7 +928,10 @@ class NetworkObservations(GroupEddiesObservations):
         """Add the merging and splitting events to a map"""
         j = 0
         mappables = dict()
-        symbol_kw = dict(markersize=10, color="k",)
+        symbol_kw = dict(
+            markersize=10,
+            color="k",
+        )
         symbol_kw.update(kwargs)
         symbol_kw_split = symbol_kw.copy()
         symbol_kw_split["markersize"] += 4
@@ -941,7 +960,13 @@ class NetworkObservations(GroupEddiesObservations):
         return mappables
 
     def scatter(
-        self, ax, name="time", factor=1, ref=None, edgecolor_cycle=None, **kwargs,
+        self,
+        ax,
+        name="time",
+        factor=1,
+        ref=None,
+        edgecolor_cycle=None,
+        **kwargs,
     ):
         """
         This function scatters the path of each network, with the merging and splitting events

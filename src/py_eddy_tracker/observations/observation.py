@@ -130,7 +130,7 @@ def shifted_ellipsoid_degrees_mask2(lon0, lat0, lon1, lat1, minor=1.5, major=1.5
             if dx > major[j]:
                 m[j, i] = False
                 continue
-            d_normalize = dx ** 2 / major[j] ** 2 + dy ** 2 / minor ** 2
+            d_normalize = dx**2 / major[j] ** 2 + dy**2 / minor**2
             m[j, i] = d_normalize < 1.0
     return m
 
@@ -729,7 +729,11 @@ class EddiesObservations(object):
         .. code-block:: python
 
             kwargs_latlon_300 = dict(
-                include_vars=["longitude", "latitude",], indexs=dict(obs=slice(0, 300)),
+                include_vars=[
+                    "longitude",
+                    "latitude",
+                ],
+                indexs=dict(obs=slice(0, 300)),
             )
             small_dataset = TrackEddiesObservations.load_file(
                 filename, **kwargs_latlon_300
@@ -1048,6 +1052,19 @@ class EddiesObservations(object):
                 )
 
     @classmethod
+    def from_array(cls, arrays, **kwargs):
+        nb = arrays["time"].size
+        # if hasattr(handler, "track_array_variables"):
+        #     kwargs["track_array_variables"] = handler.track_array_variables
+        #     kwargs["array_variables"] = handler.array_variables.split(",")
+        # if len(handler.track_extra_variables) > 1:
+        #     kwargs["track_extra_variables"] = handler.track_extra_variables.split(",")
+        eddies = cls(size=nb, **kwargs)
+        for k, v in arrays.items():
+            eddies.obs[k] = v
+        return eddies
+
+    @classmethod
     def from_zarr(cls, handler):
         nb_obs = len(handler.dimensions[cls.obs_dimension(handler)])
         kwargs = dict()
@@ -1302,7 +1319,7 @@ class EddiesObservations(object):
             if isinstance(minor, ndarray):
                 minor = minor[index_self]
             # focal distance
-            f_degree = ((major ** 2 - minor ** 2) ** 0.5) / (
+            f_degree = ((major**2 - minor**2) ** 0.5) / (
                 111.2 * cos(radians(self.lat[index_self]))
             )
 
@@ -2010,7 +2027,11 @@ class EddiesObservations(object):
 
     def format_label(self, label):
         t0, t1 = self.period
-        return label.format(t0=t0, t1=t1, nb_obs=len(self),)
+        return label.format(
+            t0=t0,
+            t1=t1,
+            nb_obs=len(self),
+        )
 
     def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
         """Plot the speed and effective (dashed) contour of the eddies
@@ -2381,7 +2402,14 @@ def grid_count_pixel_in(
         x_, y_ = reduce_size(x_, y_)
         v = create_vertice(x_, y_)
         (x_start, x_stop), (y_start, y_stop) = bbox_indice_regular(
-            v, x_bounds, y_bounds, xstep, ystep, N, is_circular, x_size,
+            v,
+            x_bounds,
+            y_bounds,
+            xstep,
+            ystep,
+            N,
+            is_circular,
+            x_size,
         )
         i, j = get_pixel_in_regular(v, x_c, y_c, x_start, x_stop, y_start, y_stop)
         grid_count_(grid, i, j)

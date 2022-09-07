@@ -66,7 +66,7 @@ def get_missing_indices(
     return indices
 
 
-def advect(x, y, c, t0, n_days):
+def advect(x, y, c, t0, n_days, u_name='u', v_name='v'):
     """
     Advect particles from t0 to t0 + n_days, with data cube.
 
@@ -75,13 +75,15 @@ def advect(x, y, c, t0, n_days):
     :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
     :param int t0: julian day of advection start
     :param int n_days: number of days to advect
+    :param str u_name: variable name for u component
+    :param str v_name: variable name for v component
     """
 
     kw = dict(nb_step=6, time_step=86400 / 6)
     if n_days < 0:
         kw["backward"] = True
         n_days = -n_days
-    p = c.advect(x, y, "u", "v", t_init=t0, **kw)
+    p = c.advect(x, y, u_name, v_name, t_init=t0, **kw)
     for _ in range(n_days):
         t, x, y = p.__next__()
     return t, x, y
@@ -125,7 +127,6 @@ def particle_candidate(
     else:
         x, y, i_start = e.create_particles(step_mesh, intern=True)
         print("The contour_start was not correct, speed contour is used")
-
     # Advection
     t_end, x, y = advect(x, y, c, t_start, **kwargs)
 
