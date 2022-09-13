@@ -1050,6 +1050,9 @@ class EddiesObservations(object):
                     input_unit,
                     output_unit,
                 )
+            return factor
+        else:
+            return 1
 
     @classmethod
     def from_array(cls, arrays, **kwargs):
