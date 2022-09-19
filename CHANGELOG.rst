@@ -11,6 +11,8 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Changed
 ^^^^^^^
 
+- Rewrite particle candidate to be easily parallelize
+
 Fixed
 ^^^^^
 
@@ -19,6 +21,10 @@ Fixed
 Added
 ^^^^^
 
+- Add method to colorize contour with a field
+- Add option to force align on to return all step for reference dataset
+- Add method and property to network to easily select segment and network
+- Add method to found same track/segment/network in dataset
 
 [3.6.0] - 2022-01-12
 --------------------
