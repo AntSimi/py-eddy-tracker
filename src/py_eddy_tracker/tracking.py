@@ -3,14 +3,13 @@
 Class to store link between observations
 """
 
+from datetime import datetime, timedelta
 import json
 import logging
 import platform
-from datetime import datetime, timedelta
 
 from netCDF4 import Dataset, default_fillvals
-from numba import njit
-from numba import types as numba_types
+from numba import njit, types as numba_types
 from numpy import (
     arange,
     array,

@@ -3,12 +3,12 @@
 GUI class
 """
 
-import logging
 from datetime import datetime, timedelta
+import logging
 
+from matplotlib.projections import register_projection
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.projections import register_projection
 
 from .generic import flatten_line_matrix, split_line
 

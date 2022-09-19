@@ -8,10 +8,10 @@ All loopers data used in this example are a subset from the dataset described in
 
 import re
 
-import numpy as np
-import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
+import numpy as np
+import py_eddy_tracker_sample
 
 from py_eddy_tracker import data
 from py_eddy_tracker.appli.gui import Anim

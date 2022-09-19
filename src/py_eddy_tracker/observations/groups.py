@@ -1,14 +1,12 @@
-import logging
 from abc import ABC, abstractmethod
+import logging
 
-from numba import njit
-from numba import types as nb_types
-from numpy import arange, int32, interp, median, where, zeros, full, isnan
-
-from .observation import EddiesObservations
+from numba import njit, types as nb_types
+from numpy import arange, full, int32, interp, isnan, median, where, zeros
 
 from ..generic import window_index
 from ..poly import create_meshed_particles, poly_indexs
+from .observation import EddiesObservations
 
 logger = logging.getLogger("pet")
 
@@ -69,7 +67,7 @@ def get_missing_indices(
     return indices
 
 
-def advect(x, y, c, t0, n_days, u_name='u', v_name='v'):
+def advect(x, y, c, t0, n_days, u_name="u", v_name="v"):
     """
     Advect particles from t0 to t0 + n_days, with data cube.
 
@@ -92,7 +90,9 @@ def advect(x, y, c, t0, n_days, u_name='u', v_name='v'):
     return t, x, y
 
 
-def particle_candidate_step(t_start, contours_start, contours_end, space_step, dt, c, **kwargs):
+def particle_candidate_step(
+    t_start, contours_start, contours_end, space_step, dt, c, **kwargs
+):
     """Select particles within eddies, advect them, return target observation and associated percentages.
     For one time step.
 
@@ -122,7 +122,7 @@ def particle_candidate_step(t_start, contours_start, contours_end, space_step, d
     i_target, pct_target = full(shape, -1, dtype="i4"), zeros(shape, dtype="f8")
     nb_end = contours_end[0].shape[0]
     get_targets(i_start, i_end, i_target, pct_target, nb_end)
-    return i_target, pct_target.astype('i1')
+    return i_target, pct_target.astype("i1")
 
 
 def particle_candidate(
@@ -216,6 +216,7 @@ def get_targets(i_start, i_end, i_target, pct, nb_end):
             elif pct_ > pct[i, 1]:
                 pct[i, 1] = pct_
                 i_target[i, 1] = j
+
 
 @njit(cache=True)
 def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
@@ -346,7 +347,9 @@ class GroupEddiesObservations(EddiesObservations, ABC):
 
         return self.extract_with_mask(mask)
 
-    def particle_candidate_atlas(self, cube, space_step, dt, start_intern=False, end_intern=False, **kwargs):
+    def particle_candidate_atlas(
+        self, cube, space_step, dt, start_intern=False, end_intern=False, **kwargs
+    ):
         """Select particles within eddies, advect them, return target observation and associated percentages
 
         :param `~py_eddy_tracker.dataset.grid.GridCollection` cube: GridCollection with speed for particles
@@ -359,7 +362,9 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         """
         t_start, t_end = int(self.period[0]), int(self.period[1])
         # Pre-compute to get time index
-        i_sort, i_start, i_end = window_index(self.time, arange(t_start, t_end + 1), .5)
+        i_sort, i_start, i_end = window_index(
+            self.time, arange(t_start, t_end + 1), 0.5
+        )
         # Out shape
         shape = (len(self), 2)
         i_target, pct = full(shape, -1, dtype="i4"), zeros(shape, dtype="i1")
@@ -368,19 +373,20 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         for t in times:
             # Get index for origin
             i = t - t_start
-            indexs0 = i_sort[i_start[i]:i_end[i]]
+            indexs0 = i_sort[i_start[i] : i_end[i]]
             # Get index for end
             i = t + dt - t_start
-            indexs1 = i_sort[i_start[i]:i_end[i]]
+            indexs1 = i_sort[i_start[i] : i_end[i]]
             # Get contour data
             contours0 = [self[label][indexs0] for label in self.intern(start_intern)]
             contours1 = [self[label][indexs1] for label in self.intern(end_intern)]
             # Get local result
-            i_target_, pct_ = particle_candidate_step(t, contours0, contours1, space_step, dt, cube, **kwargs)
+            i_target_, pct_ = particle_candidate_step(
+                t, contours0, contours1, space_step, dt, cube, **kwargs
+            )
             # Merge result
             m = i_target_ != -1
             i_target_[m] = indexs1[i_target_[m]]
-            i_target[indexs0] =  i_target_
-            pct[indexs0] =  pct_
+            i_target[indexs0] = i_target_
+            pct[indexs0] = pct_
         return i_target, pct
-        

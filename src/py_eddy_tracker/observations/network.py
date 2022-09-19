@@ -2,14 +2,13 @@
 """
 Class to create network of observations
 """
+from glob import glob
 import logging
 import time
-from glob import glob
 
 import netCDF4
-import zarr
-from numba.typed import List
 from numba import njit
+from numba.typed import List
 from numpy import (
     arange,
     array,
@@ -25,6 +24,7 @@ from numpy import (
     where,
     zeros,
 )
+import zarr
 
 from ..dataset.grid import GridCollection
 from ..generic import build_index, wrap_longitude
@@ -188,7 +188,7 @@ class NetworkObservations(GroupEddiesObservations):
         """
         i0, i1, ref = build_index(self.track[self.index_segment_track[0]])
         if id_networks is None:
-            return i1-i0
+            return i1 - i0
         else:
             i = id_networks - ref
             return i1[i] - i0[i]
@@ -204,7 +204,7 @@ class NetworkObservations(GroupEddiesObservations):
         else:
             i = id_networks - self.index_network[2]
             return self.index_network[1][i] - self.index_network[0][i]
-    
+
     def unique_segment_to_id(self, id_unique):
         """Return id network and id segment for a unique id
 
@@ -220,7 +220,7 @@ class NetworkObservations(GroupEddiesObservations):
         :param int id_network: id to identify network
         :param int id_segment: id to identify segment
         """
-        raise Exception('need to be implemented')
+        raise Exception("need to be implemented")
 
     def network_slice(self, id_network):
         """
@@ -1221,12 +1221,18 @@ class NetworkObservations(GroupEddiesObservations):
 
     def networks_mask(self, id_networks, segment=False):
         if segment:
-            return generate_mask_from_ids(id_networks, self.track.size, *self.index_segment_track)
+            return generate_mask_from_ids(
+                id_networks, self.track.size, *self.index_segment_track
+            )
         else:
-            return generate_mask_from_ids(id_networks, self.track.size, *self.index_network)
+            return generate_mask_from_ids(
+                id_networks, self.track.size, *self.index_network
+            )
 
     def networks(self, id_networks):
-        return self.extract_with_mask(generate_mask_from_ids(id_networks, self.track.size, *self.index_network))
+        return self.extract_with_mask(
+            generate_mask_from_ids(id_networks, self.track.size, *self.index_network)
+        )
 
     @property
     def nb_network(self):
@@ -1234,7 +1240,7 @@ class NetworkObservations(GroupEddiesObservations):
         Count and return number of network
         """
         return (self.network_size() != 0).sum()
-    
+
     @property
     def nb_segment(self):
         """
@@ -1252,15 +1258,18 @@ class NetworkObservations(GroupEddiesObservations):
         """
         if segment:
             counts = self.segment_size(), other.segment_size()
-            i_self_ref, i_other_ref = self.ref_segment_track_index, other.ref_segment_track_index
-            var_id = 'segment'
+            i_self_ref, i_other_ref = (
+                self.ref_segment_track_index,
+                other.ref_segment_track_index,
+            )
+            var_id = "segment"
         else:
             counts = self.network_size(), other.network_size()
             i_self_ref, i_other_ref = self.ref_index, other.ref_index
-            var_id = 'track'
+            var_id = "track"
         # object to contain index of couple
-        in_self, in_other = list(), list() 
-        # We iterate on item of same size       
+        in_self, in_other = list(), list()
+        # We iterate on item of same size
         for i_self, i_other, i0, _ in self.align_on(other, counts, all_ref=True):
             if i0 < size_min:
                 continue
@@ -1277,16 +1286,18 @@ class NetworkObservations(GroupEddiesObservations):
             # We get absolute id
             id_self, id_other = i_self + i_self_ref, i_other + i_other_ref
             # We compute mask to select data
-            m_self, m_other = self.networks_mask(id_self, segment), other.networks_mask(id_other, segment)
+            m_self, m_other = self.networks_mask(id_self, segment), other.networks_mask(
+                id_other, segment
+            )
 
             # We extract obs
             obs_self, obs_other = self.obs[m_self], other.obs[m_other]
-            x1, y1, t1 = obs_self['lon'], obs_self['lat'], obs_self['time']
-            x2, y2, t2 = obs_other['lon'], obs_other['lat'], obs_other['time']
+            x1, y1, t1 = obs_self["lon"], obs_self["lat"], obs_self["time"]
+            x2, y2, t2 = obs_other["lon"], obs_other["lat"], obs_other["time"]
 
             if segment:
-                ids1 = build_unique_array(obs_self['segment'], obs_self['track'])
-                ids2 = build_unique_array(obs_other['segment'], obs_other['track'])
+                ids1 = build_unique_array(obs_self["segment"], obs_self["track"])
+                ids2 = build_unique_array(obs_other["segment"], obs_other["track"])
                 label1 = self.segment_track_array[m_self]
                 label2 = other.segment_track_array[m_other]
             else:
@@ -1295,22 +1306,26 @@ class NetworkObservations(GroupEddiesObservations):
             i01, indexs1, id1 = list(), List(), list()
             for sl_self, id_, _ in self.iter_on(ids1):
                 i01.append(sl_self.start)
-                indexs1.append(obs_self[sl_self].argsort(order=['time', 'lon', 'lat']))
+                indexs1.append(obs_self[sl_self].argsort(order=["time", "lon", "lat"]))
                 id1.append(label1[sl_self.start])
             i02, indexs2, id2 = list(), List(), list()
             for sl_other, _, _ in other.iter_on(ids2):
                 i02.append(sl_other.start)
-                indexs2.append(obs_other[sl_other].argsort(order=['time', 'lon', 'lat']))
+                indexs2.append(
+                    obs_other[sl_other].argsort(order=["time", "lon", "lat"])
+                )
                 id2.append(label2[sl_other.start])
 
             id1, id2 = array(id1), array(id2)
             # We search item from self in item of others
-            i_local_target = same_position(x1, y1, t1, x2, y2, t2, array(i01), array(i02), indexs1, indexs2)
+            i_local_target = same_position(
+                x1, y1, t1, x2, y2, t2, array(i01), array(i02), indexs1, indexs2
+            )
 
             # -1 => no item found in other dataset
             m = i_local_target != -1
             in_self.append(id1)
-            track2_ = -ones(id1.shape, dtype='i4')
+            track2_ = -ones(id1.shape, dtype="i4")
             track2_[m] = id2[i_local_target[m]]
             in_other.append(track2_)
 
@@ -1804,7 +1819,7 @@ class NetworkObservations(GroupEddiesObservations):
         :param int dt: delta of time max , defaults to 3
         :return array: mask
         """
-        m = zeros(len(self), dtype='bool')
+        m = zeros(len(self), dtype="bool")
         if merging:
             i_target, ip1, ip2 = self.merging_event(triplet=True, only_index=True)
             mask_follow_obs(m, self.previous_obs, self.time, ip1, dt)
@@ -1816,6 +1831,7 @@ class NetworkObservations(GroupEddiesObservations):
             mask_follow_obs(m, self.next_obs, self.time, in2, dt)
             mask_follow_obs(m, self.previous_obs, self.time, i_target, dt)
         return m
+
 
 class Network:
     __slots__ = (
@@ -2034,6 +2050,7 @@ def new_numbering(segs, start=0):
 def ptp(values):
     return values.max() - values.min()
 
+
 @njit(cache=True)
 def generate_mask_from_ids(id_networks, nb, istart, iend, i0):
     """From list of id, we generate a mask
@@ -2045,22 +2062,23 @@ def generate_mask_from_ids(id_networks, nb, istart, iend, i0):
     :param int i0: ref index from :py:meth:`~py_eddy_tracker.generic.build_index`
     :return array: return a mask
     """
-    m = zeros(nb, dtype='bool')
+    m = zeros(nb, dtype="bool")
     for i in id_networks:
-        for j in range(istart[i-i0], iend[i-i0]):
+        for j in range(istart[i - i0], iend[i - i0]):
             m[j] = True
     return m
+
 
 @njit(cache=True)
 def same_position(x0, y0, t0, x1, y1, t1, i00, i01, i0, i1):
     """Return index of track/segment found in other dataset
 
-    :param array x0: 
-    :param array y0: 
-    :param array t0: 
-    :param array x1: 
-    :param array y1: 
-    :param array t1: 
+    :param array x0:
+    :param array y0:
+    :param array t0:
+    :param array x1:
+    :param array y1:
+    :param array t1:
     :param array i00: First index of track/segment/network in dataset0
     :param array i01: First index of track/segment/network in dataset1
     :param List(array) i0: list of array which contain index to order dataset0
@@ -2068,9 +2086,9 @@ def same_position(x0, y0, t0, x1, y1, t1, i00, i01, i0, i1):
     :return array: index of dataset1 which match with dataset0, -1 => no match
     """
     nb0, nb1 = i00.size, i01.size
-    i_target = -ones(nb0, dtype='i4')
+    i_target = -ones(nb0, dtype="i4")
     # To avoid to compare multiple time, if already match
-    used1 = zeros(nb1, dtype='bool')
+    used1 = zeros(nb1, dtype="bool")
     for j0 in range(nb0):
         for j1 in range(nb1):
             if used1[j1]:
@@ -2085,8 +2103,9 @@ def same_position(x0, y0, t0, x1, y1, t1, i00, i01, i0, i1):
             if test:
                 i_target[j0] = j1
                 used1[j1] = True
-                break     
+                break
     return i_target
+
 
 @njit(cache=True)
 def mask_follow_obs(m, next_obs, time, indexs, dt=3):

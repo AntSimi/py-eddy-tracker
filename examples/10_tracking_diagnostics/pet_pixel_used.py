@@ -5,9 +5,9 @@ Count pixel used
 Do Geo stat with frequency and compare with center count
 method: :ref:`sphx_glr_python_module_10_tracking_diagnostics_pet_center_count.py`
 """
-import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
+import py_eddy_tracker_sample
 
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 

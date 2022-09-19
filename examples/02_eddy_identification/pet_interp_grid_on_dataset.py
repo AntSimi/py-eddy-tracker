@@ -43,7 +43,7 @@ aviso_map.add_uv("adt")
 # %%
 # Compute and store eke in cm²/s²
 aviso_map.add_grid(
-    "eke", (aviso_map.grid("u") ** 2 + aviso_map.grid("v") ** 2) * 0.5 * (100 ** 2)
+    "eke", (aviso_map.grid("u") ** 2 + aviso_map.grid("v") ** 2) * 0.5 * (100**2)
 )
 
 eke_kwargs = dict(vmin=1, vmax=1000, cmap="magma_r")

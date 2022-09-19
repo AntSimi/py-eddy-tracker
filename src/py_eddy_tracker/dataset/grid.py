@@ -2,14 +2,13 @@
 """
 Class to load and manipulate RegularGrid and UnRegularGrid
 """
-import logging
 from datetime import datetime
+import logging
 
 from cv2 import filter2D
 from matplotlib.path import Path as BasePath
 from netCDF4 import Dataset
-from numba import njit, prange
-from numba import types as numba_types
+from numba import njit, prange, types as numba_types
 from numpy import (
     arange,
     array,
@@ -28,9 +27,7 @@ from numpy import (
     isnan,
     linspace,
     ma,
-)
-from numpy import mean as np_mean
-from numpy import (
+    mean as np_mean,
     meshgrid,
     nan,
     nanmean,
@@ -2299,14 +2296,18 @@ class GridCollection:
         new = cls()
         with Dataset(filename) as h:
             for i, t in enumerate(h.variables[t_name][:]):
-                d = RegularGridDataset(filename, x_name, y_name, indexs={t_name: i}, **kwargs)
+                d = RegularGridDataset(
+                    filename, x_name, y_name, indexs={t_name: i}, **kwargs
+                )
                 if heigth is not None:
                     d.add_uv(heigth)
                 new.datasets.append((t, d))
         return new
 
     @classmethod
-    def from_netcdf_list(cls, filenames, t, x_name, y_name, indexs=None, heigth=None, **kwargs):
+    def from_netcdf_list(
+        cls, filenames, t, x_name, y_name, indexs=None, heigth=None, **kwargs
+    ):
         new = cls()
         for i, _t in enumerate(t):
             filename = filenames[i]

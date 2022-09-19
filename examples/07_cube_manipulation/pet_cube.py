@@ -4,9 +4,10 @@ Time advection
 
 Example which use CMEMS surface current with a Runge-Kutta 4 algorithm to advect particles.
 """
+from datetime import datetime, timedelta
+
 # sphinx_gallery_thumbnail_number = 2
 import re
-from datetime import datetime, timedelta
 
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation

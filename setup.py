@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
+from setuptools import find_packages, setup
+
 import versioneer
-from setuptools import setup, find_packages
 
 with open("README.md", "r") as fh:
     long_description = fh.read()

@@ -9,8 +9,7 @@ Two detections are provided : with a filtered ADT and without filtering
 """
 from datetime import datetime
 
-from matplotlib import pyplot as plt
-from matplotlib import style
+from matplotlib import pyplot as plt, style
 
 from py_eddy_tracker import data
 from py_eddy_tracker.dataset.grid import RegularGridDataset
@@ -65,7 +64,8 @@ kw_data = dict(
     y_name="latitude",
     # Manual area subset
     indexs=dict(
-        latitude=slice(100 - margin, 220 + margin), longitude=slice(0, 230 + margin),
+        latitude=slice(100 - margin, 220 + margin),
+        longitude=slice(0, 230 + margin),
     ),
 )
 g_raw = RegularGridDataset(**kw_data)
@@ -187,10 +187,16 @@ for i, (label, field, factor, stop) in enumerate(
     ax.set_ylabel("With filter")
 
     ax.plot(
-        a_[field][i_a] * factor, a[field][j_a] * factor, "r.", label="Anticyclonic",
+        a_[field][i_a] * factor,
+        a[field][j_a] * factor,
+        "r.",
+        label="Anticyclonic",
     )
     ax.plot(
-        c_[field][i_c] * factor, c[field][j_c] * factor, "b.", label="Cyclonic",
+        c_[field][i_c] * factor,
+        c[field][j_c] * factor,
+        "b.",
+        label="Cyclonic",
     )
     ax.set_aspect("equal"), ax.grid()
     ax.plot((0, 1000), (0, 1000), "g")

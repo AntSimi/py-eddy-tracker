@@ -4,9 +4,9 @@ Stastics on identification files
 
 Some statistics on raw identification without any tracking
 """
-import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.dates import date2num
+import numpy as np
 
 from py_eddy_tracker import start_logger
 from py_eddy_tracker.data import get_remote_demo_sample

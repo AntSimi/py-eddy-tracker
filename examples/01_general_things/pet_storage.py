@@ -15,9 +15,9 @@ There are 3 class of files:
   manage eddies associated in networks, the ```track``` and ```segment``` fields allow to separate observations
 """
 
-import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
 from numpy import arange, outer
+import py_eddy_tracker_sample
 
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.observations.network import NetworkObservations

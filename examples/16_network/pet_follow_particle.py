@@ -5,8 +5,7 @@ Follow particle
 """
 import re
 
-from matplotlib import colors
-from matplotlib import pyplot as plt
+from matplotlib import colors, pyplot as plt
 from matplotlib.animation import FuncAnimation
 from numpy import arange, meshgrid, ones, unique, zeros
 

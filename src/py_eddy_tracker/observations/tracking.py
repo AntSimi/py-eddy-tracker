@@ -2,8 +2,8 @@
 """
 Class to manage observations gathered in trajectories
 """
-import logging
 from datetime import datetime, timedelta
+import logging
 
 from numba import njit
 from numpy import (

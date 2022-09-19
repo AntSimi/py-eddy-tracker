@@ -3,8 +3,7 @@
 Tool method which use mostly numba
 """
 
-from numba import njit, prange
-from numba import types as numba_types
+from numba import njit, prange, types as numba_types
 from numpy import (
     absolute,
     arcsin,

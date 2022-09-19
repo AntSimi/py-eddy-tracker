@@ -3,9 +3,9 @@
 Entry point of graphic user interface
 """
 
-import logging
 from datetime import datetime, timedelta
 from itertools import chain
+import logging
 
 from matplotlib import pyplot
 from matplotlib.animation import FuncAnimation

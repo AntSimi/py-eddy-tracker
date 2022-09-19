@@ -9,9 +9,9 @@ You could use also *EddyAnim* script to display/save animation.
 """
 import re
 
-import py_eddy_tracker_sample
 from matplotlib.animation import FuncAnimation
 from numpy import arange
+import py_eddy_tracker_sample
 
 from py_eddy_tracker.appli.gui import Anim
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations

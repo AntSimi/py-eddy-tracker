@@ -3,12 +3,11 @@
 Applications on detection and tracking files
 """
 import argparse
-import logging
 from datetime import datetime
 from glob import glob
+import logging
 from os import mkdir
-from os.path import basename, dirname, exists
-from os.path import join as join_path
+from os.path import basename, dirname, exists, join as join_path
 from re import compile as re_compile
 
 from netCDF4 import Dataset

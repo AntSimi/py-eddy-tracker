@@ -8,8 +8,7 @@ import logging
 from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize
 from matplotlib.figure import Figure
-from numba import njit
-from numba import types as numba_types
+from numba import njit, types as numba_types
 from numpy import (
     array,
     concatenate,

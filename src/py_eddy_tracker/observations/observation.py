@@ -2,21 +2,18 @@
 """
 Base class to manage eddy observation
 """
-import logging
 from datetime import datetime
 from io import BufferedReader, BytesIO
+import logging
 from tarfile import ExFileObject
 from tokenize import TokenError
 
-import packaging.version
-import zarr
+from Polygon import Polygon
 from matplotlib.cm import get_cmap
-from matplotlib.collections import LineCollection
-from matplotlib.collections import PolyCollection
+from matplotlib.collections import LineCollection, PolyCollection
 from matplotlib.colors import Normalize
 from netCDF4 import Dataset
-from numba import njit
-from numba import types as numba_types
+from numba import njit, types as numba_types
 from numpy import (
     absolute,
     arange,
@@ -45,9 +42,10 @@ from numpy import (
     where,
     zeros,
 )
+import packaging.version
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
-from Polygon import Polygon
+import zarr
 
 from .. import VAR_DESCR, VAR_DESCR_inv, __version__
 from ..generic import (
@@ -65,13 +63,13 @@ from ..poly import (
     bbox_intersection,
     close_center,
     convexs,
+    create_meshed_particles,
     create_vertice,
     get_pixel_in_regular,
     insidepoly,
     poly_indexs,
     reduce_size,
     vertice_overlap,
-    create_meshed_particles,
 )
 
 logger = logging.getLogger("pet")
@@ -645,7 +643,9 @@ class EddiesObservations(object):
                     break
             if b0_self < b0_other:
                 if all_ref:
-                    yield indexs_self, empty(0, dtype=indexs_self.dtype), b0_self, b1_self
+                    yield indexs_self, empty(
+                        0, dtype=indexs_self.dtype
+                    ), b0_self, b1_self
                 continue
             yield indexs_self, indexs_other, b0_self, b1_self
 
@@ -2056,10 +2056,12 @@ class EddiesObservations(object):
         xname, yname = self.intern(intern)
         x, y = self[xname], self[yname]
         c = self.parse_varname(field)
-        cmap = get_cmap(kwargs.pop('cmap', 'Spectral_r'))
-        cmin, cmax = kwargs.pop('vmin', c.min()), kwargs.pop('vmax', c.max())
+        cmap = get_cmap(kwargs.pop("cmap", "Spectral_r"))
+        cmin, cmax = kwargs.pop("vmin", c.min()), kwargs.pop("vmax", c.max())
         colors = cmap((c - cmin) / (cmax - cmin))
-        lines = LineCollection([create_vertice(i,j) for i,j in zip(x,y)], colors=colors, **kwargs)
+        lines = LineCollection(
+            [create_vertice(i, j) for i, j in zip(x, y)], colors=colors, **kwargs
+        )
         ax.add_collection(lines)
         return lines
 

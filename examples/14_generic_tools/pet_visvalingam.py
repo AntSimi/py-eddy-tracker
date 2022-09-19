@@ -2,8 +2,8 @@
 Visvalingam algorithm
 =====================
 """
-import matplotlib.animation as animation
 from matplotlib import pyplot as plt
+import matplotlib.animation as animation
 from numba import njit
 from numpy import array, empty
 

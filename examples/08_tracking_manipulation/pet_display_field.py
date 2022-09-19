@@ -4,8 +4,8 @@ Display fields
 
 """
 
-import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
+import py_eddy_tracker_sample
 
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 

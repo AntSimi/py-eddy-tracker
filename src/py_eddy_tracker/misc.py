@@ -1,5 +1,7 @@
 import re
+
 from matplotlib.animation import FuncAnimation
+
 
 class VideoAnimation(FuncAnimation):
     def _repr_html_(self, *args, **kwargs):

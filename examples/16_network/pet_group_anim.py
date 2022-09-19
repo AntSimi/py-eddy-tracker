@@ -2,9 +2,10 @@
 Network group process
 =====================
 """
+from datetime import datetime
+
 # sphinx_gallery_thumbnail_number = 2
 import re
-from datetime import datetime
 
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation

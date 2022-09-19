@@ -3,8 +3,8 @@
 """
 Translate eddy Dataset
 """
-import zarr
 from netCDF4 import Dataset
+import zarr
 
 from py_eddy_tracker import EddyParser
 from py_eddy_tracker.observations.observation import EddiesObservations

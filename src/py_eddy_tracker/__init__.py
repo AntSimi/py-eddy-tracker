@@ -20,9 +20,9 @@ Email: evanmason@gmail.com
 
 """
 
-import logging
 from argparse import ArgumentParser
 from datetime import datetime
+import logging
 
 import zarr
 

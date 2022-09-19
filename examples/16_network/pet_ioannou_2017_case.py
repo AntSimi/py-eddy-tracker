@@ -6,12 +6,12 @@ Figure 10 from https://doi.org/10.1002/2017JC013158
 We want to find the Ierapetra Eddy described above in a network demonstration run.
 """
 
-# %%
-import re
 from datetime import datetime, timedelta
 
-from matplotlib import colors
-from matplotlib import pyplot as plt
+# %%
+import re
+
+from matplotlib import colors, pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.ticker import FuncFormatter
 from numpy import arange, array, pi, where

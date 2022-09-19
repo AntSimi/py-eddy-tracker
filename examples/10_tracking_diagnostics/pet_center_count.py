@@ -5,9 +5,9 @@ Count center
 Do Geo stat with center and compare with frequency method
 show: :ref:`sphx_glr_python_module_10_tracking_diagnostics_pet_pixel_used.py`
 """
-import py_eddy_tracker_sample
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
+import py_eddy_tracker_sample
 
 from py_eddy_tracker.observations.tracking import TrackEddiesObservations
 
@@ -27,7 +27,7 @@ c = TrackEddiesObservations.load_file(
 step = 0.125
 bins = ((-10, 37, step), (30, 46, step))
 kwargs_pcolormesh = dict(
-    cmap="terrain_r", vmin=0, vmax=2, factor=1 / (a.nb_days * step ** 2), name="count"
+    cmap="terrain_r", vmin=0, vmax=2, factor=1 / (a.nb_days * step**2), name="count"
 )
 
 

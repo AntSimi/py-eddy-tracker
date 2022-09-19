@@ -1,5 +1,5 @@
-import zarr
 from netCDF4 import Dataset
+import zarr
 
 from py_eddy_tracker.data import get_demo_path
 from py_eddy_tracker.featured_tracking.area_tracker import AreaTracker

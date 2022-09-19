@@ -10,8 +10,8 @@ EddyId \
 """
 import io
 import lzma
-import tarfile
 from os import path
+import tarfile
 
 import requests
 
