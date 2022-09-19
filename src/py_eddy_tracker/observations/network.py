@@ -8,6 +8,7 @@ from glob import glob
 
 import netCDF4
 import zarr
+from numba.typed import List
 from numba import njit
 from numpy import (
     arange,
@@ -110,6 +111,8 @@ class NetworkObservations(GroupEddiesObservations):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._index_network = None
+        self._index_segment_track = None
+        self._segment_track_array = None
 
     def find_segments_relative(self, obs, stopped=None, order=1):
         """
@@ -161,16 +164,64 @@ class NetworkObservations(GroupEddiesObservations):
             self._index_network = build_index(self.track)
         return self._index_network
 
-    def network_size(self, id_networks):
+    @property
+    def index_segment_track(self):
+        if self._index_segment_track is None:
+            self._index_segment_track = build_index(self.segment_track_array)
+        return self._index_segment_track
+
+    def segment_size(self):
+        return self.index_segment_track[1] - self.index_segment_track[0]
+
+    @property
+    def ref_segment_track_index(self):
+        return self.index_segment_track[2]
+
+    @property
+    def ref_index(self):
+        return self.index_network[2]
+
+    def network_segment_size(self, id_networks=None):
+        """Get number of segment by network
+
+        :return array:
+        """
+        i0, i1, ref = build_index(self.track[self.index_segment_track[0]])
+        if id_networks is None:
+            return i1-i0
+        else:
+            i = id_networks - ref
+            return i1[i] - i0[i]
+
+    def network_size(self, id_networks=None):
         """
         Return size for specified network
 
-        :param list,array id_networks: ids to identify network
+        :param list,array, None id_networks: ids to identify network
         """
-        i = id_networks - self.index_network[2]
-        i_start, i_stop = self.index_network[0][i], self.index_network[1][i]
-        return i_stop - i_start
+        if id_networks is None:
+            return self.index_network[1] - self.index_network[0]
+        else:
+            i = id_networks - self.index_network[2]
+            return self.index_network[1][i] - self.index_network[0][i]
     
+    def unique_segment_to_id(self, id_unique):
+        """Return id network and id segment for a unique id
+
+        :param array id_unique:
+        """
+        i = self.index_segment_track[0][id_unique] - self.ref_segment_track_index
+        return self.track[i], self.segment[i]
+
+    def segment_slice(self, id_network, id_segment):
+        """
+        Return slice for one segment
+
+        :param int id_network: id to identify network
+        :param int id_segment: id to identify segment
+        """
+        raise Exception('need to be implemented')
+
     def network_slice(self, id_network):
         """
         Return slice for one network
@@ -487,6 +538,7 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Compute the relative order of each segment to the chosen segment
         """
+        self.only_one_network()
         i_s, i_e, i_ref = build_index(self.segment)
         segment_connexions = self.connexions()
         relative_tr = -ones(i_s.shape, dtype="i4")
@@ -634,7 +686,7 @@ class NetworkObservations(GroupEddiesObservations):
         if there are more than one network
         """
         _, i_start, _ = self.index_network
-        if len(i_start) > 1:
+        if i_start.size > 1:
             raise Exception("Several networks")
 
     def position_filter(self, median_half_window, loess_half_window):
@@ -832,7 +884,7 @@ class NetworkObservations(GroupEddiesObservations):
             out = empty(y.shape, **kw)
         else:
             out = list()
-        for i, b0, b1 in self.iter_on(self.segment_track_array):
+        for i, _, _ in self.iter_on(self.segment_track_array):
             res = method(y[i])
             if same:
                 out[i] = res
@@ -1025,7 +1077,9 @@ class NetworkObservations(GroupEddiesObservations):
     @property
     def segment_track_array(self):
         """Return a unique segment id when multiple networks are considered"""
-        return build_unique_array(self.segment, self.track)
+        if self._segment_track_array is None:
+            self._segment_track_array = build_unique_array(self.segment, self.track)
+        return self._segment_track_array
 
     def birth_event(self):
         """Extract birth events.
@@ -1081,7 +1135,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         if triplet:
             if only_index:
-                return (idx_m1, idx_m0, idx_m0_stop)
+                return array(idx_m1), array(idx_m0), array(idx_m0_stop)
             else:
                 return (
                     self.extract_event(idx_m1),
@@ -1119,12 +1173,12 @@ class NetworkObservations(GroupEddiesObservations):
 
         if triplet:
             if only_index:
-                return (idx_s0, idx_s1, idx_s1_start)
+                return array(idx_s0), array(idx_s1), array(idx_s1_start)
             else:
                 return (
-                    self.extract_event(list(idx_s0)),
-                    self.extract_event(list(idx_s1)),
-                    self.extract_event(list(idx_s1_start)),
+                    self.extract_event(idx_s0),
+                    self.extract_event(idx_s1),
+                    self.extract_event(idx_s1_start),
                 )
 
         else:
@@ -1159,14 +1213,108 @@ class NetworkObservations(GroupEddiesObservations):
         self.next_obs[:] = translate[n]
         self.previous_obs[:] = translate[p]
 
+    def network_segment(self, id_network, id_segment):
+        return self.extract_with_mask(self.segment_slice(id_network, id_segment))
+
     def network(self, id_network):
         return self.extract_with_mask(self.network_slice(id_network))
 
+    def networks_mask(self, id_networks, segment=False):
+        if segment:
+            return generate_mask_from_ids(id_networks, self.track.size, *self.index_segment_track)
+        else:
+            return generate_mask_from_ids(id_networks, self.track.size, *self.index_network)
+
     def networks(self, id_networks):
-        m = zeros(self.track.shape, dtype=bool)
-        for tr in id_networks:
-            m[self.network_slice(tr)] = True
-        return self.extract_with_mask(m)
+        return self.extract_with_mask(generate_mask_from_ids(id_networks, self.track.size, *self.index_network))
+
+    @property
+    def nb_network(self):
+        """
+        Count and return number of network
+        """
+        return (self.network_size() != 0).sum()
+    
+    @property
+    def nb_segment(self):
+        """
+        Count and return number of segment in all network
+        """
+        return self.index_segment_track[0].size
+
+    def identify_in(self, other, size_min=1, segment=False):
+        """
+        Return couple of segment or network which are equal
+
+        :param other: other atlas to compare
+        :param int size_min: number of observation in network/segment
+        :param bool segment: segment mode
+        """
+        if segment:
+            counts = self.segment_size(), other.segment_size()
+            i_self_ref, i_other_ref = self.ref_segment_track_index, other.ref_segment_track_index
+            var_id = 'segment'
+        else:
+            counts = self.network_size(), other.network_size()
+            i_self_ref, i_other_ref = self.ref_index, other.ref_index
+            var_id = 'track'
+        # object to contain index of couple
+        in_self, in_other = list(), list() 
+        # We iterate on item of same size       
+        for i_self, i_other, i0, _ in self.align_on(other, counts, all_ref=True):
+            if i0 < size_min:
+                continue
+            if isinstance(i_other, slice):
+                i_other = arange(i_other.start, i_other.stop)
+            # All_ref will give all item of self, sometime there is no things to compare with other
+            if i_other.size == 0:
+                id_self = i_self + i_self_ref
+                in_self.append(id_self)
+                in_other.append(-ones(id_self.shape, dtype=id_self.dtype))
+                continue
+            if isinstance(i_self, slice):
+                i_self = arange(i_self.start, i_self.stop)
+            # We get absolute id
+            id_self, id_other = i_self + i_self_ref, i_other + i_other_ref
+            # We compute mask to select data
+            m_self, m_other = self.networks_mask(id_self, segment), other.networks_mask(id_other, segment)
+
+            # We extract obs
+            obs_self, obs_other = self.obs[m_self], other.obs[m_other]
+            x1, y1, t1 = obs_self['lon'], obs_self['lat'], obs_self['time']
+            x2, y2, t2 = obs_other['lon'], obs_other['lat'], obs_other['time']
+
+            if segment:
+                ids1 = build_unique_array(obs_self['segment'], obs_self['track'])
+                ids2 = build_unique_array(obs_other['segment'], obs_other['track'])
+                label1 = self.segment_track_array[m_self]
+                label2 = other.segment_track_array[m_other]
+            else:
+                label1, label2 = ids1, ids2 = obs_self[var_id], obs_other[var_id]
+            # For each item we get index to sort
+            i01, indexs1, id1 = list(), List(), list()
+            for sl_self, id_, _ in self.iter_on(ids1):
+                i01.append(sl_self.start)
+                indexs1.append(obs_self[sl_self].argsort(order=['time', 'lon', 'lat']))
+                id1.append(label1[sl_self.start])
+            i02, indexs2, id2 = list(), List(), list()
+            for sl_other, _, _ in other.iter_on(ids2):
+                i02.append(sl_other.start)
+                indexs2.append(obs_other[sl_other].argsort(order=['time', 'lon', 'lat']))
+                id2.append(label2[sl_other.start])
+
+            id1, id2 = array(id1), array(id2)
+            # We search item from self in item of others
+            i_local_target = same_position(x1, y1, t1, x2, y2, t2, array(i01), array(i02), indexs1, indexs2)
+
+            # -1 => no item found in other dataset
+            m = i_local_target != -1
+            in_self.append(id1)
+            track2_ = -ones(id1.shape, dtype='i4')
+            track2_[m] = id2[i_local_target[m]]
+            in_other.append(track2_)
+
+        return concatenate(in_self), concatenate(in_other)
 
     @classmethod
     def __tag_segment(cls, seg, tag, groups, connexions):
@@ -1647,6 +1795,27 @@ class NetworkObservations(GroupEddiesObservations):
             )
         return itf_final, ptf_final
 
+    def mask_obs_close_event(self, merging=True, spliting=True, dt=3):
+        """Build a mask of close observation from event
+
+        :param n: Network
+        :param bool merging: select merging event, defaults to True
+        :param bool spliting: select splitting event, defaults to True
+        :param int dt: delta of time max , defaults to 3
+        :return array: mask
+        """
+        m = zeros(len(self), dtype='bool')
+        if merging:
+            i_target, ip1, ip2 = self.merging_event(triplet=True, only_index=True)
+            mask_follow_obs(m, self.previous_obs, self.time, ip1, dt)
+            mask_follow_obs(m, self.previous_obs, self.time, ip2, dt)
+            mask_follow_obs(m, self.next_obs, self.time, i_target, dt)
+        if spliting:
+            i_target, in1, in2 = self.splitting_event(triplet=True, only_index=True)
+            mask_follow_obs(m, self.next_obs, self.time, in1, dt)
+            mask_follow_obs(m, self.next_obs, self.time, in2, dt)
+            mask_follow_obs(m, self.previous_obs, self.time, i_target, dt)
+        return m
 
 class Network:
     __slots__ = (
@@ -1864,3 +2033,77 @@ def new_numbering(segs, start=0):
 @njit(cache=True)
 def ptp(values):
     return values.max() - values.min()
+
+@njit(cache=True)
+def generate_mask_from_ids(id_networks, nb, istart, iend, i0):
+    """From list of id, we generate a mask
+
+    :param array id_networks: list of ids
+    :param int nb: size of mask
+    :param array istart: first index for each id from :py:meth:`~py_eddy_tracker.generic.build_index`
+    :param array iend: last index for each id from :py:meth:`~py_eddy_tracker.generic.build_index`
+    :param int i0: ref index from :py:meth:`~py_eddy_tracker.generic.build_index`
+    :return array: return a mask
+    """
+    m = zeros(nb, dtype='bool')
+    for i in id_networks:
+        for j in range(istart[i-i0], iend[i-i0]):
+            m[j] = True
+    return m
+
+@njit(cache=True)
+def same_position(x0, y0, t0, x1, y1, t1, i00, i01, i0, i1):
+    """Return index of track/segment found in other dataset
+
+    :param array x0: 
+    :param array y0: 
+    :param array t0: 
+    :param array x1: 
+    :param array y1: 
+    :param array t1: 
+    :param array i00: First index of track/segment/network in dataset0
+    :param array i01: First index of track/segment/network in dataset1
+    :param List(array) i0: list of array which contain index to order dataset0
+    :param List(array) i1: list of array which contain index to order dataset1
+    :return array: index of dataset1 which match with dataset0, -1 => no match
+    """
+    nb0, nb1 = i00.size, i01.size
+    i_target = -ones(nb0, dtype='i4')
+    # To avoid to compare multiple time, if already match
+    used1 = zeros(nb1, dtype='bool')
+    for j0 in range(nb0):
+        for j1 in range(nb1):
+            if used1[j1]:
+                continue
+            test = True
+            for i0_, i1_ in zip(i0[j0], i1[j1]):
+                i0_ += i00[j0]
+                i1_ += i01[j1]
+                if t0[i0_] != t1[i1_] or x0[i0_] != x1[i1_] or y0[i0_] != y1[i1_]:
+                    test = False
+                    break
+            if test:
+                i_target[j0] = j1
+                used1[j1] = True
+                break     
+    return i_target
+
+@njit(cache=True)
+def mask_follow_obs(m, next_obs, time, indexs, dt=3):
+    """Generate a mask to select close obs in time from index
+
+    :param array m: mask to fill with True
+    :param array next_obs: index of the next observation
+    :param array time: time of each obs
+    :param array indexs: index to start follow
+    :param int dt: delta of time max from index, defaults to 3
+    """
+    for i in indexs:
+        t0 = time[i]
+        m[i] = True
+        i_next = next_obs[i]
+        dt_ = abs(time[i_next] - t0)
+        while dt_ < dt and i_next != -1:
+            m[i_next] = True
+            i_next = next_obs[i_next]
+            dt_ = abs(time[i_next] - t0)

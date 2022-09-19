@@ -132,8 +132,8 @@ def distance_grid(lon0, lat0, lon1, lat1):
             sin_dlon = sin((dlon) * 0.5 * D2R)
             cos_lat1 = cos(lat0[i] * D2R)
             cos_lat2 = cos(lat1[j] * D2R)
-            a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
-            dist[i, j] = 6370.997 * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+            a_val = sin_dlon**2 * cos_lat1 * cos_lat2 + sin_dlat**2
+            dist[i, j] = 6370.997 * 2 * arctan2(a_val**0.5, (1 - a_val) ** 0.5)
     return dist
 
 
@@ -154,8 +154,8 @@ def distance(lon0, lat0, lon1, lat1):
     sin_dlon = sin((lon1 - lon0) * 0.5 * D2R)
     cos_lat1 = cos(lat0 * D2R)
     cos_lat2 = cos(lat1 * D2R)
-    a_val = sin_dlon ** 2 * cos_lat1 * cos_lat2 + sin_dlat ** 2
-    return 6370997.0 * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+    a_val = sin_dlon**2 * cos_lat1 * cos_lat2 + sin_dlat**2
+    return 6370997.0 * 2 * arctan2(a_val**0.5, (1 - a_val) ** 0.5)
 
 
 @njit(cache=True)
@@ -367,7 +367,7 @@ def simplify(x, y, precision=0.1):
     :return: (x,y)
     :rtype: (array,array)
     """
-    precision2 = precision ** 2
+    precision2 = precision**2
     nb = x.shape[0]
     # will be True for kept values
     mask = ones(nb, dtype=bool_)
@@ -399,7 +399,7 @@ def simplify(x, y, precision=0.1):
         if d_y > precision:
             x_previous, y_previous = x_, y_
             continue
-        d2 = d_x ** 2 + d_y ** 2
+        d2 = d_x**2 + d_y**2
         if d2 > precision2:
             x_previous, y_previous = x_, y_
             continue
@@ -517,8 +517,8 @@ def coordinates_to_local(lon, lat, lon0, lat0):
     sin_dlon = sin(dlon * 0.5)
     cos_lat0 = cos(lat0 * D2R)
     cos_lat = cos(lat * D2R)
-    a_val = sin_dlon ** 2 * cos_lat0 * cos_lat + sin_dlat ** 2
-    module = R * 2 * arctan2(a_val ** 0.5, (1 - a_val) ** 0.5)
+    a_val = sin_dlon**2 * cos_lat0 * cos_lat + sin_dlat**2
+    module = R * 2 * arctan2(a_val**0.5, (1 - a_val) ** 0.5)
 
     azimuth = pi / 2 - arctan2(
         cos_lat * sin(dlon),
@@ -541,7 +541,7 @@ def local_to_coordinates(x, y, lon0, lat0):
     """
     D2R = pi / 180.0
     R = 6370997
-    d = (x ** 2 + y ** 2) ** 0.5 / R
+    d = (x**2 + y**2) ** 0.5 / R
     a = -(arctan2(y, x) - pi / 2)
     lat = arcsin(sin(lat0 * D2R) * cos(d) + cos(lat0 * D2R) * sin(d) * cos(a))
     lon = (
@@ -612,3 +612,44 @@ def build_circle(x0, y0, r):
     angle = radians(linspace(0, 360, 50))
     x_norm, y_norm = cos(angle), sin(angle)
     return x_norm * r + x0, y_norm * r + y0
+
+
+@njit(cache=True)
+def window_index(x, x0, half_window=1):
+    """
+    Give for a fixed half_window each start and end index for each x0, in
+    an unsorted array.
+
+    :param array x: array of value
+    :param array x0: array of window center
+    :param float half_window: half window
+    """
+    # Sort array, bounds will be sort also
+    i_ordered = x.argsort()
+    nb_x, nb_pt = x.size, x0.size
+    first_index = empty(nb_pt, dtype=i_ordered.dtype)
+    last_index = empty(nb_pt, dtype=i_ordered.dtype)
+    # First bound to find
+    j_min, j_max = 0, 0
+    x_min = x0[j_min] - half_window
+    x_max = x0[j_max] + half_window
+    # We iterate on ordered x
+    for i, i_x in enumerate(i_ordered):
+        x_ = x[i_x]
+        # if x bigger than x_min , we found bound and search next one
+        while x_ > x_min and j_min < nb_pt:
+            first_index[j_min] = i
+            j_min += 1
+            x_min = x0[j_min] - half_window
+        # if x bigger than x_max , we found bound and search next one
+        while x_ > x_max and j_max < nb_pt:
+            last_index[j_max] = i
+            j_max += 1
+            x_max = x0[j_max] + half_window
+        if j_max == nb_pt:
+            break
+    for i in range(j_min, nb_pt):
+        first_index[i] = nb_x
+    for i in range(j_max, nb_pt):
+        last_index[i] = nb_x
+    return i_ordered, first_index, last_index

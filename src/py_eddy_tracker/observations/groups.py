@@ -3,9 +3,12 @@ from abc import ABC, abstractmethod
 
 from numba import njit
 from numba import types as nb_types
-from numpy import arange, int32, interp, median, where, zeros
+from numpy import arange, int32, interp, median, where, zeros, full, isnan
 
 from .observation import EddiesObservations
+
+from ..generic import window_index
+from ..poly import create_meshed_particles, poly_indexs
 
 logger = logging.getLogger("pet")
 
@@ -89,6 +92,39 @@ def advect(x, y, c, t0, n_days, u_name='u', v_name='v'):
     return t, x, y
 
 
+def particle_candidate_step(t_start, contours_start, contours_end, space_step, dt, c, **kwargs):
+    """Select particles within eddies, advect them, return target observation and associated percentages.
+    For one time step.
+
+    :param int t_start: julian day of the advection
+    :param (np.array(float),np.array(float)) contours_start: origin contour
+    :param (np.array(float),np.array(float)) contours_end: destination contour
+    :param float space_step: step between 2 particles
+    :param int dt: duration of advection
+    :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
+    :params dict kwargs: dict of params given to advection
+    :return (np.array,np.array): return target index and percent associate
+    """
+    # Create particles in start contour
+    x, y, i_start = create_meshed_particles(*contours_start, space_step)
+    # Advect particles
+    kw = dict(nb_step=6, time_step=86400 / 6)
+    p = c.advect(x, y, t_init=t_start, **kwargs, **kw)
+    for _ in range(dt):
+        _, x, y = p.__next__()
+    m = ~(isnan(x) + isnan(y))
+    i_end = full(x.shape, -1, dtype="i4")
+    if m.any():
+        # Id eddies for each alive particle in start contour
+        i_end[m] = poly_indexs(x[m], y[m], *contours_end)
+    shape = (contours_start[0].shape[0], 2)
+    # Get target for each contour
+    i_target, pct_target = full(shape, -1, dtype="i4"), zeros(shape, dtype="f8")
+    nb_end = contours_end[0].shape[0]
+    get_targets(i_start, i_end, i_target, pct_target, nb_end)
+    return i_target, pct_target.astype('i1')
+
+
 def particle_candidate(
     c,
     eddies,
@@ -120,13 +156,8 @@ def particle_candidate(
     translate_start = where(m_start)[0]
 
     # Create particles in specified contour
-    if contour_start == "speed":
-        x, y, i_start = e.create_particles(step_mesh, intern=True)
-    elif contour_start == "effective":
-        x, y, i_start = e.create_particles(step_mesh, intern=False)
-    else:
-        x, y, i_start = e.create_particles(step_mesh, intern=True)
-        print("The contour_start was not correct, speed contour is used")
+    intern = False if contour_start == "effective" else True
+    x, y, i_start = e.create_particles(step_mesh, intern=intern)
     # Advection
     t_end, x, y = advect(x, y, c, t_start, **kwargs)
 
@@ -138,17 +169,53 @@ def particle_candidate(
     translate_end = where(m_end)[0]
 
     # Id eddies for each alive particle in specified contour
-    if contour_end == "speed":
-        i_end = e_end.contains(x, y, intern=True)
-    elif contour_end == "effective":
-        i_end = e_end.contains(x, y, intern=False)
-    else:
-        i_end = e_end.contains(x, y, intern=True)
-        print("The contour_end was not correct, speed contour is used")
+    intern = False if contour_end == "effective" else True
+    i_end = e_end.contains(x, y, intern=intern)
 
     # compute matrix and fill target array
     get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct)
 
+
+@njit(cache=True)
+def get_targets(i_start, i_end, i_target, pct, nb_end):
+    """Compute target observation and associated percentages
+
+    :param array(int) i_start: indices in time 0
+    :param array(int) i_end: indices in time N
+    :param array(int) i_target: corresponding obs where particles are advected
+    :param array(int) pct: corresponding percentage of avected particles
+    :param int nb_end: number of contour at time N
+    """
+    nb_start = i_target.shape[0]
+    # Matrix which will store count for every couple
+    counts = zeros((nb_start, nb_end), dtype=nb_types.int32)
+    # Number of particles in each origin observation
+    ref = zeros(nb_start, dtype=nb_types.int32)
+    # For each particle
+    for i in range(i_start.size):
+        i_end_ = i_end[i]
+        i_start_ = i_start[i]
+        ref[i_start_] += 1
+        if i_end_ != -1:
+            counts[i_start_, i_end_] += 1
+    # From i to j
+    for i in range(nb_start):
+        for j in range(nb_end):
+            count = counts[i, j]
+            if count == 0:
+                continue
+            pct_ = count / ref[i] * 100
+            pct_0 = pct[i, 0]
+            # If percent is higher than previous stored in rank 0
+            if pct_ > pct_0:
+                pct[i, 1] = pct_0
+                pct[i, 0] = pct_
+                i_target[i, 1] = i_target[i, 0]
+                i_target[i, 0] = j
+            # If percent is higher than previous stored in rank 1
+            elif pct_ > pct[i, 1]:
+                pct[i, 1] = pct_
+                i_target[i, 1] = j
 
 @njit(cache=True)
 def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
@@ -278,3 +345,42 @@ class GroupEddiesObservations(EddiesObservations, ABC):
                 mask[i] = True
 
         return self.extract_with_mask(mask)
+
+    def particle_candidate_atlas(self, cube, space_step, dt, start_intern=False, end_intern=False, **kwargs):
+        """Select particles within eddies, advect them, return target observation and associated percentages
+
+        :param `~py_eddy_tracker.dataset.grid.GridCollection` cube: GridCollection with speed for particles
+        :param float space_step: step between 2 particles
+        :param int dt: duration of advection
+        :param bool start_intern: Use intern or extern contour at injection, defaults to False
+        :param bool end_intern: Use intern or extern contour at end of advection, defaults to False
+        :params dict kwargs: dict of params given to advection
+        :return (np.array,np.array): return target index and percent associate
+        """
+        t_start, t_end = int(self.period[0]), int(self.period[1])
+        # Pre-compute to get time index
+        i_sort, i_start, i_end = window_index(self.time, arange(t_start, t_end + 1), .5)
+        # Out shape
+        shape = (len(self), 2)
+        i_target, pct = full(shape, -1, dtype="i4"), zeros(shape, dtype="i1")
+        # Backward or forward
+        times = arange(t_start, t_end - dt) if dt > 0 else arange(t_start + dt, t_end)
+        for t in times:
+            # Get index for origin
+            i = t - t_start
+            indexs0 = i_sort[i_start[i]:i_end[i]]
+            # Get index for end
+            i = t + dt - t_start
+            indexs1 = i_sort[i_start[i]:i_end[i]]
+            # Get contour data
+            contours0 = [self[label][indexs0] for label in self.intern(start_intern)]
+            contours1 = [self[label][indexs1] for label in self.intern(end_intern)]
+            # Get local result
+            i_target_, pct_ = particle_candidate_step(t, contours0, contours1, space_step, dt, cube, **kwargs)
+            # Merge result
+            m = i_target_ != -1
+            i_target_[m] = indexs1[i_target_[m]]
+            i_target[indexs0] =  i_target_
+            pct[indexs0] =  pct_
+        return i_target, pct
+        

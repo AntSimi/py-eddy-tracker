@@ -8,6 +8,7 @@ import logging
 from .. import EddyParser
 from ..observations.network import Network, NetworkObservations
 from ..observations.tracking import TrackEddiesObservations
+from numpy import in1d, zeros
 
 logger = logging.getLogger("pet")
 
@@ -128,3 +129,135 @@ def subset_network():
     if args.period is not None:
         n = n.extract_with_period(args.period)
     n.write_file(filename=args.out)
+
+
+def quick_compare():
+    parser = EddyParser(
+        """Tool to have a quick comparison between several network:
+        - N : network
+        - S : segment
+        - Obs : observations
+        """
+        
+    )
+    parser.add_argument("ref", help="Identification file of reference")
+    parser.add_argument("others", nargs="+", help="Identifications files to compare")
+    parser.add_argument(
+        "--path_out", default=None, help="Save each group in separate file"
+    )
+    args = parser.parse_args()
+
+    kw = dict(
+        include_vars=['longitude', 'latitude', 'time', 'track', 'segment', 'next_obs', 'previous_obs']
+    )
+
+    if args.path_out is not None:
+        kw = dict()
+
+    ref = NetworkObservations.load_file(args.ref, **kw)
+    print(
+        f"[ref] {args.ref} -> {ref.nb_network} network / {ref.nb_segment} segment / {len(ref)} obs "
+        f"-> {ref.network_size(0)} trash obs, "
+        f"{len(ref.merging_event())} merging, {len(ref.splitting_event())} spliting"
+        )
+    others = {other: NetworkObservations.load_file(other, **kw) for other in args.others}
+
+    if args.path_out is not None:
+        groups_ref, groups_other = run_compare(ref, others, **kwargs)
+        if not exists(args.path_out):
+            mkdir(args.path_out)
+        for i, other_ in enumerate(args.others):
+            dirname_ = f"{args.path_out}/{other_.replace('/', '_')}/"
+            if not exists(dirname_):
+                mkdir(dirname_)
+            for k, v in groups_other[other_].items():
+                basename_ = f"other_{k}.nc"
+                others[other_].index(v).write_file(filename=f"{dirname_}/{basename_}")
+            for k, v in groups_ref[other_].items():
+                basename_ = f"ref_{k}.nc"
+                ref.index(v).write_file(filename=f"{dirname_}/{basename_}")
+        return
+    display_compare(ref, others)
+
+
+def run_compare(ref, others):
+    outs = dict()
+    for i, (k, other) in enumerate(others.items()):
+        out = dict()
+        print(
+            f"[{i}]   {k} -> {other.nb_network} network / {other.nb_segment} segment / {len(other)} obs "
+            f"-> {other.network_size(0)} trash obs, "
+            f"{len(other.merging_event())} merging, {len(other.splitting_event())} spliting"
+            )
+        ref_id, other_id = ref.identify_in(other, size_min=2)
+        m = other_id != -1
+        ref_id, other_id = ref_id[m], other_id[m]
+        out['same N(N)'] = m.sum()
+        out['same N(Obs)'] = ref.network_size(ref_id).sum()
+
+        # For network which have same obs
+        ref_, other_ = ref.networks(ref_id), other.networks(other_id)
+        ref_segu, other_segu = ref_.identify_in(other_, segment=True)
+        m = other_segu==-1
+        ref_track_no_match, _ = ref_.unique_segment_to_id(ref_segu[m])
+        ref_segu, other_segu = ref_segu[~m], other_segu[~m]
+        m = ~in1d(ref_id, ref_track_no_match)
+        out['same NS(N)'] = m.sum()
+        out['same NS(Obs)'] = ref.network_size(ref_id[m]).sum()
+
+        # Check merge/split
+        def follow_obs(d, i_follow):
+            m = i_follow != -1
+            i_follow = i_follow[m]
+            t, x, y = zeros(m.size, d.time.dtype), zeros(m.size, d.longitude.dtype), zeros(m.size, d.latitude.dtype)
+            t[m], x[m], y[m] = d.time[i_follow], d.longitude[i_follow], d.latitude[i_follow]
+            return t, x, y
+        def next_obs(d, i_seg):
+            last_i = d.index_segment_track[1][i_seg] - 1
+            return follow_obs(d, d.next_obs[last_i])
+        def previous_obs(d, i_seg):
+            first_i = d.index_segment_track[0][i_seg]
+            return follow_obs(d, d.previous_obs[first_i])
+
+        tref, xref, yref = next_obs(ref_, ref_segu)
+        tother, xother, yother = next_obs(other_, other_segu)
+
+        m = (tref == tother) & (xref == xother) & (yref == yother) 
+        print(m.sum(), m.size, ref_segu.size, ref_track_no_match.size)
+
+        tref, xref, yref = previous_obs(ref_, ref_segu)
+        tother, xother, yother = previous_obs(other_, other_segu)
+
+        m = (tref == tother) & (xref == xother) & (yref == yother) 
+        print(m.sum(), m.size, ref_segu.size, ref_track_no_match.size)
+
+
+
+        ref_segu, other_segu = ref.identify_in(other, segment=True)
+        m = other_segu != -1
+        out['same S(S)'] = m.sum()
+        out['same S(Obs)'] = ref.segment_size()[ref_segu[m]].sum()
+
+        outs[k] = out
+    return outs
+
+def display_compare(ref, others):
+    def display(value, ref=None):
+        if ref:
+            outs = [f"{v/ref[k] * 100:.1f}% ({v})" for k, v in value.items()]
+        else:
+            outs = value
+        return "".join([f"{v:^18}" for v in outs])
+    
+    datas = run_compare(ref, others)
+    ref_ = {
+        'same N(N)' : ref.nb_network,
+        "same N(Obs)": len(ref),
+        'same NS(N)' : ref.nb_network,
+        'same NS(Obs)' : len(ref),
+        'same S(S)' : ref.nb_segment,
+        'same S(Obs)' : len(ref),
+        }
+    print("     ", display(ref_.keys()))
+    for i, (_, v) in enumerate(datas.items()):
+        print(f"[{i:2}] ", display(v, ref=ref_))

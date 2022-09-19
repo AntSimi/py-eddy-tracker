@@ -287,6 +287,27 @@ def close_center(x0, y0, x1, y1, delta=0.1):
     return array(i), array(j), array(c)
 
 
+@njit(cache=True)
+def create_meshed_particles(lons, lats, step):
+    x_out, y_out, i_out = list(), list(), list()
+    nb = lons.shape[0]
+    for i in range(nb):
+        lon, lat = lons[i], lats[i]
+        vertice = create_vertice(*reduce_size(lon, lat))
+        lon_min, lon_max = lon.min(), lon.max()
+        lat_min, lat_max = lat.min(), lat.max()
+        y0 = lat_min - lat_min % step
+        x = lon_min - lon_min % step
+        while x <= lon_max:
+            y = y0
+            while y <= lat_max:
+                if winding_number_poly(x, y, vertice):
+                    x_out.append(x), y_out.append(y), i_out.append(i)
+                y += step
+            x += step
+    return array(x_out), array(y_out), array(i_out)
+
+
 @njit(cache=True, fastmath=True)
 def bbox_intersection(x0, y0, x1, y1):
     """
@@ -503,7 +524,7 @@ def fit_circle(x, y):
 
     norme = (x[1:] - x_mean) ** 2 + (y[1:] - y_mean) ** 2
     norme_max = norme.max()
-    scale = norme_max ** 0.5
+    scale = norme_max**0.5
 
     # Form matrix equation and solve it
     # Maybe put f4
@@ -514,7 +535,7 @@ def fit_circle(x, y):
     (x0, y0, radius), _, _, _ = lstsq(datas, norme / norme_max)
 
     # Unscale data and get circle variables
-    radius += x0 ** 2 + y0 ** 2
+    radius += x0**2 + y0**2
     radius **= 0.5
     x0 *= scale
     y0 *= scale
@@ -546,21 +567,21 @@ def fit_ellipse(x, y):
     """
     nb = x.shape[0]
     datas = ones((nb, 5), dtype=x.dtype)
-    datas[:, 0] = x ** 2
+    datas[:, 0] = x**2
     datas[:, 1] = x * y
-    datas[:, 2] = y ** 2
+    datas[:, 2] = y**2
     datas[:, 3] = x
     datas[:, 4] = y
     (a, b, c, d, e), _, _, _ = lstsq(datas, ones(nb, dtype=x.dtype))
-    det = b ** 2 - 4 * a * c
+    det = b**2 - 4 * a * c
     if det > 0:
         print(det)
     x0 = (2 * c * d - b * e) / det
     y0 = (2 * a * e - b * d) / det
 
-    AB1 = 2 * (a * e ** 2 + c * d ** 2 - b * d * e - det)
+    AB1 = 2 * (a * e**2 + c * d**2 - b * d * e - det)
     AB2 = a + c
-    AB3 = ((a - c) ** 2 + b ** 2) ** 0.5
+    AB3 = ((a - c) ** 2 + b**2) ** 0.5
     A = -((AB1 * (AB2 + AB3)) ** 0.5) / det
     B = -((AB1 * (AB2 - AB3)) ** 0.5) / det
     theta = arctan((c - a - AB3) / b)
@@ -621,7 +642,7 @@ def fit_circle_(x, y):
     # Linear regression
     (a, b, c), _, _, _ = lstsq(datas, x[1:] ** 2 + y[1:] ** 2)
     x0, y0 = a / 2.0, b / 2.0
-    radius = (c + x0 ** 2 + y0 ** 2) ** 0.5
+    radius = (c + x0**2 + y0**2) ** 0.5
     err = shape_error(x, y, x0, y0, radius)
     return x0, y0, radius, err
 
@@ -646,14 +667,14 @@ def shape_error(x, y, x0, y0, r):
     :rtype: float
     """
     # circle area
-    c_area = (r ** 2) * pi
+    c_area = (r**2) * pi
     p_area = poly_area(x, y)
     nb = x.shape[0]
     x, y = x.copy(), y.copy()
     # Find distance between circle center and polygon
     for i in range(nb):
         dx, dy = x[i] - x0, y[i] - y0
-        rd = r / (dx ** 2 + dy ** 2) ** 0.5
+        rd = r / (dx**2 + dy**2) ** 0.5
         if rd < 1:
             x[i] = x0 + dx * rd
             y[i] = y0 + dy * rd

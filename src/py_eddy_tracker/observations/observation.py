@@ -11,6 +11,7 @@ from tokenize import TokenError
 import packaging.version
 import zarr
 from matplotlib.cm import get_cmap
+from matplotlib.collections import LineCollection
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import Normalize
 from netCDF4 import Dataset
@@ -70,7 +71,7 @@ from ..poly import (
     poly_indexs,
     reduce_size,
     vertice_overlap,
-    winding_number_poly,
+    create_meshed_particles,
 )
 
 logger = logging.getLogger("pet")
@@ -576,12 +577,12 @@ class EddiesObservations(object):
         Yield observation group for each bin.
 
         :param str,array xname:
-        :param array bins: bounds of each bin ,
-        :return: index or mask, bound low, bound up
+        :param array bins: bounds of each bin
+        :yield array,float,float: index in self, lower bound, upper bound
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.iter_on
         """
-        x = self[xname] if isinstance(xname, str) else xname
+        x = self.parse_varname(xname)
         d = x[1:] - x[:-1]
         if bins is None:
             bins = arange(x.min(), x.max() + 2)
@@ -617,14 +618,23 @@ class EddiesObservations(object):
                 i_bins = i[i0_]
                 yield slice(i0_, i1_), bins[i_bins], bins[i_bins + 1]
 
-    def align_on(self, other, var_name="time", **kwargs):
+    def align_on(self, other, var_name="time", all_ref=False, **kwargs):
         """
-        Align the time indices of two datasets.
+        Align the variable indices of two datasets.
+
+        :param other: other compare with self
+        :param str,tuple var_name: variable name to align or two array, defaults to "time"
+        :param bool all_ref: yield all value of ref, if false only common value, defaults to False
+        :yield array,array,float,float: index in self, index in other, lower bound, upper bound
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.align_on
         """
-        iter_self = self.iter_on(var_name, **kwargs)
-        iter_other = other.iter_on(var_name, **kwargs)
+        if isinstance(var_name, str):
+            iter_self = self.iter_on(var_name, **kwargs)
+            iter_other = other.iter_on(var_name, **kwargs)
+        else:
+            iter_self = self.iter_on(var_name[0], **kwargs)
+            iter_other = other.iter_on(var_name[1], **kwargs)
         indexs_other, b0_other, b1_other = iter_other.__next__()
         for indexs_self, b0_self, b1_self in iter_self:
             if b0_self > b0_other:
@@ -634,6 +644,8 @@ class EddiesObservations(object):
                 except StopIteration:
                     break
             if b0_self < b0_other:
+                if all_ref:
+                    yield indexs_self, empty(0, dtype=indexs_self.dtype), b0_self, b1_self
                 continue
             yield indexs_self, indexs_other, b0_self, b1_self
 
@@ -1057,11 +1069,6 @@ class EddiesObservations(object):
     @classmethod
     def from_array(cls, arrays, **kwargs):
         nb = arrays["time"].size
-        # if hasattr(handler, "track_array_variables"):
-        #     kwargs["track_array_variables"] = handler.track_array_variables
-        #     kwargs["array_variables"] = handler.array_variables.split(",")
-        # if len(handler.track_extra_variables) > 1:
-        #     kwargs["track_extra_variables"] = handler.track_extra_variables.split(",")
         eddies = cls(size=nb, **kwargs)
         for k, v in arrays.items():
             eddies.obs[k] = v
@@ -2036,6 +2043,26 @@ class EddiesObservations(object):
             nb_obs=len(self),
         )
 
+    def display_color(self, ax, field, intern=False, **kwargs):
+        """Plot colored contour of eddies
+
+        :param matplotlib.axes.Axes ax: matplotlib axe used to draw
+        :param str,array field: color field
+        :param bool intern: if True, draw the speed contour
+        :param dict kwargs: look at :py:meth:`matplotlib.collections.LineCollection`
+
+        .. minigallery:: py_eddy_tracker.EddiesObservations.display_color
+        """
+        xname, yname = self.intern(intern)
+        x, y = self[xname], self[yname]
+        c = self.parse_varname(field)
+        cmap = get_cmap(kwargs.pop('cmap', 'Spectral_r'))
+        cmin, cmax = kwargs.pop('vmin', c.min()), kwargs.pop('vmax', c.max())
+        colors = cmap((c - cmin) / (cmax - cmin))
+        lines = LineCollection([create_vertice(i,j) for i,j in zip(x,y)], colors=colors, **kwargs)
+        ax.add_collection(lines)
+        return lines
+
     def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
         """Plot the speed and effective (dashed) contour of the eddies
 
@@ -2353,7 +2380,7 @@ class EddiesObservations(object):
         """
 
         xname, yname = self.intern(intern)
-        return _create_meshed_particles(self[xname], self[yname], step)
+        return create_meshed_particles(self[xname], self[yname], step)
 
 
 @njit(cache=True)
@@ -2516,24 +2543,6 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
             for i_, j_ in zip(i, j):
                 v_max = max(v_max, grid[i_, j_])
             result[elt] = v_max
-
-
-@njit(cache=True)
-def _create_meshed_particles(lons, lats, step):
-    x_out, y_out, i_out = list(), list(), list()
-    for i, (lon, lat) in enumerate(zip(lons, lats)):
-        lon_min, lon_max = lon.min(), lon.max()
-        lat_min, lat_max = lat.min(), lat.max()
-        lon_min -= lon_min % step
-        lon_max -= lon_max % step - step * 2
-        lat_min -= lat_min % step
-        lat_max -= lat_max % step - step * 2
-
-        for x in arange(lon_min, lon_max, step):
-            for y in arange(lat_min, lat_max, step):
-                if winding_number_poly(x, y, create_vertice(*reduce_size(lon, lat))):
-                    x_out.append(x), y_out.append(y), i_out.append(i)
-    return array(x_out), array(y_out), array(i_out)
 
 
 class VirtualEddiesObservations(EddiesObservations):

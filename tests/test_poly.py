@@ -22,7 +22,7 @@ def test_fit_circle():
     x0, y0, r, err = fit_circle(*V)
     assert x0 == approx(2.5, rel=1e-10)
     assert y0 == approx(-9.5, rel=1e-10)
-    assert r == approx(2 ** 0.5 / 2, rel=1e-10)
+    assert r == approx(2**0.5 / 2, rel=1e-10)
     assert err == approx((1 - 2 / pi) * 100, rel=1e-10)
 
 

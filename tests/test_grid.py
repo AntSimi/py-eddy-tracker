@@ -7,7 +7,15 @@ from py_eddy_tracker.dataset.grid import RegularGridDataset
 
 G = RegularGridDataset(get_demo_path("mask_1_60.nc"), "lon", "lat")
 X = 0.025
-contour = Path(((-X, 0), (X, 0), (X, X), (-X, X), (-X, 0),))
+contour = Path(
+    (
+        (-X, 0),
+        (X, 0),
+        (X, X),
+        (-X, X),
+        (-X, 0),
+    )
+)
 
 
 # contour
@@ -91,7 +99,11 @@ def test_convolution():
     )
     g = RegularGridDataset.with_array(
         coordinates=("x", "y"),
-        datas=dict(z=z, x=arange(0, 6, 0.5), y=arange(0, 5, 0.5),),
+        datas=dict(
+            z=z,
+            x=arange(0, 6, 0.5),
+            y=arange(0, 5, 0.5),
+        ),
         centered=True,
     )
 

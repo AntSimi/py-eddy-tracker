@@ -310,6 +310,11 @@ class GridDataset(object):
             self.load_general_features()
             self.load()
 
+    def populate(self):
+        if self.dimensions is None:
+            self.load_general_features()
+            self.load()
+
     @property
     def is_centered(self):
         """Give True if pixel is described with its center's position or
@@ -539,7 +544,8 @@ class GridDataset(object):
                         self.vars[varname] = self.vars[varname].T
             if self.nan_mask:
                 self.vars[varname] = ma.array(
-                    self.vars[varname], mask=isnan(self.vars[varname]),
+                    self.vars[varname],
+                    mask=isnan(self.vars[varname]),
                 )
             if not hasattr(self.vars[varname], "mask"):
                 self.vars[varname] = ma.array(
@@ -869,7 +875,9 @@ class GridDataset(object):
                         num_fac=presampling_multiplier,
                     )
                     xy_e = uniform_resample(
-                        contour.lon, contour.lat, num_fac=presampling_multiplier,
+                        contour.lon,
+                        contour.lat,
+                        num_fac=presampling_multiplier,
                     )
                     xy_s = uniform_resample(
                         speed_contour.lon,
@@ -1204,7 +1212,9 @@ class RegularGridDataset(GridDataset):
         dx = self.x_bounds[1:] - self.x_bounds[:-1]
         dy = self.y_bounds[1:] - self.y_bounds[:-1]
         if (dx < 0).any() or (dy < 0).any():
-            raise Exception("Coordinates in RegularGridDataset must be strictly increasing")
+            raise Exception(
+                "Coordinates in RegularGridDataset must be strictly increasing"
+            )
         self._x_step = (self.x_c[1:] - self.x_c[:-1]).mean()
         self._y_step = (self.y_c[1:] - self.y_c[:-1]).mean()
 
@@ -1736,7 +1746,7 @@ class RegularGridDataset(GridDataset):
             self.x_c,
             self.y_c,
             data.data,
-            data.mask,
+            self.get_mask(data),
             self.EARTH_RADIUS,
             vertical=vertical,
             stencil_halfwidth=stencil_halfwidth,
@@ -2285,23 +2295,23 @@ class GridCollection:
         self.datasets = list()
 
     @classmethod
-    def from_netcdf_cube(cls, filename, x_name, y_name, t_name, heigth=None):
+    def from_netcdf_cube(cls, filename, x_name, y_name, t_name, heigth=None, **kwargs):
         new = cls()
         with Dataset(filename) as h:
             for i, t in enumerate(h.variables[t_name][:]):
-                d = RegularGridDataset(filename, x_name, y_name, indexs={t_name: i})
+                d = RegularGridDataset(filename, x_name, y_name, indexs={t_name: i}, **kwargs)
                 if heigth is not None:
                     d.add_uv(heigth)
                 new.datasets.append((t, d))
         return new
 
     @classmethod
-    def from_netcdf_list(cls, filenames, t, x_name, y_name, indexs=None, heigth=None):
+    def from_netcdf_list(cls, filenames, t, x_name, y_name, indexs=None, heigth=None, **kwargs):
         new = cls()
         for i, _t in enumerate(t):
             filename = filenames[i]
             logger.debug(f"load file {i:02d}/{len(t)} t={_t} : {filename}")
-            d = RegularGridDataset(filename, x_name, y_name, indexs=indexs)
+            d = RegularGridDataset(filename, x_name, y_name, indexs=indexs, **kwargs)
             if heigth is not None:
                 d.add_uv(heigth)
             new.datasets.append((_t, d))
@@ -2349,6 +2359,7 @@ class GridCollection:
     def __getitem__(self, item):
         for t, d in self.datasets:
             if t == item:
+                d.populate()
                 return d
         raise KeyError(item)
 
@@ -2448,10 +2459,13 @@ class GridCollection:
         :param array y: Latitude of obs to move
         :param str,array u_name: U field to advect obs
         :param str,array v_name: V field to advect obs
+        :param float t_init: time to start advection
+        :param array,None mask_particule: advect only i mask is True
         :param int nb_step: Number of iteration before to release data
         :param int time_step: Number of second for each advection
+        :param bool rk4: Use rk4 algorithm instead of finite difference
 
-        :return: x,y position
+        :return: t,x,y position
 
         .. minigallery:: py_eddy_tracker.GridCollection.advect
         """
@@ -2477,7 +2491,7 @@ class GridCollection:
         else:
             mask_particule += isnan(x) + isnan(y)
         while True:
-            logger.debug(f"advect : t={t}")
+            logger.debug(f"advect : t={t/86400}")
             if (backward and t <= t1) or (not backward and t >= t1):
                 t0, u0, v0, m0 = t1, u1, v1, m1
                 t1, d1 = generator.__next__()
@@ -2507,7 +2521,7 @@ class GridCollection:
         for i, (t, dataset) in enumerate(self.datasets):
             if t < t_init:
                 continue
-
+            dataset.populate()
             logger.debug(f"i={i}, t={t}, dataset={dataset}")
             yield t, dataset
 
@@ -2517,7 +2531,7 @@ class GridCollection:
             i -= 1
             if t > t_init:
                 continue
-
+            dataset.populate()
             logger.debug(f"i={i}, t={t}, dataset={dataset}")
             yield t, dataset
 
