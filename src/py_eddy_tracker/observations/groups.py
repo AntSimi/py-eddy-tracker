@@ -91,7 +91,7 @@ def advect(x, y, c, t0, n_days, u_name="u", v_name="v"):
 
 
 def particle_candidate_step(
-    t_start, contours_start, contours_end, space_step, dt, c, **kwargs
+    t_start, contours_start, contours_end, space_step, dt, c, day_fraction=6, **kwargs
 ):
     """Select particles within eddies, advect them, return target observation and associated percentages.
     For one time step.
@@ -102,13 +102,17 @@ def particle_candidate_step(
     :param float space_step: step between 2 particles
     :param int dt: duration of advection
     :param `~py_eddy_tracker.dataset.grid.GridCollection` c: GridCollection with speed for particles
+    :param int day_fraction: fraction of day
     :params dict kwargs: dict of params given to advection
     :return (np.array,np.array): return target index and percent associate
     """
+    # In case of zarr array
+    contours_start = [i[:] for i in contours_start]
+    contours_end = [i[:] for i in contours_end]
     # Create particles in start contour
     x, y, i_start = create_meshed_particles(*contours_start, space_step)
     # Advect particles
-    kw = dict(nb_step=6, time_step=86400 / 6)
+    kw = dict(nb_step=day_fraction, time_step=86400 / day_fraction)
     p = c.advect(x, y, t_init=t_start, **kwargs, **kw)
     for _ in range(dt):
         _, x, y = p.__next__()
