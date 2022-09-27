@@ -1214,6 +1214,7 @@ class NetworkObservations(GroupEddiesObservations):
         translate[:-1][i_sort] = arange(nb_obs)
         self.next_obs[:] = translate[n]
         self.previous_obs[:] = translate[p]
+        return translate
 
     def network_segment(self, id_network, id_segment):
         return self.extract_with_mask(self.segment_slice(id_network, id_segment))

@@ -375,7 +375,7 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         shape = (len(self), 2)
         i_target, pct = full(shape, -1, dtype="i4"), zeros(shape, dtype="i1")
         # Backward or forward
-        times = arange(t_start, t_end - dt) if dt > 0 else arange(t_start + dt, t_end)
+        times = arange(t_start, t_end - dt) if dt > 0 else arange(t_start - dt, t_end)
 
         if callback_coherence is None:
             callback_coherence = self.fill_coherence
