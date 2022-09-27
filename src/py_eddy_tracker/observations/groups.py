@@ -114,7 +114,7 @@ def particle_candidate_step(
     # Advect particles
     kw = dict(nb_step=day_fraction, time_step=86400 / day_fraction)
     p = c.advect(x, y, t_init=t_start, **kwargs, **kw)
-    for _ in range(dt):
+    for _ in range(abs(dt)):
         _, x, y = p.__next__()
     m = ~(isnan(x) + isnan(y))
     i_end = full(x.shape, -1, dtype="i4")
@@ -352,7 +352,7 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         return self.extract_with_mask(mask)
 
     def particle_candidate_atlas(
-        self, cube, space_step, dt, start_intern=False, end_intern=False, **kwargs
+        self, cube, space_step, dt, start_intern=False, end_intern=False, callback_coherence=None, finalize_coherence=None, **kwargs
     ):
         """Select particles within eddies, advect them, return target observation and associated percentages
 
@@ -361,7 +361,9 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         :param int dt: duration of advection
         :param bool start_intern: Use intern or extern contour at injection, defaults to False
         :param bool end_intern: Use intern or extern contour at end of advection, defaults to False
-        :params dict kwargs: dict of params given to advection
+        :param dict kwargs: dict of params given to advection
+        :param func callback_coherence: if None we will use cls.fill_coherence
+        :param func finalize_coherence: to apply on results of callback_coherence
         :return (np.array,np.array): return target index and percent associate
         """
         t_start, t_end = int(self.period[0]), int(self.period[1])
@@ -374,23 +376,62 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         i_target, pct = full(shape, -1, dtype="i4"), zeros(shape, dtype="i1")
         # Backward or forward
         times = arange(t_start, t_end - dt) if dt > 0 else arange(t_start + dt, t_end)
+
+        if callback_coherence is None:
+            callback_coherence = self.fill_coherence
+        indexs = dict()
+        results = list()
+        kw_coherence = dict(space_step=space_step, dt=dt, c=cube)
+        kw_coherence.update(kwargs)
         for t in times:
+            logger.info("Coherence for time step : %s in [%s:%s]", t, times[0], times[-1])
             # Get index for origin
             i = t - t_start
             indexs0 = i_sort[i_start[i] : i_end[i]]
             # Get index for end
             i = t + dt - t_start
             indexs1 = i_sort[i_start[i] : i_end[i]]
-            # Get contour data
-            contours0 = [self[label][indexs0] for label in self.intern(start_intern)]
-            contours1 = [self[label][indexs1] for label in self.intern(end_intern)]
-            # Get local result
-            i_target_, pct_ = particle_candidate_step(
-                t, contours0, contours1, space_step, dt, cube, **kwargs
-            )
-            # Merge result
-            m = i_target_ != -1
-            i_target_[m] = indexs1[i_target_[m]]
-            i_target[indexs0] = i_target_
-            pct[indexs0] = pct_
+            if indexs0.size == 0 or indexs1.size == 0:
+                continue
+
+            results.append(callback_coherence(self, i_target, pct, indexs0, indexs1, start_intern, end_intern, t_start=t, **kw_coherence))
+            indexs[results[-1]] = indexs0, indexs1
+
+        if finalize_coherence is not None:
+            finalize_coherence(results, indexs, i_target, pct)
         return i_target, pct
+
+    @classmethod
+    def fill_coherence(cls, network, i_targets, percents, i_origin, i_end, start_intern, end_intern, **kwargs):
+        """_summary_
+
+        :param array i_targets: global target
+        :param array percents:
+        :param array i_origin: indices of origins
+        :param array i_end: indices of ends
+        :param bool start_intern: Use intern or extern contour at injection
+        :param bool end_intern: Use intern or extern contour at end of advection
+        """
+        # Get contour data
+        contours_start = [network[label][i_origin] for label in cls.intern(start_intern)]
+        contours_end = [network[label][i_end] for label in cls.intern(end_intern)]
+        # Compute local coherence
+        i_local_targets, local_percents = particle_candidate_step(contours_start=contours_start, contours_end=contours_end,**kwargs)
+        # Store
+        cls.merge_particle_result(i_targets, percents, i_local_targets, local_percents, i_origin, i_end)
+    
+    @staticmethod
+    def merge_particle_result(i_targets, percents, i_local_targets, local_percents, i_origin, i_end):
+        """Copy local result in merged result with global indexation
+
+        :param array i_targets: global target
+        :param array percents: 
+        :param array i_local_targets: local index target
+        :param array local_percents: 
+        :param array i_origin: indices of origins
+        :param array i_end: indices of ends
+        """
+        m = i_local_targets != -1
+        i_local_targets[m] = i_end[i_local_targets[m]]
+        i_targets[i_origin] = i_local_targets
+        percents[i_origin] = local_percents

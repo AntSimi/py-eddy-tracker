@@ -7,7 +7,7 @@ import logging
 import time
 
 import netCDF4
-from numba import njit
+from numba import njit, types as nb_types
 from numba.typed import List
 from numpy import (
     arange,
@@ -23,6 +23,8 @@ from numpy import (
     unique,
     where,
     zeros,
+    percentile,
+    nan
 )
 import zarr
 
@@ -1743,6 +1745,7 @@ class NetworkObservations(GroupEddiesObservations):
         step_mesh=1.0 / 50,
         contour_start="speed",
         contour_end="speed",
+        **kwargs,
     ):
 
         """
@@ -1801,6 +1804,7 @@ class NetworkObservations(GroupEddiesObservations):
                 n_days=n_days,
                 contour_start=contour_start,
                 contour_end=contour_end,
+                **kwargs
             )
             logger.info(
                 (
@@ -1996,7 +2000,69 @@ class Network:
             print()
         eddies.track[new_i] = group
         return eddies
+    
+@njit(cache=True)
+def get_percentile_on_following_obs(i, indexs, percents, follow_obs, t, segment, i_target, window, q=50, nb_min=1):
+    """Get stat on a part of segment close of an event
 
+    :param int i: index to follow
+    :param array indexs: indexs from coherence
+    :param array percents: percent from coherence
+    :param array[int] follow_obs: give index for the following observation
+    :param array t: time for each observation
+    :param array segment: segment for each observation
+    :param int i_target: index of target
+    :param int window: time window of search
+    :param int q: Percentile from 0 to 100, defaults to 50
+    :param int nb_min: Number minimal of observation to provide statistics, defaults to 1
+    :return float : return statistic
+    """
+    last_t, segment_follow = t[i], segment[i]
+    segment_target = segment[i_target]
+    percent_target = empty(window, dtype=percents.dtype)
+    j = 0
+    while abs(last_t - t[i]) < window and i != -1 and segment_follow == segment[i]:
+        # Iter on primary & secondary
+        for index, percent in zip(indexs[i], percents[i]):
+            if index != -1 and segment[index] == segment_target:
+                percent_target[j] = percent
+                j += 1
+        i = follow_obs[i]
+    if j < nb_min:
+        return nan
+    return percentile(percent_target[:j], q)
+
+@njit(cache=True)
+def get_percentile_around_event(i, i1, i2, ind, pct, follow_obs, t, segment, window=10, follow_parent=False, q=50, nb_min=1):
+    """Get stat around event
+
+    :param array[int] i: Indexs of target
+    :param array[int] i1: Indexs of primary origin
+    :param array[int] i2: Indexs of secondary origin
+    :param array ind: indexs from coherence
+    :param array pct: percent from coherence
+    :param array[int] follow_obs: give index for the following observation
+    :param array t: time for each observation
+    :param array segment: segment for each observation
+    :param int window: time window of search, defaults to 10
+    :param bool follow_parent: Follow parent instead of child, defaults to False
+    :param int q: Percentile from 0 to 100, defaults to 50
+    :param int nb_min: Number minimal of observation to provide statistics, defaults to 1
+    :return (array,array) : statistic for each event
+    """
+    stat1 = empty(i.size, dtype=nb_types.float32)
+    stat2 = empty(i.size, dtype=nb_types.float32)
+    # iter on event
+    for j, (i_, i1_, i2_) in enumerate(zip(i, i1, i2)):
+        if follow_parent:
+            # We follow parent
+            stat1[j] = get_percentile_on_following_obs(i_, ind, pct, follow_obs, t, segment, i1_, window, q, nb_min)
+            stat2[j] = get_percentile_on_following_obs(i_, ind, pct, follow_obs, t, segment, i2_, window, q, nb_min)
+        else:
+            # We follow child
+            stat1[j] = get_percentile_on_following_obs(i1_, ind, pct, follow_obs, t, segment, i_, window, q, nb_min)
+            stat2[j] = get_percentile_on_following_obs(i2_, ind, pct, follow_obs, t, segment, i_, window, q, nb_min)
+    return stat1, stat2
 
 @njit(cache=True)
 def get_next_index(gr):

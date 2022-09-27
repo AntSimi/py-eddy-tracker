@@ -1656,6 +1656,31 @@ class EddiesObservations(object):
         except ValueError:
             logger.warning("Data is empty")
 
+    @staticmethod
+    def get_filters_zarr(name):
+        """Get filters to store in zarr for known variable
+
+        :param str name: private variable name
+        :return list: filters list
+        """
+        content = VAR_DESCR.get(name)
+        filters = list()
+        store_dtype = content["output_type"]
+        scale_factor, add_offset = content.get("scale_factor", None), content.get("add_offset", None)
+        if scale_factor is not None or add_offset is not None:
+            if add_offset is None:
+                add_offset = 0
+            filters.append(
+                zarr.FixedScaleOffset(
+                    offset=add_offset,
+                    scale=1 / scale_factor,
+                    dtype=content["nc_type"],
+                    astype=store_dtype,
+                )
+            )
+        filters.extend(content.get("filters", []))
+        return filters
+
     def create_variable_zarr(
         self,
         handler_zarr,

@@ -304,13 +304,25 @@ class GridDataset(object):
                 "We assume pixel position of grid is centered for %s", filename
             )
         if not unset:
-            self.load_general_features()
-            self.load()
+            self.populate()
 
     def populate(self):
         if self.dimensions is None:
             self.load_general_features()
             self.load()
+
+    def clean(self):
+        self.dimensions = None
+        self.variables_description = None
+        self.global_attrs = None
+        self.x_c = None
+        self.y_c = None
+        self.x_bounds = None
+        self.y_bounds = None
+        self.x_dim = None
+        self.y_dim = None
+        self.contours = None
+        self.vars = dict()
 
     @property
     def is_centered(self):
@@ -429,7 +441,7 @@ class GridDataset(object):
     def setup_coordinates(self):
         x_name, y_name = self.coordinates
         if self.is_centered:
-            logger.info("Grid center")
+            # logger.info("Grid center")
             self.x_c = self.vars[x_name].astype("float64")
             self.y_c = self.vars[y_name].astype("float64")
 
@@ -1968,14 +1980,21 @@ class RegularGridDataset(GridDataset):
             self.x_c, self.y_c, g, m, lons, lats, nearest=method == "nearest"
         )
 
-    def uv_for_advection(self, u_name, v_name, time_step=600, backward=False, factor=1):
+    def uv_for_advection(self, u_name=None, v_name=None, time_step=600, h_name=None, backward=False, factor=1):
         """
         Get U,V to be used in degrees with precomputed time step
 
-        :param str,array u_name: U field to advect obs
-        :param str,array v_name: V field to advect obs
+        :param None,str,array u_name: U field to advect obs, if h_name is None
+        :param None,str,array v_name: V field to advect obs, if h_name is None
+        :param None,str,array h_name: H field to compute UV to advect obs, if u_name and v_name are None
         :param int time_step: Number of second for each advection
         """
+        if h_name is not None:
+            u_name, v_name = 'u', 'v'
+            if u_name not in self.vars:
+                self.add_uv(h_name)
+                self.vars.pop(h_name, None)
+
         u = (self.grid(u_name) if isinstance(u_name, str) else u_name).copy()
         v = (self.grid(v_name) if isinstance(v_name, str) else v_name).copy()
         # N seconds / 1 degrees in m
@@ -2318,6 +2337,14 @@ class GridCollection:
             new.datasets.append((_t, d))
         return new
 
+    @property
+    def are_loaded(self):
+        return ~array([d.dimensions is None for _, d in self.datasets])
+
+    def __repr__(self):
+        nb_dataset = len(self.datasets)
+        return f"{self.are_loaded.sum()}/{nb_dataset} datasets loaded"
+
     def shift_files(self, t, filename, heigth=None, **rgd_kwargs):
         """Add next file to the list and remove the oldest"""
 
@@ -2440,17 +2467,23 @@ class GridCollection:
             t += dt
             yield t, f_x, f_y
 
+    def reset_grids(self, N=None):
+        if N is not None:
+            m = self.are_loaded
+            if m.sum() > N:
+                for i in where(m)[0]:
+                    self.datasets[i][1].clean()
+
     def advect(
         self,
         x,
         y,
-        u_name,
-        v_name,
         t_init,
         mask_particule=None,
         nb_step=10,
         time_step=600,
         rk4=True,
+        reset_grid=None,
         **kw,
     ):
         """
@@ -2458,18 +2491,18 @@ class GridCollection:
 
         :param array x: Longitude of obs to move
         :param array y: Latitude of obs to move
-        :param str,array u_name: U field to advect obs
-        :param str,array v_name: V field to advect obs
         :param float t_init: time to start advection
         :param array,None mask_particule: advect only i mask is True
         :param int nb_step: Number of iteration before to release data
         :param int time_step: Number of second for each advection
         :param bool rk4: Use rk4 algorithm instead of finite difference
+        :param int reset_grid: Delete all loaded data in cube if there are more than N grid loaded
 
         :return: t,x,y position
 
         .. minigallery:: py_eddy_tracker.GridCollection.advect
         """
+        self.reset_grids(reset_grid)
         backward = kw.get("backward", False)
         if backward:
             generator = self.get_previous_time_step(t_init)
@@ -2480,9 +2513,9 @@ class GridCollection:
             dt = nb_step * time_step
             t_step = time_step
         t0, d0 = generator.__next__()
-        u0, v0, m0 = d0.uv_for_advection(u_name, v_name, time_step, **kw)
+        u0, v0, m0 = d0.uv_for_advection(time_step=time_step, **kw)
         t1, d1 = generator.__next__()
-        u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
+        u1, v1, m1 = d1.uv_for_advection(time_step=time_step, **kw)
         t0 = t0 * 86400
         t1 = t1 * 86400
         t = t_init * 86400
@@ -2497,7 +2530,7 @@ class GridCollection:
                 t0, u0, v0, m0 = t1, u1, v1, m1
                 t1, d1 = generator.__next__()
                 t1 = t1 * 86400
-                u1, v1, m1 = d1.uv_for_advection(u_name, v_name, time_step, **kw)
+                u1, v1, m1 = d1.uv_for_advection(time_step=time_step, **kw)
             w = 1 - (arange(t, t + dt, t_step) - t0) / (t1 - t0)
             half_w = t_step / 2.0 / (t1 - t0)
             advect_(
