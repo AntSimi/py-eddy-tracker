@@ -142,8 +142,8 @@ x, y = build_triplet(x0, y0, dist_init)
 used = zeros(x.shape[0], dtype="bool")
 
 # advection generator
-kw = dict(t_init=t0, nb_step=1, backward=backward, mask_particule=used)
-p = c.advect(x, y, "u", "v", time_step=86400 / time_step_by_days, **kw)
+kw = dict(t_init=t0, nb_step=1, backward=backward, mask_particule=used, u_name="u", v_name="v")
+p = c.advect(x, y, time_step=86400 / time_step_by_days, **kw)
 
 # We check at each step of advection if particle distance is over `dist_max`
 for i in range(time_step_by_days * nb_days):

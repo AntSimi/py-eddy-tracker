@@ -93,7 +93,7 @@ for g in c:
 # Time properties, for example with advection only 25 days
 nb_days, step_by_day = 25, 6
 nb_time = step_by_day * nb_days
-kw_p = dict(nb_step=1, time_step=86400 / step_by_day)
+kw_p = dict(nb_step=1, time_step=86400 / step_by_day, u_name="u", v_name="v")
 t0 = 20236
 t0_grid = c[t0]
 # Geographic properties, we use a coarser resolution for time consuming reasons
@@ -114,7 +114,7 @@ m = m.reshape(original_shape)
 # ----------------------------
 lavd = zeros(original_shape)
 lavd_ = lavd[m]
-p = c.advect(x0.copy(), y0.copy(), "u", "v", t_init=t0, **kw_p)
+p = c.advect(x0.copy(), y0.copy(), t_init=t0, **kw_p)
 for _ in range(nb_time):
     t, x, y = p.__next__()
     lavd_ += abs(c.interp("vort", t / 86400.0, x, y))
@@ -131,7 +131,7 @@ _ = update_axes(ax, mappable)
 # -----------------------------
 lavd = zeros(original_shape)
 lavd_ = lavd[m]
-p = c.advect(x0.copy(), y0.copy(), "u", "v", t_init=t0, backward=True, **kw_p)
+p = c.advect(x0.copy(), y0.copy(), t_init=t0, backward=True, **kw_p)
 for i in range(nb_time):
     t, x, y = p.__next__()
     lavd_ += abs(c.interp("vort", t / 86400.0, x, y))
@@ -148,7 +148,7 @@ _ = update_axes(ax, mappable)
 # ---------------------------
 lavd = zeros(original_shape)
 lavd_ = lavd[m]
-p = t0_grid.advect(x0.copy(), y0.copy(), "u", "v", **kw_p)
+p = t0_grid.advect(x0.copy(), y0.copy(), **kw_p)
 for _ in range(nb_time):
     x, y = p.__next__()
     lavd_ += abs(t0_grid.interp("vort", x, y))
@@ -165,7 +165,7 @@ _ = update_axes(ax, mappable)
 # ----------------------------
 lavd = zeros(original_shape)
 lavd_ = lavd[m]
-p = t0_grid.advect(x0.copy(), y0.copy(), "u", "v", backward=True, **kw_p)
+p = t0_grid.advect(x0.copy(), y0.copy(), backward=True, **kw_p)
 for i in range(nb_time):
     x, y = p.__next__()
     lavd_ += abs(t0_grid.interp("vort", x, y))

@@ -110,9 +110,9 @@ print(f"{len(x)} particles advected")
 step_by_day = 3
 # Compute step of advection every 4h
 nb_step = 2
-kw_p = dict(nb_step=nb_step, time_step=86400 / step_by_day / nb_step)
+kw_p = dict(nb_step=nb_step, time_step=86400 / step_by_day / nb_step, u_name="u", v_name="v")
 # Start a generator which at each iteration return new position at next time step
-particule = g.advect(x, y, "u", "v", **kw_p, rk4=True)
+particule = g.advect(x, y, **kw_p, rk4=True)
 
 # %%
 # LAVD
