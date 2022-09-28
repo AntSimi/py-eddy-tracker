@@ -183,16 +183,16 @@ class TrackEddiesObservations(GroupEddiesObservations):
         lon0 = (self.lon[self.index_from_track] - 180).repeat(self.nb_obs_by_track)
         logger.debug("Normalize longitude")
         self.lon[:] = (self.lon - lon0) % 360 + lon0
-        if "lon_max" in self.obs.dtype.names:
+        if "lon_max" in self.fields:
             logger.debug("Normalize longitude_max")
             self.lon_max[:] = (self.lon_max - self.lon + 180) % 360 + self.lon - 180
         if not self.raw_data:
-            if "contour_lon_e" in self.obs.dtype.names:
+            if "contour_lon_e" in self.fields:
                 logger.debug("Normalize effective contour longitude")
                 self.contour_lon_e[:] = (
                     (self.contour_lon_e.T - self.lon + 180) % 360 + self.lon - 180
                 ).T
-            if "contour_lon_s" in self.obs.dtype.names:
+            if "contour_lon_s" in self.fields:
                 logger.debug("Normalize speed contour longitude")
                 self.contour_lon_s[:] = (
                     (self.contour_lon_s.T - self.lon + 180) % 360 + self.lon - 180

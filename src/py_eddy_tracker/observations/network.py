@@ -106,12 +106,14 @@ def fix_next_previous_obs(next_obs, previous_obs, flag_virtual):
 
 class NetworkObservations(GroupEddiesObservations):
 
-    __slots__ = ("_index_network",)
-
+    __slots__ = ("_index_network", "_index_segment_track", "_segment_track_array")
     NOGROUP = 0
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.reset_index()
+    
+    def reset_index(self):
         self._index_network = None
         self._index_segment_track = None
         self._segment_track_array = None
@@ -251,9 +253,8 @@ class NetworkObservations(GroupEddiesObservations):
 
     def astype(self, cls):
         new = cls.new_like(self, self.shape)
-        print()
-        for k in new.obs.dtype.names:
-            if k in self.obs.dtype.names:
+        for k in new.fields:
+            if k in self.fields:
                 new[k][:] = self[k][:]
         new.sign_type = self.sign_type
         return new
@@ -371,8 +372,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         self.segment[:] = segment_copy
         self.previous_obs[:] = previous_obs
-
-        self.sort()
+        return self.sort()
 
     def sort(self, order=("track", "segment", "time")):
         """
@@ -380,14 +380,19 @@ class NetworkObservations(GroupEddiesObservations):
 
         :param tuple order: order or sorting. Given to :func:`numpy.argsort`
         """
-        index_order = self.obs.argsort(order=order)
-        for field in self.elements:
+        index_order = self.obs.argsort(order=order, kind="mergesort")
+        self.reset_index()
+        for field in self.fields:
             self[field][:] = self[field][index_order]
 
-        translate = -ones(index_order.max() + 2, dtype="i4")
-        translate[index_order] = arange(index_order.shape[0])
+        nb_obs = len(self)
+        # we add 1 for -1 index return index -1
+        translate = -ones(nb_obs + 1, dtype="i4")
+        translate[index_order] = arange(nb_obs)
+        # next & previous must be re-indexed
         self.next_obs[:] = translate[self.next_obs]
         self.previous_obs[:] = translate[self.previous_obs]
+        return index_order, translate
 
     def obs_relative_order(self, i_obs):
         self.only_one_network()
@@ -654,16 +659,16 @@ class NetworkObservations(GroupEddiesObservations):
         lon0 = (self.lon[i_start] - 180).repeat(i_stop - i_start)
         logger.debug("Normalize longitude")
         self.lon[:] = (self.lon - lon0) % 360 + lon0
-        if "lon_max" in self.obs.dtype.names:
+        if "lon_max" in self.fields:
             logger.debug("Normalize longitude_max")
             self.lon_max[:] = (self.lon_max - self.lon + 180) % 360 + self.lon - 180
         if not self.raw_data:
-            if "contour_lon_e" in self.obs.dtype.names:
+            if "contour_lon_e" in self.fields:
                 logger.debug("Normalize effective contour longitude")
                 self.contour_lon_e[:] = (
                     (self.contour_lon_e.T - self.lon + 180) % 360 + self.lon - 180
                 ).T
-            if "contour_lon_s" in self.obs.dtype.names:
+            if "contour_lon_s" in self.fields:
                 logger.debug("Normalize speed contour longitude")
                 self.contour_lon_s[:] = (
                     (self.contour_lon_s.T - self.lon + 180) % 360 + self.lon - 180
@@ -1071,7 +1076,7 @@ class NetworkObservations(GroupEddiesObservations):
             raw_data=self.raw_data,
         )
 
-        for k in new.obs.dtype.names:
+        for k in new.fields:
             new[k][:] = self[k][indices]
         new.sign_type = self.sign_type
         return new
@@ -1194,27 +1199,11 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Dissociate networks with no known interaction (splitting/merging)
         """
-
         tags = self.tag_segment(multi_network=True)
         if self.track[0] == 0:
             tags -= 1
-
         self.track[:] = tags[self.segment_track_array]
-
-        i_sort = self.obs.argsort(order=("track", "segment", "time"), kind="mergesort")
-        # Sort directly obs, with hope to save memory
-        self.obs.sort(order=("track", "segment", "time"), kind="mergesort")
-        self._index_network = None
-
-        # n & p must be re-indexed
-        n, p = self.next_obs, self.previous_obs
-        # we add 2 for -1 index return index -1
-        nb_obs = len(self)
-        translate = -ones(nb_obs + 1, dtype="i4")
-        translate[:-1][i_sort] = arange(nb_obs)
-        self.next_obs[:] = translate[n]
-        self.previous_obs[:] = translate[p]
-        return translate
+        return self.sort()
 
     def network_segment(self, id_network, id_segment):
         return self.extract_with_mask(self.segment_slice(id_network, id_segment))

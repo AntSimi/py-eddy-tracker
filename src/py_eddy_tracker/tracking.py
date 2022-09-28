@@ -658,7 +658,7 @@ class Correspondances(list):
         # Set type of eddy with first file
         eddies.sign_type = self.current_obs.sign_type
         # Fields to copy
-        fields = self.current_obs.obs.dtype.names
+        fields = self.current_obs.fields
 
         # To know if the track start
         first_obs_save_in_tracks = zeros(self.i_current_by_tracks.shape, dtype=bool_)
@@ -707,7 +707,7 @@ class Correspondances(list):
             # Index in the current file
             index_current = self[i]["out"]
 
-            if "cost_association" in eddies.obs.dtype.names:
+            if "cost_association" in eddies.fields:
                 eddies["cost_association"][index_final - 1] = self[i]["cost_value"]
             # Copy all variable
             for field in fields:

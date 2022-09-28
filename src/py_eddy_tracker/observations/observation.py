@@ -306,12 +306,16 @@ class EddiesObservations(object):
         """Return values evenly spaced with few numbers"""
         return "".join([f"{v_:10.2f}" for v_ in value])
 
+    @property
+    def fields(self):
+        return list(self.obs.dtype.names)
+
     def field_table(self):
         """
         Produce description table of the fields available in this object
         """
         rows = [("Name (Unit)", "Long name", "Scale factor", "Offset")]
-        names = list(self.obs.dtype.names)
+        names = self.fields
         names.sort()
         for field in names:
             infos = VAR_DESCR[field]
@@ -414,7 +418,7 @@ class EddiesObservations(object):
         """
         nb_obs = self.obs.shape[0]
         fields = set(fields)
-        only_variables = set(self.obs.dtype.names) - fields
+        only_variables = set(self.fields) - fields
         track_extra_variables = set(self.track_extra_variables) - fields
         array_variables = set(self.array_variables) - fields
         new = self.__class__(
@@ -426,7 +430,7 @@ class EddiesObservations(object):
             raw_data=self.raw_data,
         )
         new.sign_type = self.sign_type
-        for name in new.obs.dtype.names:
+        for name in new.fields:
             logger.debug("Copy of field %s ...", name)
             new.obs[name] = self.obs[name]
         return new
@@ -444,12 +448,12 @@ class EddiesObservations(object):
             track_array_variables=self.track_array_variables,
             array_variables=list(concatenate((self.array_variables, array_fields))),
             only_variables=list(
-                concatenate((self.obs.dtype.names, fields, array_fields))
+                concatenate((self.fields, fields, array_fields))
             ),
             raw_data=self.raw_data,
         )
         new.sign_type = self.sign_type
-        for name in self.obs.dtype.names:
+        for name in self.fields:
             logger.debug("Copy of field %s ...", name)
             new.obs[name] = self.obs[name]
         return new
@@ -467,8 +471,8 @@ class EddiesObservations(object):
         """
         angle = radians(linspace(0, 360, self.track_array_variables))
         x_norm, y_norm = cos(angle), sin(angle)
-        radius_s = "contour_lon_s" in self.obs.dtype.names
-        radius_e = "contour_lon_e" in self.obs.dtype.names
+        radius_s = "contour_lon_s" in self.fields
+        radius_e = "contour_lon_e" in self.fields
         for i, obs in enumerate(self):
             if only_virtual and not obs["virtual"]:
                 continue
@@ -684,7 +688,7 @@ class EddiesObservations(object):
 
     def __copy__(self):
         eddies = self.new_like(self, len(self))
-        for k in self.obs.dtype.names:
+        for k in self.fields:
             eddies[k][:] = self[k][:]
         eddies.sign_type = self.sign_type
         return eddies
