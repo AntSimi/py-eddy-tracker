@@ -84,7 +84,7 @@ def advect(x, y, c, t0, n_days, u_name="u", v_name="v"):
     if n_days < 0:
         kw["backward"] = True
         n_days = -n_days
-    p = c.advect(x, y, u_name, v_name, t_init=t0, **kw)
+    p = c.advect(x, y, u_name=u_name, v_name=v_name, t_init=t0, **kw)
     for _ in range(n_days):
         t, x, y = p.__next__()
     return t, x, y

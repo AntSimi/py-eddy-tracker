@@ -20,7 +20,7 @@ c = GridCollection.from_netcdf_cube(
     "longitude",
     "latitude",
     "time",
-    heigth="adt",
+    unset=True
 )
 
 # %%
@@ -34,7 +34,7 @@ t0 = 20210
 # Get paths
 x0, y0 = meshgrid(arange(32, 35, 0.5), arange(32.5, 34.5, 0.5))
 x0, y0 = x0.reshape(-1), y0.reshape(-1)
-t, x, y = c.path(x0, y0, "u", "v", t_init=t0, **kw_p, nb_time=nb_time)
+t, x, y = c.path(x0, y0, h_name="adt", t_init=t0, **kw_p, nb_time=nb_time)
 
 # %%
 # Plot paths
