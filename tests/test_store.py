@@ -17,3 +17,9 @@ def test_size():
 
 def test_reordering():
     pass
+
+def test_zarr_read_subset_write_zarr():
+    pass
+
+def test_netcdf_read_subset_write_zarr():
+    pass

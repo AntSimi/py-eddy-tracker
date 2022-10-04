@@ -29,18 +29,26 @@ class Store:
 
     def __eq__(self, other):
         raise Exception()
-    
+
     def __iter__(self):
         raise Exception()
-    
+
     def reset(self):
         raise Exception()
 
     def fields(self):
         raise Exception()
 
+    def sort(self):
+        raise Exception()
+    
+    def argsort(self):
+        raise Exception()
+
+
 class ZarrMemoryStore(Store):
     pass
+
 
 class RecordArrayStore(Store):
     pass
