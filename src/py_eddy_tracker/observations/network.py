@@ -113,6 +113,20 @@ class NetworkObservations(GroupEddiesObservations):
         super().__init__(*args, **kwargs)
         self.reset_index()
     
+    def __repr__(self):
+        m_event, s_event = self.merging_event(only_index=True, triplet=True)[0], self.splitting_event(only_index=True, triplet=True)[0]
+        period = (self.period[1] - self.period[0]) / 365.25
+        nb_by_network = self.network_size()
+        big = 50_000
+        infos = [
+            f"Atlas with {self.nb_network} networks ({self.nb_network / period:0.0f} networks/year),"
+            f" {self.nb_segment} segments ({self.nb_segment / period:0.0f} segments/year), {len(self)} observations ({len(self) / period:0.0f} observations/year)",
+            f"    {m_event.size} merging ({m_event.size / period:0.0f} merging/year), {s_event.size} splitting ({s_event.size / period:0.0f} splitting/year)",
+            f"    with {(nb_by_network > big).sum()} network with more than {big} obs and the biggest have {nb_by_network.max()} observations ({nb_by_network[nb_by_network> big].sum()} observations cumulate)",
+            f"    {nb_by_network[0]} observations in trash"
+        ]
+        return "\n".join(infos)
+
     def reset_index(self):
         self._index_network = None
         self._index_segment_track = None
@@ -313,12 +327,18 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Transform event where
         segment A splits from segment B, then x days after segment B merges with A
-
         to
-
         segment A splits from segment B then x days after segment A merges with B (B will be longer)
-
         These events have to last less than `nb_days_max` to be changed.
+
+ 
+                         ------------------- A
+                        /     /
+        B --------------------
+        to
+                         --A--
+                        /     \
+        B -----------------------------------
 
         :param float nb_days_max: maximum time to search for splitting-merging event
         """
@@ -342,7 +362,7 @@ class NetworkObservations(GroupEddiesObservations):
             segments_connexion[seg] = [i, i_p, i_n]
 
         for seg in sorted(segments_connexion.keys()):
-            seg_slice, i_seg_p, i_seg_n = segments_connexion[seg]
+            seg_slice, _, i_seg_n = segments_connexion[seg]
 
             # the segment ID has to be corrected, because we may have changed it since
             seg_corrected = segment[seg_slice.stop - 1]
@@ -370,8 +390,6 @@ class NetworkObservations(GroupEddiesObservations):
 
                     segments_connexion[seg_corrected][0] = my_slice
 
-        self.segment[:] = segment_copy
-        self.previous_obs[:] = previous_obs
         return self.sort()
 
     def sort(self, order=("track", "segment", "time")):
@@ -495,8 +513,10 @@ class NetworkObservations(GroupEddiesObservations):
         return self.extract_with_mask(mask)
 
     def connexions(self, multi_network=False):
-        """
-        Create dictionnary for each segment, gives the segments in interaction with
+        """Create dictionnary for each segment, gives the segments in interaction with
+
+        :param bool multi_network: use segment_track_array instead of segment, defaults to False
+        :return dict: Return dict of set, for each seg id we get set of segment which have event with him
         """
         if multi_network:
             segment = self.segment_track_array
@@ -504,26 +524,27 @@ class NetworkObservations(GroupEddiesObservations):
             self.only_one_network()
             segment = self.segment
         segments_connexion = dict()
-
-        def add_seg(father, child):
-            if father not in segments_connexion:
-                segments_connexion[father] = set()
-            segments_connexion[father].add(child)
-
-        previous_obs, next_obs = self.previous_obs, self.next_obs
-        for i, seg, _ in self.iter_on(segment):
-            if i.start == i.stop:
-                continue
-            i_p, i_n = previous_obs[i.start], next_obs[i.stop - 1]
-            # segment in interaction
-            p_seg, n_seg = segment[i_p], segment[i_n]
-            # Where segment are called
-            if i_p != -1:
-                add_seg(p_seg, seg)
-                add_seg(seg, p_seg)
-            if i_n != -1:
-                add_seg(n_seg, seg)
-                add_seg(seg, n_seg)
+        def add_seg(s1, s2):
+            if s1 not in segments_connexion:
+                segments_connexion[s1] = set()
+            if s2 not in segments_connexion:
+                segments_connexion[s2] = set()
+            segments_connexion[s1].add(s2), segments_connexion[s2].add(s1)
+        # Get index for each segment
+        i0, i1, _ = self.index_segment_track
+        i1 = i1 - 1
+        # Check if segment merge
+        i_next = self.next_obs[i1]
+        m_n = i_next != -1
+        # Check if segment come from splitting
+        i_previous = self.previous_obs[i0]
+        m_p = i_previous != -1
+        # For each split
+        for s1, s2 in zip(segment[i_previous[m_p]], segment[i0[m_p]]):
+            add_seg(s1, s2)
+        # For each merge
+        for s1, s2 in zip(segment[i_next[m_n]], segment[i1[m_n]]):
+            add_seg(s1, s2)
         return segments_connexion
 
     @classmethod
@@ -1089,34 +1110,22 @@ class NetworkObservations(GroupEddiesObservations):
         return self._segment_track_array
 
     def birth_event(self):
-        """Extract birth events.
-        Advice : individual eddies (self.track == 0) should be removed before -> apply remove_trash."""
-        # FIXME how to manage group 0
-        indices = list()
-        previous_obs = self.previous_obs
-        for i, _, _ in self.iter_on(self.segment_track_array):
-            nb = i.stop - i.start
-            if nb == 0:
-                continue
-            i_p = previous_obs[i.start]
-            if i_p == -1:
-                indices.append(i.start)
-        return self.extract_event(list(set(indices)))
+        """Extract birth events."""
+        i_start, _, _ = self.index_segment_track
+        indices = i_start[self.previous_obs[i_start] == -1]
+        if self.first_is_trash():
+            indices = indices[1:]
+        return self.extract_event(indices)
+    generation_event = birth_event
 
     def death_event(self):
-        """Extract death events.
-        Advice : individual eddies (self.track == 0) should be removed before -> apply remove_trash."""
-        # FIXME how to manage group 0
-        indices = list()
-        next_obs = self.next_obs
-        for i, _, _ in self.iter_on(self.segment_track_array):
-            nb = i.stop - i.start
-            if nb == 0:
-                continue
-            i_n = next_obs[i.stop - 1]
-            if i_n == -1:
-                indices.append(i.stop - 1)
-        return self.extract_event(list(set(indices)))
+        """Extract death events."""
+        _, i_stop, _ = self.index_segment_track
+        indices = i_stop[self.next_obs[i_stop - 1] == -1] - 1
+        if self.first_is_trash():
+            indices = indices[1:]
+        return self.extract_event(indices)
+    dissipation_event = death_event
 
     def merging_event(self, triplet=False, only_index=False):
         """Return observation after a merging event.
@@ -1124,25 +1133,26 @@ class NetworkObservations(GroupEddiesObservations):
         If `triplet=True` return the eddy after a merging event, the eddy before the merging event,
         and the eddy stopped due to merging.
         """
-        idx_m1 = list()
+        # Get start and stop for each segment, there is no empty segment
+        _, i1, _ = self.index_segment_track
+        # Get last index for each segment
+        i_stop = i1 - 1
+        # Get target index
+        idx_m1 = self.next_obs[i_stop]
+        # Get mask and valid target
+        m = idx_m1 != -1
+        idx_m1 = idx_m1[m]
+        # Sort by time event
+        i = self.time[idx_m1].argsort()
+        idx_m1 = idx_m1[i]
         if triplet:
-            idx_m0_stop = list()
-            idx_m0 = list()
-        next_obs, previous_obs = self.next_obs, self.previous_obs
-        for i, _, _ in self.iter_on(self.segment_track_array):
-            nb = i.stop - i.start
-            if nb == 0:
-                continue
-            i_n = next_obs[i.stop - 1]
-            if i_n != -1:
-                if triplet:
-                    idx_m0_stop.append(i.stop - 1)
-                    idx_m0.append(previous_obs[i_n])
-                idx_m1.append(i_n)
+            # Get obs before target
+            idx_m0_stop = i_stop[m][i]
+            idx_m0 = self.previous_obs[idx_m1].copy()
 
         if triplet:
             if only_index:
-                return array(idx_m1), array(idx_m0), array(idx_m0_stop)
+                return idx_m1, idx_m0, idx_m0_stop
             else:
                 return (
                     self.extract_event(idx_m1),
@@ -1150,7 +1160,7 @@ class NetworkObservations(GroupEddiesObservations):
                     self.extract_event(idx_m0_stop),
                 )
         else:
-            idx_m1 = list(set(idx_m1))
+            idx_m1 = unique(idx_m1)
             if only_index:
                 return idx_m1
             else:
@@ -1162,25 +1172,24 @@ class NetworkObservations(GroupEddiesObservations):
         If `triplet=True` return the eddy before a splitting event, the eddy after the splitting event,
         and the eddy starting due to splitting.
         """
-        idx_s0 = list()
+        # Get start and stop for each segment, there is no empty segment
+        i_start, _, _ = self.index_segment_track
+        # Get target index
+        idx_s0 = self.previous_obs[i_start]
+        # Get mask and valid target
+        m = idx_s0 != -1
+        idx_s0 = idx_s0[m]
+        # Sort by time event
+        i = self.time[idx_s0].argsort()
+        idx_s0 = idx_s0[i]
         if triplet:
-            idx_s1_start = list()
-            idx_s1 = list()
-        next_obs, previous_obs = self.next_obs, self.previous_obs
-        for i, _, _ in self.iter_on(self.segment_track_array):
-            nb = i.stop - i.start
-            if nb == 0:
-                continue
-            i_p = previous_obs[i.start]
-            if i_p != -1:
-                if triplet:
-                    idx_s1_start.append(i.start)
-                    idx_s1.append(next_obs[i_p])
-                idx_s0.append(i_p)
+            # Get obs after target
+            idx_s1_start = i_start[m][i]
+            idx_s1 = self.next_obs[idx_s0].copy()
 
         if triplet:
             if only_index:
-                return array(idx_s0), array(idx_s1), array(idx_s1_start)
+                return idx_s0, idx_s1, idx_s1_start
             else:
                 return (
                     self.extract_event(idx_s0),
@@ -1189,7 +1198,7 @@ class NetworkObservations(GroupEddiesObservations):
                 )
 
         else:
-            idx_s0 = list(set(idx_s0))
+            idx_s0 = unique(idx_s0)
             if only_index:
                 return idx_s0
             else:
@@ -1199,7 +1208,7 @@ class NetworkObservations(GroupEddiesObservations):
         """
         Dissociate networks with no known interaction (splitting/merging)
         """
-        tags = self.tag_segment(multi_network=True)
+        tags = self.tag_segment()
         if self.track[0] == 0:
             tags -= 1
         self.track[:] = tags[self.segment_track_array]
@@ -1345,16 +1354,22 @@ class NetworkObservations(GroupEddiesObservations):
                 # For each connexion we apply same function
                 cls.__tag_segment(seg, tag, groups, connexions)
 
-    def tag_segment(self, multi_network=False):
-        if multi_network:
-            nb = self.segment_track_array[-1] + 1
-        else:
-            nb = self.segment.max() + 1
+    def tag_segment(self):
+        """For each segment, method give a new network id, and all segment are connected
+
+        :return array: for each unique seg id, it return new network id
+        """
+        nb = self.segment_track_array[-1] + 1
         sub_group = zeros(nb, dtype="u4")
-        c = self.connexions(multi_network=multi_network)
+        c = self.connexions(multi_network=True)
         j = 1
         # for each available id
         for i in range(nb):
+            # No connexions, no need to explore
+            if i not in c:
+                sub_group[i] = j
+                j+= 1
+                continue
             # Skip if already set
             if sub_group[i] != 0:
                 continue
@@ -1363,15 +1378,31 @@ class NetworkObservations(GroupEddiesObservations):
             j += 1
         return sub_group
 
+
     def fully_connected(self):
+        """Suspicious
+        """
+        raise Exception("Must be check")
         self.only_one_network()
         return self.tag_segment().shape[0] == 1
+
+    def first_is_trash(self):
+        """Check if first network is Trash
+
+        :return bool: True if first network is trash
+        """
+        i_start, i_stop, _ = self.index_segment_track
+        sl = slice(i_start[0], i_stop[0])
+        return (self.previous_obs[sl] == -1).all() and (self.next_obs[sl] == -1).all()
 
     def remove_trash(self):
         """
         Remove the lonely eddies (only 1 obs in segment, associated network number is 0)
         """
-        return self.extract_with_mask(self.track != 0)
+        if self.first_is_trash():
+            return self.extract_with_mask(self.track != 0)
+        else:
+            return self
 
     def plot(self, ax, ref=None, color_cycle=None, **kwargs):
         """
@@ -1551,12 +1582,11 @@ class NetworkObservations(GroupEddiesObservations):
             logger.debug(
                 f"{nb_obs} observations will be extracted ({nb_obs / self.shape[0]:.3%})"
             )
-            for field in self.obs.dtype.descr:
+            for field in self.fields:
                 if field in ("next_obs", "previous_obs"):
                     continue
                 logger.debug("Copy of field %s ...", field)
-                var = field[0]
-                new.obs[var] = self.obs[var][mask]
+                new.obs[field] = self.obs[field][mask]
             # n & p must be re-index
             n, p = self.next_obs[mask], self.previous_obs[mask]
             # we add 2 for -1 index return index -1
@@ -1682,9 +1712,9 @@ class NetworkObservations(GroupEddiesObservations):
 
                     return f"/tmp/dt_global_{date.strftime('%Y%m%d')}.nc"
         """
-
-        itb_final = -ones((self.obs.size, 2), dtype="i4")
-        ptb_final = zeros((self.obs.size, 2), dtype="i1")
+        shape = len(self), 2
+        itb_final = -ones(shape, dtype="i4")
+        ptb_final = zeros(shape, dtype="i1")
 
         t_start, t_end = int(self.period[0]), int(self.period[1])
 
@@ -1760,9 +1790,9 @@ class NetworkObservations(GroupEddiesObservations):
 
                     return f"/tmp/dt_global_{date.strftime('%Y%m%d')}.nc"
         """
-
-        itf_final = -ones((self.obs.size, 2), dtype="i4")
-        ptf_final = zeros((self.obs.size, 2), dtype="i1")
+        shape = len(self), 2
+        itf_final = -ones(shape, dtype="i4")
+        ptf_final = zeros(shape, dtype="i1")
 
         t_start, t_end = int(self.period[0]), int(self.period[1])
 
