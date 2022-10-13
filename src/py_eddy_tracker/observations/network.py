@@ -1913,21 +1913,14 @@ class Network:
                 apply_replace(translate, gr_i, gr_j)
         return translate
 
-    def group_observations(self, min_overlap=0.2, minimal_area=False):
+    def group_observations(self, min_overlap=0.2, minimal_area=False, **kwargs):
         """Store every interaction between identifications
 
-        Parameters
-        ----------
-        minimal_area : bool, optional
-            If True, function will compute intersection/little polygon, else intersection/union, by default False
+        :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union, by default False
+        :param float min_overlap: minimum overlap area to associate observations, by default 0.2
 
-        min_overlap : float, optional
-            minimum overlap area to associate observations, by default 0.2
-
-        Returns
-        -------
-        TrackEddiesObservations
-            netcdf with interactions
+        :return: 
+        :rtype: TrackEddiesObservations
         """
 
         results, nb_obs = list(), list()
@@ -1945,9 +1938,9 @@ class Network:
                 ii, ij = bbox_intersection(xi, yi, xj, yj)
                 m = (
                     vertice_overlap(
-                        xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+                        xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area, min_overlap=min_overlap, **kwargs
                     )
-                    > min_overlap
+                    != 0
                 )
                 results.append((i, j, ii[m], ij[m]))
         if display_iteration:

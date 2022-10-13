@@ -720,7 +720,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         time_ref,
         window,
         min_overlap=0.2,
-        minimal_area=False,
+        **kwargs,
     ):
         """Backward association of observations to the segments"""
         time_cur = int_(ids["time"][i_current])
@@ -737,10 +737,8 @@ class TrackEddiesObservations(GroupEddiesObservations):
                 continue
             c = zeros(len(xj))
             c[ij] = vertice_overlap(
-                xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+                xi[ii], yi[ii], xj[ij], yj[ij], min_overlap=min_overlap, **kwargs
             )
-            # We remove low overlap
-            c[c < min_overlap] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]
@@ -762,7 +760,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         time_ref,
         window,
         min_overlap=0.2,
-        minimal_area=False,
+        **kwargs
     ):
         """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1
@@ -782,10 +780,8 @@ class TrackEddiesObservations(GroupEddiesObservations):
                 continue
             c = zeros(len(xj))
             c[ij] = vertice_overlap(
-                xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area
+                xi[ii], yi[ii], xj[ij], yj[ij], min_overlap=min_overlap, **kwargs
             )
-            # We remove low overlap
-            c[c < min_overlap] = 0
             # We get index of maximal overlap
             i = c.argmax()
             c_i = c[i]
