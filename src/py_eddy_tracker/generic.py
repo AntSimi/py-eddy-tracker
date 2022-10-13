@@ -456,17 +456,18 @@ def wrap_longitude(x, y, ref, cut=False):
     if cut:
         indexs = list()
         nb = x.shape[0]
-        new_previous = (x[0] - ref) % 360
+
+        new_x_previous = (x[0] - ref) % 360 + ref
         x_previous = x[0]
         for i in range(1, nb):
             x_ = x[i]
-            new_x = (x_ - ref) % 360
+            new_x = (x_ - ref) % 360 + ref
             if not isnan(x_) and not isnan(x_previous):
-                d_new = new_x - new_previous
+                d_new = new_x - new_x_previous
                 d = x_ - x_previous
                 if abs(d - d_new) > 1e-5:
                     indexs.append(i)
-            x_previous, new_previous = x_, new_x
+            x_previous, new_x_previous = x_, new_x
 
         nb_indexs = len(indexs)
         new_size = nb + nb_indexs * 3
@@ -477,6 +478,7 @@ def wrap_longitude(x, y, ref, cut=False):
         for i in range(nb):
             if j < nb_indexs and i == indexs[j]:
                 j += 1
+                # FIXME need check
                 cor = 360 if x[i - 1] > x[i] else -360
                 out_x[i + i_] = (x[i] - ref) % 360 + ref - cor
                 out_y[i + i_] = y[i]

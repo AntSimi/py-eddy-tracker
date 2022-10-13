@@ -2069,11 +2069,12 @@ class EddiesObservations(object):
             nb_obs=len(self),
         )
 
-    def display_color(self, ax, field, intern=False, **kwargs):
+    def display_color(self, ax, field, ref=None, intern=False, **kwargs):
         """Plot colored contour of eddies
 
         :param matplotlib.axes.Axes ax: matplotlib axe used to draw
         :param str,array field: color field
+        :param float,None ref: if defined, all coordinates are wrapped with ref as western boundary
         :param bool intern: if True, draw the speed contour
         :param dict kwargs: look at :py:meth:`matplotlib.collections.LineCollection`
 
@@ -2081,6 +2082,13 @@ class EddiesObservations(object):
         """
         xname, yname = self.intern(intern)
         x, y = self[xname], self[yname]
+
+        if ref is not None:
+            # TODO : maybe buggy with global display
+            shape_out = x.shape
+            x, y = wrap_longitude(x.reshape(-1), y.reshape(-1), ref)
+            x, y = x.reshape(shape_out), y.reshape(shape_out)
+
         c = self.parse_varname(field)
         cmap = get_cmap(kwargs.pop("cmap", "Spectral_r"))
         cmin, cmax = kwargs.pop("vmin", c.min()), kwargs.pop("vmax", c.max())
@@ -2089,6 +2097,8 @@ class EddiesObservations(object):
             [create_vertice(i, j) for i, j in zip(x, y)], colors=colors, **kwargs
         )
         ax.add_collection(lines)
+        lines.cmap = cmap
+        lines.norm = Normalize(vmin=cmin, vmax=cmax)
         return lines
 
     def display(self, ax, ref=None, extern_only=False, intern_only=False, **kwargs):
