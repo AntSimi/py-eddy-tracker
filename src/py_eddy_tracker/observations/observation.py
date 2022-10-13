@@ -264,7 +264,7 @@ class EddiesObservations(object):
             bins_lat=(-90, -60, -15, 15, 60, 90),
             bins_amplitude=array((0, 1, 2, 3, 4, 5, 10, 500)),
             bins_radius=array((0, 15, 30, 45, 60, 75, 100, 200, 2000)),
-            nb_obs=self.observations.shape[0],
+            nb_obs=len(self),
         )
         t0, t1 = self.period
         infos["t0"], infos["t1"] = t0, t1
@@ -341,7 +341,7 @@ class EddiesObservations(object):
         bins_lat = (-90, -60, -15, 15, 60, 90)
         bins_amplitude = array((0, 1, 2, 3, 4, 5, 10, 500))
         bins_radius = array((0, 15, 30, 45, 60, 75, 100, 200, 2000))
-        nb_obs = self.observations.shape[0]
+        nb_obs = len(self)
 
         return f"""    | {nb_obs} observations from {t0} to {t1} ({period} days, ~{nb_obs / period:.0f} obs/day)
     |   Speed area      : {self.speed_area.sum() / period / 1e12:.2f} Mkm²/day
@@ -416,7 +416,7 @@ class EddiesObservations(object):
         """
         Copy with fields listed remove
         """
-        nb_obs = self.obs.shape[0]
+        nb_obs = len(self)
         fields = set(fields)
         only_variables = set(self.fields) - fields
         track_extra_variables = set(self.track_extra_variables) - fields
@@ -439,7 +439,7 @@ class EddiesObservations(object):
         """
         Add a new field.
         """
-        nb_obs = self.obs.shape[0]
+        nb_obs = len(self)
         new = self.__class__(
             size=nb_obs,
             track_extra_variables=list(
@@ -547,9 +547,9 @@ class EddiesObservations(object):
         nb_obs_self = len(self)
         nb_obs = nb_obs_self + len(other)
         eddies = self.new_like(self, nb_obs)
-        other_keys = other.obs.dtype.fields.keys()
-        self_keys = self.obs.dtype.fields.keys()
-        for key in eddies.obs.dtype.fields.keys():
+        other_keys = other.fields
+        self_keys = self.fields
+        for key in eddies.fields:
             eddies.obs[key][:nb_obs_self] = self.obs[key][:]
             if key in other_keys:
                 eddies.obs[key][nb_obs_self:] = other.obs[key][:]
@@ -657,8 +657,8 @@ class EddiesObservations(object):
         """Insert other obs in self at the given index."""
         if not self.coherence(other):
             raise Exception("Observations with no coherence")
-        insert_size = len(other.obs)
-        self_size = len(self.obs)
+        insert_size = len(other)
+        self_size = len(self)
         new_size = self_size + insert_size
         if self_size == 0:
             self.observations = other.obs
@@ -1542,8 +1542,7 @@ class EddiesObservations(object):
             handler.attrs["track_array_variables"] = self.track_array_variables
             handler.attrs["array_variables"] = ",".join(self.array_variables)
         # Iter on variables to create:
-        fields = [field[0] for field in self.observations.dtype.descr]
-        for ori_name in fields:
+        for ori_name in self.fields:
             # Patch for a transition
             name = ori_name
             #
@@ -1588,12 +1587,11 @@ class EddiesObservations(object):
             handler.track_array_variables = self.track_array_variables
             handler.array_variables = ",".join(self.array_variables)
         # Iter on variables to create:
-        fields = [field[0] for field in self.observations.dtype.descr]
         fields_ = array(
-            [VAR_DESCR[field[0]]["nc_name"] for field in self.observations.dtype.descr]
+            [VAR_DESCR[field]["nc_name"] for field in self.fields]
         )
         i = fields_.argsort()
-        for ori_name in array(fields)[i]:
+        for ori_name in array(self.fields)[i]:
             # Patch for a transition
             name = ori_name
             #
@@ -1865,10 +1863,9 @@ class EddiesObservations(object):
         if nb_obs == 0:
             logger.warning("Empty dataset will be created")
         else:
-            for field in self.obs.dtype.descr:
+            for field in self.fields:
                 logger.debug("Copy of field %s ...", field)
-                var = field[0]
-                new.obs[var] = self.obs[var][mask]
+                new.obs[field] = self.obs[field][mask]
         return new
 
     def scatter(self, ax, name=None, ref=None, factor=1, **kwargs):

@@ -118,7 +118,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         t0, t1 = self.period
         period = t1 - t0 + 1
         nb = self.nb_obs_by_track
-        nb_obs = self.observations.shape[0]
+        nb_obs = len(self)
         m = self.virtual.astype("bool")
         nb_m = m.sum()
         bins_t = (1, 30, 90, 180, 270, 365, 1000, 10000)
@@ -147,7 +147,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
 
     def add_distance(self):
         """Add a field of distance (m) between two consecutive observations, 0 for the last observation of each track"""
-        if "distance_next" in self.observations.dtype.descr:
+        if "distance_next" in self.fields:
             return self
         new = self.add_fields(("distance_next",))
         new["distance_next"][:1] = self.distance_to_next()
@@ -205,10 +205,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
         logger.info("Selection of %d observations", nb_obs_select)
         eddies = self.__class__.new_like(self, nb_obs_select)
         eddies.sign_type = self.sign_type
-        for field in self.obs.dtype.descr:
+        for field in self.fields:
             logger.debug("Copy of field %s ...", field)
-            var = field[0]
-            eddies.obs[var] = self.obs[var][mask]
+            eddies.obs[field] = self.obs[field][mask]
         if compress_id:
             list_id = unique(eddies.obs.track)
             list_id.sort()
@@ -387,13 +386,13 @@ class TrackEddiesObservations(GroupEddiesObservations):
 
     def extract_first_obs_in_box(self, res):
         data = empty(
-            self.obs.shape, dtype=[("lon", "f4"), ("lat", "f4"), ("track", "i4")]
+            len(self), dtype=[("lon", "f4"), ("lat", "f4"), ("track", "i4")]
         )
         data["lon"] = self.longitude - self.longitude % res
         data["lat"] = self.latitude - self.latitude % res
         data["track"] = self.track
         _, indexs = unique(data, return_index=True)
-        mask = zeros(self.obs.shape, dtype="bool")
+        mask = zeros(len(self), dtype="bool")
         mask[indexs] = True
         return self.extract_with_mask(mask)
 
@@ -508,10 +507,9 @@ class TrackEddiesObservations(GroupEddiesObservations):
         if nb_obs == 0:
             logger.info("Empty dataset will be created")
         else:
-            for field in self.obs.dtype.descr:
+            for field in self.fields:
                 logger.debug("Copy of field %s ...", field)
-                var = field[0]
-                new.obs[var] = self.obs[var][mask]
+                new.obs[field] = self.obs[field][mask]
             if compress_id:
                 list_id = unique(new.track)
                 list_id.sort()

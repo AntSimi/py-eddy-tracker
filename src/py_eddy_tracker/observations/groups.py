@@ -292,15 +292,14 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         nb_obs = len(self)
         index = arange(nb_obs)
 
-        for field in self.obs.dtype.descr:
-            var = field[0]
+        for field in self.fields:
             if (
-                var in ["n", "virtual", "track", "cost_association"]
-                or var in self.array_variables
+                field in ["n", "virtual", "track", "cost_association"]
+                or field in self.array_variables
             ):
                 continue
-            self.obs[var][mask] = interp(
-                index[mask], index[~mask], self.obs[var][~mask]
+            self.obs[field][mask] = interp(
+                index[mask], index[~mask], self.obs[field][~mask]
             )
 
     def insert_virtual(self):
