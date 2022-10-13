@@ -431,7 +431,7 @@ def merge(x, y):
     return concatenate(x), concatenate(y)
 
 
-def vertice_overlap(x0, y0, x1, y1, minimal_area=False, p1_area=False):
+def vertice_overlap(x0, y0, x1, y1, minimal_area=False, p1_area=False, hybrid_area=False, min_overlap=0):
     r"""
     Return percent of overlap for each item.
 
@@ -441,6 +441,9 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False, p1_area=False):
     :param array y1: y for polygon list 1
     :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union
     :param bool p1_area: If True, function will compute intersection/p1 polygon, else intersection/union
+    :param bool hybrid_area: If True, function will compute like union,
+                             but if cost is under min_overlap, obs is kept in case of fully included
+    :param float min_overlap: under this value cost is set to zero
     :return: Result of cost function
     :rtype: array
 
@@ -466,14 +469,25 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False, p1_area=False):
         # Area of intersection
         intersection = (p0 & p1).area()
         # we divide intersection with the little one result from 0 to 1
+        if intersection == 0:
+            cost[i] = 0
+            continue
+        p0_area_, p1_area_ = p0.area(), p1.area()
         if minimal_area:
-            cost[i] = intersection / min(p0.area(), p1.area())
+            cost_ = intersection / min(p0_area_, p1_area_)
         # we divide intersection with p1
         elif p1_area:
-            cost[i] = intersection / p1.area()
+            cost_ = intersection / p1_area_
         # we divide intersection with polygon merging result from 0 to 1
         else:
-            cost[i] = intersection / (p0 + p1).area()
+            cost_ = intersection / (p0_area_ + p1_area_ - intersection)
+        if cost_ >= min_overlap:
+            cost[i] = cost_
+        else:
+            if hybrid_area and cost_ != 0 and (intersection / min(p0_area_, p1_area_)) > .99:
+                cost[i] = cost_
+            else:
+                cost[i] = 0
     return cost
 
 
