@@ -284,11 +284,11 @@ class NetworkObservations(GroupEddiesObservations):
             nb_day_max = 1000000000000
         mask = zeros(self.shape, dtype="bool")
         t = self.time
-        for i, b0, b1 in self.iter_on(self.track):
+        for i, _, _ in self.iter_on(self.track):
             nb = i.stop - i.start
             if nb == 0:
                 continue
-            if nb_day_min <= ptp(t[i]) <= nb_day_max:
+            if nb_day_min <= (ptp(t[i]) + 1) <= nb_day_max:
                 mask[i] = True
         return self.extract_with_mask(mask)
 

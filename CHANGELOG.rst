@@ -11,12 +11,25 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Changed
 ^^^^^^^
 
+Fixed
+^^^^^
+
+Added
+^^^^^
+
+
+[3.6.1] - 2022-10-14
+--------------------
+Changed
+^^^^^^^
+
 - Rewrite particle candidate to be easily parallelize
 
 Fixed
 ^^^^^
 
 - Check strictly increasing coordinates for RegularGridDataset.
+- Grid mask is check to replace mask monovalue by 2D mask with fixed value
 
 Added
 ^^^^^

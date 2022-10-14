@@ -58,6 +58,7 @@ from ..generic import (
     local_to_coordinates,
     reverse_index,
     wrap_longitude,
+    window_index,
 )
 from ..poly import (
     bbox_intersection,
@@ -574,51 +575,58 @@ class EddiesObservations(object):
         for obs in self.obs:
             yield obs
 
-    def iter_on(self, xname, bins=None):
+    def iter_on(self, xname, window=None, bins=None):
         """
         Yield observation group for each bin.
 
         :param str,array xname:
+        :param float,None window: if defined we use a moving window with value like half window
         :param array bins: bounds of each bin
         :yield array,float,float: index in self, lower bound, upper bound
 
         .. minigallery:: py_eddy_tracker.EddiesObservations.iter_on
         """
         x = self.parse_varname(xname)
-        d = x[1:] - x[:-1]
-        if bins is None:
-            bins = arange(x.min(), x.max() + 2)
-        elif not isinstance(bins, ndarray):
-            bins = array(bins)
-        nb_bins = len(bins) - 1
-
-        # Not monotonous
-        if (d < 0).any():
-            # If bins cover a small part of value
-            test, translate, x = iter_mode_reduce(x, bins)
-            # convert value in bins number
-            i = numba_digitize(x, bins) - 1
-            # Order by bins
-            i_sort = i.argsort()
-            # If in reduced mode we will translate i_sort in full array index
-            i_sort_ = translate[i_sort] if test else i_sort
-            # Bound for each bins in sorting view
-            i0, i1, _ = build_index(i[i_sort])
-            m = ~(i0 == i1)
-            i0, i1 = i0[m], i1[m]
-            for i0_, i1_ in zip(i0, i1):
-                i_bins = i[i_sort[i0_]]
-                if i_bins == -1 or i_bins == nb_bins:
-                    continue
-                yield i_sort_[i0_:i1_], bins[i_bins], bins[i_bins + 1]
+        if window is not None:
+            x0 = arange(x.min(), x.max()) if bins is None else array(bins)
+            i_ordered, first_index, last_index = window_index(x, x0, window)
+            for x_, i0, i1 in zip(x0, first_index, last_index):
+                yield i_ordered[i0: i1], x_ - window, x_ + window
         else:
-            i = numba_digitize(x, bins) - 1
-            i0, i1, _ = build_index(i)
-            m = ~(i0 == i1)
-            i0, i1 = i0[m], i1[m]
-            for i0_, i1_ in zip(i0, i1):
-                i_bins = i[i0_]
-                yield slice(i0_, i1_), bins[i_bins], bins[i_bins + 1]
+            d = x[1:] - x[:-1]
+            if bins is None:
+                bins = arange(x.min(), x.max() + 2)
+            elif not isinstance(bins, ndarray):
+                bins = array(bins)
+            nb_bins = len(bins) - 1
+
+            # Not monotonous
+            if (d < 0).any():
+                # If bins cover a small part of value
+                test, translate, x = iter_mode_reduce(x, bins)
+                # convert value in bins number
+                i = numba_digitize(x, bins) - 1
+                # Order by bins
+                i_sort = i.argsort()
+                # If in reduced mode we will translate i_sort in full array index
+                i_sort_ = translate[i_sort] if test else i_sort
+                # Bound for each bins in sorting view
+                i0, i1, _ = build_index(i[i_sort])
+                m = ~(i0 == i1)
+                i0, i1 = i0[m], i1[m]
+                for i0_, i1_ in zip(i0, i1):
+                    i_bins = i[i_sort[i0_]]
+                    if i_bins == -1 or i_bins == nb_bins:
+                        continue
+                    yield i_sort_[i0_:i1_], bins[i_bins], bins[i_bins + 1]
+            else:
+                i = numba_digitize(x, bins) - 1
+                i0, i1, _ = build_index(i)
+                m = ~(i0 == i1)
+                i0, i1 = i0[m], i1[m]
+                for i0_, i1_ in zip(i0, i1):
+                    i_bins = i[i0_]
+                    yield slice(i0_, i1_), bins[i_bins], bins[i_bins + 1]
 
     def align_on(self, other, var_name="time", all_ref=False, **kwargs):
         """
@@ -2419,6 +2427,9 @@ class EddiesObservations(object):
 
         xname, yname = self.intern(intern)
         return create_meshed_particles(self[xname], self[yname], step)
+
+    def empty_dataset(self):
+        return self.new_like(self, 0)
 
 
 @njit(cache=True)

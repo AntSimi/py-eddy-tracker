@@ -437,9 +437,6 @@ class TrackEddiesObservations(GroupEddiesObservations):
             raise Exception("One bound must be positive")
         return self.extract_with_mask(track_mask.repeat(self.nb_obs_by_track))
 
-    def empty_dataset(self):
-        return self.new_like(self, 0)
-
     def loess_filter(self, half_window, xfield, yfield, inplace=True):
         track = self.track
         x = self.obs[xfield]
