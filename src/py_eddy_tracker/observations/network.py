@@ -117,13 +117,14 @@ class NetworkObservations(GroupEddiesObservations):
         m_event, s_event = self.merging_event(only_index=True, triplet=True)[0], self.splitting_event(only_index=True, triplet=True)[0]
         period = (self.period[1] - self.period[0]) / 365.25
         nb_by_network = self.network_size()
+        nb_trash = 0 if self.ref_index != 0 else nb_by_network[0]
         big = 50_000
         infos = [
             f"Atlas with {self.nb_network} networks ({self.nb_network / period:0.0f} networks/year),"
             f" {self.nb_segment} segments ({self.nb_segment / period:0.0f} segments/year), {len(self)} observations ({len(self) / period:0.0f} observations/year)",
             f"    {m_event.size} merging ({m_event.size / period:0.0f} merging/year), {s_event.size} splitting ({s_event.size / period:0.0f} splitting/year)",
             f"    with {(nb_by_network > big).sum()} network with more than {big} obs and the biggest have {nb_by_network.max()} observations ({nb_by_network[nb_by_network> big].sum()} observations cumulate)",
-            f"    {nb_by_network[0]} observations in trash"
+            f"    {nb_trash} observations in trash"
         ]
         return "\n".join(infos)
 
@@ -369,26 +370,29 @@ class NetworkObservations(GroupEddiesObservations):
 
             # we keep the real segment number
             seg_corrected_copy = segment_copy[seg_slice.stop - 1]
-
-            n_seg = segment[i_seg_n]
+            if i_seg_n == -1:
+                continue
 
             # if segment is split
-            if i_seg_n != -1:
-                seg2_slice, i2_seg_p, i2_seg_n = segments_connexion[n_seg]
-                p2_seg = segment[i2_seg_p]
+            n_seg = segment[i_seg_n]
 
-                # if it merges on the first in a certain time
-                if (p2_seg == seg_corrected) and (
-                    _time[i_seg_n] - _time[i2_seg_p] < nb_days_max
-                ):
-                    my_slice = slice(i_seg_n, seg2_slice.stop)
-                    # correct the factice segment
-                    segment[my_slice] = seg_corrected
-                    # correct the good segment
-                    segment_copy[my_slice] = seg_corrected_copy
-                    previous_obs[i_seg_n] = seg_slice.stop - 1
+            seg2_slice, i2_seg_p, _ = segments_connexion[n_seg]
+            if i2_seg_p == -1:
+                continue
+            p2_seg = segment[i2_seg_p]
 
-                    segments_connexion[seg_corrected][0] = my_slice
+            # if it merges on the first in a certain time
+            if (p2_seg == seg_corrected) and (
+                _time[i_seg_n] - _time[i2_seg_p] < nb_days_max
+            ):
+                my_slice = slice(i_seg_n, seg2_slice.stop)
+                # correct the factice segment
+                segment[my_slice] = seg_corrected
+                # correct the good segment
+                segment_copy[my_slice] = seg_corrected_copy
+                previous_obs[i_seg_n] = seg_slice.stop - 1
+
+                segments_connexion[seg_corrected][0] = my_slice
 
         return self.sort()
 
@@ -789,6 +793,8 @@ class NetworkObservations(GroupEddiesObservations):
                     colors_mode=colors_mode,
                 )
             )
+        if field is not None:
+            field = self.parse_varname(field)
         for i, b0, b1 in self.iter_on("segment"):
             x = self.time[i]
             if x.shape[0] == 0:
@@ -797,9 +803,9 @@ class NetworkObservations(GroupEddiesObservations):
                 y = b0 * ones(x.shape)
             else:
                 if method == "all":
-                    y = self[field][i] * factor
+                    y = field[i] * factor
                 else:
-                    y = self[field][i].mean() * ones(x.shape) * factor
+                    y = field[i].mean() * ones(x.shape) * factor
 
             if colors_mode == "roll":
                 _color = self.get_color(j)
@@ -825,7 +831,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         if field is not None and method != "all":
             for i, b0, _ in self.iter_on("segment"):
-                y = self[field][i]
+                y = self.parse_varname(field)[i]
                 if y.shape[0] != 0:
                     y_seg[b0] = y.mean() * factor
         mappables = dict()
@@ -851,7 +857,7 @@ class NetworkObservations(GroupEddiesObservations):
                 y0 = b0
             else:
                 if method == "all":
-                    y0 = self[field][i.stop - 1] * factor
+                    y0 = self.parse_varname(field)[i.stop - 1] * factor
                 else:
                     y0 = y_seg[b0]
             if i_n != -1:
@@ -860,7 +866,7 @@ class NetworkObservations(GroupEddiesObservations):
                     seg_next
                     if field is None
                     else (
-                        self[field][i_n] * factor
+                        self.parse_varname(field)[i_n] * factor
                         if method == "all"
                         else y_seg[seg_next]
                     )
@@ -876,7 +882,7 @@ class NetworkObservations(GroupEddiesObservations):
                     seg_previous
                     if field is None
                     else (
-                        self[field][i_p] * factor
+                        self.parse_varname(field)[i_p] * factor
                         if method == "all"
                         else y_seg[seg_previous]
                     )
@@ -1446,35 +1452,54 @@ class NetworkObservations(GroupEddiesObservations):
         .. warning::
             It will remove short segment that splits from then merges with the same segment
         """
-        segments_keep = list()
         connexions = self.connexions(multi_network=True)
-        t = self.time
-        for i, b0, _ in self.iter_on(self.segment_track_array):
-            if mask and mask[i].any():
-                segments_keep.append(b0)
-                continue
-            nb = i.stop - i.start
-            dt = t[i.stop - 1] - t[i.start]
-            if (nb < nobs or dt < ndays) and len(connexions.get(b0, tuple())) < 2:
-                continue
-            segments_keep.append(b0)
+        i0, i1, _ = self.index_segment_track
+        dt = self.time[i1 -1] - self.time[i0] + 1
+        nb = i1 - i0
+        m = (dt >= ndays) * (nb >= nobs)
+        nb_connexions = array([len(connexions.get(i, tuple())) for i in where(~m)[0]])
+        m[~m] = nb_connexions >= 2
+        segments_keep = where(m)[0]
+        if mask is not None:
+            segments_keep = unique(concatenate((segments_keep, self.segment_track_array[mask])))
+        # get mask for selected obs
+        m = ~self.segment_mask(segments_keep)
+        self.track[m] = 0
+        self.segment[m] = 0
+        self.previous_obs[m] = -1
+        self.previous_cost[m] = 0
+        self.next_obs[m] = -1
+        self.next_cost[m] = 0
+        
+        m_previous = m[self.previous_obs]
+        self.previous_obs[m_previous] = -1
+        self.previous_cost[m_previous] = 0
+        m_next = m[self.next_obs]
+        self.next_obs[m_next] = -1
+        self.next_cost[m_next] = 0
+        
+        self.sort()
         if recursive > 0:
-            return self.extract_segment(segments_keep, absolute=True).remove_dead_end(
-                nobs, ndays, recursive - 1
-            )
-        return self.extract_segment(segments_keep, absolute=True)
+            self.remove_dead_end(nobs, ndays, recursive - 1)
 
     def extract_segment(self, segments, absolute=False):
-        mask = ones(self.shape, dtype="bool")
-        segments = array(segments)
-        values = self.segment_track_array if absolute else "segment"
-        keep = ones(values.max() + 1, dtype="bool")
-        v = unique(values)
-        keep[v] = in1d(v, segments)
-        for i, b0, b1 in self.iter_on(values):
-            if not keep[b0]:
-                mask[i] = False
-        return self.extract_with_mask(mask)
+        """Extract given segments
+
+        :param array,tuple,list segments: list of segment to extract
+        :param bool absolute: keep for compatibility, defaults to False
+        :return NetworkObservations: Return observations from selected segment
+        """
+        if not absolute:
+            raise Exception("Not implemented")
+        return self.extract_with_mask(self.segment_mask(segments))
+
+    def segment_mask(self, segments):
+        """Get mask from list of segment
+
+        :param list,array segments: absolute id of segment
+        """
+        return generate_mask_from_ids(array(segments), len(self), *self.index_segment_track)
+
 
     def get_mask_with_period(self, period):
         """
