@@ -431,7 +431,9 @@ def merge(x, y):
     return concatenate(x), concatenate(y)
 
 
-def vertice_overlap(x0, y0, x1, y1, minimal_area=False, p1_area=False, hybrid_area=False, min_overlap=0):
+def vertice_overlap(
+    x0, y0, x1, y1, minimal_area=False, p1_area=False, hybrid_area=False, min_overlap=0
+):
     r"""
     Return percent of overlap for each item.
 
@@ -484,7 +486,11 @@ def vertice_overlap(x0, y0, x1, y1, minimal_area=False, p1_area=False, hybrid_ar
         if cost_ >= min_overlap:
             cost[i] = cost_
         else:
-            if hybrid_area and cost_ != 0 and (intersection / min(p0_area_, p1_area_)) > .99:
+            if (
+                hybrid_area
+                and cost_ != 0
+                and (intersection / min(p0_area_, p1_area_)) > 0.99
+            ):
                 cost[i] = cost_
             else:
                 cost[i] = 0

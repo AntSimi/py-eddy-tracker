@@ -54,7 +54,9 @@ def build_network():
         memory=args.memory,
     )
     group = n.group_observations(
-        min_overlap=args.min_overlap, minimal_area=args.minimal_area, hybrid_area=args.hybrid_area
+        min_overlap=args.min_overlap,
+        minimal_area=args.minimal_area,
+        hybrid_area=args.hybrid_area,
     )
     n.build_dataset(group).write_file(filename=args.out)
 
@@ -97,7 +99,7 @@ def divide_network():
             window=args.window,
             min_overlap=args.min_overlap,
             minimal_area=args.minimal_area,
-            hybrid_area=args.hybrid_area
+            hybrid_area=args.hybrid_area,
         ),
     )
     n.write_file(filename=args.out)

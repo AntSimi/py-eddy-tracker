@@ -385,9 +385,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         return self.extract_with_mask(m)
 
     def extract_first_obs_in_box(self, res):
-        data = empty(
-            len(self), dtype=[("lon", "f4"), ("lat", "f4"), ("track", "i4")]
-        )
+        data = empty(len(self), dtype=[("lon", "f4"), ("lat", "f4"), ("track", "i4")])
         data["lon"] = self.longitude - self.longitude % res
         data["lat"] = self.latitude - self.latitude % res
         data["track"] = self.track
@@ -757,7 +755,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         time_ref,
         window,
         min_overlap=0.2,
-        **kwargs
+        **kwargs,
     ):
         """Forward association of observations to the segments"""
         time_max = time_e.shape[0] - 1

@@ -16,15 +16,14 @@ from numpy import (
     bool_,
     concatenate,
     empty,
-    in1d,
+    nan,
     ones,
+    percentile,
     uint16,
     uint32,
     unique,
     where,
     zeros,
-    percentile,
-    nan
 )
 import zarr
 
@@ -112,9 +111,12 @@ class NetworkObservations(GroupEddiesObservations):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reset_index()
-    
+
     def __repr__(self):
-        m_event, s_event = self.merging_event(only_index=True, triplet=True)[0], self.splitting_event(only_index=True, triplet=True)[0]
+        m_event, s_event = (
+            self.merging_event(only_index=True, triplet=True)[0],
+            self.splitting_event(only_index=True, triplet=True)[0],
+        )
         period = (self.period[1] - self.period[0]) / 365.25
         nb_by_network = self.network_size()
         nb_trash = 0 if self.ref_index != 0 else nb_by_network[0]
@@ -124,7 +126,7 @@ class NetworkObservations(GroupEddiesObservations):
             f" {self.nb_segment} segments ({self.nb_segment / period:0.0f} segments/year), {len(self)} observations ({len(self) / period:0.0f} observations/year)",
             f"    {m_event.size} merging ({m_event.size / period:0.0f} merging/year), {s_event.size} splitting ({s_event.size / period:0.0f} splitting/year)",
             f"    with {(nb_by_network > big).sum()} network with more than {big} obs and the biggest have {nb_by_network.max()} observations ({nb_by_network[nb_by_network> big].sum()} observations cumulate)",
-            f"    {nb_trash} observations in trash"
+            f"    {nb_trash} observations in trash",
         ]
         return "\n".join(infos)
 
@@ -332,7 +334,7 @@ class NetworkObservations(GroupEddiesObservations):
         segment A splits from segment B then x days after segment A merges with B (B will be longer)
         These events have to last less than `nb_days_max` to be changed.
 
- 
+
                          ------------------- A
                         /     /
         B --------------------
@@ -528,12 +530,14 @@ class NetworkObservations(GroupEddiesObservations):
             self.only_one_network()
             segment = self.segment
         segments_connexion = dict()
+
         def add_seg(s1, s2):
             if s1 not in segments_connexion:
                 segments_connexion[s1] = set()
             if s2 not in segments_connexion:
                 segments_connexion[s2] = set()
             segments_connexion[s1].add(s2), segments_connexion[s2].add(s1)
+
         # Get index for each segment
         i0, i1, _ = self.index_segment_track
         i1 = i1 - 1
@@ -1122,6 +1126,7 @@ class NetworkObservations(GroupEddiesObservations):
         if self.first_is_trash():
             indices = indices[1:]
         return self.extract_event(indices)
+
     generation_event = birth_event
 
     def death_event(self):
@@ -1131,6 +1136,7 @@ class NetworkObservations(GroupEddiesObservations):
         if self.first_is_trash():
             indices = indices[1:]
         return self.extract_event(indices)
+
     dissipation_event = death_event
 
     def merging_event(self, triplet=False, only_index=False):
@@ -1374,7 +1380,7 @@ class NetworkObservations(GroupEddiesObservations):
             # No connexions, no need to explore
             if i not in c:
                 sub_group[i] = j
-                j+= 1
+                j += 1
                 continue
             # Skip if already set
             if sub_group[i] != 0:
@@ -1384,10 +1390,8 @@ class NetworkObservations(GroupEddiesObservations):
             j += 1
         return sub_group
 
-
     def fully_connected(self):
-        """Suspicious
-        """
+        """Suspicious"""
         raise Exception("Must be check")
         self.only_one_network()
         return self.tag_segment().shape[0] == 1
@@ -1454,14 +1458,16 @@ class NetworkObservations(GroupEddiesObservations):
         """
         connexions = self.connexions(multi_network=True)
         i0, i1, _ = self.index_segment_track
-        dt = self.time[i1 -1] - self.time[i0] + 1
+        dt = self.time[i1 - 1] - self.time[i0] + 1
         nb = i1 - i0
         m = (dt >= ndays) * (nb >= nobs)
         nb_connexions = array([len(connexions.get(i, tuple())) for i in where(~m)[0]])
         m[~m] = nb_connexions >= 2
         segments_keep = where(m)[0]
         if mask is not None:
-            segments_keep = unique(concatenate((segments_keep, self.segment_track_array[mask])))
+            segments_keep = unique(
+                concatenate((segments_keep, self.segment_track_array[mask]))
+            )
         # get mask for selected obs
         m = ~self.segment_mask(segments_keep)
         self.track[m] = 0
@@ -1470,14 +1476,14 @@ class NetworkObservations(GroupEddiesObservations):
         self.previous_cost[m] = 0
         self.next_obs[m] = -1
         self.next_cost[m] = 0
-        
+
         m_previous = m[self.previous_obs]
         self.previous_obs[m_previous] = -1
         self.previous_cost[m_previous] = 0
         m_next = m[self.next_obs]
         self.next_obs[m_next] = -1
         self.next_cost[m_next] = 0
-        
+
         self.sort()
         if recursive > 0:
             self.remove_dead_end(nobs, ndays, recursive - 1)
@@ -1498,8 +1504,9 @@ class NetworkObservations(GroupEddiesObservations):
 
         :param list,array segments: absolute id of segment
         """
-        return generate_mask_from_ids(array(segments), len(self), *self.index_segment_track)
-
+        return generate_mask_from_ids(
+            array(segments), len(self), *self.index_segment_track
+        )
 
     def get_mask_with_period(self, period):
         """
@@ -1849,7 +1856,7 @@ class NetworkObservations(GroupEddiesObservations):
                 n_days=n_days,
                 contour_start=contour_start,
                 contour_end=contour_end,
-                **kwargs
+                **kwargs,
             )
             logger.info(
                 (
@@ -1974,7 +1981,7 @@ class Network:
         :param bool minimal_area: If True, function will compute intersection/little polygon, else intersection/union, by default False
         :param float min_overlap: minimum overlap area to associate observations, by default 0.2
 
-        :return: 
+        :return:
         :rtype: TrackEddiesObservations
         """
 
@@ -1993,7 +2000,13 @@ class Network:
                 ii, ij = bbox_intersection(xi, yi, xj, yj)
                 m = (
                     vertice_overlap(
-                        xi[ii], yi[ii], xj[ij], yj[ij], minimal_area=minimal_area, min_overlap=min_overlap, **kwargs
+                        xi[ii],
+                        yi[ii],
+                        xj[ij],
+                        yj[ij],
+                        minimal_area=minimal_area,
+                        min_overlap=min_overlap,
+                        **kwargs,
                     )
                     != 0
                 )
@@ -2038,9 +2051,12 @@ class Network:
             print()
         eddies.track[new_i] = group
         return eddies
-    
+
+
 @njit(cache=True)
-def get_percentile_on_following_obs(i, indexs, percents, follow_obs, t, segment, i_target, window, q=50, nb_min=1):
+def get_percentile_on_following_obs(
+    i, indexs, percents, follow_obs, t, segment, i_target, window, q=50, nb_min=1
+):
     """Get stat on a part of segment close of an event
 
     :param int i: index to follow
@@ -2070,8 +2086,22 @@ def get_percentile_on_following_obs(i, indexs, percents, follow_obs, t, segment,
         return nan
     return percentile(percent_target[:j], q)
 
+
 @njit(cache=True)
-def get_percentile_around_event(i, i1, i2, ind, pct, follow_obs, t, segment, window=10, follow_parent=False, q=50, nb_min=1):
+def get_percentile_around_event(
+    i,
+    i1,
+    i2,
+    ind,
+    pct,
+    follow_obs,
+    t,
+    segment,
+    window=10,
+    follow_parent=False,
+    q=50,
+    nb_min=1,
+):
     """Get stat around event
 
     :param array[int] i: Indexs of target
@@ -2094,13 +2124,22 @@ def get_percentile_around_event(i, i1, i2, ind, pct, follow_obs, t, segment, win
     for j, (i_, i1_, i2_) in enumerate(zip(i, i1, i2)):
         if follow_parent:
             # We follow parent
-            stat1[j] = get_percentile_on_following_obs(i_, ind, pct, follow_obs, t, segment, i1_, window, q, nb_min)
-            stat2[j] = get_percentile_on_following_obs(i_, ind, pct, follow_obs, t, segment, i2_, window, q, nb_min)
+            stat1[j] = get_percentile_on_following_obs(
+                i_, ind, pct, follow_obs, t, segment, i1_, window, q, nb_min
+            )
+            stat2[j] = get_percentile_on_following_obs(
+                i_, ind, pct, follow_obs, t, segment, i2_, window, q, nb_min
+            )
         else:
             # We follow child
-            stat1[j] = get_percentile_on_following_obs(i1_, ind, pct, follow_obs, t, segment, i_, window, q, nb_min)
-            stat2[j] = get_percentile_on_following_obs(i2_, ind, pct, follow_obs, t, segment, i_, window, q, nb_min)
+            stat1[j] = get_percentile_on_following_obs(
+                i1_, ind, pct, follow_obs, t, segment, i_, window, q, nb_min
+            )
+            stat2[j] = get_percentile_on_following_obs(
+                i2_, ind, pct, follow_obs, t, segment, i_, window, q, nb_min
+            )
     return stat1, stat2
+
 
 @njit(cache=True)
 def get_next_index(gr):

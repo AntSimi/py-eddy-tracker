@@ -95,7 +95,13 @@ a.fig.suptitle(""), a.ax.set_xlim(24, 36), a.ax.set_ylim(30, 36)
 a.txt.set_position((25, 31))
 
 step = 0.25
-kw_p = dict(nb_step=2, time_step=86400 * step * 0.5, t_init=t_snapshot - 2 * step, u_name="u", v_name="v")
+kw_p = dict(
+    nb_step=2,
+    time_step=86400 * step * 0.5,
+    t_init=t_snapshot - 2 * step,
+    u_name="u",
+    v_name="v",
+)
 
 mappables = dict()
 particules = c.advect(x, y, **kw_p)

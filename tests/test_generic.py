@@ -33,7 +33,7 @@ def test_cumsum_by_track():
 
 
 def test_wrapping():
-    y = x = arange(-5,5, dtype='f4')
+    y = x = arange(-5, 5, dtype="f4")
     x_, _ = wrap_longitude(x, y, ref=-10)
     assert (x_ == x).all()
     x_, _ = wrap_longitude(x, y, ref=1)
@@ -42,7 +42,7 @@ def test_wrapping():
     assert (x_[:6] == x[:6] + 360).all()
     x_, _ = wrap_longitude(x, y, ref=1, cut=True)
     assert x.size + 3 == x_.size
-    assert (x_[6 + 3:] == x[6:]).all()
+    assert (x_[6 + 3 :] == x[6:]).all()
     assert (x_[:7] == x[:7] + 360).all()
 
     # FIXME Need evolution in wrap_longitude

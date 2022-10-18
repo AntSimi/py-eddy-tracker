@@ -57,8 +57,8 @@ from ..generic import (
     hist_numba,
     local_to_coordinates,
     reverse_index,
-    wrap_longitude,
     window_index,
+    wrap_longitude,
 )
 from ..poly import (
     bbox_intersection,
@@ -448,9 +448,7 @@ class EddiesObservations(object):
             ),
             track_array_variables=self.track_array_variables,
             array_variables=list(concatenate((self.array_variables, array_fields))),
-            only_variables=list(
-                concatenate((self.fields, fields, array_fields))
-            ),
+            only_variables=list(concatenate((self.fields, fields, array_fields))),
             raw_data=self.raw_data,
         )
         new.sign_type = self.sign_type
@@ -591,7 +589,7 @@ class EddiesObservations(object):
             x0 = arange(x.min(), x.max()) if bins is None else array(bins)
             i_ordered, first_index, last_index = window_index(x, x0, window)
             for x_, i0, i1 in zip(x0, first_index, last_index):
-                yield i_ordered[i0: i1], x_ - window, x_ + window
+                yield i_ordered[i0:i1], x_ - window, x_ + window
         else:
             d = x[1:] - x[:-1]
             if bins is None:
@@ -1595,9 +1593,7 @@ class EddiesObservations(object):
             handler.track_array_variables = self.track_array_variables
             handler.array_variables = ",".join(self.array_variables)
         # Iter on variables to create:
-        fields_ = array(
-            [VAR_DESCR[field]["nc_name"] for field in self.fields]
-        )
+        fields_ = array([VAR_DESCR[field]["nc_name"] for field in self.fields])
         i = fields_.argsort()
         for ori_name in array(self.fields)[i]:
             # Patch for a transition
@@ -1676,7 +1672,9 @@ class EddiesObservations(object):
         content = VAR_DESCR.get(name)
         filters = list()
         store_dtype = content["output_type"]
-        scale_factor, add_offset = content.get("scale_factor", None), content.get("add_offset", None)
+        scale_factor, add_offset = content.get("scale_factor", None), content.get(
+            "add_offset", None
+        )
         if scale_factor is not None or add_offset is not None:
             if add_offset is None:
                 add_offset = 0

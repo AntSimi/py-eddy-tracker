@@ -20,7 +20,7 @@ c = GridCollection.from_netcdf_cube(
     "longitude",
     "latitude",
     "time",
-    unset=True
+    unset=True,
 )
 
 # %%

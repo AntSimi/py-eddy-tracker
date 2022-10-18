@@ -351,7 +351,15 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         return self.extract_with_mask(mask)
 
     def particle_candidate_atlas(
-        self, cube, space_step, dt, start_intern=False, end_intern=False, callback_coherence=None, finalize_coherence=None, **kwargs
+        self,
+        cube,
+        space_step,
+        dt,
+        start_intern=False,
+        end_intern=False,
+        callback_coherence=None,
+        finalize_coherence=None,
+        **kwargs
     ):
         """Select particles within eddies, advect them, return target observation and associated percentages
 
@@ -383,7 +391,9 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         kw_coherence = dict(space_step=space_step, dt=dt, c=cube)
         kw_coherence.update(kwargs)
         for t in times:
-            logger.info("Coherence for time step : %s in [%s:%s]", t, times[0], times[-1])
+            logger.info(
+                "Coherence for time step : %s in [%s:%s]", t, times[0], times[-1]
+            )
             # Get index for origin
             i = t - t_start
             indexs0 = i_sort[i_start[i] : i_end[i]]
@@ -393,7 +403,19 @@ class GroupEddiesObservations(EddiesObservations, ABC):
             if indexs0.size == 0 or indexs1.size == 0:
                 continue
 
-            results.append(callback_coherence(self, i_target, pct, indexs0, indexs1, start_intern, end_intern, t_start=t, **kw_coherence))
+            results.append(
+                callback_coherence(
+                    self,
+                    i_target,
+                    pct,
+                    indexs0,
+                    indexs1,
+                    start_intern,
+                    end_intern,
+                    t_start=t,
+                    **kw_coherence
+                )
+            )
             indexs[results[-1]] = indexs0, indexs1
 
         if finalize_coherence is not None:
@@ -401,7 +423,17 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         return i_target, pct
 
     @classmethod
-    def fill_coherence(cls, network, i_targets, percents, i_origin, i_end, start_intern, end_intern, **kwargs):
+    def fill_coherence(
+        cls,
+        network,
+        i_targets,
+        percents,
+        i_origin,
+        i_end,
+        start_intern,
+        end_intern,
+        **kwargs
+    ):
         """_summary_
 
         :param array i_targets: global target
@@ -412,21 +444,29 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         :param bool end_intern: Use intern or extern contour at end of advection
         """
         # Get contour data
-        contours_start = [network[label][i_origin] for label in cls.intern(start_intern)]
+        contours_start = [
+            network[label][i_origin] for label in cls.intern(start_intern)
+        ]
         contours_end = [network[label][i_end] for label in cls.intern(end_intern)]
         # Compute local coherence
-        i_local_targets, local_percents = particle_candidate_step(contours_start=contours_start, contours_end=contours_end,**kwargs)
+        i_local_targets, local_percents = particle_candidate_step(
+            contours_start=contours_start, contours_end=contours_end, **kwargs
+        )
         # Store
-        cls.merge_particle_result(i_targets, percents, i_local_targets, local_percents, i_origin, i_end)
-    
+        cls.merge_particle_result(
+            i_targets, percents, i_local_targets, local_percents, i_origin, i_end
+        )
+
     @staticmethod
-    def merge_particle_result(i_targets, percents, i_local_targets, local_percents, i_origin, i_end):
+    def merge_particle_result(
+        i_targets, percents, i_local_targets, local_percents, i_origin, i_end
+    ):
         """Copy local result in merged result with global indexation
 
         :param array i_targets: global target
-        :param array percents: 
+        :param array percents:
         :param array i_local_targets: local index target
-        :param array local_percents: 
+        :param array local_percents:
         :param array i_origin: indices of origins
         :param array i_end: indices of ends
         """

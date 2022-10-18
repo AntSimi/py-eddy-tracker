@@ -96,9 +96,9 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = u"py-eddy-tracker"
-copyright = u"2019, A. Delepoulle & E. Mason"
-author = u"A. Delepoulle & E. Mason"
+project = "py-eddy-tracker"
+copyright = "2019, A. Delepoulle & E. Mason"
+author = "A. Delepoulle & E. Mason"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -272,8 +272,8 @@ latex_documents = [
     (
         master_doc,
         "py-eddy-tracker.tex",
-        u"py-eddy-tracker Documentation",
-        u"A. Delepoulle \\& E. Mason",
+        "py-eddy-tracker Documentation",
+        "A. Delepoulle \\& E. Mason",
         "manual",
     ),
 ]
@@ -304,7 +304,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, "py-eddy-tracker", u"py-eddy-tracker Documentation", [author], 1)
+    (master_doc, "py-eddy-tracker", "py-eddy-tracker Documentation", [author], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -320,7 +320,7 @@ texinfo_documents = [
     (
         master_doc,
         "py-eddy-tracker",
-        u"py-eddy-tracker Documentation",
+        "py-eddy-tracker Documentation",
         author,
         "py-eddy-tracker",
         "One line description of project.",

@@ -139,7 +139,9 @@ kw = dict(
 )
 for time_step in (10800, 21600, 43200, 86400):
     x, y = x0.copy(), y0.copy()
-    kw_advect = dict(nb_step=int(50 * 86400 / time_step), time_step=time_step, u_name="u", v_name="v")
+    kw_advect = dict(
+        nb_step=int(50 * 86400 / time_step), time_step=time_step, u_name="u", v_name="v"
+    )
     g.advect(x, y, **kw_advect).__next__()
     g.advect(x, y, **kw_advect, backward=True).__next__()
     d = ((x - x0) ** 2 + (y - y0) ** 2) ** 0.5
@@ -158,7 +160,12 @@ ax = fig.add_subplot(111)
 time_step = 10800
 for duration in (5, 50, 100):
     x, y = x0.copy(), y0.copy()
-    kw_advect = dict(nb_step=int(duration * 86400 / time_step), time_step=time_step, u_name="u", v_name="v")
+    kw_advect = dict(
+        nb_step=int(duration * 86400 / time_step),
+        time_step=time_step,
+        u_name="u",
+        v_name="v",
+    )
     g.advect(x, y, **kw_advect).__next__()
     g.advect(x, y, **kw_advect, backward=True).__next__()
     d = ((x - x0) ** 2 + (y - y0) ** 2) ** 0.5

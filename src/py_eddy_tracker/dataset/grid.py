@@ -1980,7 +1980,15 @@ class RegularGridDataset(GridDataset):
             self.x_c, self.y_c, g, m, lons, lats, nearest=method == "nearest"
         )
 
-    def uv_for_advection(self, u_name=None, v_name=None, time_step=600, h_name=None, backward=False, factor=1):
+    def uv_for_advection(
+        self,
+        u_name=None,
+        v_name=None,
+        time_step=600,
+        h_name=None,
+        backward=False,
+        factor=1,
+    ):
         """
         Get U,V to be used in degrees with precomputed time step
 
@@ -1990,7 +1998,7 @@ class RegularGridDataset(GridDataset):
         :param int time_step: Number of second for each advection
         """
         if h_name is not None:
-            u_name, v_name = 'u', 'v'
+            u_name, v_name = "u", "v"
             if u_name not in self.vars:
                 self.add_uv(h_name)
                 self.vars.pop(h_name, None)
