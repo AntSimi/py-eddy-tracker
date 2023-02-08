@@ -2,45 +2,20 @@
 """
 Class to load and manipulate RegularGrid and UnRegularGrid
 """
-from datetime import datetime
 import logging
+from datetime import datetime
 
 from cv2 import filter2D
 from matplotlib.path import Path as BasePath
 from netCDF4 import Dataset
-from numba import njit, prange, types as numba_types
-from numpy import (
-    arange,
-    array,
-    ceil,
-    concatenate,
-    cos,
-    deg2rad,
-    empty,
-    errstate,
-    exp,
-    float_,
-    floor,
-    histogram2d,
-    int_,
-    interp,
-    isnan,
-    linspace,
-    ma,
-    mean as np_mean,
-    meshgrid,
-    nan,
-    nanmean,
-    ones,
-    percentile,
-    pi,
-    radians,
-    round_,
-    sin,
-    sinc,
-    where,
-    zeros,
-)
+from numba import njit, prange
+from numba import types as numba_types
+from numpy import (arange, array, ceil, concatenate, cos, deg2rad, empty,
+                   errstate, exp, float_, floor, histogram2d, int_, interp,
+                   isnan, linspace, ma)
+from numpy import mean as np_mean
+from numpy import (meshgrid, nan, nanmean, ones, percentile, pi, radians,
+                   round_, sin, sinc, where, zeros)
 from pint import UnitRegistry
 from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.ndimage import gaussian_filter
@@ -49,26 +24,15 @@ from scipy.spatial import cKDTree
 from scipy.special import j1
 
 from .. import VAR_DESCR
+from ..data import get_demo_path
 from ..eddy_feature import Amplitude, Contours
-from ..generic import (
-    bbox_indice_regular,
-    coordinates_to_local,
-    distance,
-    interp2d_geo,
-    local_to_coordinates,
-    nearest_grd_indice,
-    uniform_resample,
-)
+from ..generic import (bbox_indice_regular, coordinates_to_local, distance,
+                       interp2d_geo, local_to_coordinates, nearest_grd_indice,
+                       uniform_resample)
 from ..observations.observation import EddiesObservations
-from ..poly import (
-    create_vertice,
-    fit_circle,
-    get_pixel_in_regular,
-    poly_area,
-    poly_contain_poly,
-    visvalingam,
-    winding_number_poly,
-)
+from ..poly import (create_vertice, fit_circle, get_pixel_in_regular,
+                    poly_area, poly_contain_poly, visvalingam,
+                    winding_number_poly)
 
 logger = logging.getLogger("pet")
 
@@ -1318,9 +1282,13 @@ class RegularGridDataset(GridDataset):
             self.x_size,
         )
 
-    def clean_land(self):
+    def clean_land(self, name):
         """Function to remove all land pixel"""
-        pass
+        mask_land = self.__class__(get_demo_path("mask_1_60.nc"), "lon", "lat")
+        x,y = meshgrid(self.x_c, self.y_c)
+        m = mask_land.interp('mask', x.reshape(-1), y.reshape(-1), 'nearest')
+        data = self.grid(name)
+        self.vars[name] = ma.array(data, mask=m.reshape(x.shape).T)
 
     def is_circular(self):
         """Check if the grid is circular"""
@@ -2391,6 +2359,15 @@ class GridCollection:
     def __iter__(self):
         for _, d in self.datasets:
             yield d
+
+    @property
+    def time(self):
+        return array([t for t, _ in self.datasets])
+
+    @property
+    def period(self):
+        t = self.time
+        return t.min(), t.max()
 
     def __getitem__(self, item):
         for t, d in self.datasets:

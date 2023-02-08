@@ -5,10 +5,12 @@ Method for polygon
 
 import heapq
 
-from Polygon import Polygon
-from numba import njit, prange, types as numba_types
-from numpy import arctan, array, concatenate, empty, nan, ones, pi, where, zeros
+from numba import njit, prange
+from numba import types as numba_types
+from numpy import (arctan, array, concatenate, empty, nan, ones, pi, where,
+                   zeros)
 from numpy.linalg import lstsq
+from Polygon import Polygon
 
 from .generic import build_index
 
@@ -278,7 +280,10 @@ def close_center(x0, y0, x1, y1, delta=0.1):
     for i0 in range(nb0):
         xi0, yi0 = x0[i0], y0[i0]
         for i1 in range(nb1):
-            if abs(x1[i1] - xi0) > delta:
+            d_x = x1[i1] - xi0
+            if abs(d_x) > 180:
+                d_x = (d_x + 180) % 360 - 180
+            if abs(d_x) > delta:
                 continue
             if abs(y1[i1] - yi0) > delta:
                 continue
@@ -474,22 +479,22 @@ def vertice_overlap(
         if intersection == 0:
             cost[i] = 0
             continue
-        p0_area_, p1_area_ = p0.area(), p1.area()
+        p0_area, p1_area = p0.area(), p1.area()
         if minimal_area:
-            cost_ = intersection / min(p0_area_, p1_area_)
+            cost_ = intersection / min(p0_area, p1_area)
         # we divide intersection with p1
         elif p1_area:
-            cost_ = intersection / p1_area_
+            cost_ = intersection / p1_area
         # we divide intersection with polygon merging result from 0 to 1
         else:
-            cost_ = intersection / (p0_area_ + p1_area_ - intersection)
+            cost_ = intersection / (p0_area + p1_area - intersection)
         if cost_ >= min_overlap:
             cost[i] = cost_
         else:
             if (
                 hybrid_area
                 and cost_ != 0
-                and (intersection / min(p0_area_, p1_area_)) > 0.99
+                and (intersection / min(p0_area, p1_area)) > 0.99
             ):
                 cost[i] = cost_
             else:

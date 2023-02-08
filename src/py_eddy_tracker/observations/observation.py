@@ -2,76 +2,38 @@
 """
 Base class to manage eddy observation
 """
+import logging
 from datetime import datetime
 from io import BufferedReader, BytesIO
-import logging
 from tarfile import ExFileObject
 from tokenize import TokenError
 
-from Polygon import Polygon
+import packaging.version
+import zarr
 from matplotlib.cm import get_cmap
 from matplotlib.collections import LineCollection, PolyCollection
 from matplotlib.colors import Normalize
 from netCDF4 import Dataset
-from numba import njit, types as numba_types
-from numpy import (
-    absolute,
-    arange,
-    array,
-    array_equal,
-    ceil,
-    concatenate,
-    cos,
-    digitize,
-    empty,
-    errstate,
-    floor,
-    histogram,
-    histogram2d,
-    in1d,
-    isnan,
-    linspace,
-    ma,
-    nan,
-    ndarray,
-    ones,
-    percentile,
-    radians,
-    sin,
-    unique,
-    where,
-    zeros,
-)
-import packaging.version
+from numba import njit
+from numba import types as numba_types
+from numpy import (absolute, arange, array, array_equal, ceil, concatenate,
+                   cos, datetime64, digitize, empty, errstate, floor,
+                   histogram, histogram2d, in1d, isnan, linspace, ma, nan,
+                   ndarray, ones, percentile, radians, sin, unique, where,
+                   zeros)
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
-import zarr
+from Polygon import Polygon
 
 from .. import VAR_DESCR, VAR_DESCR_inv, __version__
-from ..generic import (
-    bbox_indice_regular,
-    build_index,
-    distance,
-    distance_grid,
-    flatten_line_matrix,
-    hist_numba,
-    local_to_coordinates,
-    reverse_index,
-    window_index,
-    wrap_longitude,
-)
-from ..poly import (
-    bbox_intersection,
-    close_center,
-    convexs,
-    create_meshed_particles,
-    create_vertice,
-    get_pixel_in_regular,
-    insidepoly,
-    poly_indexs,
-    reduce_size,
-    vertice_overlap,
-)
+from ..generic import (bbox_indice_regular, build_index, distance,
+                       distance_grid, flatten_line_matrix, hist_numba,
+                       local_to_coordinates, reverse_index, window_index,
+                       wrap_longitude)
+from ..poly import (bbox_intersection, close_center, convexs,
+                    create_meshed_particles, create_vertice,
+                    get_pixel_in_regular, insidepoly, poly_indexs, reduce_size,
+                    vertice_overlap)
 
 logger = logging.getLogger("pet")
 
@@ -1844,6 +1806,11 @@ class EddiesObservations(object):
         mask *= (lon > lon0) * (lon < area["urcrnrlon"])
         return self.extract_with_mask(mask, **kwargs)
 
+    @property
+    def time_datetime64(self):
+        dt = (datetime64('1970-01-01') - datetime64('1950-01-01')).astype('i8')
+        return (self.time - dt).astype('datetime64[D]')
+
     def time_sub_sample(self, t0, time_step):
         """
         Time sub sampling
@@ -2351,7 +2318,7 @@ class EddiesObservations(object):
         return regular_grid
 
     def interp_grid(
-        self, grid_object, varname, method="center", dtype=None, intern=None
+        self, grid_object, varname, i=None, method="center", dtype=None, intern=None
     ):
         """
         Interpolate a grid on a center or contour with mean, min or max method
@@ -2359,6 +2326,8 @@ class EddiesObservations(object):
         :param grid_object: Handler of grid to interp
         :type grid_object: py_eddy_tracker.dataset.grid.RegularGridDataset
         :param str varname: Name of variable to use
+        :param array[bool,int],None i:
+            Index or mask to subset observations, it could avoid to build a specific dataset.
         :param str method: 'center', 'mean', 'max', 'min', 'nearest'
         :param str dtype: if None we use var dtype
         :param bool intern: Use extern or intern contour
@@ -2366,19 +2335,25 @@ class EddiesObservations(object):
         .. minigallery:: py_eddy_tracker.EddiesObservations.interp_grid
         """
         if method in ("center", "nearest"):
-            return grid_object.interp(varname, self.longitude, self.latitude, method)
+            x, y = self.longitude, self.latitude
+            if i is not None:
+                x, y = x[i], y[i]
+            return grid_object.interp(varname, x,y , method)
         elif method in ("min", "max", "mean", "count"):
             x0 = grid_object.x_bounds[0]
             x_name, y_name = self.intern(False if intern is None else intern)
             x_ref = ((self.longitude - x0) % 360 + x0 - 180).reshape(-1, 1)
             x, y = (self[x_name] - x_ref) % 360 + x_ref, self[y_name]
+            if i is not None:
+                x, y = x[i], y[i]
             grid = grid_object.grid(varname)
-            result = empty(self.shape, dtype=grid.dtype if dtype is None else dtype)
+            result = empty(x.shape[0], dtype=grid.dtype if dtype is None else dtype)
             min_method = method == "min"
             grid_stat(
                 grid_object.x_c,
                 grid_object.y_c,
                 -grid if min_method else grid,
+                grid.mask,
                 x,
                 y,
                 result,
@@ -2545,13 +2520,14 @@ def grid_box_stat(x_c, y_c, grid, mask, x, y, value, circular=False, method=50):
 
 
 @njit(cache=True)
-def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
+def grid_stat(x_c, y_c, grid, mask, x, y, result, circular=False, method="mean"):
     """
     Compute the mean or the max of the grid for each contour
 
     :param array_like x_c: the grid longitude coordinates
     :param array_like y_c: the grid latitude coordinates
     :param array_like grid: grid value
+    :param array[bool] mask: mask for invalid value
     :param array_like x: longitude of contours
     :param array_like y: latitude of contours
     :param array_like result: return values
@@ -2577,9 +2553,12 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
             result[elt] = i.shape[0]
         elif mean_method:
             v_sum = 0
+            nb_ = 0
             for i_, j_ in zip(i, j):
+                if mask[i_, j_]:
+                    continue
                 v_sum += grid[i_, j_]
-            nb_ = i.shape[0]
+                nb_ += 1
             # FIXME : how does it work on grid bound,
             if nb_ == 0:
                 result[elt] = nan
@@ -2588,7 +2567,9 @@ def grid_stat(x_c, y_c, grid, x, y, result, circular=False, method="mean"):
         elif max_method:
             v_max = -1e40
             for i_, j_ in zip(i, j):
-                v_max = max(v_max, grid[i_, j_])
+                values = grid[i_, j_]
+                # FIXME must use mask
+                v_max = max(v_max, values)
             result[elt] = v_max
 
 

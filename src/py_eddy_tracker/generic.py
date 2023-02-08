@@ -3,27 +3,11 @@
 Tool method which use mostly numba
 """
 
-from numba import njit, prange, types as numba_types
-from numpy import (
-    absolute,
-    arcsin,
-    arctan2,
-    bool_,
-    cos,
-    empty,
-    floor,
-    histogram,
-    interp,
-    isnan,
-    linspace,
-    nan,
-    ones,
-    pi,
-    radians,
-    sin,
-    where,
-    zeros,
-)
+from numba import njit, prange
+from numba import types as numba_types
+from numpy import (absolute, arcsin, arctan2, bool_, cos, empty, floor,
+                   histogram, interp, isnan, linspace, nan, ones, pi, radians,
+                   sin, where, zeros)
 
 
 @njit(cache=True)
@@ -426,7 +410,7 @@ def split_line(x, y, i):
     """
     nb_jump = len(where(i[1:] - i[:-1] != 0)[0])
     nb_value = x.shape[0]
-    final_size = (nb_jump - 1) + nb_value
+    final_size = nb_jump + nb_value
     new_x = empty(final_size, dtype=x.dtype)
     new_y = empty(final_size, dtype=y.dtype)
     new_j = 0

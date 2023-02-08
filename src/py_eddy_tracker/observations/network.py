@@ -2,37 +2,26 @@
 """
 Class to create network of observations
 """
-from glob import glob
 import logging
 import time
+from glob import glob
 
 import netCDF4
-from numba import njit, types as nb_types
-from numba.typed import List
-from numpy import (
-    arange,
-    array,
-    bincount,
-    bool_,
-    concatenate,
-    empty,
-    nan,
-    ones,
-    percentile,
-    uint16,
-    uint32,
-    unique,
-    where,
-    zeros,
-)
 import zarr
+from numba import njit
+from numba import types as nb_types
+from numba.typed import List
+from numpy import (arange, array, bincount, bool_, concatenate, empty, nan,
+                   ones, percentile, uint16, uint32, unique, where, zeros)
 
 from ..dataset.grid import GridCollection
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
-from .groups import GroupEddiesObservations, get_missing_indices, particle_candidate
+from .groups import (GroupEddiesObservations, get_missing_indices,
+                     particle_candidate)
 from .observation import EddiesObservations
-from .tracking import TrackEddiesObservations, track_loess_filter, track_median_filter
+from .tracking import (TrackEddiesObservations, track_loess_filter,
+                       track_median_filter)
 
 logger = logging.getLogger("pet")
 
@@ -283,6 +272,15 @@ class NetworkObservations(GroupEddiesObservations):
         :param int nb_day_min: Minimal number of days covered by one network, if negative -> not used
         :param int nb_day_max: Maximal number of days covered by one network, if negative -> not used
         """
+        return self.extract_with_mask(self.mask_longer_than(nb_day_min, nb_day_max))
+
+    def mask_longer_than(self, nb_day_min=-1, nb_day_max=-1):
+        """
+        Select network on time duration
+
+        :param int nb_day_min: Minimal number of days covered by one network, if negative -> not used
+        :param int nb_day_max: Maximal number of days covered by one network, if negative -> not used
+        """
         if nb_day_max < 0:
             nb_day_max = 1000000000000
         mask = zeros(self.shape, dtype="bool")
@@ -293,7 +291,7 @@ class NetworkObservations(GroupEddiesObservations):
                 continue
             if nb_day_min <= (ptp(t[i]) + 1) <= nb_day_max:
                 mask[i] = True
-        return self.extract_with_mask(mask)
+        return mask
 
     @classmethod
     def from_split_network(cls, group_dataset, indexs, **kwargs):
@@ -800,7 +798,7 @@ class NetworkObservations(GroupEddiesObservations):
         if field is not None:
             field = self.parse_varname(field)
         for i, b0, b1 in self.iter_on("segment"):
-            x = self.time[i]
+            x = self.time_datetime64[i]
             if x.shape[0] == 0:
                 continue
             if field is None:
@@ -831,7 +829,7 @@ class NetworkObservations(GroupEddiesObservations):
 
         # TODO : fill mappables dict
         y_seg = dict()
-        _time = self.time
+        _time = self.time_datetime64
 
         if field is not None and method != "all":
             for i, b0, _ in self.iter_on("segment"):
@@ -1011,7 +1009,7 @@ class NetworkObservations(GroupEddiesObservations):
         if "c" not in kwargs:
             v = self.parse_varname(name)
             kwargs["c"] = v * factor
-        mappables["scatter"] = ax.scatter(self.time, y, **kwargs)
+        mappables["scatter"] = ax.scatter(self.time_datetime64, y, **kwargs)
         return mappables
 
     def event_map(self, ax, **kwargs):
@@ -1244,7 +1242,7 @@ class NetworkObservations(GroupEddiesObservations):
 
     def networks(self, id_networks):
         return self.extract_with_mask(
-            generate_mask_from_ids(id_networks, self.track.size, *self.index_network)
+            generate_mask_from_ids(array(id_networks), self.track.size, *self.index_network)
         )
 
     @property
@@ -1423,10 +1421,10 @@ class NetworkObservations(GroupEddiesObservations):
         :param dict kwargs: keyword arguments for Axes.plot
         :return: a list of matplotlib mappables
         """
-        nb_colors = 0
-        if color_cycle is not None:
-            kwargs = kwargs.copy()
-            nb_colors = len(color_cycle)
+        kwargs = kwargs.copy()
+        if color_cycle is None:
+            color_cycle = self.COLORS
+        nb_colors = len(color_cycle)
         mappables = list()
         if "label" in kwargs:
             kwargs["label"] = self.format_label(kwargs["label"])

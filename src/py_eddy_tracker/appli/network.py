@@ -129,6 +129,9 @@ def subset_network():
         help="Remove trash (network id == 0)",
     )
     parser.add_argument(
+        "-i", "--ids", nargs="+", type=int, help="List of network which will be extract"
+    )
+    parser.add_argument(
         "-p",
         "--period",
         nargs=2,
@@ -138,6 +141,8 @@ def subset_network():
     )
     args = parser.parse_args()
     n = NetworkObservations.load_file(args.input, raw_data=True)
+    if args.ids is not None:
+        n = n.networks(args.ids)
     if args.length is not None:
         n = n.longer_than(*args.length)
     if args.remove_dead_end is not None:
