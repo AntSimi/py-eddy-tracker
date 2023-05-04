@@ -2,20 +2,45 @@
 """
 Class to load and manipulate RegularGrid and UnRegularGrid
 """
-import logging
 from datetime import datetime
+import logging
 
 from cv2 import filter2D
 from matplotlib.path import Path as BasePath
 from netCDF4 import Dataset
-from numba import njit, prange
-from numba import types as numba_types
-from numpy import (arange, array, ceil, concatenate, cos, deg2rad, empty,
-                   errstate, exp, float_, floor, histogram2d, int_, interp,
-                   isnan, linspace, ma)
-from numpy import mean as np_mean
-from numpy import (meshgrid, nan, nanmean, ones, percentile, pi, radians,
-                   round_, sin, sinc, where, zeros)
+from numba import njit, prange, types as numba_types
+from numpy import (
+    arange,
+    array,
+    ceil,
+    concatenate,
+    cos,
+    deg2rad,
+    empty,
+    errstate,
+    exp,
+    float_,
+    floor,
+    histogram2d,
+    int_,
+    interp,
+    isnan,
+    linspace,
+    ma,
+    mean as np_mean,
+    meshgrid,
+    nan,
+    nanmean,
+    ones,
+    percentile,
+    pi,
+    radians,
+    round_,
+    sin,
+    sinc,
+    where,
+    zeros,
+)
 from pint import UnitRegistry
 from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.ndimage import gaussian_filter
@@ -26,13 +51,25 @@ from scipy.special import j1
 from .. import VAR_DESCR
 from ..data import get_demo_path
 from ..eddy_feature import Amplitude, Contours
-from ..generic import (bbox_indice_regular, coordinates_to_local, distance,
-                       interp2d_geo, local_to_coordinates, nearest_grd_indice,
-                       uniform_resample)
+from ..generic import (
+    bbox_indice_regular,
+    coordinates_to_local,
+    distance,
+    interp2d_geo,
+    local_to_coordinates,
+    nearest_grd_indice,
+    uniform_resample,
+)
 from ..observations.observation import EddiesObservations
-from ..poly import (create_vertice, fit_circle, get_pixel_in_regular,
-                    poly_area, poly_contain_poly, visvalingam,
-                    winding_number_poly)
+from ..poly import (
+    create_vertice,
+    fit_circle,
+    get_pixel_in_regular,
+    poly_area,
+    poly_contain_poly,
+    visvalingam,
+    winding_number_poly,
+)
 
 logger = logging.getLogger("pet")
 
@@ -86,7 +123,7 @@ def value_on_regular_contour(x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size
 
 @njit(cache=True)
 def mean_on_regular_contour(
-    x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size=None, nan_remove=False
+    x_g, y_g, z_g, m_g, vertices, num_fac=2, fixed_size=-1, nan_remove=False
 ):
     x_val, y_val = vertices[:, 0], vertices[:, 1]
     x_new, y_new = uniform_resample(x_val, y_val, num_fac, fixed_size)
@@ -406,8 +443,8 @@ class GridDataset(object):
         x_name, y_name = self.coordinates
         if self.is_centered:
             # logger.info("Grid center")
-            self.x_c = self.vars[x_name].astype("float64")
-            self.y_c = self.vars[y_name].astype("float64")
+            self.x_c = array(self.vars[x_name].astype("float64"))
+            self.y_c = array(self.vars[y_name].astype("float64"))
 
             self.x_bounds = concatenate((self.x_c, (2 * self.x_c[-1] - self.x_c[-2],)))
             self.y_bounds = concatenate((self.y_c, (2 * self.y_c[-1] - self.y_c[-2],)))
@@ -419,8 +456,8 @@ class GridDataset(object):
             self.y_bounds[-1] -= d_y[-1] / 2
 
         else:
-            self.x_bounds = self.vars[x_name].astype("float64")
-            self.y_bounds = self.vars[y_name].astype("float64")
+            self.x_bounds = array(self.vars[x_name].astype("float64"))
+            self.y_bounds = array(self.vars[y_name].astype("float64"))
 
             if len(self.x_dim) == 1:
                 self.x_c = self.x_bounds.copy()
@@ -757,7 +794,7 @@ class GridDataset(object):
 
                     # Test of the rotating sense: cyclone or anticyclone
                     if has_value(
-                        data, i_x_in, i_y_in, cvalues, below=anticyclonic_search
+                        data.data, i_x_in, i_y_in, cvalues, below=anticyclonic_search
                     ):
                         continue
 
@@ -788,7 +825,6 @@ class GridDataset(object):
                         contour.reject = 4
                         continue
                     if reset_centroid:
-
                         if self.is_circular():
                             centi = self.normalize_x_indice(reset_centroid[0])
                         else:
@@ -1285,8 +1321,8 @@ class RegularGridDataset(GridDataset):
     def clean_land(self, name):
         """Function to remove all land pixel"""
         mask_land = self.__class__(get_demo_path("mask_1_60.nc"), "lon", "lat")
-        x,y = meshgrid(self.x_c, self.y_c)
-        m = mask_land.interp('mask', x.reshape(-1), y.reshape(-1), 'nearest')
+        x, y = meshgrid(self.x_c, self.y_c)
+        m = mask_land.interp("mask", x.reshape(-1), y.reshape(-1), "nearest")
         data = self.grid(name)
         self.vars[name] = ma.array(data, mask=m.reshape(x.shape).T)
 
@@ -1310,7 +1346,7 @@ class RegularGridDataset(GridDataset):
         min_wave_length = max(step_x_km, step_y_km) * 2
         if wave_length < min_wave_length:
             logger.error(
-                "wave_length too short for resolution, must be > %d km",
+                "Wave_length too short for resolution, must be > %d km",
                 ceil(min_wave_length),
             )
             raise Exception()
@@ -1359,6 +1395,24 @@ class RegularGridDataset(GridDataset):
         )
         kernel = sinc(dist_norm / order) * sinc(dist_norm)
         kernel[dist_norm > order] = 0
+        return self.finalize_kernel(kernel, order, half_x_pt, half_y_pt)
+
+    def kernel_loess(self, lat, wave_length, order=1):
+        """
+        https://fr.wikipedia.org/wiki/R%C3%A9gression_locale
+        """
+        order = self.check_order(order)
+        half_x_pt, half_y_pt, dist_norm = self.estimate_kernel_shape(
+            lat, wave_length, order
+        )
+
+        def inc_func(xdist):
+            f = zeros(xdist.size)
+            f[abs(xdist) < 1] = 1
+            return f
+
+        kernel = (1 - abs(dist_norm) ** 3) ** 3
+        kernel[abs(dist_norm) > order] = 0
         return self.finalize_kernel(kernel, order, half_x_pt, half_y_pt)
 
     def kernel_bessel(self, lat, wave_length, order=1):
@@ -1638,11 +1692,13 @@ class RegularGridDataset(GridDataset):
                 data1[-schema:] = nan
                 data2[:schema] = nan
 
-        d = self.EARTH_RADIUS * 2 * pi / 360 * 2 * schema
+        # Distance for one degree
+        d = self.EARTH_RADIUS * 2 * pi / 360
+        # Mulitply by 2 step
         if vertical:
-            d *= self.ystep
+            d *= self.ystep * 2 * schema
         else:
-            d *= self.xstep * cos(deg2rad(self.y_c))
+            d *= self.xstep * cos(deg2rad(self.y_c)) * 2 * schema
         return (data1 - data2) / d
 
     def compute_stencil(
@@ -1855,7 +1911,7 @@ class RegularGridDataset(GridDataset):
         return mean_on_regular_contour(
             self.x_c,
             self.y_c,
-            self._speed_ev,
+            self._speed_ev.data,
             self._speed_ev.mask,
             contour.vertices,
             nan_remove=True,
@@ -1945,7 +2001,7 @@ class RegularGridDataset(GridDataset):
         g = self.grid(grid_name)
         m = self.get_mask(g)
         return interp2d_geo(
-            self.x_c, self.y_c, g, m, lons, lats, nearest=method == "nearest"
+            self.x_c, self.y_c, g.data, m, lons, lats, nearest=method == "nearest"
         )
 
     def uv_for_advection(
@@ -1981,7 +2037,7 @@ class RegularGridDataset(GridDataset):
             u = -u
             v = -v
         m = u.mask + v.mask
-        return u, v, m
+        return u.data, v.data, m
 
     def advect(self, x, y, u_name, v_name, nb_step=10, rk4=True, **kw):
         """

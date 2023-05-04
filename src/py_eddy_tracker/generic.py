@@ -3,11 +3,27 @@
 Tool method which use mostly numba
 """
 
-from numba import njit, prange
-from numba import types as numba_types
-from numpy import (absolute, arcsin, arctan2, bool_, cos, empty, floor,
-                   histogram, interp, isnan, linspace, nan, ones, pi, radians,
-                   sin, where, zeros)
+from numba import njit, prange, types as numba_types
+from numpy import (
+    absolute,
+    arcsin,
+    arctan2,
+    bool_,
+    cos,
+    empty,
+    floor,
+    histogram,
+    interp,
+    isnan,
+    linspace,
+    nan,
+    ones,
+    pi,
+    radians,
+    sin,
+    where,
+    zeros,
+)
 
 
 @njit(cache=True)
@@ -285,14 +301,14 @@ def interp2d_bilinear(x_g, y_g, z_g, m_g, x, y):
 
 
 @njit(cache=True, fastmath=True)
-def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
+def uniform_resample(x_val, y_val, num_fac=2, fixed_size=-1):
     """
     Resample contours to have (nearly) equal spacing.
 
     :param array_like x_val: input x contour coordinates
     :param array_like y_val: input y contour coordinates
     :param int num_fac: factor to increase lengths of output coordinates
-    :param int,None fixed_size: if defined, will be used to set sampling
+    :param int fixed_size: if > -1, will be used to set sampling
     """
     nb = x_val.shape[0]
     # Get distances
@@ -303,7 +319,7 @@ def uniform_resample(x_val, y_val, num_fac=2, fixed_size=None):
     dist[1:][dist[1:] < 1e-3] = 1e-3
     dist = dist.cumsum()
     # Get uniform distances
-    if fixed_size is None:
+    if fixed_size == -1:
         fixed_size = dist.size * num_fac
     d_uniform = linspace(0, dist[-1], fixed_size)
     x_new = interp(d_uniform, dist, x_val)

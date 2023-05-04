@@ -409,14 +409,14 @@ class Correspondances(list):
         logger.debug('Create Dimensions "Nstep" : %d', nb_step)
         handler.createDimension("Nstep", nb_step)
         var_file_in = handler.createVariable(
-            zlib=True,
+            zlib=False,
             complevel=1,
             varname="FileIn",
             datatype="S1024",
             dimensions="Nstep",
         )
         var_file_out = handler.createVariable(
-            zlib=True,
+            zlib=False,
             complevel=1,
             varname="FileOut",
             datatype="S1024",

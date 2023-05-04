@@ -2,38 +2,77 @@
 """
 Base class to manage eddy observation
 """
-import logging
 from datetime import datetime
 from io import BufferedReader, BytesIO
+import logging
 from tarfile import ExFileObject
 from tokenize import TokenError
 
-import packaging.version
-import zarr
+from Polygon import Polygon
 from matplotlib.cm import get_cmap
 from matplotlib.collections import LineCollection, PolyCollection
 from matplotlib.colors import Normalize
 from netCDF4 import Dataset
-from numba import njit
-from numba import types as numba_types
-from numpy import (absolute, arange, array, array_equal, ceil, concatenate,
-                   cos, datetime64, digitize, empty, errstate, floor,
-                   histogram, histogram2d, in1d, isnan, linspace, ma, nan,
-                   ndarray, ones, percentile, radians, sin, unique, where,
-                   zeros)
+from numba import njit, types as numba_types
+from numpy import (
+    absolute,
+    arange,
+    array,
+    array_equal,
+    ceil,
+    concatenate,
+    cos,
+    datetime64,
+    digitize,
+    empty,
+    errstate,
+    floor,
+    histogram,
+    histogram2d,
+    in1d,
+    isnan,
+    linspace,
+    ma,
+    nan,
+    ndarray,
+    ones,
+    percentile,
+    radians,
+    sin,
+    unique,
+    where,
+    zeros,
+)
+import packaging.version
 from pint import UnitRegistry
 from pint.errors import UndefinedUnitError
-from Polygon import Polygon
+import zarr
 
 from .. import VAR_DESCR, VAR_DESCR_inv, __version__
-from ..generic import (bbox_indice_regular, build_index, distance,
-                       distance_grid, flatten_line_matrix, hist_numba,
-                       local_to_coordinates, reverse_index, window_index,
-                       wrap_longitude)
-from ..poly import (bbox_intersection, close_center, convexs,
-                    create_meshed_particles, create_vertice,
-                    get_pixel_in_regular, insidepoly, poly_indexs, reduce_size,
-                    vertice_overlap)
+from ..generic import (
+    bbox_indice_regular,
+    build_index,
+    distance,
+    distance_grid,
+    flatten_line_matrix,
+    hist_numba,
+    local_to_coordinates,
+    reverse_index,
+    window_index,
+    wrap_longitude,
+)
+from ..poly import (
+    bbox_intersection,
+    close_center,
+    convexs,
+    create_meshed_particles,
+    create_vertice,
+    get_pixel_in_regular,
+    insidepoly,
+    poly_indexs,
+    reduce_size,
+    vertice_overlap,
+)
 
 logger = logging.getLogger("pet")
 
@@ -1808,8 +1847,8 @@ class EddiesObservations(object):
 
     @property
     def time_datetime64(self):
-        dt = (datetime64('1970-01-01') - datetime64('1950-01-01')).astype('i8')
-        return (self.time - dt).astype('datetime64[D]')
+        dt = (datetime64("1970-01-01") - datetime64("1950-01-01")).astype("i8")
+        return (self.time - dt).astype("datetime64[D]")
 
     def time_sub_sample(self, t0, time_step):
         """
@@ -2215,7 +2254,7 @@ class EddiesObservations(object):
             x_ref = ((self.longitude[filter] - x0) % 360 + x0 - 180).reshape(-1, 1)
             x_contour, y_contour = self[x_name][filter], self[y_name][filter]
             grid_count_pixel_in(
-                grid,
+                grid.data,
                 x_contour,
                 y_contour,
                 x_ref,
@@ -2338,7 +2377,7 @@ class EddiesObservations(object):
             x, y = self.longitude, self.latitude
             if i is not None:
                 x, y = x[i], y[i]
-            return grid_object.interp(varname, x,y , method)
+            return grid_object.interp(varname, x, y, method)
         elif method in ("min", "max", "mean", "count"):
             x0 = grid_object.x_bounds[0]
             x_name, y_name = self.intern(False if intern is None else intern)
@@ -2352,7 +2391,7 @@ class EddiesObservations(object):
             grid_stat(
                 grid_object.x_c,
                 grid_object.y_c,
-                -grid if min_method else grid,
+                -grid.data if min_method else grid.data,
                 grid.mask,
                 x,
                 y,

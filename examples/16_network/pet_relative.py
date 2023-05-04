@@ -127,7 +127,9 @@ cb.set_label("Speed radius (km)")
 # Remove dead branch
 # ------------------
 # Remove all tiny segments with less than N obs which didn't join two segments
-n_clean = n.remove_dead_end(nobs=5, ndays=10)
+n_clean = n.copy()
+n_clean.remove_dead_end(nobs=5, ndays=10)
+n_clean = n_clean.remove_trash()
 fig = plt.figure(figsize=(15, 12))
 ax = fig.add_axes([0.04, 0.54, 0.90, 0.40])
 ax.set_title(f"Original network ({n.infos()})")
@@ -261,7 +263,9 @@ for k in range(0, max_order + 1):
 # --------------------
 
 # Get a simplified network
-n = n2.remove_dead_end(nobs=50, recursive=1)
+n = n2.copy()
+n.remove_dead_end(nobs=50, recursive=1)
+n = n.remove_trash()
 n.numbering_segment()
 # %%
 # Only a map can be tricky to understand, with a timeline it's easier!

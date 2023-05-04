@@ -8,7 +8,6 @@ from ..observations.observation import EddiesObservations as Model
 
 
 class CheltonTracker(Model):
-
     __slots__ = tuple()
 
     GROUND = RegularGridDataset(

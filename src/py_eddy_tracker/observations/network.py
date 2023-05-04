@@ -2,26 +2,37 @@
 """
 Class to create network of observations
 """
+from glob import glob
 import logging
 import time
-from glob import glob
 
 import netCDF4
-import zarr
-from numba import njit
-from numba import types as nb_types
+from numba import njit, types as nb_types
 from numba.typed import List
-from numpy import (arange, array, bincount, bool_, concatenate, empty, nan,
-                   ones, percentile, uint16, uint32, unique, where, zeros)
+from numpy import (
+    arange,
+    array,
+    bincount,
+    bool_,
+    concatenate,
+    empty,
+    nan,
+    ones,
+    percentile,
+    uint16,
+    uint32,
+    unique,
+    where,
+    zeros,
+)
+import zarr
 
 from ..dataset.grid import GridCollection
 from ..generic import build_index, wrap_longitude
 from ..poly import bbox_intersection, vertice_overlap
-from .groups import (GroupEddiesObservations, get_missing_indices,
-                     particle_candidate)
+from .groups import GroupEddiesObservations, get_missing_indices, particle_candidate
 from .observation import EddiesObservations
-from .tracking import (TrackEddiesObservations, track_loess_filter,
-                       track_median_filter)
+from .tracking import TrackEddiesObservations, track_loess_filter, track_median_filter
 
 logger = logging.getLogger("pet")
 
@@ -93,7 +104,6 @@ def fix_next_previous_obs(next_obs, previous_obs, flag_virtual):
 
 
 class NetworkObservations(GroupEddiesObservations):
-
     __slots__ = ("_index_network", "_index_segment_track", "_segment_track_array")
     NOGROUP = 0
 
@@ -465,7 +475,6 @@ class NetworkObservations(GroupEddiesObservations):
                 segments_connexion[seg][0] = i_slice
 
             if i_p != -1:
-
                 if p_seg not in segments_connexion:
                     segments_connexion[p_seg] = [None, [], []]
 
@@ -614,7 +623,6 @@ class NetworkObservations(GroupEddiesObservations):
                 segments_connexion[seg][0] = i_slice
 
             if i_p != -1:
-
                 if p_seg not in segments_connexion:
                     segments_connexion[p_seg] = [None, []]
 
@@ -1242,7 +1250,9 @@ class NetworkObservations(GroupEddiesObservations):
 
     def networks(self, id_networks):
         return self.extract_with_mask(
-            generate_mask_from_ids(array(id_networks), self.track.size, *self.index_network)
+            generate_mask_from_ids(
+                array(id_networks), self.track.size, *self.index_network
+            )
         )
 
     @property
@@ -1638,7 +1648,6 @@ class NetworkObservations(GroupEddiesObservations):
         correct_close_events=0,
         remove_dead_end=0,
     ):
-
         """Global function to analyse segments coherence, with network preprocessing.
         :param callable date_function: python function, takes as param `int` (julian day) and return
             data filename associated to the date
@@ -1719,7 +1728,6 @@ class NetworkObservations(GroupEddiesObservations):
         contour_start="speed",
         contour_end="speed",
     ):
-
         """
         Percentage of particules and their targets after backward advection from a specific eddy.
 
@@ -1797,7 +1805,6 @@ class NetworkObservations(GroupEddiesObservations):
         contour_end="speed",
         **kwargs,
     ):
-
         """
         Percentage of particules and their targets after forward advection from a specific eddy.
 
@@ -1885,6 +1892,48 @@ class NetworkObservations(GroupEddiesObservations):
             mask_follow_obs(m, self.next_obs, self.time, in2, dt)
             mask_follow_obs(m, self.previous_obs, self.time, i_target, dt)
         return m
+
+    def swap_track(
+        self,
+        length_main_max_after_event=2,
+        length_secondary_min_after_event=10,
+        delta_pct_max=-0.2,
+    ):
+        events = self.splitting_event(triplet=True, only_index=True)
+        count = 0
+        for i_main, i1, i2 in zip(*events):
+            seg_main, _, seg2 = (
+                self.segment_track_array[i_main],
+                self.segment_track_array[i1],
+                self.segment_track_array[i2],
+            )
+            i_start, i_end, i0 = self.index_segment_track
+            # For splitting
+            last_index_main = i_end[seg_main - i0] - 1
+            last_index_secondary = i_end[seg2 - i0] - 1
+            last_main_next_obs = self.next_obs[last_index_main]
+            t_event, t_main_end, t_secondary_start, t_secondary_end = (
+                self.time[i_main],
+                self.time[last_index_main],
+                self.time[i2],
+                self.time[last_index_secondary],
+            )
+            dt_main, dt_secondary = (
+                t_main_end - t_event,
+                t_secondary_end - t_secondary_start,
+            )
+            delta_cost = self.previous_cost[i2] - self.previous_cost[i1]
+            if (
+                dt_main <= length_main_max_after_event
+                and dt_secondary >= length_secondary_min_after_event
+                and last_main_next_obs == -1
+                and delta_cost > delta_pct_max
+            ):
+                self.segment[i1 : last_index_main + 1] = self.segment[i2]
+                self.segment[i2 : last_index_secondary + 1] = self.segment[i_main]
+                count += 1
+        logger.info("%d segmnent swap on %d", count, len(events[0]))
+        return self.sort()
 
 
 class Network:

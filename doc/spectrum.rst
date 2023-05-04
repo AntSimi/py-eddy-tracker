@@ -28,7 +28,6 @@ Compute and display spectrum
     ax.set_title("Spectrum")
     ax.set_xlabel("km")
     for name_area, area in areas.items():
-
         lon_spec, lat_spec = raw.spectrum_lonlat("adt", area=area)
         mappable = ax.loglog(*lat_spec, label="lat %s raw" % name_area)[0]
         ax.loglog(

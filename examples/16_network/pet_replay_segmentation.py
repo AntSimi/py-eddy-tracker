@@ -163,7 +163,6 @@ n_copy.median_filter(2, "time", "next_cost")
 for b0, b1 in [
     (datetime(i, 1, 1), datetime(i, 12, 31)) for i in (2004, 2005, 2006, 2007, 2008)
 ]:
-
     ref, delta = datetime(1950, 1, 1), 20
     b0_, b1_ = (b0 - ref).days, (b1 - ref).days
     ax = timeline_axes()

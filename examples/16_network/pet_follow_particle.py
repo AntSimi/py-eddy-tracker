@@ -41,7 +41,8 @@ class VideoAnimation(FuncAnimation):
 # %%
 n = NetworkObservations.load_file(get_demo_path("network_med.nc")).network(651)
 n = n.extract_with_mask((n.time >= 20180) * (n.time <= 20269))
-n = n.remove_dead_end(nobs=0, ndays=10)
+n.remove_dead_end(nobs=0, ndays=10)
+n = n.remove_trash()
 n.numbering_segment()
 c = GridCollection.from_netcdf_cube(
     get_demo_path("dt_med_allsat_phy_l4_2005T2.nc"),

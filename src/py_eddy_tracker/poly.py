@@ -5,12 +5,10 @@ Method for polygon
 
 import heapq
 
-from numba import njit, prange
-from numba import types as numba_types
-from numpy import (arctan, array, concatenate, empty, nan, ones, pi, where,
-                   zeros)
-from numpy.linalg import lstsq
 from Polygon import Polygon
+from numba import njit, prange, types as numba_types
+from numpy import arctan, array, concatenate, empty, nan, ones, pi, where, zeros
+from numpy.linalg import lstsq
 
 from .generic import build_index
 
