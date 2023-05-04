@@ -2,11 +2,11 @@
 """
 Class to store link between observations
 """
-
 from datetime import datetime, timedelta
 import json
 import logging
 import platform
+from tarfile import ExFileObject
 
 from netCDF4 import Dataset, default_fillvals
 from numba import njit, types as numba_types
@@ -375,7 +375,10 @@ class Correspondances(list):
         # We begin with second file, first one is in previous
         for file_name in self.datasets[first_dataset:]:
             self.swap_dataset(file_name, **kwargs)
-            logger.info("%s match with previous state", file_name)
+            filename_ = (
+                file_name.filename if isinstance(file_name, ExFileObject) else file_name
+            )
+            logger.info("%s match with previous state", filename_)
             logger.debug("%d obs to match", len(self.current_obs))
 
             nb_real_obs = len(self.previous_obs)

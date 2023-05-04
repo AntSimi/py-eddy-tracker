@@ -80,6 +80,7 @@ logger = logging.getLogger("pet")
 _software_version_reduced = packaging.version.Version(
     "{v.major}.{v.minor}".format(v=packaging.version.parse(__version__))
 )
+_display_check_warning = True
 
 
 def _check_versions(version):
@@ -90,7 +91,8 @@ def _check_versions(version):
     :param version: string version of software used to create the file. If None, version was not provided
     :type version: str, None
     """
-
+    if not _display_check_warning:
+        return
     file_version = packaging.version.parse(version) if version is not None else None
     if file_version is None or file_version < _software_version_reduced:
         logger.warning(
@@ -774,7 +776,7 @@ class EddiesObservations(object):
             zarr_file = filename_.endswith(end)
         else:
             zarr_file = False
-        logger.info(f"loading file '{filename}'")
+        logger.info(f"loading file '{filename_}'")
         if zarr_file:
             return cls.load_from_zarr(filename, **kwargs)
         else:
