@@ -1,11 +1,11 @@
 matplotlib
 opencv-python
-pint==0.18
+pint
 polygon3
 pyyaml
 requests
 scipy
 zarr
-netCDF4<1.6
-numpy<1.23
-numba<0.56
+netCDF4
+numpy
+numba

@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - python=3.10
+  - pip
   - ffmpeg
   - pip:
     - -r requirements.txt

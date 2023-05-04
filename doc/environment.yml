@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.10
   - ffmpeg
+  - pip
   - pip:
     - sphinx-gallery
     - sphinx_rtd_theme
