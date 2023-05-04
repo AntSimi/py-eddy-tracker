@@ -10,7 +10,7 @@ with open("requirements.txt", "r") as fh:
 
 setup(
     name="pyEddyTracker",
-    python_requires=">=3.7",
+    python_requires=">=3.10",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     description="Py-Eddy-Tracker libraries",
