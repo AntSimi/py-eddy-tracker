@@ -477,22 +477,22 @@ def vertice_overlap(
         if intersection == 0:
             cost[i] = 0
             continue
-        p0_area, p1_area = p0.area(), p1.area()
+        p0_area_, p1_area_ = p0.area(), p1.area()
         if minimal_area:
-            cost_ = intersection / min(p0_area, p1_area)
+            cost_ = intersection / min(p0_area_, p1_area_)
         # we divide intersection with p1
         elif p1_area:
-            cost_ = intersection / p1_area
+            cost_ = intersection / p1_area_
         # we divide intersection with polygon merging result from 0 to 1
         else:
-            cost_ = intersection / (p0_area + p1_area - intersection)
+            cost_ = intersection / (p0_area_ + p1_area_ - intersection)
         if cost_ >= min_overlap:
             cost[i] = cost_
         else:
             if (
                 hybrid_area
                 and cost_ != 0
-                and (intersection / min(p0_area, p1_area)) > 0.99
+                and (intersection / min(p0_area_, p1_area_)) > 0.99
             ):
                 cost[i] = cost_
             else:
