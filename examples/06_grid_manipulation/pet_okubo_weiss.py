@@ -2,7 +2,7 @@ r"""
 Get Okubo Weis
 ==============
 
-.. math:: OW = S_n^2 + S_s^2 + \omega^2
+.. math:: OW = S_n^2 + S_s^2 - \omega^2
 
 with normal strain (:math:`S_n`), shear strain (:math:`S_s`) and vorticity (:math:`\omega`)
 
