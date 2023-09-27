@@ -38,6 +38,7 @@ from numpy import (
     round_,
     sin,
     sinc,
+    sqrt,
     where,
     zeros,
 )
@@ -1919,7 +1920,8 @@ class RegularGridDataset(GridDataset):
 
     def init_speed_coef(self, uname="u", vname="v"):
         """Draft"""
-        self._speed_ev = (self.grid(uname) ** 2 + self.grid(vname) ** 2) ** 0.5
+        u, v = self.grid(uname), self.grid(vname)
+        self._speed_ev = sqrt(u * u + v * v)
 
     def display(self, ax, name, factor=1, ref=None, **kwargs):
         """
