@@ -1,6 +1,8 @@
 version: 2
 conda:
   environment: doc/environment.yml
+build:
+  os: ubuntu-lts-latest
 python:
    install:
      - method: setuptools
