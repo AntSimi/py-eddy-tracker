@@ -4,8 +4,10 @@ conda:
 build:
   os: ubuntu-lts-latest
   tools:
-    python: "3.10"
+    python: "mambaforge-latest"
 python:
   install:
     - method: setuptools
       path: .
+sphinx:
+  configuration: docs/conf.py
