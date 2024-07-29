@@ -32,13 +32,13 @@ __version__ = get_versions()["version"]
 del get_versions
 
 
-def start_logger():
+def start_logger(color=True):
     FORMAT_LOG = "%(levelname)-8s %(asctime)s %(module)s.%(funcName)s :\n\t%(message)s"
     logger = logging.getLogger("pet")
     if len(logger.handlers) == 0:
         # set up logging to CONSOLE
         console = logging.StreamHandler()
-        console.setFormatter(ColoredFormatter(FORMAT_LOG))
+        console.setFormatter(ColoredFormatter(FORMAT_LOG, color=color))
         # add the handler to the root logger
         logger.addHandler(console)
     return logger
@@ -53,13 +53,14 @@ class ColoredFormatter(logging.Formatter):
         DEBUG="\033[34m\t",
     )
 
-    def __init__(self, message):
+    def __init__(self, message, color=True):
         super().__init__(message)
+        self.with_color = color
 
     def format(self, record):
         color = self.COLOR_LEVEL.get(record.levelname, "")
         color_reset = "\033[0m"
-        model = color + "%s" + color_reset
+        model = (color + "%s" + color_reset) if self.with_color else "%s"
         record.msg = model % record.msg
         record.funcName = model % record.funcName
         record.module = model % record.module
@@ -696,3 +697,6 @@ for key in VAR_DESCR.keys():
     VAR_DESCR_inv[VAR_DESCR[key]["nc_name"]] = key
     for key_old in VAR_DESCR[key].get("old_nc_name", list()):
         VAR_DESCR_inv[key_old] = key
+
+from . import _version
+__version__ = _version.get_versions()['version']
