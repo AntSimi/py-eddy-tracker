@@ -1670,7 +1670,7 @@ class RegularGridDataset(GridDataset):
                 (lat_content[0], lat_content[1] / ref_lat_content[1]),
             )
 
-    def compute_finite_difference(self, data, schema=1, mode="reflect", vertical=False):
+    def compute_finite_difference(self, data, schema=1, mode="reflect", vertical=False, second=False):
         if not isinstance(schema, int) and schema < 1:
             raise Exception("schema must be a positive int")
 
@@ -1694,13 +1694,16 @@ class RegularGridDataset(GridDataset):
                 data2[:schema] = nan
 
         # Distance for one degree
-        d = self.EARTH_RADIUS * 2 * pi / 360
+        d = self.EARTH_RADIUS * 2 * pi / 360 * 2 * schema
         # Mulitply by 2 step
         if vertical:
-            d *= self.ystep * 2 * schema
+            d *= self.ystep 
         else:
-            d *= self.xstep * cos(deg2rad(self.y_c)) * 2 * schema
-        return (data1 - data2) / d
+            d *= self.xstep * cos(deg2rad(self.y_c))
+        if second:
+            return (data1 + data2 - 2 * data) / (d ** 2 / 4)
+        else:
+            return (data1 - data2) / d
 
     def compute_stencil(
         self, data, stencil_halfwidth=4, mode="reflect", vertical=False
@@ -1787,13 +1790,14 @@ class RegularGridDataset(GridDataset):
         )
         return ma.array(g, mask=m)
 
-    def add_uv_lagerloef(self, grid_height, uname="u", vname="v", schema=15):
-        self.add_uv(grid_height, uname, vname)
+    def add_uv_lagerloef(self, grid_height, uname="u", vname="v", schema=15, **kwargs):
+        self.add_uv(grid_height, uname, vname, **kwargs)
         latmax = 5
-        _, (i_start, i_end) = self.nearest_grd_indice((0, 0), (-latmax, latmax))
+        _, i_start = self.nearest_grd_indice(0, -latmax)
+        _, i_end = self.nearest_grd_indice(0, latmax)
         sl = slice(i_start, i_end)
         # Divide by sideral day
-        lat = self.y_c[sl]
+        lat = self.y_c
         gob = (
             cos(deg2rad(lat))
             * ones((self.x_c.shape[0], 1))
@@ -1807,39 +1811,26 @@ class RegularGridDataset(GridDataset):
         mode = "wrap" if self.is_circular() else "reflect"
 
         # fill data to compute a finite difference on all point
-        data = self.convolve_filter_with_dynamic_kernel(
-            grid_height,
-            self.kernel_bessel,
-            lat_max=10,
-            wave_length=500,
-            order=1,
-            extend=0.1,
-        )
-        data = self.convolve_filter_with_dynamic_kernel(
-            data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=0.1
-        )
-        data = self.convolve_filter_with_dynamic_kernel(
-            data, self.kernel_bessel, lat_max=10, wave_length=500, order=1, extend=0.1
-        )
+        kw_filter = dict(kernel_func=self.kernel_bessel, order=1, extend=.1)
+        data = self.convolve_filter_with_dynamic_kernel(grid_height, wave_length=500, **kw_filter, lat_max=6+5+2+3)
         v_lagerloef = (
             self.compute_finite_difference(
-                self.compute_finite_difference(data, mode=mode, schema=schema),
-                mode=mode,
-                schema=schema,
-            )[:, sl]
+                self.compute_finite_difference(data, mode=mode, schema=1),
+                vertical=True, schema=1
+            )
             * gob
         )
-        u_lagerloef = (
-            -self.compute_finite_difference(
-                self.compute_finite_difference(data, vertical=True, schema=schema),
-                vertical=True,
-                schema=schema,
-            )[:, sl]
-            * gob
-        )
-        w = 1 - exp(-((lat / 2.2) ** 2))
-        self.vars[vname][:, sl] = self.vars[vname][:, sl] * w + v_lagerloef * (1 - w)
-        self.vars[uname][:, sl] = self.vars[uname][:, sl] * w + u_lagerloef * (1 - w)
+        u_lagerloef = -self.compute_finite_difference(data, vertical=True, schema=schema, second=True) * gob
+
+        v_lagerloef = self.convolve_filter_with_dynamic_kernel(v_lagerloef, wave_length=195, **kw_filter, lat_max=6 + 5 +2)
+        v_lagerloef = self.convolve_filter_with_dynamic_kernel(v_lagerloef, wave_length=416, **kw_filter, lat_max=6 + 5)
+        v_lagerloef = self.convolve_filter_with_dynamic_kernel(v_lagerloef, wave_length=416, **kw_filter, lat_max=6)
+        u_lagerloef = self.convolve_filter_with_dynamic_kernel(u_lagerloef, wave_length=195, **kw_filter, lat_max=6 + 5 +2)
+        u_lagerloef = self.convolve_filter_with_dynamic_kernel(u_lagerloef, wave_length=416, **kw_filter, lat_max=6 + 5)
+        u_lagerloef = self.convolve_filter_with_dynamic_kernel(u_lagerloef, wave_length=416, **kw_filter, lat_max=6)
+        w = 1 - exp(-((lat[sl] / 2.2) ** 2))
+        self.vars[vname][:, sl] = self.vars[vname][:, sl] * w + v_lagerloef[:, sl] * (1 - w)
+        self.vars[uname][:, sl] = self.vars[uname][:, sl] * w + u_lagerloef[:, sl] * (1 - w)
 
     def add_uv(self, grid_height, uname="u", vname="v", stencil_halfwidth=4):
         r"""Compute a u and v grid
