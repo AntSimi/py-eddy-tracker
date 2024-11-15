@@ -1,11 +1,11 @@
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - python=3.10
   - ffmpeg
   - pip
   - pip:
+    - -r ../requirements.txt
     - sphinx-gallery
     - sphinx_rtd_theme
     - sphinx>=3.1
