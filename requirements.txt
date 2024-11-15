@@ -1,11 +1,11 @@
-matplotlib
+matplotlib < 3.8 # need an update of contour management
 opencv-python
 pint
 polygon3
 pyyaml
 requests
 scipy
-zarr
+zarr < 3.0
 netCDF4
 numpy
 numba
