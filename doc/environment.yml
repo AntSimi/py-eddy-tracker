@@ -6,6 +6,7 @@ dependencies:
   - pip
   - pip:
     - -r ../requirements.txt
+    - git+https://github.com/AntSimi/py-eddy-tracker-sample-id.git
     - sphinx-gallery
     - sphinx_rtd_theme
     - sphinx>=3.1
