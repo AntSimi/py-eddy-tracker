@@ -7,5 +7,5 @@ build:
     python: "mambaforge-latest"
 python:
   install:
-    - method: setuptools
+    - method: pip
       path: .
