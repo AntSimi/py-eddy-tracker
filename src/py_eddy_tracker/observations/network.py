@@ -9,6 +9,7 @@ import time
 import netCDF4
 from numba import njit, types as nb_types
 from numba.typed import List
+import numpy as np
 from numpy import (
     arange,
     array,
@@ -124,7 +125,7 @@ class NetworkObservations(GroupEddiesObservations):
             f"Atlas with {self.nb_network} networks ({self.nb_network / period:0.0f} networks/year),"
             f" {self.nb_segment} segments ({self.nb_segment / period:0.0f} segments/year), {len(self)} observations ({len(self) / period:0.0f} observations/year)",
             f"    {m_event.size} merging ({m_event.size / period:0.0f} merging/year), {s_event.size} splitting ({s_event.size / period:0.0f} splitting/year)",
-            f"    with {(nb_by_network > big).sum()} network with more than {big} obs and the biggest have {nb_by_network.max()} observations ({nb_by_network[nb_by_network> big].sum()} observations cumulate)",
+            f"    with {(nb_by_network > big).sum()} network with more than {big} obs and the biggest have {nb_by_network.max()} observations ({nb_by_network[nb_by_network > big].sum()} observations cumulate)",
             f"    {nb_trash} observations in trash",
         ]
         return "\n".join(infos)
@@ -224,6 +225,12 @@ class NetworkObservations(GroupEddiesObservations):
         else:
             i = id_networks - self.index_network[2]
             return self.index_network[1][i] - self.index_network[0][i]
+
+    def networks_period(self):
+        """
+        Return period for each network
+        """
+        return get_period_with_index(self.time, *self.index_network[:2])
 
     def unique_segment_to_id(self, id_unique):
         """Return id network and id segment for a unique id
@@ -1788,8 +1795,8 @@ class NetworkObservations(GroupEddiesObservations):
             )
             logger.info(
                 (
-                    f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
-                    f" : {time.time()-_timestamp:5.2f}s"
+                    f"coherence {_t} / {range_end - 1} ({(_t - range_start) / (range_end - range_start - 1):.1%})"
+                    f" : {time.time() - _timestamp:5.2f}s"
                 )
             )
 
@@ -1865,8 +1872,8 @@ class NetworkObservations(GroupEddiesObservations):
             )
             logger.info(
                 (
-                    f"coherence {_t} / {range_end-1} ({(_t - range_start) / (range_end - range_start-1):.1%})"
-                    f" : {time.time()-_timestamp:5.2f}s"
+                    f"coherence {_t} / {range_end - 1} ({(_t - range_start) / (range_end - range_start - 1):.1%})"
+                    f" : {time.time() - _timestamp:5.2f}s"
                 )
             )
         return itf_final, ptf_final
@@ -2065,7 +2072,7 @@ class Network:
         nb_alone, nb_obs, nb_gr = (gr == self.NOGROUP).sum(), len(gr), len(unique(gr))
         logger.info(
             f"{nb_alone} alone / {nb_obs} obs, {nb_gr} groups, "
-            f"{nb_alone *100./nb_obs:.2f} % alone, {(nb_obs - nb_alone) / (nb_gr - 1):.1f} obs/group"
+            f"{nb_alone * 100. / nb_obs:.2f} % alone, {(nb_obs - nb_alone) / (nb_gr - 1):.1f} obs/group"
         )
         return gr
 
@@ -2316,3 +2323,18 @@ def mask_follow_obs(m, next_obs, time, indexs, dt=3):
             m[i_next] = True
             i_next = next_obs[i_next]
             dt_ = abs(time[i_next] - t0)
+
+
+@njit(cache=True)
+def get_period_with_index(t, i0, i1):
+    """Return peek to peek cover by each slice define by i0 and i1
+
+    :param array t: array which contain values to estimate spread
+    :param array i0: index which determine start of slice
+    :param array i1: index which determine end of slice
+    :return array: Peek to peek of t
+    """
+    periods = np.empty(i0.size, t.dtype)
+    for i in range(i0.size):
+        periods[i] = t[i0[i] : i1[i]].ptp()
+    return periods
