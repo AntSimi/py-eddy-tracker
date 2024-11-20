@@ -29,7 +29,6 @@ def get_remote_demo_sample(path):
     else:
         try:
             import py_eddy_tracker_sample_id
-            py_eddy_tracker_sample_id.get_remote_demo_sample()
             if path.endswith(".nc"):
                 return py_eddy_tracker_sample_id.get_remote_demo_sample(path)
             content = open(py_eddy_tracker_sample_id.get_remote_demo_sample(f"{path}.tar.xz"), "rb").read()
