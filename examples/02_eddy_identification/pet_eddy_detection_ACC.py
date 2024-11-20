@@ -7,6 +7,7 @@ This script detect eddies on the ADT field, and compute u,v with the method add_
 Two detections are provided : with a filtered ADT and without filtering
 
 """
+
 from datetime import datetime
 
 from matplotlib import pyplot as plt, style
@@ -80,7 +81,7 @@ g.add_uv("adt")
 # Identification
 # ^^^^^^^^^^^^^^
 # Run the identification step with slices of 2 mm
-date = datetime(2016, 5, 15)
+date = datetime(2019, 2, 23)
 kw_ident = dict(
     date=date, step=0.002, shape_error=70, sampling=30, uname="u", vname="v"
 )

@@ -8,6 +8,7 @@ EddyId \
     20160515 adt None None longitude latitude . \
     --cut 800 --fil 1
 """
+
 import io
 import lzma
 from os import path
@@ -26,14 +27,20 @@ def get_remote_demo_sample(path):
         if path.endswith(".nc"):
             return io.BytesIO(content)
     else:
-        if path.endswith(".nc"):
+        try:
+            import py_eddy_tracker_sample_id
+            if path.endswith(".nc"):
+                return py_eddy_tracker_sample_id.get_remote_demo_sample(path)
+            content = open(py_eddy_tracker_sample_id.get_remote_demo_sample(f"{path}.tar.xz"), "rb").read()
+        except:
+            if path.endswith(".nc"):
+                content = requests.get(
+                    f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}"
+                ).content
+                return io.BytesIO(content)
             content = requests.get(
-                f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}"
+                f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}.tar.xz"
             ).content
-            return io.BytesIO(content)
-        content = requests.get(
-            f"https://github.com/AntSimi/py-eddy-tracker-sample-id/raw/master/{path}.tar.xz"
-        ).content
 
     # Tar module could manage lzma tar, but it will apply uncompress for each extractfile
     tar = tarfile.open(mode="r", fileobj=io.BytesIO(lzma.decompress(content)))
