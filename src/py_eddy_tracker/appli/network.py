@@ -283,7 +283,7 @@ def run_compare(ref, others):
 def display_compare(ref, others):
     def display(value, ref=None):
         if ref:
-            outs = [f"{v/ref[k] * 100:.1f}% ({v})" for k, v in value.items()]
+            outs = [f"{v / ref[k] * 100:.1f}% ({v})" for k, v in value.items()]
         else:
             outs = value
         return "".join([f"{v:^18}" for v in outs])

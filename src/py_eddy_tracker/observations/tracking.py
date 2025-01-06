@@ -380,7 +380,7 @@ class TrackEddiesObservations(GroupEddiesObservations):
         d_lon = lon[i1] - lon[i0]
         m = d_lon < 0 if west else d_lon > 0
         if delta_lon is not None:
-            m *= delta_lon < d_lon
+            m *= delta_lon < abs(d_lon)
         m = m.repeat(nb)
         return self.extract_with_mask(m)
 

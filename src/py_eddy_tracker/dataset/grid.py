@@ -9,6 +9,7 @@ from cv2 import filter2D
 from matplotlib.path import Path as BasePath
 from netCDF4 import Dataset
 from numba import njit, prange, types as numba_types
+import numpy as np
 from numpy import (
     arange,
     array,
@@ -35,7 +36,6 @@ from numpy import (
     percentile,
     pi,
     radians,
-    round_,
     sin,
     sinc,
     sqrt,
@@ -2251,12 +2251,11 @@ def compute_pixel_path(x0, y0, x1, y1, x_ori, y_ori, x_step, y_step, nb_x):
     i_x1 = empty(nx, dtype=numba_types.int_)
     i_y0 = empty(nx, dtype=numba_types.int_)
     i_y1 = empty(nx, dtype=numba_types.int_)
-    # Because round_ is not accepted with array in numba
     for i in range(nx):
-        i_x0[i] = round_(((x0[i] - x_ori) % 360) / x_step)
-        i_x1[i] = round_(((x1[i] - x_ori) % 360) / x_step)
-        i_y0[i] = round_((y0[i] - y_ori) / y_step)
-        i_y1[i] = round_((y1[i] - y_ori) / y_step)
+        i_x0[i] = np.round(((x0[i] - x_ori) % 360) / x_step)
+        i_x1[i] = np.round(((x1[i] - x_ori) % 360) / x_step)
+        i_y0[i] = np.round((y0[i] - y_ori) / y_step)
+        i_y1[i] = np.round((y1[i] - y_ori) / y_step)
     # Delta index of x
     d_x = i_x1 - i_x0
     d_x = (d_x + nb_x // 2) % nb_x - (nb_x // 2)
@@ -2941,7 +2940,7 @@ def compute_stencil(x, y, h, m, earth_radius, vertical=False, stencil_halfwidth=
             h_3, h_2, h_1, h0 = h[-4, j], h[-3, j], h[-2, j], h[-1, j]
             m_3, m_2, m_1, m0 = m[-4, j], m[-3, j], m[-2, j], m[-1, j]
         else:
-            m_3, m_2, m_1, m0 = False, False, False, False
+            m_3, m_2, m_1, m0 = True, True, True, True
         h1, h2, h3, h4 = h[0, j], h[1, j], h[2, j], h[3, j]
         m1, m2, m3, m4 = m[0, j], m[1, j], m[2, j], m[3, j]
         for i in range(nb_x):
