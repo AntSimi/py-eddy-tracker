@@ -2336,5 +2336,8 @@ def get_period_with_index(t, i0, i1):
     """
     periods = np.empty(i0.size, t.dtype)
     for i in range(i0.size):
+        if i1[i] == i0[i]:
+            periods[i] = 0
+            continue
         periods[i] = t[i0[i] : i1[i]].ptp()
     return periods
