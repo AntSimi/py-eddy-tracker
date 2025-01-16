@@ -5,7 +5,8 @@ Class to create network of observations
 from glob import glob
 import logging
 import time
-
+from datetime import timedelta, datetime
+import os
 import netCDF4
 from numba import njit, types as nb_types
 from numba.typed import List
@@ -16,6 +17,7 @@ from numpy import (
     bincount,
     bool_,
     concatenate,
+
     empty,
     nan,
     ones,
@@ -120,6 +122,7 @@ class NetworkObservations(GroupEddiesObservations):
         period = (self.period[1] - self.period[0]) / 365.25
         nb_by_network = self.network_size()
         nb_trash = 0 if self.ref_index != 0 else nb_by_network[0]
+        lifetime=self.lifetime
         big = 50_000
         infos = [
             f"Atlas with {self.nb_network} networks ({self.nb_network / period:0.0f} networks/year),"
@@ -127,6 +130,7 @@ class NetworkObservations(GroupEddiesObservations):
             f"    {m_event.size} merging ({m_event.size / period:0.0f} merging/year), {s_event.size} splitting ({s_event.size / period:0.0f} splitting/year)",
             f"    with {(nb_by_network > big).sum()} network with more than {big} obs and the biggest have {nb_by_network.max()} observations ({nb_by_network[nb_by_network > big].sum()} observations cumulate)",
             f"    {nb_trash} observations in trash",
+            f" {lifetime.max()} days max of lifetime",
         ]
         return "\n".join(infos)
 
@@ -201,6 +205,13 @@ class NetworkObservations(GroupEddiesObservations):
     @property
     def ref_index(self):
         return self.index_network[2]
+    
+    @property
+    def lifetime(self):
+        """Return lifetime for each observation"""
+        lt=self.networks_period.astype("int")
+        nb_by_network=self.network_size()
+        return lt.repeat(nb_by_network)
 
     def network_segment_size(self, id_networks=None):
         """Get number of segment by network
@@ -226,12 +237,15 @@ class NetworkObservations(GroupEddiesObservations):
             i = id_networks - self.index_network[2]
             return self.index_network[1][i] - self.index_network[0][i]
 
+    @property
     def networks_period(self):
         """
         Return period for each network
         """
         return get_period_with_index(self.time, *self.index_network[:2])
 
+    
+    
     def unique_segment_to_id(self, id_unique):
         """Return id network and id segment for a unique id
 
@@ -281,7 +295,7 @@ class NetworkObservations(GroupEddiesObservations):
                 new[k][:] = self[k][:]
         new.sign_type = self.sign_type
         return new
-
+    
     def longer_than(self, nb_day_min=-1, nb_day_max=-1):
         """
         Select network on time duration
@@ -1132,23 +1146,29 @@ class NetworkObservations(GroupEddiesObservations):
             self._segment_track_array = build_unique_array(self.segment, self.track)
         return self._segment_track_array
 
-    def birth_event(self):
+    def birth_event(self, only_index=False):
         """Extract birth events."""
         i_start, _, _ = self.index_segment_track
         indices = i_start[self.previous_obs[i_start] == -1]
         if self.first_is_trash():
             indices = indices[1:]
-        return self.extract_event(indices)
-
+        if only_index: 
+            return indices
+        else : 
+            return self.extract_event(indices)
+        
     generation_event = birth_event
 
-    def death_event(self):
+    def death_event(self, only_index=False):
         """Extract death events."""
         _, i_stop, _ = self.index_segment_track
         indices = i_stop[self.next_obs[i_stop - 1] == -1] - 1
         if self.first_is_trash():
             indices = indices[1:]
-        return self.extract_event(indices)
+        if only_index: 
+            return indices
+        else : 
+            return self.extract_event(indices)
 
     dissipation_event = death_event
 
@@ -1459,7 +1479,7 @@ class NetworkObservations(GroupEddiesObservations):
             j += 1
         return mappables
 
-    def remove_dead_end(self, nobs=3, ndays=0, recursive=0, mask=None):
+    def remove_dead_end(self, nobs=3, ndays=0, recursive=0, mask=None, return_mask=False):
         """
         Remove short segments that don't connect several segments
 
@@ -1485,6 +1505,8 @@ class NetworkObservations(GroupEddiesObservations):
             )
         # get mask for selected obs
         m = ~self.segment_mask(segments_keep)
+        if return_mask:
+            return ~m
         self.track[m] = 0
         self.segment[m] = 0
         self.previous_obs[m] = -1
@@ -1502,6 +1524,8 @@ class NetworkObservations(GroupEddiesObservations):
         self.sort()
         if recursive > 0:
             self.remove_dead_end(nobs, ndays, recursive - 1)
+        
+        
 
     def extract_segment(self, segments, absolute=False):
         """Extract given segments
@@ -2042,6 +2066,29 @@ class Network:
         results, nb_obs = list(), list()
         # To display print only in INFO
         display_iteration = logger.getEffectiveLevel() == logging.INFO
+        
+        
+        # Trier les fichiers par date
+        def extract_date(file):
+            filename = os.path.basename(file)
+            date_str = filename.split('_')[-1].split('.')[0]  # Extraire la partie date (ex : "20180101")
+            return datetime.strptime(date_str, "%Y%m%d")  # Convertir en objet datetime
+        self.filenames = sorted(self.filenames, key=extract_date)
+
+        # Detect missing date and print them to inform the user which files are missing
+        missing_dates = []
+        dates_list = [extract_date(self.filenames[i]) for i in range(len(self.filenames))]
+        for i in range(len(dates_list) - 1):
+            expected_date = dates_list[i] + timedelta(days=1)
+            while expected_date < dates_list[i + 1]:  
+                missing_dates.append(expected_date)
+                expected_date += timedelta(days=1)
+        if missing_dates:
+            missing_str = ', '.join(date.strftime("%Y-%m-%d") for date in missing_dates)
+            raise Exception(f"Following files missing : {missing_str}")
+        else:
+            print("No missing files")
+
         for i, filename in enumerate(self.filenames):
             if display_iteration:
                 print(f"{filename} compared to {self.window} next", end="\r")

@@ -11,7 +11,7 @@ from matplotlib import pyplot
 from matplotlib.animation import FuncAnimation
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
-from numpy import arange, where
+from numpy import arange, where, nan
 
 from .. import EddyParser
 from ..gui import GUI
@@ -58,7 +58,10 @@ class Anim:
         self.kw_label["fontweight"] = kwargs.pop("fontweight", "demibold")
         # To text each visible eddy
         if field_txt:
-            self.field_txt = self.eddy[field_txt]
+            if isinstance(field_txt,str):
+                self.field_txt = self.eddy[field_txt]
+            else :
+                self.field_txt=field_txt
         if field_color:
             # To color each visible eddy
             self.field_color = self.eddy[field_color].astype("f4")
