@@ -615,7 +615,6 @@ def build_circle(x0, y0, r):
     return x_norm * r + x0, y_norm * r + y0
 
 
-@njit(cache=True)
 def window_index(x, x0, half_window=1):
     """
     Give for a fixed half_window each start and end index for each x0, in
@@ -626,7 +625,12 @@ def window_index(x, x0, half_window=1):
     :param float half_window: half window
     """
     # Sort array, bounds will be sort also
-    i_ordered = x.argsort()
+    i_ordered = x.argsort(kind="mergesort")
+    return window_index_(x, i_ordered, x0, half_window)
+
+
+@njit(cache=True)
+def window_index_(x, i_ordered, x0, half_window=1):
     nb_x, nb_pt = x.size, x0.size
     first_index = empty(nb_pt, dtype=i_ordered.dtype)
     last_index = empty(nb_pt, dtype=i_ordered.dtype)
