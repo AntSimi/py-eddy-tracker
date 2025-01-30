@@ -2067,28 +2067,6 @@ class Network:
         # To display print only in INFO
         display_iteration = logger.getEffectiveLevel() == logging.INFO
         
-        
-        # Trier les fichiers par date
-        def extract_date(file):
-            filename = os.path.basename(file)
-            date_str = filename.split('_')[-1].split('.')[0]  # Extraire la partie date (ex : "20180101")
-            return datetime.strptime(date_str, "%Y%m%d")  # Convertir en objet datetime
-        self.filenames = sorted(self.filenames, key=extract_date)
-
-        # Detect missing date and print them to inform the user which files are missing
-        missing_dates = []
-        dates_list = [extract_date(self.filenames[i]) for i in range(len(self.filenames))]
-        for i in range(len(dates_list) - 1):
-            expected_date = dates_list[i] + timedelta(days=1)
-            while expected_date < dates_list[i + 1]:  
-                missing_dates.append(expected_date)
-                expected_date += timedelta(days=1)
-        if missing_dates:
-            missing_str = ', '.join(date.strftime("%Y-%m-%d") for date in missing_dates)
-            raise Exception(f"Following files missing : {missing_str}")
-        else:
-            print("No missing files")
-
         for i, filename in enumerate(self.filenames):
             if display_iteration:
                 print(f"{filename} compared to {self.window} next", end="\r")
