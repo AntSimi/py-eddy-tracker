@@ -11,14 +11,23 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Changed
 ^^^^^^^
 
-- Remove dead end method for network will move dead end to the trash and not remove observations
-
 Fixed
 ^^^^^
 
 Added
 ^^^^^
 
+[3.6.2] - 2025-06-06
+--------------------
+Changed
+^^^^^^^
+
+- Remove dead end method for network will move dead end to the trash and not remove observations
+
+Fixed
+^^^^^
+
+- Fix matplotlib version
 
 [3.6.1] - 2022-10-14
 --------------------
