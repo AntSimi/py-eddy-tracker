@@ -717,12 +717,8 @@ def get_pixel_in_regular(vertices, x_c, y_c, x_start, x_stop, y_start, y_stop):
     :param int y_stop: north index of contour
     """
     if x_stop < x_start:
-        x_ref = vertices[0, 0]
-        x_array = (
-            (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref + 180) % 360
-            + x_ref
-            - 180
-        )
+        x_ref = vertices[0, 0] - 180
+        x_array = (concatenate((x_c[x_start:], x_c[:x_stop])) - x_ref) % 360 + x_ref
         return winding_number_grid_in_poly(
             x_array,
             y_c[y_start:y_stop],

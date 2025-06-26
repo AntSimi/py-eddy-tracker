@@ -268,6 +268,12 @@ def get_matrix(i_start, i_end, translate_start, translate_end, i_target, pct):
 
 
 class GroupEddiesObservations(EddiesObservations, ABC):
+    __slots__ = ('indexers',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.indexers = dict()
+
     @abstractmethod
     def fix_next_previous_obs(self):
         pass
@@ -474,3 +480,16 @@ class GroupEddiesObservations(EddiesObservations, ABC):
         i_local_targets[m] = i_end[i_local_targets[m]]
         i_targets[i_origin] = i_local_targets
         percents[i_origin] = local_percents
+
+    def daily_time_indexer(self, t, dt=.5):
+        """Get all index cover by time window
+
+        :param float t: time centered of window
+        :param float dt: delta +/- around t
+        """
+        if 'time' not in self.indexers:
+            x0, x1 = self.period
+            self.indexers['time'] = x0, *window_index(self.time, np.arange(x0, x1), 0.5)
+        x0, i_ordered, first_index, last_index = self.indexers['time']
+        j0, j1 = max(0, int(np.ceil(t - x0 - dt))), min(int(np.trunc(t - x0 + dt)), last_index.size - 1)
+        return i_ordered[first_index[j0]:last_index[j1]]

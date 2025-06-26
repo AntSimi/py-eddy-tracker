@@ -326,6 +326,9 @@ class GridDataset(object):
         self.contours = None
         self.vars = dict()
 
+    def parse_varname(self, name):
+        return self.grid(name) if isinstance(name, str) else name
+
     @property
     def is_centered(self):
         """Give True if pixel is described with its center's position or
@@ -526,6 +529,8 @@ class GridDataset(object):
 
         .. minigallery:: py_eddy_tracker.GridDataset.grid
         """
+        # Ensure to have acces to coordinates
+        self.populate()
         if indexs is None:
             indexs = dict()
         if varname not in self.vars:
@@ -1914,6 +1919,18 @@ class RegularGridDataset(GridDataset):
         u, v = self.grid(uname), self.grid(vname)
         self._speed_ev = sqrt(u * u + v * v)
 
+    def text(self, ax, name, label="{v:.2f}", **kwargs):
+        """
+        :param matplotlib.axes.Axes ax: matplotlib axes used to draw
+        :param str,array name: variable to display, could be an array
+        :param str label: string to format value
+        :param dict kwargs: look at :py:meth:`matplotlib.axes.Axes.pcolormesh`
+        """
+        data = self.parse_varname(name)
+        for ix, x in enumerate(self.x_c):
+            for iy, y in enumerate(self.y_c):
+                ax.text(x, y, label.format(v=data[ix,iy]), **kwargs)
+
     def display(self, ax, name, factor=1, ref=None, **kwargs):
         """
         :param matplotlib.axes.Axes ax: matplotlib axes used to draw
@@ -1926,7 +1943,7 @@ class RegularGridDataset(GridDataset):
         """
         if "cmap" not in kwargs:
             kwargs["cmap"] = "coolwarm"
-        data = self.grid(name) if isinstance(name, str) else name
+        data = self.parse_varname(name)
         if ref is None:
             x = self.x_bounds
         else:
@@ -1946,7 +1963,7 @@ class RegularGridDataset(GridDataset):
 
         .. minigallery:: py_eddy_tracker.RegularGridDataset.contour
         """
-        data = self.grid(name) if isinstance(name, str) else name
+        data = self.parse_varname(name)
         if ref is None:
             x = self.x_c
         else:
@@ -2020,8 +2037,8 @@ class RegularGridDataset(GridDataset):
                 self.add_uv(h_name)
                 self.vars.pop(h_name, None)
 
-        u = (self.grid(u_name) if isinstance(u_name, str) else u_name).copy()
-        v = (self.grid(v_name) if isinstance(v_name, str) else v_name).copy()
+        u = self.parse_varname(u_name).copy()
+        v = self.parse_varname(v_name).copy()
         # N seconds / 1 degrees in m
         coef = time_step * 180 / pi / self.EARTH_RADIUS * factor
         u *= coef / cos(radians(self.y_c))
